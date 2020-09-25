@@ -1,6 +1,6 @@
 # ServerlessCQ
 ServerlessCQ: Continuous Queries on Cloud Function Services
 
-## Copyright 
+## License 
 
 Copyright 2020, Gang Liao, All rights reserved.
