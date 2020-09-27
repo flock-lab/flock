@@ -4,4 +4,4 @@
 
 ## License 
 
-Copyright 2020, Gang Liao, All rights reserved.
+ServerlessCQ resources in this repository are released under the Apache License 2.0.
