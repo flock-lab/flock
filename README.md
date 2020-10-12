@@ -1,4 +1,4 @@
-<img src="https://i.imgur.com/NWgvrwh.png" width=15%>
+<img src="https://i.imgur.com/NWgvrwh.png" width=12%>
 
 ## ServerlessCQ: Continuous Queries on Cloud Function Services
 
