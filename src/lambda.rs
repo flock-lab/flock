@@ -1,18 +1,9 @@
-#[macro_use]
-extern crate lambda_runtime as lambda;
-#[macro_use]
-extern crate log;
-extern crate simple_logger;
-#[cfg(feature = "serde_derive")]
-#[allow(unused_imports)]
-#[macro_use]
-extern crate serde;
+use lambda::{error::HandlerError, lambda};
+use lambda_runtime as lambda;
 
-use lambda::error::HandlerError;
-use std::error::Error;
-
-use log::LevelFilter;
+use log::{error, LevelFilter};
 use simple_logger::SimpleLogger;
+use std::error::Error;
 
 use serde::{Deserialize, Serialize};
 
