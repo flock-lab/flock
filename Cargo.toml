@@ -1,0 +1,44 @@
+[package]
+name = "serverlesscq"
+version = "0.1.0"
+authors = ["Gang Liao <gangliao@cs.umd.edu>"]
+edition = "2018"
+autobins = false
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+lambda_runtime = "0.2.1"
+serde = { version = "1.0.117", features = ["derive"] }
+log = "0.4.11"
+simple_logger = "1.11.0"
+
+[[bin]]
+name = "bootstrap"
+path = "src/lambda.rs"
+
+
+[profile.release]
+# Cargo defaults its optimization level to 3 for release builds, which optimizes the binary for speed. 
+# To instruct Cargo to optimize for minimal binary size, use the `z` optimization level in Cargo.toml.
+# opt-level = 'z'
+
+# By default, Cargo instructs compilation units to be compiled and optimized in isolation. LTO instructs
+# the linker to optimize at the link stage. This can remove dead code and often times reduces binary size.
+lto = true
+
+# By default, Cargo specifies 16 parallel codegen units for release builds. This improves compile times,
+# but prevents some optimizations. Set this to 1 in to allow for maximum size reduction optimizations.
+codegen-units = 1
+
+# By default, when Rust code encounters a situation when it must call panic!(), it unwinds the stack and
+# produces a helpful backtrace. The unwinding code, however, does require extra binary size. rustc can be
+# instructed to abort immediately rather than unwind, which removes the need for this extra unwinding code.
+panic = 'abort'
+
+# By default on Linux and macOS, symbol information is included in the compiled .elf file.
+# This information is not needed to properly execute the binary.
+# cargo +nightly build -Z strip=symbols
+
+# Build
+# cargo build --target x86_64-unknown-linux-gnu --release
