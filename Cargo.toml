@@ -25,16 +25,16 @@ path = "src/lambda.rs"
 
 # By default, Cargo instructs compilation units to be compiled and optimized in isolation. LTO instructs
 # the linker to optimize at the link stage. This can remove dead code and often times reduces binary size.
-# lto = true
+lto = true
 
 # By default, Cargo specifies 16 parallel codegen units for release builds. This improves compile times,
 # but prevents some optimizations. Set this to 1 in to allow for maximum size reduction optimizations.
-# codegen-units = 1
+codegen-units = 1
 
 # By default, when Rust code encounters a situation when it must call panic!(), it unwinds the stack and
 # produces a helpful backtrace. The unwinding code, however, does require extra binary size. rustc can be
 # instructed to abort immediately rather than unwind, which removes the need for this extra unwinding code.
-# panic = 'abort'
+panic = 'abort'
 
 # By default on Linux and macOS, symbol information is included in the compiled .elf file.
 # This information is not needed to properly execute the binary.
