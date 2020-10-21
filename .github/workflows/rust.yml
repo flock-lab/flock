@@ -8,15 +8,104 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  LAMBDA_NAME: lambda
+  AWS_LAMBDA_ROLE: ${{ secrets.AWS_LAMBDA_ROLE }}
 
 jobs:
-  build:
-
+  codestyle:
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v2
-    - name: Build
-      run: cargo build --verbose
-#     - name: Run tests
-#       run: cargo test --verbose
+      - name: Set up Rust
+        uses: hecrj/setup-rust-action@v1
+        with:
+          components: rustfmt
+      - uses: actions/checkout@v2
+      - run: cargo fmt --all -- --check
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Rust
+        uses: hecrj/setup-rust-action@v1
+        with:
+          components: clippy
+      - uses: actions/checkout@v2
+      - run: cargo clippy --all-targets -- -D clippy::all
+
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Rust
+        uses: hecrj/setup-rust-action@v1
+      - uses: actions/checkout@v2
+      - run: cargo check --all
+
+  test:
+    needs: [codestyle, lint, compile]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Setup Rust
+      uses: hecrj/setup-rust-action@v1
+    - name: Checkout
+      uses: actions/checkout@v2
+    - name: Test
+      run: cargo test
+
+  # deploy on pushes to master branch
+  # assumes aws credentials (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+  # are configured in travis settings
+  # see https://serverless.com/framework/docs/providers/aws/guide/credentials/
+  # for more information
+  deploy:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+    needs: [test]
+    steps:
+      - name: Install nightly
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install xargo
+        run: cargo install xargo
+      - name: Build
+        run: xargo build --target ${{ matrix.target }} --release
+      # - name: Configure AWS credentials
+      #   uses: aws-actions/configure-aws-credentials@v1
+      #   with:
+      #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      #     aws-region: us-east-1
+      # - name: AWS lambda package
+      #   run: |
+      #     mv ./target/x86_64-unknown-linux-gnu/lambda ./bootstrap 
+      #     zip -j lambda.zip ./bootstrap
+      # - name: Try to get function
+      #   run: |
+      #     echo ::set-env name=GET_FUNCTION_NAME::$(aws lambda list-functions \
+      #       --query "Functions[?FunctionName=='${LAMBDA_NAME}'].FunctionName[]" \
+      #       --output text)
+      # - name: Try to print variable
+      #   run: echo $GET_FUNCTION_NAME
+      # - name: Update function if exist
+      #   run: |
+      #     aws lambda update-function-code --function-name $LAMBDA_NAME \
+      #       --zip-file fileb://./lambda.zip
+      #   if: env.GET_FUNCTION_NAME == env.LAMBDA_NAME
+      # - name: Create Lambda if does not exist
+      #   if: env.GET_FUNCTION_NAME == ''
+      #   run: |
+      #     aws lambda create-function --function-name $LAMBDA_NAME \
+      #       --runtime provided \
+      #       --role $AWS_LAMBDA_ROLE \
+      #       --handler doesnt.matter \
+      #       --zip-file fileb://./lambda.zip \
+      #       --environment Variables={RUST_BACKTRACE=1} \
+      #       --tracing-config Mode=Active
+      #     echo "pass.."
