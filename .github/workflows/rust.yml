@@ -73,7 +73,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
       - name: Install xargo
-        run: cargo install xargo
+        run: |
+          rustup component add rust-src
+          cargo install xargo
       - name: Build
         run: xargo build --target ${{ matrix.target }} --release
       # - name: Configure AWS credentials
