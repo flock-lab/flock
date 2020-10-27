@@ -1,40 +1,34 @@
-use lambda::{error::HandlerError, lambda};
-use lambda_runtime as lambda;
+use lambda::{handler_fn, Context};
+use serde_json::Value;
 
-use log::{error, LevelFilter};
-use simple_logger::SimpleLogger;
-use std::error::Error;
+type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
 
-use serde::{Deserialize, Serialize};
-
-#[derive(Deserialize, Clone)]
-struct CustomEvent {
-    #[serde(rename = "firstName")]
-    first_name: String,
+async fn handler(event: Value, _: Context) -> Result<Value, Error> {
+    Ok(event)
 }
 
-#[derive(Serialize, Clone)]
-struct CustomOutput {
-    message: String,
-}
-
-fn my_handler(e: CustomEvent, c: lambda::Context) -> Result<CustomOutput, HandlerError> {
-    if e.first_name == "" {
-        error!("Empty first name in request {}", c.aws_request_id);
-        return Err(HandlerError::from("Empty first name"));
-    }
-
-    Ok(CustomOutput {
-        message: format!("Hello, {}!", e.first_name),
-    })
-}
-
-fn main() -> Result<(), Box<dyn Error>> {
-    SimpleLogger::new()
-        .with_level(LevelFilter::Info)
-        .init()
-        .unwrap();
-    lambda!(my_handler);
-
+#[tokio::main]
+async fn main() -> Result<(), Error> {
+    lambda::run(handler_fn(handler)).await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[tokio::test]
+    async fn handler_handles() {
+        let event = json!({
+            "answer": 42
+        });
+
+        assert_eq!(
+            handler(event.clone(), Context::default())
+                .await
+                .expect("expected Ok(_) value"),
+            event
+        )
+    }
 }
