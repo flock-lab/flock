@@ -48,6 +48,15 @@ jobs:
       uses: hecrj/setup-rust-action@v1
     - name: Checkout
       uses: actions/checkout@v2
+    - name: Cache cargo and xargo
+      uses: actions/cache@v2
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          ~/.xargo
+          target
+        key: ${{ runner.os }}-cargo-serverlesscq-${{ hashFiles('**/Cargo.lock') }}
     - name: Test
       run: cargo test
 
@@ -75,7 +84,7 @@ jobs:
             ~/.cargo/git
             ~/.xargo
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-serverlesscq-${{ hashFiles('**/Cargo.lock') }}
       - name: Install nightly
         uses: actions-rs/toolchain@v1
         with:
