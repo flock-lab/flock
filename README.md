@@ -1,6 +1,6 @@
 <img src="https://i.imgur.com/NWgvrwh.png" width=12%>
 
-## ServerlessCQ: Continuous Queries on Cloud Function Services
+## $erverlessCQ: Continuous Queries on Cloud Function Services
 
 [![CI](https://github.com/DSLAM-UMD/ServerlessCQ/workflows/CI/badge.svg?branch=master)](https://github.com/DSLAM-UMD/ServerlessCQ/actions)
 [![License](https://img.shields.io/badge/license-Apache%202-blue.svg)](LICENSE)
