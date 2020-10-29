@@ -8,7 +8,7 @@ autobins = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = { version = "0.3.1", features = ["macros", "rt", "rt-multi-thread"] }
+tokio = { version = "0.2", features = ["macros"] }
 lambda = { git = "https://github.com/awslabs/aws-lambda-rust-runtime/", branch = "master"}
 serde_json = "1.0"
 
