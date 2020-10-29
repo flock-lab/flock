@@ -120,7 +120,7 @@ jobs:
               echo "Congratulations! You've successfully upgraded ServerlessCQ.";
             else
               aws lambda create-function --function-name $f \
-                --runtime provided \
+                --runtime provided.al2 \
                 --role $AWS_LAMBDA_ROLE \
                 --handler doesnt.matter \
                 --zip-file fileb://./$f.zip \
