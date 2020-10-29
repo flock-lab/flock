@@ -114,7 +114,7 @@ jobs:
             echo ::set-env name=GET_FUNCTION_NAME::$(aws lambda list-functions \
               --query "Functions[?FunctionName=='${f}'].FunctionName[]" \
               --output text);
-            if [ $GET_FUNCTION_NAME == $f ]; then
+            if [ "$GET_FUNCTION_NAME" == "$f" ]; then
               aws lambda update-function-code --function-name $f --zip-file fileb://./$f.zip;              
               echo "Congratulations! You've successfully upgraded ServerlessCQ.";
             else
