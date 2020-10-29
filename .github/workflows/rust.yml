@@ -8,7 +8,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  LAMBDA_NAME: test-rust
+  LAMBDA_NAME: hello step_1 step_2
   AWS_LAMBDA_ROLE: ${{ secrets.AWS_LAMBDA_ROLE }}
 
 jobs:
@@ -108,29 +108,23 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
       - name: AWS lambda package
-        run: zip -j lambda.zip ./target/x86_64-unknown-linux-gnu/release/bootstrap
-      - name: Try to get function
         run: |
-          echo ::set-env name=GET_FUNCTION_NAME::$(aws lambda list-functions \
-            --query "Functions[?FunctionName=='${LAMBDA_NAME}'].FunctionName[]" \
-            --output text)
-      - name: Try to print variable
-        run: echo $GET_FUNCTION_NAME
-      - name: Update function if exist
-        if: env.GET_FUNCTION_NAME == env.LAMBDA_NAME
-        run: |
-          aws lambda update-function-code --function-name $LAMBDA_NAME \
-            --zip-file fileb://./lambda.zip
-          echo "Congratulations! You've successfully upgraded ServerlessCQ."
-      - name: Create Lambda if does not exist
-        if: env.GET_FUNCTION_NAME == ''
-        run: |
-          aws lambda create-function --function-name $LAMBDA_NAME \
-            --runtime provided \
-            --role $AWS_LAMBDA_ROLE \
-            --handler doesnt.matter \
-            --zip-file fileb://./lambda.zip \
-            --environment Variables={RUST_BACKTRACE=1} \
-            --tracing-config Mode=Active
-          echo "Congratulations! You've successfully deployed ServerlessCQ."
-
+          for f in $LAMBDA_NAME; do
+            zip -j $f.zip ./target/x86_64-unknown-linux-gnu/release/$f;
+            echo ::set-env name=GET_FUNCTION_NAME::$(aws lambda list-functions \
+              --query "Functions[?FunctionName=='${f}'].FunctionName[]" \
+              --output text);
+            if [ $GET_FUNCTION_NAME == $f ]; then
+              aws lambda update-function-code --function-name $f --zip-file fileb://./$f.zip;              
+              echo "Congratulations! You've successfully upgraded ServerlessCQ.";
+            else
+              aws lambda create-function --function-name $f \
+                --runtime provided \
+                --role $AWS_LAMBDA_ROLE \
+                --handler doesnt.matter \
+                --zip-file fileb://./$f.zip \
+                --environment Variables={RUST_BACKTRACE=1} \
+                --tracing-config Mode=Active;
+              echo "Congratulations! You've successfully deployed ServerlessCQ.";
+            fi
+          done
