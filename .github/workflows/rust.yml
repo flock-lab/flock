@@ -110,7 +110,8 @@ jobs:
       - name: AWS lambda package
         run: |
           for f in $LAMBDA_NAME; do
-            zip -j $f.zip ./target/x86_64-unknown-linux-gnu/release/$f;
+            mv ./target/x86_64-unknown-linux-gnu/release/$f ./bootstrap
+            zip -j $f.zip ./bootstrap;
             GET_FUNCTION_NAME=$(aws lambda list-functions --query \
               "Functions[?FunctionName=='${f}'].FunctionName[]" --output text);
             echo "${GET_FUNCTION_NAME}";
