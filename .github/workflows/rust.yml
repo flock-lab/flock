@@ -119,7 +119,7 @@ jobs:
               "Functions[?FunctionName=='${f}'].FunctionName[]" --output text);
             echo "${GET_FUNCTION_NAME}";
             if [ "${GET_FUNCTION_NAME}" == "${f}" ]; then
-              aws lambda update-function-code --function-name $f --zip-file fileb://./$f.zip;              
+              aws lambda update-function-code --function-name $f --zip-file fileb://./$f.zip;
               echo "Congratulations! You've successfully upgraded ServerlessCQ.";
             else
               aws lambda create-function --function-name $f \
