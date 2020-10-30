@@ -13,6 +13,7 @@ env:
 
 jobs:
   codestyle:
+    if: github.ref != 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
       - name: Set up Rust
@@ -23,6 +24,7 @@ jobs:
       - run: cargo fmt --all -- --check
 
   lint:
+    if: github.ref != 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
       - name: Set up Rust
@@ -33,6 +35,7 @@ jobs:
       - run: cargo clippy --all-targets -- -D clippy::all
 
   compile:
+    if: github.ref != 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
       - name: Set up Rust
@@ -41,6 +44,7 @@ jobs:
       - run: cargo check --all
 
   test:
+    if: github.ref != 'refs/heads/master'
     needs: [codestyle, lint, compile]
     runs-on: ubuntu-latest
     steps:
