@@ -76,7 +76,6 @@ jobs:
       matrix:
         target:
           - x86_64-unknown-linux-gnu
-    needs: [test]
     steps:
       - name: Checkout
         uses: actions/checkout@v2
