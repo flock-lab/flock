@@ -1,28 +1,9 @@
-[package]
-name = "serverlesscq"
-version = "0.1.0"
-authors = ["Gang Liao <gangliao@cs.umd.edu>"]
-edition = "2018"
-autobins = false
+[workspace]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-tokio = { version = "0.2", features = ["macros"] }
-lambda = { git = "https://github.com/awslabs/aws-lambda-rust-runtime/", branch = "master"}
-serde_json = "1.0"
-
-[[bin]]
-name = "hello"
-path = "src/examples/hello.rs"
-
-[[bin]]
-name = "step_1"
-path = "src/examples/step_functions/hello.rs"
-
-[[bin]]
-name = "step_2"
-path = "src/examples/step_functions/world.rs"
+members = [
+    "src/driver",
+    "examples",
+]
 
 [profile.release]
 # Cargo defaults its optimization level to 3 for release builds, which optimizes the binary for speed.
