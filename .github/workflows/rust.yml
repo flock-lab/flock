@@ -8,7 +8,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  LAMBDA_NAME: hello step_1 step_2
+  LAMBDA_NAME: hello step_1 step_2 gen_data
   AWS_LAMBDA_ROLE: ${{ secrets.AWS_LAMBDA_ROLE }}
 
 jobs:
