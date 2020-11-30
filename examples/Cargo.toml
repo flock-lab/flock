@@ -27,5 +27,5 @@ name = "step_2"
 path = "step_functions/world.rs"
 
 [[bin]]
-name = "kinesis"
+name = "gen_data"
 path = "kinesis/gen_data.rs"
