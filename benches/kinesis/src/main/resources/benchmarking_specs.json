@@ -1,0 +1,70 @@
+{
+  "childJobSummmaryDDBTableName": "kda_flink_benchmarking_child_job_summary",
+  "childJobs": [
+    {
+      "batchCadence": 72,
+      "batchSize": 20,
+      "jobName": "60_Min",
+      "numberofBatches": 50,
+      "numberofInteractions": 4
+    },
+    {
+      "batchCadence": 48,
+      "batchSize": 20,
+      "jobName": "40_Min",
+      "numberofBatches": 50,
+      "numberofInteractions": 4
+    },
+    {
+      "batchCadence": 18,
+      "batchSize": 30,
+      "jobName": "30_Min",
+      "numberofBatches": 100,
+      "numberofInteractions": 6
+    },
+    {
+      "batchCadence": 15,
+      "batchSize": 30,
+      "jobName": "25_Min",
+      "numberofBatches": 100,
+      "numberofInteractions": 6
+    },
+    {
+      "batchCadence": 10,
+      "batchSize": 40,
+      "jobName": "20_Min",
+      "numberofBatches": 125,
+      "numberofInteractions": 8
+    },
+    {
+      "batchCadence": 7,
+      "batchSize": 40,
+      "jobName": "15_Min",
+      "numberofBatches": 125,
+      "numberofInteractions": 8
+    },
+    {
+      "batchCadence": 4,
+      "batchSize": 50,
+      "jobName": "10_Min",
+      "numberofBatches": 150,
+      "numberofInteractions": 16
+    },
+    {
+      "batchCadence": 2,
+      "batchSize": 50,
+      "jobName": "5_Min",
+      "numberofBatches": 150,
+      "numberofInteractions": 16
+    }
+  ],
+  "dynamoDBLocalURI": "http://localhost:8000",
+  "isUsingDynamoDBLocal": true,
+  "jobDurationInMinutes": 65,
+  "jobName": "amazon_kda_flink_benchmarking_utility",
+  "parentJobSummmaryDDBTableName": "kda_flink_benchmarking_parent_job_summary",
+  "region": "us-east-1",
+  "targetKinesisStreams": [
+    "kda_flink_benchmarking_kinesis_stream"
+  ]
+}
