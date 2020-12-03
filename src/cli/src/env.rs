@@ -21,12 +21,12 @@ use tempdir::TempDir;
 /// Keep track of our repl environment
 #[allow(dead_code)]
 pub struct Env {
-    pub quit: bool,
+    pub quit:            bool,
     pub need_new_editor: bool,
-    pub ctrlcbool: Arc<AtomicBool>,
-    pub prompt: String,
-    range_str: Option<String>,
-    pub tempdir: std::io::Result<TempDir>,
+    pub ctrlcbool:       Arc<AtomicBool>,
+    pub prompt:          String,
+    range_str:           Option<String>,
+    pub tempdir:         std::io::Result<TempDir>,
 }
 
 lazy_static! {
@@ -49,17 +49,17 @@ impl Env {
         let duration = specific_time.signed_duration_since(now);
         let hm = format!("{}:{}", duration.num_hours(), duration.num_minutes() % 60);
         let env = Env {
-            quit: false,
+            quit:            false,
             need_new_editor: false,
-            ctrlcbool: CTC_BOOL.clone(),
-            prompt: format!(
+            ctrlcbool:       CTC_BOOL.clone(),
+            prompt:          format!(
                 "[{}] [{}] [{}] > ",
                 Blue.paint(hm),
                 Green.paint("scqsql"),
                 Red.paint("=#")
             ),
-            range_str: None,
-            tempdir: TempDir::new("scqsql"),
+            range_str:       None,
+            tempdir:         TempDir::new("scqsql"),
         };
         env
     }
