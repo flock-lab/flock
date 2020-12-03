@@ -20,8 +20,9 @@ jobs:
         uses: hecrj/setup-rust-action@v1
         with:
           components: rustfmt
+          rust-version: nightly
       - uses: actions/checkout@v2
-      - run: cargo fmt --all -- --check
+      - run: cargo +nightly fmt --all -- --check
 
   lint:
     if: github.ref != 'refs/heads/master'
@@ -31,8 +32,9 @@ jobs:
         uses: hecrj/setup-rust-action@v1
         with:
           components: clippy
+          rust-version: nightly
       - uses: actions/checkout@v2
-      - run: cargo clippy --all-targets -- -D clippy::all
+      - run: cargo +nightly clippy --all-targets -- -D clippy::all
 
   compile:
     if: github.ref != 'refs/heads/master'
@@ -40,8 +42,10 @@ jobs:
     steps:
       - name: Set up Rust
         uses: hecrj/setup-rust-action@v1
+        with:
+          rust-version: nightly
       - uses: actions/checkout@v2
-      - run: cargo check --all
+      - run: cargo +nightly check --all
 
   test:
     if: github.ref != 'refs/heads/master'
