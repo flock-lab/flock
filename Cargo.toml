@@ -2,6 +2,7 @@
 
 members = [
     "src/cli",
+    "src/step_functions",
     "examples",
 ]
 

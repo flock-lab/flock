@@ -169,17 +169,17 @@ impl Write for ScqWriter {
 }
 
 pub struct PrettyColorFormatter<'a> {
-    pretty: PrettyFormatter<'a>,
+    pretty:  PrettyFormatter<'a>,
     invalue: bool,
-    iskey: bool,
+    iskey:   bool,
 }
 
 impl<'a> PrettyColorFormatter<'a> {
     pub fn new() -> PrettyColorFormatter<'a> {
         PrettyColorFormatter {
-            pretty: PrettyFormatter::new(),
+            pretty:  PrettyFormatter::new(),
             invalue: false,
-            iskey: false,
+            iskey:   false,
         }
     }
 }
