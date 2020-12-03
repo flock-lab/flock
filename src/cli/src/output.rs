@@ -19,7 +19,6 @@ use duct::Handle;
 use duct_sh::sh_dangerous;
 use os_pipe::{pipe, PipeWriter};
 use serde::ser::Serialize;
-use serde_json;
 use serde_json::ser::{CharEscape, Formatter, PrettyFormatter, Serializer};
 use serde_json::Error as JsonError;
 
