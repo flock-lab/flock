@@ -1,0 +1,38 @@
+[package]
+name = "scqsql"
+version = "0.1.0"
+description = "A command-line REPL for ServerlessCQ that integrates into existing cli workflows"
+authors = ["Gang Liao <gangliao@cs.umd.edu>"]
+license = "Apache-2.0"
+keywords = ["ServerlessCQ", "repl", "client", "cli"]
+categories = ["command-line-interface", "command-line-utilities"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+sqlparser = {version = "0.6.1", features = ["json_example"]}
+tokio = { version = "0.2", features = ["macros"] }
+serde_json = "1.0"
+clap = "2.33.3"
+env_logger = "0.8.2"
+prettytable-rs = "0.8.0"
+lazy_static = "1.4.0"
+anyhow = "1.0.34"
+log = "0.4"
+rusoto_core = "0.45.0"
+rusoto_credential = "0.45.0"
+rusoto_sts = "0.45.0"
+ansi_term = "0.12.1"
+rustyline = "7.0.0"
+tempdir = "0.3.7"
+chrono = "0.4.19"
+duct = "0.13.4"
+duct_sh = "0.13.4"
+os_pipe = "0.9.2"
+ctrlc = "3.1.1"
+serde = "1.0.117"
+
+[[bin]]
+name = "scqsql"
+path = "src/main.rs"

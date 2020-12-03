@@ -1,6 +1,6 @@
 # ServerlessCQ Weekly Report
 
-A weekly report communicates the progress, accomplishments, and issues encountered in a given week. 
+A weekly report communicates the progress, accomplishments, and issues encountered in a given week.
 > For a private repo, we doesn't allow editing wiki pages directly on GitHub.
 
 ## 11-01-2020
