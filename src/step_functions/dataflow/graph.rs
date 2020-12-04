@@ -12,6 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! You create a workflow that runs a group of Lambda functions (steps) in a
+//! specific order. One Lambda function's output passes to the next Lambda
+//! function's input. The last step in your workflow gives a result. With Step
+//! Functions, you can see how each step in your workflow interacts with one
+//! other, so you can make sure that each step performs its intended function.
+
 use std::collections::HashMap;
 
 /// States are elements in your state machine. A state is referred to by its
