@@ -18,11 +18,43 @@
 //! Functions, you can see how each step in your workflow interacts with one
 //! other, so you can make sure that each step performs its intended function.
 
-#[path = "states/mod.rs"]
-mod states;
-use states::State;
-
 use std::collections::HashMap;
+
+/// States are elements in your state machine. A state is referred to by its
+/// name, which can be any string, but which must be unique within the scope of
+/// the entire state machine.
+#[allow(dead_code)]
+pub enum State {
+    /// The Map state ("Type": "Map") can be used to run a set of steps for each
+    /// element of an input array. While the Parallel state executes multiple
+    /// branches of steps using the same input, a Map state will execute the
+    /// same steps for multiple entries of an array in the state input.
+    Map,
+    /// A Choice state ("Type": "Choice") adds branching logic to a state
+    /// machine.
+    Choice,
+    /// A Fail state ("Type": "Fail") stops the execution of the state machine
+    /// and marks it as a failure.
+    Fail,
+    /// The Parallel state ("Type": "Parallel") can be used to create parallel
+    /// branches of execution in your state machine.
+    Parallel,
+    /// A Succeed state ("Type": "Succeed") stops an execution successfully. The
+    /// Succeed state is a useful target for Choice state branches that don't do
+    /// anything but stop the execution.
+    Succeed,
+    /// A Wait state ("Type": "Wait") delays the state machine from continuing
+    /// for a specified time. You can choose either a relative time, specified
+    /// in seconds from when the state begins, or an absolute end time,
+    /// specified as a timestamp.
+    Wait,
+    /// A Task state ("Type": "Task") represents a single unit of work performed
+    /// by a state machine.
+    Task,
+    /// A Pass state ("Type": "Pass") passes its input to its output, without
+    /// performing work.
+    Pass,
+}
 
 /// A State Machine is represented by a JSON Object.
 ///
