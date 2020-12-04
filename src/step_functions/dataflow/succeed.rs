@@ -12,5 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/// A Succeed state ("Type": "Succeed") stops an execution successfully. The
+/// Succeed state is a useful target for Choice state branches that don't do
+/// anything but stop the execution.
+///
+/// Because `Succeed` states are terminal states, they have no `Next` field,
+/// and don't need an `End` field.
 #[allow(dead_code)]
-pub struct Wait {}
+pub struct Succeed {
+    pub name:   String,
+    pub family: String,
+}

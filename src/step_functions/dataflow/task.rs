@@ -26,6 +26,14 @@
 //!    "HeartbeatSeconds": 60
 //! }
 
+#[path = "./common.rs"]
+mod common;
+use common::Common;
+
+#[path = "./paths.rs"]
+mod paths;
+use paths::{Parameters, ResultPath, ResultSelector};
+
 /// A Task state ("Type": "Task") represents a single unit of work performed by
 /// a state machine.
 /// All work in your state machine is done by tasks. A task performs work by
@@ -36,20 +44,14 @@
 /// https://docs.aws.amazon.com/step-functions/latest/dg/amazon-states-language-task-state.html
 #[allow(dead_code)]
 pub struct Task {
-    /// All states MUST have a "Type" field. This document refers to the values
-    /// of this field as a state’s type, and to a state such as the one in the
-    /// example above as a Task State.
-    /// FIXME: we use `family` to replace `type` keyword reserved by rust.
-    pub family:            String,
+    /// Common state fields.
+    pub common:            Common,
     /// A Task State MUST include a "Resource" field, whose value MUST be a URI
     /// that uniquely identifies the specific task to execute. The States
     /// language does not constrain the URI scheme nor any other part of the
     /// URI.
+    /// arn:partition:service:region:account:task_type:name
     pub resource:          String,
-    pub next:              String,
-    /// Any state MAY have a "Comment" field, to hold a human-readable comment
-    /// or description.
-    pub comment:           String,
     /// Tasks can optionally specify timeouts. Timeouts (the "TimeoutSeconds"
     /// and "HeartbeatSeconds" fields) are specified in seconds and MUST be
     /// positive integers.
@@ -61,4 +63,18 @@ pub struct Task {
     /// If provided, the "HeartbeatSeconds" interval MUST be smaller than the
     /// "TimeoutSeconds" value.
     pub heartbeat_seconds: u32,
+    /// Used to pass information to the API actions of connected resources. The
+    /// parameters can use a mix of static JSON and JsonPath.
+    pub parameters:        Option<Parameters>,
+    /// Specifies where (in the input) to place the results of executing the
+    /// task that's specified in Resource. The input is then filtered as
+    /// specified by the OutputPath field (if present) before being used as the
+    /// state's output.
+    pub result_path:       Option<ResultPath>,
+    /// Use the `ResultSelector` field to manipulate a state's result before
+    /// `ResultPath` is applied. The `ResultSelector` field lets you create a
+    /// collection of key value pairs, where the values are static or selected
+    /// from the state's result. The output of ResultSelector replaces the
+    /// state's result and is passed to ResultPath.
+    pub result_selector:   Option<ResultSelector>,
 }

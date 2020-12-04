@@ -35,4 +35,5 @@
 //! Step Functions console provides a graphical representation of that state
 //! machine to help visualize your application logic.
 
+#[path = "dataflow/mod.rs"]
 mod dataflow;
