@@ -40,7 +40,6 @@ pub struct Pass {
 
 #[cfg(test)]
 mod tests {
-    use json;
     #[tokio::test]
     async fn test_json_value() {
         let mut data = json::JsonValue::new_object();

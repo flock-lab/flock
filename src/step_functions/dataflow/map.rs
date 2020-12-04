@@ -58,7 +58,7 @@ use paths::{ResultPath, ResultSelector};
 ///    "States": {
 ///      "Validate": {
 ///        "Type": "Task",
-/// 	   "Resource":"arn:aws:lambda:us-east-1:123456789012:function:ship-val",
+///        "Resource" : "arn:aws:lambda:us-east-1:xxxx:function:ship-val",
 ///        "End": true
 ///      }
 ///    }
