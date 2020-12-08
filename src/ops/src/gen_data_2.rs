@@ -106,7 +106,7 @@ async fn handler(event: KinesisEvent, _: Context) -> Result<Value, Error> {
 //     #[tokio::test]
 //     async fn handler_handles() {
 //         let event: KinesisEvent =
-// serde_json::from_slice(include_bytes!("./example-event.json"))             
+// serde_json::from_slice(include_bytes!("./example-event.json"))
 // .expect("invalid kinesis event");         let data = handler(event,
 // Context::default()).await.ok().unwrap();
 
