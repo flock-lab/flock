@@ -110,7 +110,8 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
     Ok(json!(res))
 }
 
-fn CheckStream() {
+#[allow(dead_code)]
+fn check_stream() {
     println!("In stream 1:\n");
     for v in STREAM_1.lock().unwrap().iter() {
         println!("{:?}", v);
