@@ -13,11 +13,6 @@ lambda = { git = "https://github.com/awslabs/aws-lambda-rust-runtime/", branch =
 serde_json = "1.0"
 aws_lambda_events = "0.3"
 base64 = "0.13"
-lazy_static = "1.4.0"
-rusoto_stepfunctions = "0.45.0"
-openssl = { version = "0.10", features = ["vendored"] }
-rusoto_core = "0.45.0"
-rand = "0.7.3"
 
 [[bin]]
 name = "hello"
@@ -34,23 +29,3 @@ path = "step_functions/world.rs"
 [[bin]]
 name = "gen_data"
 path = "kinesis/gen_data.rs"
-
-[[bin]]
-name = "projection"
-path = "src/projection.rs"
-
-[[bin]]
-name = "join_scheduler"
-path = "src/join_scheduler.rs"
-
-[[bin]]
-name = "join_nested_loop"
-path = "src/join_nested_loop.rs"
-
-[[bin]]
-name = "gen_data_1"
-path = "src/gen_data_1.rs"
-
-[[bin]]
-name = "gen_data_2"
-path = "src/gen_data_2.rs"
