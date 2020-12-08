@@ -23,18 +23,18 @@ type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
 // One record
 struct JoinRecord {
     result_cols: HashMap<String, String>,
-    join_cols:   HashMap<String, String>,
+    join_cols: HashMap<String, String>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct JoinArgs {
-    join_method:  String, // "0": Nested loop; "1": Hash join
-    join_type:    String, // Inner, Left, Right, Full
-    left_stream:  String,
-    left_attr:    String,
+    join_method: String, // "0": Nested loop; "1": Hash join
+    join_type: String,   // Inner, Left, Right, Full
+    left_stream: String,
+    left_attr: String,
     right_stream: String,
-    right_attr:   String,
-    op:           String, // "=", ">", "<"
+    right_attr: String,
+    op: String, // "=", ">", "<"
 }
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct JoinOutput {
@@ -45,7 +45,7 @@ fn generate_record(
     left_record: &JoinRecord,
     right_record: &JoinRecord,
     join_args: &JoinArgs,
-) -> Result<HashMap<String, String>, Error> {
+) -> HashMap<String, String> {
     let mut record_hashmap: HashMap<String, String> = HashMap::new();
 
     for (k, v) in left_record.result_cols.iter() {
@@ -59,7 +59,7 @@ fn generate_record(
             record_hashmap.insert(k.clone(), v.clone());
         }
     }
-    Ok(record_hashmap)
+    record_hashmap
 }
 
 async fn handler(event: Value, _: Context) -> Result<Value, Error> {
@@ -87,7 +87,7 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
                             == right_record.join_cols[&join_args.right_attr]
                         {
                             let record_hashmap =
-                                generate_record(left_record, right_record, &join_args)?;
+                                generate_record(left_record, right_record, &join_args);
                             join_output.push(record_hashmap);
                         }
                     }
@@ -101,7 +101,7 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
                             > right_record.join_cols[&join_args.right_attr]
                         {
                             let record_hashmap =
-                                generate_record(left_record, right_record, &join_args)?;
+                                generate_record(left_record, right_record, &join_args);
                             join_output.push(record_hashmap);
                         }
                     }
@@ -115,7 +115,7 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
                             < right_record.join_cols[&join_args.right_attr]
                         {
                             let record_hashmap =
-                                generate_record(left_record, right_record, &join_args)?;
+                                generate_record(left_record, right_record, &join_args);
                             join_output.push(record_hashmap);
                         }
                     }
@@ -129,7 +129,7 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
                             >= right_record.join_cols[&join_args.right_attr]
                         {
                             let record_hashmap =
-                                generate_record(left_record, right_record, &join_args)?;
+                                generate_record(left_record, right_record, &join_args);
                             join_output.push(record_hashmap);
                         }
                     }
@@ -143,7 +143,7 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
                             <= right_record.join_cols[&join_args.right_attr]
                         {
                             let record_hashmap =
-                                generate_record(left_record, right_record, &join_args)?;
+                                generate_record(left_record, right_record, &join_args);
                             join_output.push(record_hashmap);
                         }
                     }
