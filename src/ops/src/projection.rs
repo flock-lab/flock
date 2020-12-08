@@ -34,33 +34,33 @@ struct Event {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ProjectionInput {
-    projection: Vec<String>,
+    projection:  Vec<String>,
     stream_name: String,
-    data: Vec<String>,      // [{}, {}, ...]
-    join_cols: Vec<String>, // join on ...
-    join_args: JoinArgs,
+    data:        Vec<String>, // [{}, {}, ...]
+    join_cols:   Vec<String>, // join on ...
+    join_args:   JoinArgs,
 }
 #[derive(Debug, Default, Serialize, Deserialize)]
 // One record
 struct ProjectionOutputRecord {
     result_cols: HashMap<String, String>,
-    join_cols: HashMap<String, String>,
+    join_cols:   HashMap<String, String>,
 }
 #[derive(Debug, Serialize, Deserialize)]
 struct ProjectionOutputMsg {
     stream_name: String,
-    message: Vec<ProjectionOutputRecord>,
-    join_args: JoinArgs,
+    message:     Vec<ProjectionOutputRecord>,
+    join_args:   JoinArgs,
 }
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct JoinArgs {
-    join_method: String, // "0": Nested loop; "1": Hash join
-    join_type: String,   // Inner, Left ...
-    left_stream: String,
-    left_attr: String,
+    join_method:  String, // "0": Nested loop; "1": Hash join
+    join_type:    String, // Inner, Left ...
+    left_stream:  String,
+    left_attr:    String,
     right_stream: String,
-    right_attr: String,
-    op: String, // "=", ">", "<"
+    right_attr:   String,
+    op:           String, // "=", ">", "<"
 }
 
 async fn handler(input: ProjectionInput, _: Context) -> Result<Value, Error> {
@@ -71,7 +71,7 @@ async fn handler(input: ProjectionInput, _: Context) -> Result<Value, Error> {
     for record in input.data {
         let mut output = ProjectionOutputRecord {
             result_cols: HashMap::new(),
-            join_cols: HashMap::new(),
+            join_cols:   HashMap::new(),
             // stream_name: input.stream_name.clone(),
         };
 
@@ -87,13 +87,13 @@ async fn handler(input: ProjectionInput, _: Context) -> Result<Value, Error> {
                     output
                         .result_cols
                         .entry(col.clone())
-                        .or_insert(v.to_string());
+                        .or_insert_with(|| v.to_string());
                 }
                 serde_json::Value::Number(v) => {
                     output
                         .result_cols
                         .entry(col.clone())
-                        .or_insert(v.to_string());
+                        .or_insert_with(|| v.to_string());
                 }
                 _ => {}
             }
@@ -104,10 +104,16 @@ async fn handler(input: ProjectionInput, _: Context) -> Result<Value, Error> {
                     output.join_cols.entry(col.clone()).or_insert(v);
                 }
                 serde_json::Value::Bool(v) => {
-                    output.join_cols.entry(col.clone()).or_insert(v.to_string());
+                    output
+                        .join_cols
+                        .entry(col.clone())
+                        .or_insert_with(|| v.to_string());
                 }
                 serde_json::Value::Number(v) => {
-                    output.join_cols.entry(col.clone()).or_insert(v.to_string());
+                    output
+                        .join_cols
+                        .entry(col.clone())
+                        .or_insert_with(|| v.to_string());
                 }
                 _ => {}
             }
@@ -117,9 +123,9 @@ async fn handler(input: ProjectionInput, _: Context) -> Result<Value, Error> {
     // Ok(re)
     // let re: ProjectionOutputMsg = { message: re };
     let res = json!(ProjectionOutputMsg {
-        message: re,
+        message:     re,
         stream_name: input.stream_name.clone(),
-        join_args: input.join_args,
+        join_args:   input.join_args,
     });
     println!("res size: {}", mem::size_of_val(&res));
     Ok(res)
@@ -147,18 +153,20 @@ async fn main() -> Result<(), Error> {
 //     ) -> Result<ProjectionInput, Error> {
 //         // let prj_cols = vec!["attr_1", "attr_2", "attr_3", "attr_4"];
 //         let join_args = JoinArgs {
-//             join_method:  "0".to_string(),     // "0": Nested loop; "1": Hash join
-//             join_type:    "Inner".to_string(), // Inner, Left ...
+//             join_method:  "0".to_string(),     // "0": Nested loop; "1": Hash
+// join             join_type:    "Inner".to_string(), // Inner, Left ...
 //             left_stream:  "stream1".to_string(),
 //             left_attr:    "attr_1".to_string(),
 //             right_stream: "stream2".to_string(),
 //             right_attr:   "attr_1".to_string(),
 //             op:           "=".to_string(), // "=", ">", "<"
 //         };
-//         let projections: Vec<String> = prj_cols.iter().map(|s| s.to_string()).collect();
+//         let projections: Vec<String> = prj_cols.iter().map(|s|
+// s.to_string()).collect();
 
 //         // let join_cols = vec!["attr_1"];
-//         let joins: Vec<String> = join_cols.iter().map(|s| s.to_string()).collect();
+//         let joins: Vec<String> = join_cols.iter().map(|s|
+// s.to_string()).collect();
 
 //         let mut data: Vec<String> = Vec::new();
 //         for i in start_record..num_records {
@@ -211,8 +219,8 @@ async fn main() -> Result<(), Error> {
 //         // Check the result is ok
 //         let re = handler(proj_input, Context::default()).await.ok().unwrap();
 
-//         serde_json::to_writer(&File::create("proj_output_stream1.json").ok().unwrap(), &re);
-//         println!("re:\n{:#?}", re);
+//         serde_json::to_writer(&File::create("proj_output_stream1.json").ok().
+// unwrap(), &re);         println!("re:\n{:#?}", re);
 //     }
 //     #[tokio::test]
 //     async fn two_streams() {
@@ -233,8 +241,8 @@ async fn main() -> Result<(), Error> {
 //         // Check the result is ok
 //         let re = handler(proj_input, Context::default()).await.ok().unwrap();
 
-//         serde_json::to_writer(&File::create("proj_output_stream1.json").ok().unwrap(), &re);
-//         println!("re:\n{:#?}", re);
+//         serde_json::to_writer(&File::create("proj_output_stream1.json").ok().
+// unwrap(), &re);         println!("re:\n{:#?}", re);
 
 //         // Stream 2
 //         let proj_input2 = generate_stream_data(
@@ -251,9 +259,10 @@ async fn main() -> Result<(), Error> {
 //             &proj_input2,
 //         );
 //         // Check the result is ok
-//         let re = handler(proj_input2, Context::default()).await.ok().unwrap();
+//         let re = handler(proj_input2,
+// Context::default()).await.ok().unwrap();
 
-//         serde_json::to_writer(&File::create("proj_output_stream2.json").ok().unwrap(), &re);
-//         println!("re:\n{:#?}", re);
+//         serde_json::to_writer(&File::create("proj_output_stream2.json").ok().
+// unwrap(), &re);         println!("re:\n{:#?}", re);
 //     }
 // }

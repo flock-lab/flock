@@ -23,18 +23,18 @@ type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
 // One record
 struct JoinRecord {
     result_cols: HashMap<String, String>,
-    join_cols: HashMap<String, String>,
+    join_cols:   HashMap<String, String>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct JoinArgs {
-    join_method: String, // "0": Nested loop; "1": Hash join
-    join_type: String,   // Inner, Left, Right, Full
-    left_stream: String,
-    left_attr: String,
+    join_method:  String, // "0": Nested loop; "1": Hash join
+    join_type:    String, // Inner, Left, Right, Full
+    left_stream:  String,
+    left_attr:    String,
     right_stream: String,
-    right_attr: String,
-    op: String, // "=", ">", "<"
+    right_attr:   String,
+    op:           String, // "=", ">", "<"
 }
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct JoinOutput {
@@ -49,7 +49,7 @@ fn generate_record(
     let mut record_hashmap: HashMap<String, String> = HashMap::new();
 
     for (k, v) in left_record.result_cols.iter() {
-        record_hashmap.entry(k.clone()).or_insert(v.clone());
+        record_hashmap.entry(k.clone()).or_insert_with(|| v.clone());
     }
     for (k, v) in right_record.result_cols.iter() {
         if record_hashmap.contains_key(k) {
@@ -174,12 +174,14 @@ async fn main() -> Result<(), Error> {
 //     use std::fs::File;
 //     #[tokio::test]
 //     async fn join_test() {
-//         let event = serde_json::from_slice(include_bytes!("../sche_output2.json")).unwrap();
+//         let event =
+// serde_json::from_slice(include_bytes!("../sche_output2.json")).unwrap();
 //         println!("event:{}\n", event);
 
 //         let res = handler(event, Context::default()).await.ok().unwrap();
 //         println!("res: {}", res);
-//         // serde_json::to_writer(&File::create("nested_join_output.json").ok().
+//         //
+// serde_json::to_writer(&File::create("nested_join_output.json").ok().
 //         // unwrap(), &res);
 //     }
 // }
