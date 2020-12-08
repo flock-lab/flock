@@ -59,25 +59,4 @@ for i in range(50):
                            PartitionKey="partitionkey")
         stream2 += 1
 
-# for i in range(10):
-#     rnd = random.random()
-#     data = json.dumps(getStream1Data())
-#     print(data)
-#     kinesis.put_record(
-#         StreamName="stream1",
-#         Data=data,
-#         PartitionKey="partitionkey")
-#     stream1 += 1
-# print(stream1, stream2)
-
-# for i in range(10):
-#     rnd = random.random()
-#     data = json.dumps(getStream1Data())
-#     print(data)
-#     kinesis.put_record(
-#         StreamName="stream1",
-#         Data=data,
-#         PartitionKey="partitionkey")
-#     stream1 += 1
-
 print(stream1, stream2)

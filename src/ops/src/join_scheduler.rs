@@ -33,20 +33,20 @@ lazy_static! {
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct JoinArgs {
-    join_method:  String, // "0": Nested loop; "1": Hash join
-    join_type:    String, // Inner, Left ...
-    left_stream:  String,
-    left_attr:    String,
+    join_method: String, // "0": Nested loop; "1": Hash join
+    join_type: String,   // Inner, Left ...
+    left_stream: String,
+    left_attr: String,
     right_stream: String,
-    right_attr:   String,
-    op:           String, // "=", ">", "<"
+    right_attr: String,
+    op: String, // "=", ">", "<"
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct JoinSchedulerOutput {
-    end:         bool,
+    end: bool,
     stream_data: HashMap<String, Value>,
-    join_args:   JoinArgs,
+    join_args: JoinArgs,
 }
 
 #[tokio::main]
@@ -60,9 +60,9 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
     let join_args: JoinArgs = serde_json::from_value(event["join_args"].clone()).unwrap();
 
     let mut res = JoinSchedulerOutput {
-        end:         false,
+        end: false,
         stream_data: HashMap::new(),
-        join_args:   join_args,
+        join_args: join_args,
     };
 
     match stream_name {
@@ -122,40 +122,40 @@ fn check_stream() {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use lambda::Context;
-    use serde::{Deserialize, Serialize};
-    use std::fs::File;
-    #[derive(Debug, Default, Serialize, Deserialize)]
-    // One record
-    struct ProjectionOutputRecord {
-        result_cols: HashMap<String, String>,
-        join_cols:   HashMap<String, String>,
-        /* stream_name: String,
-         * join_args: JoinArgs, */
-    }
-    #[derive(Debug, Serialize, Deserialize)]
-    struct ProjectionOutputMsg {
-        stream_name: String,
-        message:     Vec<ProjectionOutputRecord>,
-        join_args:   JoinArgs,
-    }
-    #[tokio::test]
-    async fn stream_1() {
-        let event = serde_json::from_slice(include_bytes!("../proj_output_stream1.json")).unwrap();
-        println!("event:{}\n", event);
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use lambda::Context;
+//     use serde::{Deserialize, Serialize};
+//     use std::fs::File;
+//     #[derive(Debug, Default, Serialize, Deserialize)]
+//     // One record
+//     struct ProjectionOutputRecord {
+//         result_cols: HashMap<String, String>,
+//         join_cols:   HashMap<String, String>,
+//         /* stream_name: String,
+//          * join_args: JoinArgs, */
+//     }
+//     #[derive(Debug, Serialize, Deserialize)]
+//     struct ProjectionOutputMsg {
+//         stream_name: String,
+//         message:     Vec<ProjectionOutputRecord>,
+//         join_args:   JoinArgs,
+//     }
+//     #[tokio::test]
+//     async fn stream_1() {
+//         let event = serde_json::from_slice(include_bytes!("../proj_output_stream1.json")).unwrap();
+//         println!("event:{}\n", event);
 
-        let res = handler(event, Context::default()).await.ok().unwrap();
-        println!("res: {}", res);
-    }
-    #[tokio::test]
-    async fn stream_2() {
-        let event = serde_json::from_slice(include_bytes!("../proj_output_stream2.json")).unwrap();
-        println!("event:{}\n", event);
+//         let res = handler(event, Context::default()).await.ok().unwrap();
+//         println!("res: {}", res);
+//     }
+//     #[tokio::test]
+//     async fn stream_2() {
+//         let event = serde_json::from_slice(include_bytes!("../proj_output_stream2.json")).unwrap();
+//         println!("event:{}\n", event);
 
-        let res = handler(event, Context::default()).await.ok().unwrap();
-        println!("res: {}", res);
-    }
-}
+//         let res = handler(event, Context::default()).await.ok().unwrap();
+//         println!("res: {}", res);
+//     }
+// }

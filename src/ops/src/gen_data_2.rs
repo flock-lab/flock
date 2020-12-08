@@ -30,22 +30,22 @@ struct Input {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ProjectionInput {
-    projection:  Vec<String>,
+    projection: Vec<String>,
     stream_name: String,
-    data:        Vec<String>, // [{}, {}, ...]
-    join_cols:   Vec<String>, // join on ...
-    join_args:   JoinArgs,
+    data: Vec<String>,      // [{}, {}, ...]
+    join_cols: Vec<String>, // join on ...
+    join_args: JoinArgs,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct JoinArgs {
-    join_method:  String, // "0": Nested loop; "1": Hash join
-    join_type:    String, // Inner, Left ...
-    left_stream:  String,
-    left_attr:    String,
+    join_method: String, // "0": Nested loop; "1": Hash join
+    join_type: String,   // Inner, Left ...
+    left_stream: String,
+    left_attr: String,
     right_stream: String,
-    right_attr:   String,
-    op:           String, // "=", ">", "<"
+    right_attr: String,
+    op: String, // "=", ">", "<"
 }
 
 #[tokio::main]
@@ -63,13 +63,13 @@ async fn handler(event: KinesisEvent, _: Context) -> Result<Value, Error> {
         res.push(a);
     }
     let join_args = JoinArgs {
-        join_method:  "0".to_string(),     // "0": Nested loop; "1": Hash join
-        join_type:    "Inner".to_string(), // Inner, Left ...
-        left_stream:  "stream1".to_string(),
-        left_attr:    "attr_1".to_string(),
+        join_method: "0".to_string(),   // "0": Nested loop; "1": Hash join
+        join_type: "Inner".to_string(), // Inner, Left ...
+        left_stream: "stream1".to_string(),
+        left_attr: "attr_1".to_string(),
         right_stream: "stream2".to_string(),
-        right_attr:   "attr_1".to_string(),
-        op:           "=".to_string(), // "=", ">", "<"
+        right_attr: "attr_1".to_string(),
+        op: "=".to_string(), // "=", ">", "<"
     };
 
     let projection: Vec<String> = vec!["attr_1", "attr_5", "attr_6", "attr_7"]
@@ -77,19 +77,19 @@ async fn handler(event: KinesisEvent, _: Context) -> Result<Value, Error> {
         .map(|s| s.to_owned())
         .collect();
     let proj_input = ProjectionInput {
-        projection:  projection,
+        projection: projection,
         stream_name: "stream2".to_string(),
-        data:        res,                        // [{}, {}, ...]
-        join_cols:   vec!["attr_1".to_string()], // join on ...
-        join_args:   join_args,
+        data: res,                             // [{}, {}, ...]
+        join_cols: vec!["attr_1".to_string()], // join on ...
+        join_args: join_args,
     };
 
     let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(50).collect();
 
     // println!("{}", rand_string);
     let request = StartExecutionInput {
-        input:             Some(json!(proj_input).to_string()),
-        name:              Some(rand_string),
+        input: Some(json!(proj_input).to_string()),
+        name: Some(rand_string),
         state_machine_arn: "arn:aws:states:us-east-1:942368842860:stateMachine:InnerJoin2Streams"
             .to_string(),
     };
@@ -98,20 +98,20 @@ async fn handler(event: KinesisEvent, _: Context) -> Result<Value, Error> {
     Ok(json!(proj_input))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs::File;
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use std::fs::File;
 
-    #[tokio::test]
-    async fn handler_handles() {
-        let event: KinesisEvent = serde_json::from_slice(include_bytes!("./example-event.json"))
-            .expect("invalid kinesis event");
-        let data = handler(event, Context::default()).await.ok().unwrap();
+//     #[tokio::test]
+//     async fn handler_handles() {
+//         let event: KinesisEvent = serde_json::from_slice(include_bytes!("./example-event.json"))
+//             .expect("invalid kinesis event");
+//         let data = handler(event, Context::default()).await.ok().unwrap();
 
-        // assert!(handler(event, Context::default()).await.is_ok());
-        println!("{:?}", data);
-        // serde_json::to_writer(&File::create("gen_data1_output.json").ok().
-        // unwrap(), &data);
-    }
-}
+//         // assert!(handler(event, Context::default()).await.is_ok());
+//         println!("{:?}", data);
+//         // serde_json::to_writer(&File::create("gen_data1_output.json").ok().
+//         // unwrap(), &data);
+//     }
+// }
