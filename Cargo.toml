@@ -1,7 +1,7 @@
 [workspace]
 
 members = [
-    "src/cli",
+    "src/bin",
     "src/step_functions",
     "src/ops",
     "examples",

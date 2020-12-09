@@ -1,3 +1,4 @@
+#![allow(bare_trait_objects)]
 // Copyright (c) 2020 UMD Database Group. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,49 +13,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! The Command Line Interactive Contoller for ServerlessCQ
-mod cmd;
-mod env;
-mod output;
 
-#[macro_use]
-extern crate lazy_static;
+
+#[path = "./error.rs"]
+mod error;
+use error::Result;
 
 use clap::{crate_version, App, Arg};
-#[allow(unused_imports)]
-use cmd::Cmd;
-
-use sqlparser::dialect::GenericDialect;
-use sqlparser::parser::Parser;
-
-type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
-
-async fn print_ast() -> Result<(), Error> {
-    let dialect = GenericDialect {}; // or AnsiDialect
-
-    let sql = "SELECT a, b, 123, myfunc(b) \
-                   FROM table_1 \
-                   WHERE a > b AND b < 100 \
-                   ORDER BY a DESC, b";
-    let ast = Parser::parse_sql(&dialect, sql).unwrap();
-    println!(
-        "SQL:\n'{}'",
-        ast.iter()
-            .map(std::string::ToString::to_string)
-            .collect::<Vec<_>>()
-            .join("\n")
-    );
-
-    println!(
-        "Serialized AST as JSON:\n{}",
-        serde_json::to_string_pretty(&ast).unwrap()
-    );
-    // println!("AST: {:#?}", ast);
-    Ok(())
-}
+use lazy_static::lazy_static;
+use rustyline::Editor;
+use std::env;
 
 lazy_static! {
-    static ref SCQSQL: &'static str =
+    static ref SERVERLESS_CQ: &'static str =
     "
 ███████╗███████╗██████╗ ██╗   ██╗███████╗██████╗ ██╗     ███████╗███████╗███████╗ ██████╗ ██████╗
 ██╔════╝██╔════╝██╔══██╗██║   ██║██╔════╝██╔══██╗██║     ██╔════╝██╔════╝██╔════╝██╔════╝██╔═══██╗
@@ -73,10 +44,9 @@ This has all the right tools installed required to execute a query against cloud
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Error> {
-    env_logger::init();
+pub async fn main() {
     // Command line arg parsing for scqsql itself
-    let matches = App::new("SCQSQL")
+    let matches = App::new("ServerlessCQ")
         .version(crate_version!())
         .about("Command Line Interactive Contoller for ServerlessCQ")
         .arg(
@@ -111,9 +81,47 @@ async fn main() -> Result<(), Error> {
         )
         .get_matches();
 
+    println!("{}", *SERVERLESS_CQ);
     let _config = matches.value_of("config").unwrap_or("default.conf");
 
-    println!("{}", *SCQSQL);
-    print_ast().await?;
+    let mut rl = Editor::<()>::new();
+    rl.load_history(".history").ok();
+
+    let mut query = "".to_owned();
+    loop {
+        let readline = rl.readline("> ");
+        match readline {
+            Ok(ref line) if is_exit_command(line) && query.is_empty() => {
+                break;
+            }
+            Ok(ref line) if line.trim_end().ends_with(';') => {
+                query.push_str(line.trim_end());
+                rl.add_history_entry(query.clone());
+                match exec_and_print(query).await {
+                    Ok(_) => {}
+                    Err(err) => println!("{:?}", err),
+                }
+                query = "".to_owned();
+            }
+            Ok(ref line) => {
+                query.push_str(line);
+                query.push(' ');
+            }
+            Err(_) => {
+                break;
+            }
+        }
+    }
+
+    rl.save_history(".history").ok();
+}
+
+fn is_exit_command(line: &str) -> bool {
+    let line = line.trim_end().to_lowercase();
+    line == "quit" || line == "exit"
+}
+
+#[allow(unused_variables)]
+async fn exec_and_print(sql: String) -> Result<()> {
     Ok(())
 }
