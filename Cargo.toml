@@ -4,6 +4,7 @@ members = [
     "src/bin",
     "src/step_functions",
     "src/ops",
+    "src/sql",
     "examples",
 ]
 
