@@ -16,7 +16,7 @@ cli = ["rustyline"]
 
 [dependencies]
 sqlparser = {version = "0.6.1", features = ["json_example"]}
-tokio = { version = "0.2", features = ["macros"] }
+tokio = { version = "0.3", features = ["macros"] }
 rustyline = {version = "7.0", optional = true}
 common = {path = "../common"}
 clap = "2.33.3"
