@@ -2,7 +2,7 @@
 
 members = [
     "src/bin",
-    "src/step_functions",
+    "src/dataflow",
     "src/ops",
     "src/sql",
     "src/logical_plan",

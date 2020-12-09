@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[path = "./paths.rs"]
-mod paths;
-use paths::{InputPath, OutputPath};
+use crate::paths::{InputPath, OutputPath};
 
 #[allow(dead_code)]
 pub struct Common {

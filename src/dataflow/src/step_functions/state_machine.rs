@@ -23,6 +23,17 @@ use std::collections::HashMap;
 /// States are elements in your state machine. A state is referred to by its
 /// name, which can be any string, but which must be unique within the scope of
 /// the entire state machine.
+///
+/// States can perform a variety of functions in your state machine:
+///
+/// - Do some work in your state machine (a Task state)
+/// - Make a choice between branches of execution (a Choice state)
+/// - Stop an execution with a failure or success (a Fail or Succeed state)
+/// - Simply pass input to its output or inject some fixed data (a Pass state)
+/// - Provide a delay for a certain amount of time or until a specified
+///   time/date (a Wait state)
+/// - Begin parallel branches of execution (a Parallel state)
+/// - Dynamically iterate steps (a Map state)
 #[allow(dead_code)]
 pub enum State {
     /// The Map state ("Type": "Map") can be used to run a set of steps for each
@@ -61,7 +72,7 @@ pub enum State {
 /// The operation of a state machine is specified by states, which are
 /// represented by JSON objects, fields in the top-level "States" object.
 #[allow(dead_code)]
-pub struct Dataflow {
+pub struct StateMachine {
     /// A State Machine MAY have a string field named "Comment", provided for
     /// human-readable description of the machine.
     pub comment:         Option<String>,
