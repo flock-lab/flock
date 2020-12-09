@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[path = "./error.rs"]
-mod error;
-use error::Result;
-
 use clap::{crate_version, App, Arg};
+use common::error::Result;
 use lazy_static::lazy_static;
 use rustyline::Editor;
 use std::env;
