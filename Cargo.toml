@@ -5,6 +5,7 @@ members = [
     "src/step_functions",
     "src/ops",
     "src/sql",
+    "src/logical_plan",
     "examples",
 ]
 
