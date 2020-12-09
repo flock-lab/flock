@@ -12,16 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! States can perform a variety of functions in your state machine:
+//! Step Functions is a serverless orchestration service that lets you combine
+//! AWS Lambda functions and other AWS services to build business-critical
+//! applications. Through Step Functions' graphical console, you see your
+//! application’s workflow as a series of event-driven steps.
+//! https://docs.aws.amazon.com/step-functions
 //!
-//! - Do some work in your state machine (a Task state)
-//! - Make a choice between branches of execution (a Choice state)
-//! - Stop an execution with a failure or success (a Fail or Succeed state)
-//! - Simply pass input to its output or inject some fixed data (a Pass state)
-//! - Provide a delay for a certain amount of time or until a specified
-//!   time/date (a Wait state)
-//! - Begin parallel branches of execution (a Parallel state)
-//! - Dynamically iterate steps (a Map state)
+//! Step Functions is based on state machines and tasks. A state machine is a
+//! workflow. A task is a state in a workflow that represents a single unit of
+//! work that another AWS service performs. Each step in a workflow is a state.
+//!
+//! With Step Functions' built-in controls, you examine the state of each step
+//! in your workflow to make sure that your application runs in order and as
+//! expected. Depending on your use case, you can have Step Functions call AWS
+//! services, such as Lambda, to perform tasks. You also can create
+//! long-running, automated workflows for applications that require human
+//! interaction.
+//!
+//! Individual states can make decisions based on their input, perform actions,
+//! and pass output to other states. In AWS Step Functions you define your
+//! workflows in the Amazon States Language (https://states-language.net/). The
+//! Step Functions console provides a graphical representation of that state
+//! machine to help visualize your application logic.
+
 pub mod common;
 pub use common::Common;
 
