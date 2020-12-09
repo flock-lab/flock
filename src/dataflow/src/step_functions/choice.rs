@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[path = "./common.rs"]
-mod common;
-use common::Common;
+use crate::common::Common;
 use json::JsonValue;
 
 #[allow(dead_code)]

@@ -61,7 +61,7 @@ pub enum State {
 /// The operation of a state machine is specified by states, which are
 /// represented by JSON objects, fields in the top-level "States" object.
 #[allow(dead_code)]
-pub struct Dataflow {
+pub struct StateMachine {
     /// A State Machine MAY have a string field named "Comment", provided for
     /// human-readable description of the machine.
     pub comment:         Option<String>,

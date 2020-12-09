@@ -22,6 +22,8 @@
 //!   time/date (a Wait state)
 //! - Begin parallel branches of execution (a Parallel state)
 //! - Dynamically iterate steps (a Map state)
+pub mod common;
+pub use common::Common;
 
 pub mod map;
 pub use map::Map;
@@ -50,5 +52,5 @@ pub use task::Task;
 pub mod paths;
 pub use paths::{InputPath, OutputPath, Parameters, ResultPath, ResultSelector};
 
-pub mod graph;
-pub use graph::Dataflow;
+pub mod state_machine;
+pub use state_machine::StateMachine;

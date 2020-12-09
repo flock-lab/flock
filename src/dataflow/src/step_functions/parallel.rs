@@ -12,17 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[path = "./common.rs"]
-mod common;
-use common::Common;
-
-#[path = "./graph.rs"]
-mod graph;
-use graph::Dataflow;
-
-#[path = "./paths.rs"]
-mod paths;
-use paths::{ResultPath, ResultSelector};
+use crate::common::Common;
+use crate::paths::{ResultPath, ResultSelector};
+use crate::state_machine::StateMachine;
 
 /// The Parallel state ("Type": "Parallel") can be used to create parallel
 /// branches of execution in your state machine.
@@ -50,5 +42,5 @@ pub struct Parallel {
     /// Each such state machine object must have fields named States and
     /// StartAt, whose meanings are exactly like those in the top level of a
     /// state machine.
-    pub branches:        Vec<Dataflow>,
+    pub branches:        Vec<StateMachine>,
 }

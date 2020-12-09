@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[path = "./common.rs"]
-mod common;
-use common::Common;
+use crate::common::Common;
 
 /// A Wait state ("Type": "Wait") delays the state machine from continuing for a
 /// specified time. You can choose either a relative time, specified in seconds
