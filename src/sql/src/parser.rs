@@ -42,7 +42,7 @@ pub struct ExplainPlan {
 
 /// ServerlessCQ Statement representations.
 ///
-/// Tokens parsed by `DFParser` are converted into these values.
+/// Tokens parsed by `SCQParser` are converted into these values.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
     /// ANSI SQL AST node
@@ -52,15 +52,15 @@ pub enum Statement {
 }
 
 /// SQL Parser
-pub struct DFParser {
+pub struct SCQParser {
     parser: Parser,
 }
 
-impl DFParser {
+impl SCQParser {
     /// Parse the specified tokens
     pub fn new(sql: &str) -> Result<Self, ParserError> {
         let dialect = &GenericDialect {};
-        DFParser::new_with_dialect(sql, dialect)
+        SCQParser::new_with_dialect(sql, dialect)
     }
 
     /// Parse the specified tokens with dialect
@@ -79,7 +79,7 @@ impl DFParser {
 
         let mut tokenizer = Tokenizer::new(dialect, sql.as_str());
         let tokens = tokenizer.tokenize()?;
-        Ok(DFParser {
+        Ok(SCQParser {
             parser: Parser::new(tokens),
         })
     }
@@ -87,7 +87,7 @@ impl DFParser {
     /// Parse a SQL statement and produce a set of statements with dialect
     pub fn parse_sql(sql: &str) -> Result<Vec<Statement>, ParserError> {
         let dialect = &GenericDialect {};
-        DFParser::parse_sql_with_dialect(sql, dialect)
+        SCQParser::parse_sql_with_dialect(sql, dialect)
     }
 
     /// Parse a SQL statement and produce a set of statements
@@ -95,7 +95,7 @@ impl DFParser {
         sql: &str,
         dialect: &dyn Dialect,
     ) -> Result<Vec<Statement>, ParserError> {
-        let mut parser = DFParser::new_with_dialect(sql, dialect)?;
+        let mut parser = SCQParser::new_with_dialect(sql, dialect)?;
         let mut stmts = Vec::new();
         let mut expecting_statement_delimiter = false;
         loop {
@@ -173,8 +173,8 @@ mod tests {
     fn stream_query() -> Result<(), ParserError> {
         let sql1 = "SELECT STREAM * FROM Orders;";
         let sql2 = "SELECT * FROM Orders;";
-        let statements1 = DFParser::parse_sql(sql1.to_uppercase().as_str())?;
-        let statements2 = DFParser::parse_sql(sql2.to_uppercase().as_str())?;
+        let statements1 = SCQParser::parse_sql(sql1.to_uppercase().as_str())?;
+        let statements2 = SCQParser::parse_sql(sql2.to_uppercase().as_str())?;
         assert_eq!(statements1.len(), statements2.len());
         assert_eq!(statements1[0], statements2[0]);
         Ok(())
