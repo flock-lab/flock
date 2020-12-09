@@ -33,18 +33,19 @@ pub enum ServerlessCQError {
     IoError(io::Error),
     /// Error returned when SQL is syntatically incorrect.
     SQL(ParserError),
-    /// Error returned on a branch that we know it is possible
-    /// but to which we still have no implementation for.
-    /// Often, these errors are tracked in our issue tracker.
+    /// Error returned on a branch that we know it is possible but to which we
+    /// still have no implementation for. Often, these errors are tracked in our
+    /// issue tracker.
     NotImplemented(String),
     /// Error returned as a consequence of an error in ServerlessCQ.
     /// This error should not happen in normal usage of ServerlessCQ.
-    // ServerlessCQ has internal invariants that we are unable to ask the compiler to check for us.
-    // This error is raised when one of those invariants is not verified during execution.
+    /// ServerlessCQ has internal invariants that we are unable to ask the
+    /// compiler to check for us. This error is raised when one of those
+    /// invariants is not verified during execution.
     Internal(String),
-    /// This error happens whenever a plan is not valid. Examples include
-    /// impossible casts, schema inference not possible and non-unique column
-    /// names.
+    /// This error happens whenever a plan is not valid.
+    /// Examples include impossible casts, schema inference not possible and
+    /// non-unique column names.
     Plan(String),
     /// Error returned during execution of the query.
     /// Examples include files not found, errors in parsing certain types.
