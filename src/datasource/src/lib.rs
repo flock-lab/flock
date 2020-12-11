@@ -12,5 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod error;
-pub mod scalar;
+//! ServerlessCQ data sources
+
+pub mod datasource;
+pub mod kinesis;
