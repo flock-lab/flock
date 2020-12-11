@@ -12,5 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod error;
-pub mod scalar;
+//! Traits for physical query plan, supporting parallel execution for
+//! partitioned relations on cloud function services.
+
+pub mod kinesis;
+pub use kinesis::KinesisStreamExec;
