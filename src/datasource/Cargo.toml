@@ -12,4 +12,4 @@ autobins = false
 arrow = { git = "https://github.com/apache/arrow", branch = "master" }
 common = {path = "../common"}
 physical_plan = {path = "../physical_plan"}
-tokio = { version = "0.2", features = ["macros"] }
+tokio = { version = "0.3", features = ["macros"] }
