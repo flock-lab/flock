@@ -1,8 +1,13 @@
 [workspace]
 
 members = [
-    "src/cli",
-    "src/step_functions",
+    "src/bin",
+    "src/dataflow",
+    "src/ops",
+    "src/sql",
+    "src/logical_plan",
+    "src/physical_plan",
+    "src/datasource",
     "examples",
 ]
 

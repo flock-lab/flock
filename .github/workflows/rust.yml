@@ -8,52 +8,18 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  LAMBDA_NAME: hello step_1 step_2 gen_data
+  LAMBDA_NAME: hello step_1 step_2 gen_data gen_data_1 gen_data_2 join_nested_loop join_scheduler
   AWS_LAMBDA_ROLE: ${{ secrets.AWS_LAMBDA_ROLE }}
 
 jobs:
-  codestyle:
-    if: github.ref != 'refs/heads/master'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Set up Rust
-        uses: hecrj/setup-rust-action@v1
-        with:
-          components: rustfmt
-          rust-version: nightly
-      - uses: actions/checkout@v2
-      - run: cargo +nightly fmt --all -- --check
-
-  lint:
-    if: github.ref != 'refs/heads/master'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Set up Rust
-        uses: hecrj/setup-rust-action@v1
-        with:
-          components: clippy
-          rust-version: nightly
-      - uses: actions/checkout@v2
-      - run: cargo +nightly clippy --all-targets -- -D clippy::all
-
-  compile:
-    if: github.ref != 'refs/heads/master'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Set up Rust
-        uses: hecrj/setup-rust-action@v1
-        with:
-          rust-version: nightly
-      - uses: actions/checkout@v2
-      - run: cargo +nightly check --all
-
   test:
     if: github.ref != 'refs/heads/master'
-    needs: [codestyle, lint, compile]
     runs-on: ubuntu-latest
     steps:
     - name: Setup Rust
       uses: hecrj/setup-rust-action@v1
+      with:
+        rust-version: nightly
     - name: Checkout
       uses: actions/checkout@v2
     - name: Cache cargo and xargo
@@ -66,7 +32,7 @@ jobs:
           target
         key: ${{ runner.os }}-cargo-serverlesscq-${{ hashFiles('**/Cargo.lock') }}
     - name: Test
-      run: cargo test
+      run: cargo +nightly test
 
   # deploy on pushes to master branch
   # assumes aws credentials (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)

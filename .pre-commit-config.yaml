@@ -52,3 +52,9 @@ repos:
         entry: python ./scripts/copyright.py
         language: system
         files: \.(go|py|sh|java|yaml|rs)$
+  - repo: https://github.com/doublify/pre-commit-rust
+    rev: master
+    hooks:
+      - id: fmt
+      - id: cargo-check
+      - id: clippy
