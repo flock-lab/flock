@@ -71,7 +71,7 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
 
     let join_args: JoinArgs = serde_json::from_value(event["join_args"].clone()).unwrap();
     let stream_data: HashMap<String, Value> =
-        serde_json::from_value(event["stream_data"].clone()).unwrap();
+        serde_json::from_value(event["data"].clone()).unwrap();
 
     let left_data: Vec<JoinRecord> =
         serde_json::from_value(stream_data[&join_args.left_stream].clone()).unwrap();
@@ -181,7 +181,6 @@ async fn main() -> Result<(), Error> {
 //         let res = handler(event, Context::default()).await.ok().unwrap();
 //         println!("res: {}", res);
 //         //
-// serde_json::to_writer(&File::create("nested_join_output.json").ok().
-//         // unwrap(), &res);
-//     }
+//         serde_json::to_writer(&File::create("nested_join_output.json").ok().
+// unwrap(), &res);     }
 // }

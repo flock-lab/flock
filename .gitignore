@@ -10,3 +10,7 @@ Cargo.lock
 **/*.rs.bk
 
 .cache
+
+.DS_Store
+
+src/ops/test_output
