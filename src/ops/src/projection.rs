@@ -34,41 +34,41 @@ struct Event {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ProjectionInput {
-    projection: Vec<String>,
+    projection:  Vec<String>,
     stream_name: String,
-    data: Vec<String>,      // [{}, {}, ...]
-    join_cols: Vec<String>, // join on ...
-    join_args: JoinArgs,
+    data:        Vec<String>, // [{}, {}, ...]
+    join_cols:   Vec<String>, // join on ...
+    join_args:   JoinArgs,
 
-    is_last: bool, // if this is the last batch of the key
-    key: String,
+    is_last:   bool, // if this is the last batch of the key
+    key:       String,
     batch_num: i32,
 }
 #[derive(Debug, Default, Serialize, Deserialize)]
 // One record
 struct ProjectionOutputRecord {
     result_cols: HashMap<String, String>,
-    join_cols: HashMap<String, String>,
+    join_cols:   HashMap<String, String>,
 }
 #[derive(Debug, Serialize, Deserialize)]
 struct ProjectionOutputMsg {
     stream_name: String,
-    data: Vec<ProjectionOutputRecord>,
-    join_args: JoinArgs,
+    data:        Vec<ProjectionOutputRecord>,
+    join_args:   JoinArgs,
 
-    key: String,
-    is_last: bool,
+    key:       String,
+    is_last:   bool,
     batch_num: i32,
 }
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct JoinArgs {
-    join_method: String, // "0": Nested loop; "1": Hash join
-    join_type: String,   // Inner, Left ...
-    left_stream: String,
-    left_attr: String,
+    join_method:  String, // "0": Nested loop; "1": Hash join
+    join_type:    String, // Inner, Left ...
+    left_stream:  String,
+    left_attr:    String,
     right_stream: String,
-    right_attr: String,
-    op: String, // "=", ">", "<"
+    right_attr:   String,
+    op:           String, // "=", ">", "<"
 }
 
 // async fn handler(input: ProjectionInput, _: Context) -> Result<Value, Error>
@@ -80,7 +80,7 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
     for record in input.data {
         let mut output = ProjectionOutputRecord {
             result_cols: HashMap::new(),
-            join_cols: HashMap::new(),
+            join_cols:   HashMap::new(),
             // stream_name: input.stream_name.clone(),
         };
 
@@ -132,12 +132,12 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
     // Ok(re)
     // let re: ProjectionOutputMsg = { message: re };
     let res = json!(ProjectionOutputMsg {
-        data: re,
+        data:        re,
         stream_name: input.stream_name.clone(),
-        join_args: input.join_args,
-        key: input.key,
-        is_last: input.is_last,
-        batch_num: input.batch_num,
+        join_args:   input.join_args,
+        key:         input.key,
+        is_last:     input.is_last,
+        batch_num:   input.batch_num,
     });
     println!("res size: {}", mem::size_of_val(&res));
     Ok(res)

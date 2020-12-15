@@ -26,11 +26,11 @@ use std::sync::Arc;
 #[derive(Debug, Clone)]
 pub struct KinesisStreamExec {
     /// The name of the Amazon Kinesis data stream
-    name: String,
+    name:       String,
     /// The shard ID of the Kinesis Data Streams shard to get the iterator for
-    shard_id: String,
+    shard_id:   String,
     /// Schema after projection is applied
-    schema: SchemaRef,
+    schema:     SchemaRef,
     /// Projection for which columns to load
     projection: Vec<usize>,
     /// Batch size
@@ -53,11 +53,11 @@ impl KinesisStreamExec {
         };
 
         let iter_input = GetShardIteratorInput {
-            shard_id: stream_shard_id.to_string(),
-            stream_name: stream_name.to_string(),
-            shard_iterator_type: "TRIM_HORIZON".to_string(),
+            shard_id:                 stream_shard_id.to_string(),
+            stream_name:              stream_name.to_string(),
+            shard_iterator_type:      "TRIM_HORIZON".to_string(),
             starting_sequence_number: None,
-            timestamp: None,
+            timestamp:                None,
         };
 
         // Creates a client backed by the default tokio event loop.
@@ -69,7 +69,7 @@ impl KinesisStreamExec {
             .unwrap();
 
         let records_input = GetRecordsInput {
-            limit: None,
+            limit:          None,
             shard_iterator: shard_iter,
         };
 

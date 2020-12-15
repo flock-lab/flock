@@ -71,10 +71,10 @@ use crate::state_machine::StateMachine;
 #[allow(dead_code)]
 pub struct Map {
     /// Common state fields.
-    pub common: Common,
+    pub common:          Common,
     /// The Iterator field’s value is an object that defines a state machine
     /// which will process each element of the array.
-    pub iterator: StateMachine,
+    pub iterator:        StateMachine,
     /// The ItemsPath field’s value is a reference path identifying where in the
     /// effective input the array field is found. For more information, see
     /// ItemsPath. States within an Iterator field can only transition to
@@ -82,7 +82,7 @@ pub struct Map {
     /// state within it.
     /// If any iteration fails, entire Map state fails, and all iterations are
     /// terminated.
-    pub items_path: Option<String>,
+    pub items_path:      Option<String>,
     /// The MaxConcurrencyfield’s value is an integer that provides an upper
     /// bound on how many invocations of the Iterator may run in parallel. For
     /// instance, a MaxConcurrency value of 10 will limit your Map state to 10
@@ -94,7 +94,7 @@ pub struct Map {
     /// task that's specified in Resource. The input is then filtered as
     /// specified by the OutputPath field (if present) before being used as the
     /// state's output.
-    pub result_path: Option<ResultPath>,
+    pub result_path:     Option<ResultPath>,
     /// Use the `ResultSelector` field to manipulate a state's result before
     /// `ResultPath` is applied. The `ResultSelector` field lets you create a
     /// collection of key value pairs, where the values are static or selected

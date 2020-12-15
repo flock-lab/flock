@@ -23,18 +23,18 @@ type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
 // One record
 struct JoinRecord {
     result_cols: HashMap<String, String>,
-    join_cols: HashMap<String, String>,
+    join_cols:   HashMap<String, String>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct JoinArgs {
-    join_method: String, // "0": Nested loop; "1": Hash join
-    join_type: String,   // Inner, Left, Right, Full
-    left_stream: String,
-    left_attr: String,
+    join_method:  String, // "0": Nested loop; "1": Hash join
+    join_type:    String, // Inner, Left, Right, Full
+    left_stream:  String,
+    left_attr:    String,
     right_stream: String,
-    right_attr: String,
-    op: String, // "=", ">", "<"
+    right_attr:   String,
+    op:           String, // "=", ">", "<"
 }
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct JoinOutput {

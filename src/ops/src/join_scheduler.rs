@@ -33,19 +33,19 @@ lazy_static! {
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct JoinArgs {
-    join_method: String, // "0": Nested loop; "1": Hash join
-    join_type: String,   // Inner, Left ...
-    left_stream: String,
-    left_attr: String,
+    join_method:  String, // "0": Nested loop; "1": Hash join
+    join_type:    String, // Inner, Left ...
+    left_stream:  String,
+    left_attr:    String,
     right_stream: String,
-    right_attr: String,
-    op: String, // "=", ">", "<"
+    right_attr:   String,
+    op:           String, // "=", ">", "<"
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct JoinSchedulerOutput {
-    end: bool,
-    data: HashMap<String, Value>,
+    end:       bool,
+    data:      HashMap<String, Value>,
     join_args: JoinArgs,
 }
 
@@ -60,8 +60,8 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
     let jargs: JoinArgs = serde_json::from_value(event["join_args"].clone()).unwrap();
 
     let mut res = JoinSchedulerOutput {
-        end: false,
-        data: HashMap::new(),
+        end:       false,
+        data:      HashMap::new(),
         join_args: jargs,
     };
 

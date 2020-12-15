@@ -26,12 +26,12 @@ use crate::state_machine::StateMachine;
 #[allow(dead_code)]
 pub struct Parallel {
     /// Common state fields.
-    pub common: Common,
+    pub common:          Common,
     /// Specifies where (in the input) to place the results of executing the
     /// task that's specified in Resource. The input is then filtered as
     /// specified by the OutputPath field (if present) before being used as the
     /// state's output.
-    pub result_path: Option<ResultPath>,
+    pub result_path:     Option<ResultPath>,
     /// Use the `ResultSelector` field to manipulate a state's result before
     /// `ResultPath` is applied. The `ResultSelector` field lets you create a
     /// collection of key value pairs, where the values are static or selected
@@ -42,5 +42,5 @@ pub struct Parallel {
     /// Each such state machine object must have fields named States and
     /// StartAt, whose meanings are exactly like those in the top level of a
     /// state machine.
-    pub branches: Vec<StateMachine>,
+    pub branches:        Vec<StateMachine>,
 }
