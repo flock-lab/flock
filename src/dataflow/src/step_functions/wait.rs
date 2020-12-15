@@ -21,19 +21,19 @@ use crate::common::Common;
 #[allow(dead_code)]
 pub struct Wait {
     /// Common state fields.
-    pub common:         Common,
+    pub common: Common,
     /// A time, in seconds, to wait before beginning the state specified in the
     /// Next field.
-    pub seconds:        Option<String>,
+    pub seconds: Option<String>,
     /// An absolute time to wait until beginning the state specified in the Next
     /// field. Timestamps must conform to the RFC3339 profile of ISO 8601,
     /// with the further restrictions that an uppercase T must separate the date
     /// and time portions, and an uppercase Z must denote that a numeric time
     /// zone offset is not present, for example, 2016-08-18T17:33:00Z.
-    pub timestamp:      Option<String>,
+    pub timestamp: Option<String>,
     /// A time, in seconds, to wait before beginning the state specified in the
     /// Next field, specified using a path from the state's input data.
-    pub seconds_path:   Option<String>,
+    pub seconds_path: Option<String>,
     /// An absolute time to wait until beginning the state specified in the Next
     /// field, specified using a path from the state's input data.
     pub timestamp_path: Option<String>,

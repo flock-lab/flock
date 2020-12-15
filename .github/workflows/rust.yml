@@ -2,13 +2,14 @@ name: CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [master]
   pull_request:
-    branches: [ master ]
+    branches: [master]
 
 env:
   CARGO_TERM_COLOR: always
-  LAMBDA_NAME: hello step_1 step_2 gen_data gen_data_1 gen_data_2 join_nested_loop join_scheduler
+
+  LAMBDA_NAME: hello step_1 step_2 gen_data gen_data_1 gen_data_2 join_nested_loop join_scheduler stream1partition stream2partition lambda_check join_distributed
   AWS_LAMBDA_ROLE: ${{ secrets.AWS_LAMBDA_ROLE }}
 
 jobs:
@@ -16,23 +17,23 @@ jobs:
     if: github.ref != 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
-    - name: Setup Rust
-      uses: hecrj/setup-rust-action@v1
-      with:
-        rust-version: nightly
-    - name: Checkout
-      uses: actions/checkout@v2
-    - name: Cache cargo and xargo
-      uses: actions/cache@v2
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          ~/.xargo
-          target
-        key: ${{ runner.os }}-cargo-serverlesscq-${{ hashFiles('**/Cargo.lock') }}
-    - name: Test
-      run: cargo +nightly test
+      - name: Setup Rust
+        uses: hecrj/setup-rust-action@v1
+        with:
+          rust-version: nightly
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Cache cargo and xargo
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.xargo
+            target
+          key: ${{ runner.os }}-cargo-serverlesscq-${{ hashFiles('**/Cargo.lock') }}
+      - name: Test
+        run: cargo +nightly test
 
   # deploy on pushes to master branch
   # assumes aws credentials (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)

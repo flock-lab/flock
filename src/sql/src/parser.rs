@@ -35,7 +35,7 @@ macro_rules! parser_err {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExplainPlan {
     /// If true, dumps more intermediate plans and results of optimizaton passes
-    pub verbose:   bool,
+    pub verbose: bool,
     /// The statement for which to generate an planning explanation
     pub statement: Box<Statement>,
 }

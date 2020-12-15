@@ -90,7 +90,7 @@ impl SCQSchema {
                 .fields()
                 .iter()
                 .map(|f| SCQField {
-                    field:     f.clone(),
+                    field: f.clone(),
                     qualifier: None,
                 })
                 .collect(),
@@ -104,7 +104,7 @@ impl SCQSchema {
                 .fields()
                 .iter()
                 .map(|f| SCQField {
-                    field:     f.clone(),
+                    field: f.clone(),
                     qualifier: Some(qualifier.to_owned()),
                 })
                 .collect(),
@@ -241,7 +241,7 @@ pub struct SCQField {
     /// Optional qualifier (usually a table or relation name)
     qualifier: Option<String>,
     /// Arrow field definition
-    field:     Field,
+    field: Field,
 }
 
 impl SCQField {
@@ -249,7 +249,7 @@ impl SCQField {
     pub fn new(qualifier: Option<&str>, name: &str, data_type: DataType, nullable: bool) -> Self {
         SCQField {
             qualifier: qualifier.map(|s| s.to_owned()),
-            field:     Field::new(name, data_type, nullable),
+            field: Field::new(name, data_type, nullable),
         }
     }
 

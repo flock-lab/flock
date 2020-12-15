@@ -20,6 +20,6 @@
 /// and don't need an `End` field.
 #[allow(dead_code)]
 pub struct Succeed {
-    pub name:   String,
+    pub name: String,
     pub family: String,
 }

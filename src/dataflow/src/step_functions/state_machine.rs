@@ -75,19 +75,19 @@ pub enum State {
 pub struct StateMachine {
     /// A State Machine MAY have a string field named "Comment", provided for
     /// human-readable description of the machine.
-    pub comment:         Option<String>,
+    pub comment: Option<String>,
     /// A State Machine MAY have a string field named "Version", which gives the
     /// version of the States language used in the machine. This document
     /// describes version 1.0, and if omitted, the default value of "Version" is
     /// the string "1.0".
-    pub version:         Option<String>,
+    pub version: Option<String>,
     /// A State Machine MUST have a string field named "StartAt", whose value
     /// MUST exactly match one of names of the "States" fields. The interpreter
     /// starts running the the machine at the named state.
-    pub start_at:        String,
+    pub start_at: String,
     /// A State Machine MUST have an object field named "States", whose fields
     /// represent the states.
-    pub states:          HashMap<String, State>,
+    pub states: HashMap<String, State>,
     /// A State Machine MAY have an integer field named "TimeoutSeconds". If
     /// provided, it provides the maximum number of seconds the machine is
     /// allowed to run. If the machine runs longer than the specified time, then

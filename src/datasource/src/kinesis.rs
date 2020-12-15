@@ -30,8 +30,8 @@ use crate::datasource::TableProvider;
 /// Table-based representation of a Kinesis stream.
 #[allow(dead_code)]
 pub struct KinesisStreamTable {
-    name:       String,
-    schema:     SchemaRef,
+    name: String,
+    schema: SchemaRef,
     statistics: Option<Statistics>,
 }
 

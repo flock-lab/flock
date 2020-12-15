@@ -19,17 +19,17 @@ use json::JsonValue;
 #[allow(dead_code)]
 pub struct Pass {
     /// Common state fields.
-    pub common:      Common,
+    pub common: Common,
     /// Treated as the output of a virtual task to be passed to the next state,
     /// and filtered as specified by the ResultPath field (if present).
-    pub result:      Option<JsonValue>,
+    pub result: Option<JsonValue>,
     /// Specifies where (in the input) to place the "output" of the virtual task
     /// specified in Result. The input is further filtered as specified by the
     /// OutputPath field (if present) before being used as the state's output.
     pub result_path: Option<ResultPath>,
     /// Create a collection of key-value pairs that will be passed as input.
     /// Values can be static, or selected from the input with a path.
-    pub parameters:  Option<Parameters>,
+    pub parameters: Option<Parameters>,
 }
 
 #[cfg(test)]
