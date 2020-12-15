@@ -1,0 +1,559 @@
+commit e5ea1532514c29256ec4426724787d89521dedb0
+Merge: 21ee037 585ba1d
+Author: Zejun Liu <zejun96liu@gmail.com>
+Date:   Mon Dec 14 19:11:13 2020 -0500
+
+    resovled conflict
+
+commit 21ee0373281542f9f7452c62a82555146e76389d
+Author: Zejun Liu <zejun96liu@gmail.com>
+Date:   Mon Dec 14 18:49:10 2020 -0500
+
+    distributed join
+
+commit 585ba1d541acb729f84cd92a68f62cd7b685b89c
+Merge: 8125a48 020ea85
+Author: Zejun Liu <zejun96liu@gmail.com>
+Date:   Sat Dec 12 17:39:06 2020 -0500
+
+    Merge branch 'master' of github.com:DSLAM-UMD/ServerlessCQ
+
+commit 020ea85e6f59ac4b595c54a76efad4c0ec6ea23f
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Fri Dec 11 01:35:36 2020 -0500
+
+    feat: infer schema from kinesis data source (#43)
+
+    * feat: infer schema from kinesis data source
+
+    * ci: push down rust checks to pre-commit
+
+commit 6118aa8d1cb01d36ad82a520f1cfe2d2dc3c0d85
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Wed Dec 9 14:16:07 2020 -0500
+
+    fix: ignore .DS_Store files
+
+commit 54ce856a38fb0f06ec0d678b22f9ca072d132f5f
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Wed Dec 9 14:12:51 2020 -0500
+
+    fix: remove import path (#41)
+
+    * fix: remove import path
+
+    * docs: describe dataflow module
+
+commit f8412acbef93fd8ee740fe9b1339a2bf86a103b6
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Wed Dec 9 12:58:12 2020 -0500
+
+    feat: scq schema module (#40)
+
+    * feat: scq schema module
+
+    * ci: cargo +nightly test
+
+commit b342e7f0275b4ec115c69085b7fb71ae3d8a2353
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Wed Dec 9 02:21:34 2020 -0500
+
+    feat: sql parser with stream keyword (#39)
+
+    * feat: sql parser with stream keyword
+
+    * fix: rename parser
+
+commit 30ec1c4bfc8468cfb4abefb5fbf01ed86799ffd7
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Tue Dec 8 23:03:59 2020 -0500
+
+    refactor!: serverlesscq cli (#38)
+
+    * refactor!: serverlesscq cli
+
+    BREAKING CHANGE: use rustyline::Editor
+
+    * ci: fix rust fmt
+
+commit 1b5c7f7f2c3dc12fe6cfd362e36b50a3aa696e83
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Tue Dec 8 19:37:43 2020 -0500
+
+    feat: add projection and join operators  (#37)
+
+    * op: join
+
+    * op: join
+
+    * op: join
+
+    * fix: adjust location
+
+    * ci: cargo +nightly fmt --all
+
+    * fix: add serde
+
+    * ci: deploy lambdas to aws
+
+    * fix: tests
+
+    * ci: follow clippy's help
+
+    * ci: follow cargo fmt
+
+    * fix: clippy
+
+    * fix: fmt
+
+    Co-authored-by: Zejun <zejun@Zejuns-MBP.fios-router.home>
+
+commit 770aa53bc6543395b0d18503c036aff7b683c871
+Author: Zejun <zejun@Zejuns-MBP.fios-router.home>
+Date:   Tue Dec 8 19:03:08 2020 -0500
+
+    fix: fmt
+
+commit fa14af6b388d12e60e054090ec8331eccb0db305
+Author: Zejun <zejun@Zejuns-MBP.fios-router.home>
+Date:   Tue Dec 8 18:57:52 2020 -0500
+
+    fix: clippy
+
+commit 7a1832908a08935ba56278dc01af7839f9b2eb73
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Tue Dec 8 18:47:03 2020 -0500
+
+    ci: follow cargo fmt
+
+commit 9cacd2e1ef95d1d4c08c6e6544b83158662bf192
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Tue Dec 8 18:44:31 2020 -0500
+
+    ci: follow clippy's help
+
+commit 463f51237001703df9d4db6c6e6e74e80e8f974f
+Author: Zejun <zejun@Zejuns-MBP.fios-router.home>
+Date:   Tue Dec 8 18:37:44 2020 -0500
+
+    fix: tests
+
+commit 7a938cef435be78e8cbba4928d878d539dcb7f5f
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Tue Dec 8 18:31:07 2020 -0500
+
+    ci: deploy lambdas to aws
+
+commit bc55bd7f8668c03ca865cc748141e85703500cb7
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Tue Dec 8 18:26:45 2020 -0500
+
+    fix: add serde
+
+commit c0469af36a29ebdcf1566ba76d335329e81d907c
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Tue Dec 8 18:22:42 2020 -0500
+
+    ci: cargo +nightly fmt --all
+
+commit 8877ba115c7159052a917bef0bb63855c82bce87
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Tue Dec 8 18:17:30 2020 -0500
+
+    fix: adjust location
+
+commit 00749364743a95557709082b998a7d4597fd5e18
+Author: Zejun <zejun@Zejuns-MBP.fios-router.home>
+Date:   Tue Dec 8 17:58:24 2020 -0500
+
+    op: join
+
+commit 8125a48a54b16ec4e13946597f0b04dc3d74cd59
+Author: Zejun <zejun@Zejuns-MBP.fios-router.home>
+Date:   Tue Dec 8 17:41:44 2020 -0500
+
+    op: join
+
+commit 87ef049415e3b5a64c23cf70f4b6870c8f2fc2a7
+Author: Zejun <zejun@Zejuns-MBP.fios-router.home>
+Date:   Tue Dec 8 17:35:25 2020 -0500
+
+    op: join
+
+commit 528fc6def5194210fe6b46c771e642d36100bd27
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Thu Dec 3 23:35:27 2020 -0500
+
+    feat: states in step function (wip 2) (#34)
+
+    * feat: states in step function (wip 2)
+
+    * fix: auto gen copyright
+
+    * doc: add comments for dataflow model
+
+    * ci: using tabs in doc comments is not recommended
+
+commit 4d00dc3a59a0b441d539f0ec3da5e3f06675f182
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Thu Dec 3 17:01:24 2020 -0500
+
+    feat: states in step function (wip 1) (#33)
+
+    * feat: states in step function (wip)
+
+    * ci: set rust to nightly
+
+commit 1c07af20523e3b6f6716e06f82d45b4cb897cfe7
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Thu Dec 3 06:10:05 2020 -0500
+
+    feat: scqsql cli (#32)
+
+    * feat: scqsql cli
+
+    * fix: pre-commit
+
+    * lint: this import is redundant
+
+commit 866d94e3ed08522f862375dcc435e3cf8739cb44
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Tue Dec 1 16:49:43 2020 -0500
+
+    docs: update weekly report (#30)
+
+commit 81af46e5239dc796a685a9eb3ffea0ed6de2ba90
+Author: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+Date:   Mon Nov 30 09:31:45 2020 -0500
+
+    build(deps): update base64 requirement from 0.12 to 0.13 (#27)
+
+    Updates the requirements on [base64](https://github.com/marshallpierce/rust-base64) to permit the latest version.
+    - [Release notes](https://github.com/marshallpierce/rust-base64/releases)
+    - [Changelog](https://github.com/marshallpierce/rust-base64/blob/master/RELEASE-NOTES.md)
+    - [Commits](https://github.com/marshallpierce/rust-base64/compare/v0.12.0...v0.13.0)
+
+    Signed-off-by: dependabot[bot] <support@github.com>
+
+    Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+commit 62e2d22de5a4ad2853c72633e0f5223537f00464
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Mon Nov 30 02:02:31 2020 -0500
+
+    feat: add git pull request template (#26)
+
+    * feat: add git pull request template
+
+    * ci: fix binary name
+
+commit 6815c3997aa70d70d8315426c32aafb7d9ec6a58
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Mon Nov 30 01:43:26 2020 -0500
+
+    feat: lamdba function reads data from kinesis (#25)
+
+commit ddf8fb752289bc35231c0f4f092438e957128235
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Sun Nov 29 23:48:20 2020 -0500
+
+    ci: automated dependency updates
+
+commit 77bf43f40c03fb83ce279c6c415ca088d3a7ad72
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Sun Nov 29 23:44:02 2020 -0500
+
+    bench: generate data to kinesis data stream (#22)
+
+commit 652e79119361de5286fd518dd9e5d76a870749f0
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Thu Nov 26 21:06:04 2020 -0500
+
+    doc: update copyright (#21)
+
+commit 22e433d61912677fbb05c2e2e238090a693d2920
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Fri Nov 13 15:19:58 2020 -0500
+
+    Update README.md
+
+commit 8ee328f32f0f6829c902dd33b5856209e86c89c1
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Fri Oct 30 13:38:16 2020 -0400
+
+    fix: adjust code structure (#19)
+
+commit 21c8a2afff694c4f81bb593e0feefb3a44f11a46
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Fri Oct 30 03:23:08 2020 -0400
+
+    feat: add precommit to format code and doc (#18)
+
+commit c6cfffdd3e3ce6d6e018a6ea6cfb42df13a840ca
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Fri Oct 30 02:51:38 2020 -0400
+
+    ci: triggering deploy when a pr is merged
+
+commit 78e63fbcd6e652b09719163f27c2290087f47530
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Fri Oct 30 02:40:06 2020 -0400
+
+    ci: avoid repeated jobs for new pull requests
+
+commit 1419d8a9c90ed2e8a4416b73c3716fa4ea579585
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Fri Oct 30 02:36:23 2020 -0400
+
+    kinesis: add an example
+
+commit a48e1e5facc0162e690f9b725e3925a52e2149d5
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Thu Oct 29 02:36:32 2020 -0400
+
+    aws: update rt to amazon linux
+
+commit eb2b53a5dbfadf5a09331f2154ea59fb699fac85
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Thu Oct 29 02:17:45 2020 -0400
+
+    ci: fix typo
+
+commit f83c747dcbebcfbdf6f4ec8a5d33bec9de111a1f
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Thu Oct 29 02:16:47 2020 -0400
+
+    aws: couldn't find valid bootstrap(s)
+
+commit c5105ac85f14297b3a84a113cbce64affed307e0
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Thu Oct 29 02:06:16 2020 -0400
+
+    ci: try to get Lambda functions from AWS
+
+commit 4d6dcc70f194152c4aebc4a5cd246369fa71054c
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Thu Oct 29 01:52:34 2020 -0400
+
+    ci: fix env variable comparison
+
+commit df0dc7fc62539140a334c6a75ee57f4f7edce4f3
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Thu Oct 29 01:34:54 2020 -0400
+
+    ci: fix typo
+
+commit 4307c7d428d940e2d193ccd01a629f09c5ccb7be
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Thu Oct 29 01:09:57 2020 -0400
+
+    ci: add step function deployment
+
+commit c1726ef672c0c1f9f13a12dad12e449c923cf95a
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Wed Oct 28 20:31:10 2020 -0400
+
+    fix: thread 'main' panicked
+    https://github.com/awslabs/aws-lambda-rust-runtime/issues/266
+
+commit 100654c7cc6ed04a6f2da8aa861aeca8a71dabd9
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Wed Oct 28 14:56:21 2020 -0400
+
+    Update README.md
+
+commit 14ba07eb0abe6f1ff12ed13a35d20423736286b4
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Tue Oct 27 19:17:42 2020 -0400
+
+    ci: try to cache crates
+
+commit e5713944c3d8038277355ad7faff80cfbebb6b95
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Tue Oct 27 19:06:35 2020 -0400
+
+    ci: add local test
+
+commit 2137e0e3e0f4640415cf340ee3328c5dda98ef15
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Wed Oct 21 11:32:07 2020 -0400
+
+    ci: try to cache xargo
+
+commit 4c580ba3eaa1818d3429d2d65804eea7788bf553
+Merge: 5870aee f29f5ef
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Wed Oct 21 10:26:45 2020 -0400
+
+    Merge pull request #5 from DSLAM-UMD/develop
+
+    ci:  auto upgrade and deploy severlesscq to aws
+
+commit f29f5eff1354ebac65f21123f6a527a4979aabe1
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Wed Oct 21 10:22:39 2020 -0400
+
+    ci:  auto upgrade and deploy severlesscq to aws
+
+commit 5870aee0af84c651bead6e1f9e4ee2747feb0bfe
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Wed Oct 21 01:27:43 2020 -0400
+
+    ci: fix could not compile `std`
+
+    error[E0463]: can't find crate for `panic_unwind`
+
+commit 09a885370e4a1c271ec3e2bf401b658dfe2c1f1a
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Wed Oct 21 01:19:15 2020 -0400
+
+    ci: fix nightly error
+
+commit 1d7ecb79c0cb234825cfd8ecd90f7f7c40f7f607
+Merge: f88c625 7b0a3b1
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Wed Oct 21 01:09:57 2020 -0400
+
+    Merge pull request #4 from DSLAM-UMD/develop
+
+    ci: fix `rust-src` component not found
+
+commit 7b0a3b1ecf1ee54fd5805f3ba2178b12228157a2
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Wed Oct 21 01:04:04 2020 -0400
+
+    ci: fix `rust-src` component not found
+
+    https://github.com/DSLAM-UMD/ServerlessCQ/runs/1284865542
+
+commit f88c625319ca029f7042415f552385d4189ada48
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Wed Oct 21 00:56:10 2020 -0400
+
+    ci: update lambda ci
+
+commit 960c92dcda14bdc1747040802cce2134d258c4be
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Mon Oct 19 15:47:28 2020 -0400
+
+    docs: update badge link
+
+commit bc03049e6265f4f59107955eb94e05391adaeed4
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Mon Oct 19 15:45:58 2020 -0400
+
+    docs: add status badges
+
+commit 42fc98f56e3e0be1edb372b6d9eba6ac65793174
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Mon Oct 19 15:41:06 2020 -0400
+
+    Update rust.yml
+
+commit 755fe8b50b639696bdf7f45522f9083a244f1ab0
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Mon Oct 19 15:29:07 2020 -0400
+
+    feat: add ci via github action
+
+commit fbbc7d21de7545cfcba32fd95104b0985ac19b5f
+Merge: 3ab4886 b4ced1d
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Mon Oct 19 15:24:06 2020 -0400
+
+    Merge pull request #2 from DSLAM-UMD/develop
+
+    fix: refine code to 2018 edition
+
+commit b4ced1d24f9541877e40f33cd80a19d042c0cfd1
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Mon Oct 19 15:23:33 2020 -0400
+
+    fix: refine code to 2018 edition
+
+commit 3ab4886aa425f62669edf7dafa21d7a8fd88834c
+Merge: 3c3a40f 4924db6
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Mon Oct 19 15:03:16 2020 -0400
+
+    Merge pull request #1 from DSLAM-UMD/develop
+
+    feat: lamada function in rust
+
+commit 4924db6b22ad764c3a35834404fad6971bd0c1ef
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Mon Oct 19 15:00:58 2020 -0400
+
+    feat: lamada function in rust
+
+commit 3c3a40fa6fe9058e12d329fe421c6d999659163a
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Mon Oct 12 17:38:03 2020 -0400
+
+    Update README.md
+
+commit 32977bf51427bcf827472644a4e08e220453d627
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Sun Sep 27 15:57:22 2020 -0400
+
+    Update .gitignore
+
+commit 9e20af6ceaa362d0fb9a806b269f72cf546e4610
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Sun Sep 27 15:46:47 2020 -0400
+
+    Update README.md
+
+commit d0df227f7f990924f518271d5b83d5602832848d
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Sun Sep 27 15:45:55 2020 -0400
+
+    Create LICENSE
+
+commit e4f22d2f74af8817153744ff2c022b9c0bcbb2cb
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Fri Sep 25 01:35:06 2020 -0400
+
+    Update README.md
+
+commit fe5d0ff0c21366bbed3270b07baed21635026e97
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Fri Sep 25 01:34:49 2020 -0400
+
+    Update README.md
+
+commit df69a551e1f39b25dbad442b1f329751b02749c4
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Fri Sep 25 01:13:57 2020 -0400
+
+    Update README.md
+
+commit 382c748b9a696af3eb6b130d361111384d2dd104
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Fri Sep 25 01:06:50 2020 -0400
+
+    Update README.md
+
+commit 950ef207e62a00fdb2fc564f851f752642d4e713
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Fri Sep 25 01:06:29 2020 -0400
+
+    Delete LICENSE
+
+commit eea6bb6835e8af8a412b6f022c6e801cf4737bc4
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Fri Sep 25 01:06:02 2020 -0400
+
+    Update LICENSE
+
+commit 092dfb23e65e260ac8e86a35a69eed1631fb568f
+Author: Gang Liao <gangliao@cs.umd.edu>
+Date:   Sat Sep 19 00:18:45 2020 -0400
+
+    Update README.md
+
+commit caf7eff30b27f5005149336fa19438e778cc388d
+Author: Gang Liao <gangliao@umd.edu>
+Date:   Sun Sep 13 10:27:11 2020 -0400
+
+    Initial commit
