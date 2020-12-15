@@ -16,6 +16,7 @@ extern crate lazy_static;
 use aws_lambda_events::event::kinesis::KinesisEvent;
 use chrono::{DateTime, Utc};
 use lambda::{handler_fn, Context};
+use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use rusoto_core::Region;
 use rusoto_stepfunctions::{StartExecutionInput, StepFunctions, StepFunctionsClient};

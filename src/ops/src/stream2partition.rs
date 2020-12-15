@@ -137,11 +137,11 @@ async fn handler(event: KinesisEvent, _: Context) -> Result<(), Error> {
                 // );
                 // output_n += 1;
 
-                invoke_step_function(proj_input);
-                // println!(
-                //     "stream name: {}, key: {}, batch_size: {}, islast: {}",
-                //     proj_input.stream_name, key, batch_size, proj_input.is_last
-                // );
+                // invoke_step_function(proj_input);
+                println!(
+                    "stream name: {}, key: {}, batch_size: {}, islast: {}",
+                    proj_input.stream_name, key, batch_size, proj_input.is_last
+                );
 
                 batch_size = 0;
                 res.clear();
@@ -165,7 +165,7 @@ async fn handler(event: KinesisEvent, _: Context) -> Result<(), Error> {
             proj_input.stream_name, key, batch_size, proj_input.is_last
         );
         // println!("Partitioned data: {:?}", proj_input);
-        invoke_step_function(proj_input);
+        // invoke_step_function(proj_input);
     }
     Ok(())
 }
