@@ -16,7 +16,6 @@ extern crate lazy_static;
 use aws_lambda_events::event::kinesis::KinesisEvent;
 use chrono::{DateTime, Utc};
 use lambda::{handler_fn, Context};
-use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use rusoto_core::Region;
 use rusoto_stepfunctions::{StartExecutionInput, StepFunctions, StepFunctionsClient};
@@ -40,26 +39,26 @@ struct Input {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ProjectionInput {
-    projection:  Vec<String>,
+    projection: Vec<String>,
     stream_name: String,
-    data:        Vec<String>, // [{}, {}, ...]
-    join_cols:   Vec<String>, // join on ...
-    join_args:   JoinArgs,
+    data: Vec<String>,      // [{}, {}, ...]
+    join_cols: Vec<String>, // join on ...
+    join_args: JoinArgs,
 
-    is_last:   bool, // if this is the last batch of the key
-    key:       String,
+    is_last: bool, // if this is the last batch of the key
+    key: String,
     batch_num: i32,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 struct JoinArgs {
-    join_method:  String, // "0": Nested loop; "1": Hash join
-    join_type:    String, // Inner, Left ...
-    left_stream:  String,
-    left_attr:    String,
+    join_method: String, // "0": Nested loop; "1": Hash join
+    join_type: String,   // Inner, Left ...
+    left_stream: String,
+    left_attr: String,
     right_stream: String,
-    right_attr:   String,
-    op:           String, // "=", ">", "<"
+    right_attr: String,
+    op: String, // "=", ">", "<"
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -176,13 +175,13 @@ fn get_proj_input(data: Vec<String>, key: String, islast: bool, batch: i32) -> P
         .map(|s| s.to_owned())
         .collect();
     let jargs = JoinArgs {
-        join_method:  "0".to_string(),     // "0": Nested loop; "1": Hash join
-        join_type:    "Inner".to_string(), // Inner, Left ...
-        left_stream:  "stream1".to_string(),
-        left_attr:    "attr_1".to_string(),
+        join_method: "0".to_string(),   // "0": Nested loop; "1": Hash join
+        join_type: "Inner".to_string(), // Inner, Left ...
+        left_stream: "stream1".to_string(),
+        left_attr: "attr_1".to_string(),
         right_stream: "stream2".to_string(),
-        right_attr:   "attr_1".to_string(),
-        op:           "=".to_string(), // "=", ">", "<"
+        right_attr: "attr_1".to_string(),
+        op: "=".to_string(), // "=", ">", "<"
     };
     ProjectionInput {
         projection: proj,
@@ -202,8 +201,8 @@ async fn invoke_step_function(input: ProjectionInput) {
 
     // println!("{}", rand_string);
     let request = StartExecutionInput {
-        input:             Some(json!(input).to_string()),
-        name:              Some(rand_string),
+        input: Some(json!(input).to_string()),
+        name: Some(rand_string),
         state_machine_arn: "arn:aws:states:us-east-1:942368842860:stateMachine:DistrJoin2Streams"
             .to_string(),
     };
