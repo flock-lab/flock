@@ -35,5 +35,35 @@
 //! Step Functions console provides a graphical representation of that state
 //! machine to help visualize your application logic.
 
-#[path = "dataflow/mod.rs"]
-mod dataflow;
+pub mod common;
+pub use common::Common;
+
+pub mod map;
+pub use map::Map;
+
+pub mod choice;
+pub use choice::Choice;
+
+pub mod fail;
+pub use fail::Fail;
+
+pub mod parallel;
+pub use parallel::Parallel;
+
+pub mod pass;
+pub use pass::Pass;
+
+pub mod succeed;
+pub use succeed::Succeed;
+
+pub mod wait;
+pub use wait::Wait;
+
+pub mod task;
+pub use task::Task;
+
+pub mod paths;
+pub use paths::{InputPath, OutputPath, Parameters, ResultPath, ResultSelector};
+
+pub mod state_machine;
+pub use state_machine::StateMachine;

@@ -12,17 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[path = "./common.rs"]
-mod common;
-use common::Common;
-
-#[path = "./graph.rs"]
-mod graph;
-use graph::Dataflow;
-
-#[path = "./paths.rs"]
-mod paths;
-use paths::{ResultPath, ResultSelector};
+use crate::common::Common;
+use crate::paths::{ResultPath, ResultSelector};
+use crate::state_machine::StateMachine;
 
 /// The Map state ("Type": "Map") can be used to run a set of steps for each
 /// element of an input array. While the Parallel state executes multiple
@@ -82,7 +74,7 @@ pub struct Map {
     pub common:          Common,
     /// The Iterator field’s value is an object that defines a state machine
     /// which will process each element of the array.
-    pub iterator:        Dataflow,
+    pub iterator:        StateMachine,
     /// The ItemsPath field’s value is a reference path identifying where in the
     /// effective input the array field is found. For more information, see
     /// ItemsPath. States within an Iterator field can only transition to

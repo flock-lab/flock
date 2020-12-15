@@ -47,6 +47,7 @@ struct JoinSchedulerOutput {
     end:       bool,
     data:      HashMap<String, Value>,
     join_args: JoinArgs,
+
 }
 
 #[tokio::main]
@@ -79,10 +80,12 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
             }
 
             let batch = STREAM_2.lock().unwrap().pop_front().unwrap();
+
             res.data
                 .insert("stream2".to_string(), batch["data"].clone());
             res.data
                 .insert("stream1".to_string(), event["data"].clone());
+
         }
         "stream2" => {
             // Another stream is not ready to join
@@ -98,6 +101,7 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
             }
 
             let batch = STREAM_1.lock().unwrap().pop_front().unwrap();
+
             res.data
                 .insert("stream1".to_string(), batch["data"].clone());
             res.data

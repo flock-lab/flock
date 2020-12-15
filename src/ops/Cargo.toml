@@ -27,6 +27,7 @@ rusoto_kinesis = "0.45.0"
 bincode = "1.3.1"
 bytes = { version = "0.5.6", features = ["serde"] }
 
+
 [[bin]]
 name = "projection"
 path = "src/projection.rs"
@@ -62,3 +63,4 @@ path = "src/lambda_check.rs"
 [[bin]]
 name = "join_distributed"
 path = "src/join_distributed.rs"
+

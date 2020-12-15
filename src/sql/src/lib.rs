@@ -12,19 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[path = "./common.rs"]
-mod common;
-use common::Common;
-use json::JsonValue;
+//! This module provides a SQL parser that translates SQL queries into an
+//! abstract syntax tree (AST), and a SQL query planner that creates a logical
+//! plan from the AST.
 
-#[allow(dead_code)]
-pub struct Choice {
-    /// Common state fields.
-    pub common:  Common,
-    /// The name of the state to transition to if none of the transitions in
-    /// Choices is taken.
-    pub default: Option<String>,
-    /// An array of Choice Rules that determines which state the state machine
-    /// transitions to next.
-    pub choices: JsonValue,
-}
+pub mod parser;

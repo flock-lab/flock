@@ -26,13 +26,8 @@
 //!    "HeartbeatSeconds": 60
 //! }
 
-#[path = "./common.rs"]
-mod common;
-use common::Common;
-
-#[path = "./paths.rs"]
-mod paths;
-use paths::{Parameters, ResultPath, ResultSelector};
+use crate::common::Common;
+use crate::paths::{Parameters, ResultPath, ResultSelector};
 
 /// A Task state ("Type": "Task") represents a single unit of work performed by
 /// a state machine.

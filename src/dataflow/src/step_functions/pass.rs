@@ -12,14 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[path = "./common.rs"]
-mod common;
-use common::Common;
-
-#[path = "./paths.rs"]
-mod paths;
-use paths::{Parameters, ResultPath};
-
+use crate::common::Common;
+use crate::paths::{Parameters, ResultPath};
 use json::JsonValue;
 
 #[allow(dead_code)]
@@ -40,8 +34,8 @@ pub struct Pass {
 
 #[cfg(test)]
 mod tests {
-    #[tokio::test]
-    async fn test_json_value() {
+    #[test]
+    fn test_json_value() {
         let mut data = json::JsonValue::new_object();
         data["answer"] = 42.into();
         data["foo"] = "bar".into();
