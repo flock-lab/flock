@@ -15,9 +15,17 @@ aws_lambda_events = "0.3"
 base64 = "0.13"
 lazy_static = "1.4.0"
 rusoto_stepfunctions = "0.45.0"
+rusoto_lambda = "0.45.0"
 openssl = { version = "0.10", features = ["vendored"] }
 rusoto_core = "0.45.0"
 rand = "0.7.3"
+chrono = "0.4"
+
+hyper = "0.13"
+hyper-tls = "0.4.3"
+rusoto_kinesis = "0.45.0"
+bincode = "1.3.1"
+bytes = { version = "0.5.6", features = ["serde"] }
 
 [[bin]]
 name = "projection"
@@ -38,3 +46,19 @@ path = "src/gen_data_1.rs"
 [[bin]]
 name = "gen_data_2"
 path = "src/gen_data_2.rs"
+
+[[bin]]
+name = "stream1partition"
+path = "src/stream1partition.rs"
+
+[[bin]]
+name = "stream2partition"
+path = "src/stream2partition.rs"
+
+[[bin]]
+name = "lambda_check"
+path = "src/lambda_check.rs"
+
+[[bin]]
+name = "join_distributed"
+path = "src/join_distributed.rs"

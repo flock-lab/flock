@@ -44,9 +44,9 @@ struct JoinArgs {
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct JoinSchedulerOutput {
-    end:         bool,
-    stream_data: HashMap<String, Value>,
-    join_args:   JoinArgs,
+    end:       bool,
+    data:      HashMap<String, Value>,
+    join_args: JoinArgs,
 }
 
 #[tokio::main]
@@ -60,9 +60,9 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
     let jargs: JoinArgs = serde_json::from_value(event["join_args"].clone()).unwrap();
 
     let mut res = JoinSchedulerOutput {
-        end:         false,
-        stream_data: HashMap::new(),
-        join_args:   jargs,
+        end:       false,
+        data:      HashMap::new(),
+        join_args: jargs,
     };
 
     match stream_name {
@@ -79,10 +79,10 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
             }
 
             let batch = STREAM_2.lock().unwrap().pop_front().unwrap();
-            res.stream_data
-                .insert("stream2".to_string(), batch["message"].clone());
-            res.stream_data
-                .insert("stream1".to_string(), event["message"].clone());
+            res.data
+                .insert("stream2".to_string(), batch["data"].clone());
+            res.data
+                .insert("stream1".to_string(), event["data"].clone());
         }
         "stream2" => {
             // Another stream is not ready to join
@@ -98,10 +98,10 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
             }
 
             let batch = STREAM_1.lock().unwrap().pop_front().unwrap();
-            res.stream_data
-                .insert("stream1".to_string(), batch["message"].clone());
-            res.stream_data
-                .insert("stream2".to_string(), event["message"].clone());
+            res.data
+                .insert("stream1".to_string(), batch["data"].clone());
+            res.data
+                .insert("stream2".to_string(), event["data"].clone());
         }
         _ => {}
     }

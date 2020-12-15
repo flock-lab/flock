@@ -12,3 +12,5 @@ Cargo.lock
 .cache
 
 .DS_Store
+
+src/ops/test_output
