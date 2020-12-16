@@ -35,11 +35,11 @@ type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
 #[derive(Debug, Serialize, Deserialize)]
 struct ProjectionOutputMsg {
     stream_name: String,
-    data:        Vec<ProjectionOutputRecord>,
-    join_args:   JoinArgs,
+    data: Vec<ProjectionOutputRecord>,
+    join_args: JoinArgs,
 
-    key:       String,
-    is_last:   bool,
+    key: String,
+    is_last: bool,
     batch_num: i32,
 }
 
@@ -47,18 +47,18 @@ struct ProjectionOutputMsg {
 // One record
 struct ProjectionOutputRecord {
     result_cols: HashMap<String, String>,
-    join_cols:   HashMap<String, String>,
+    join_cols: HashMap<String, String>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct JoinArgs {
-    join_method:  String, // "0": Nested loop; "1": Hash join
-    join_type:    String, // Inner, Left ...
-    left_stream:  String,
-    left_attr:    String,
+    join_method: String, // "0": Nested loop; "1": Hash join
+    join_type: String,   // Inner, Left ...
+    left_stream: String,
+    left_attr: String,
     right_stream: String,
-    right_attr:   String,
-    op:           String, // "=", ">", "<"
+    right_attr: String,
+    op: String, // "=", ">", "<"
 }
 
 #[tokio::main]
@@ -87,7 +87,7 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
     match client.get_function_configuration(req).await {
         Ok(func) => {
             // Find function, invoke.
-            println!("{:#?}", func);
+            println!("Find func: {:?}", func_name);
             func_arn = func.function_arn.unwrap();
             let request = InvocationRequest {
                 function_name: func_name.clone(),
@@ -96,7 +96,7 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
                 ..InvocationRequest::default()
             };
             let result = client.invoke(request).await;
-            println!("result: {:#?}", result);
+            // println!("result: {:#?}", result);
         }
         Err(e) => {
             // Doesn't exist, create one.
@@ -113,7 +113,7 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
                     // println!("code info: {:?}", resp.configuration);
                     if let Some(code_location) = resp.code {
                         let url = code_location.location.unwrap();
-                        println!("code loacation: {:?}", url);
+                        // println!("code loacation: {:?}", url);
                         let https = HttpsConnector::new();
                         let codeClient = Client::builder().build::<_, hyper::Body>(https);
 
@@ -163,17 +163,16 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
     Ok(json!({ "msg": func_arn }))
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use std::fs::File;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::File;
 
-//     #[tokio::test]
-//     async fn stream1() {
-//         let event: Value =
-//
-// serde_json::from_slice(include_bytes!("../test_output/proj_output_0.json"))
-//                 .expect("invalid kinesis event");
-//         handler(event, Context::default()).await.ok().unwrap();
-//     }
-// }
+    #[tokio::test]
+    async fn stream1() {
+        let event: Value =
+            serde_json::from_slice(include_bytes!("../test_output/proj_output_1.json"))
+                .expect("invalid kinesis event");
+        handler(event, Context::default()).await.ok().unwrap();
+    }
+}

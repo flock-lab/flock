@@ -45,11 +45,11 @@ lazy_static! {
 #[derive(Debug, Serialize, Deserialize)]
 struct ProjectionOutputMsg {
     stream_name: String,
-    data:        Vec<ProjectionOutputRecord>,
-    join_args:   JoinArgs,
+    data: Vec<ProjectionOutputRecord>,
+    join_args: JoinArgs,
 
-    key:       String,
-    is_last:   bool,
+    key: String,
+    is_last: bool,
     batch_num: i32,
 }
 
@@ -57,18 +57,18 @@ struct ProjectionOutputMsg {
 // One record
 struct ProjectionOutputRecord {
     result_cols: HashMap<String, String>,
-    join_cols:   HashMap<String, String>,
+    join_cols: HashMap<String, String>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct JoinArgs {
-    join_method:  String, // "0": Nested loop; "1": Hash join
-    join_type:    String, // Inner, Left ...
-    left_stream:  String,
-    left_attr:    String,
+    join_method: String, // "0": Nested loop; "1": Hash join
+    join_type: String,   // Inner, Left ...
+    left_stream: String,
+    left_attr: String,
     right_stream: String,
-    right_attr:   String,
-    op:           String, // "=", ">", "<"
+    right_attr: String,
+    op: String, // "=", ">", "<"
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -199,6 +199,10 @@ async fn handler(event: Value, _: Context) -> Result<(), Error> {
     let input: ProjectionOutputMsg = serde_json::from_value(event.clone()).unwrap();
     let mut join_output: Vec<HashMap<String, String>> = Vec::new();
     let batch_num = input.batch_num;
+    println!(
+        "batch num: {:?}, stream: {:?}, last batch? {:?}",
+        batch_num, input.stream_name, input.is_last
+    );
 
     BATCH_COMPLETENESS
         .lock()
@@ -308,13 +312,13 @@ async fn handler(event: Value, _: Context) -> Result<(), Error> {
     // let len1 = STREAM1_BATCHES.lock().unwrap()[&batch_num.clone()].len();
     // let len2 = STREAM2_BATCHES.lock().unwrap()[&batch_num.clone()].len();
 
-    // let res = JoinOutput {
-    //     results: join_output,
-    // };
-
-    let res = testMag {
-        msg: "test".to_string(),
+    let res = JoinOutput {
+        results: join_output,
     };
+
+    // let res = testMag {
+    //     msg: "test".to_string(),
+    // };
     // println!("{:}", json!(res));
     // Write to Kinesis Data streams
     let kinesis_client = KinesisClient::new(Region::UsEast1);
