@@ -22,13 +22,13 @@ import org.apache.flink.api.common.functions.JoinFunction;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.api.java.functions.KeySelector;
-import org.apache.flink.api.java.tuple.Tuple4;
+import org.apache.flink.api.java.tuple.Tuple5;
 import org.apache.flink.api.java.tuple.Tuple7;
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.flink.streaming.api.TimeCharacteristic;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.IterativeStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.streaming.connectors.kinesis.FlinkKinesisConsumer;
@@ -45,6 +45,7 @@ public class BasicStreamingJoinJob {
   private static final String outputStreamName = "joinResults";
   private static final long windowSize = 2000L;
   private static final long rate = 3L;
+  private static final long delay = 5L;
 
   private static DataStream<String> createSourceFromStaticConfig(
       StreamExecutionEnvironment env, String streamName) {
@@ -96,41 +97,71 @@ public class BasicStreamingJoinJob {
   public static void main(String[] args) throws Exception {
     // set up the streaming execution environment
     final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+    env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
 
     /* if you would like to use runtime configuration properties, uncomment the lines below
      * DataStream<String> input = createSourceFromApplicationProperties(env);
      */
-    DataStream<String> stream1 = createSourceFromStaticConfig(env, inputStream1Name);
-    DataStream<String> stream2 = createSourceFromStaticConfig(env, inputStream2Name);
-    ObjectMapper jsonParser = new ObjectMapper();
+    // DataStream<String> stream1 = createSourceFromStaticConfig(env, inputStream1Name);
+    // DataStream<String> stream2 = createSourceFromStaticConfig(env, inputStream2Name);
+    // ObjectMapper jsonParser = new ObjectMapper();
 
-    IterativeStream<String> iter1 = stream1.iterate();
-    DataStream<Tuple4<Integer, Integer, Integer, Integer>> input1 =
-        iter1.map(
-            new MapFunction<String, Tuple4<Integer, Integer, Integer, Integer>>() {
+    // IterativeStream<String> iter1 = stream1.iterate();
+    // DataStream<Tuple4<Integer, Integer, Integer, Integer>> input1 =
+    //     iter1.map(
+    //         new MapFunction<String, Tuple4<Integer, Integer, Integer, Integer>>() {
+    //           @Override
+    //           public Tuple4<Integer, Integer, Integer, Integer> map(String value) throws
+    // Exception {
+    //             JsonNode jsonNode = jsonParser.readValue(value, JsonNode.class);
+    //             return new Tuple4<>(
+    //                 jsonNode.get("attr_1").asInt(),
+    //                 jsonNode.get("attr_2").asInt(),
+    //                 jsonNode.get("attr_3").asInt(),
+    //                 jsonNode.get("attr_4").asInt());
+    //           }
+    //         });
+
+    // IterativeStream<String> iter2 = stream2.iterate();
+    // DataStream<Tuple4<Integer, Integer, Integer, Integer>> input2 =
+    //     iter2.map(
+    //         new MapFunction<String, Tuple4<Integer, Integer, Integer, Integer>>() {
+    //           @Override
+    //           public Tuple4<Integer, Integer, Integer, Integer> map(String value) throws
+    // Exception {
+    //             JsonNode jsonNode = jsonParser.readValue(value, JsonNode.class);
+    //             return new Tuple4<>(
+    //                 jsonNode.get("attr_1").asInt(),
+    //                 jsonNode.get("attr_5").asInt(),
+    //                 jsonNode.get("attr_6").asInt(),
+    //                 jsonNode.get("attr_7").asInt());
+    //           }
+    //         });
+
+    DataStream<Tuple5<Integer, Integer, Integer, Integer, Long>> stream1 =
+        env.addSource(new StreamDataSource1()).name("Demo Source1");
+    DataStream<Tuple5<Integer, Integer, Integer, Integer, Long>> stream2 =
+        env.addSource(new StreamDataSource2()).name("Demo Source2");
+
+    DataStream<Tuple5<Integer, Integer, Integer, Integer, Long>> input1 =
+        stream1.assignTimestampsAndWatermarks(
+            new BoundedOutOfOrdernessTimestampExtractor<
+                Tuple5<Integer, Integer, Integer, Integer, Long>>(Time.milliseconds(delay)) {
               @Override
-              public Tuple4<Integer, Integer, Integer, Integer> map(String value) throws Exception {
-                JsonNode jsonNode = jsonParser.readValue(value, JsonNode.class);
-                return new Tuple4<>(
-                    jsonNode.get("attr_1").asInt(),
-                    jsonNode.get("attr_2").asInt(),
-                    jsonNode.get("attr_3").asInt(),
-                    jsonNode.get("attr_4").asInt());
+              public long extractTimestamp(
+                  Tuple5<Integer, Integer, Integer, Integer, Long> element) {
+                return element.f4;
               }
             });
 
-    IterativeStream<String> iter2 = stream2.iterate();
-    DataStream<Tuple4<Integer, Integer, Integer, Integer>> input2 =
-        iter2.map(
-            new MapFunction<String, Tuple4<Integer, Integer, Integer, Integer>>() {
+    DataStream<Tuple5<Integer, Integer, Integer, Integer, Long>> input2 =
+        stream2.assignTimestampsAndWatermarks(
+            new BoundedOutOfOrdernessTimestampExtractor<
+                Tuple5<Integer, Integer, Integer, Integer, Long>>(Time.milliseconds(delay)) {
               @Override
-              public Tuple4<Integer, Integer, Integer, Integer> map(String value) throws Exception {
-                JsonNode jsonNode = jsonParser.readValue(value, JsonNode.class);
-                return new Tuple4<>(
-                    jsonNode.get("attr_1").asInt(),
-                    jsonNode.get("attr_5").asInt(),
-                    jsonNode.get("attr_6").asInt(),
-                    jsonNode.get("attr_7").asInt());
+              public long extractTimestamp(
+                  Tuple5<Integer, Integer, Integer, Integer, Long> element) {
+                return element.f4;
               }
             });
 
@@ -167,8 +198,8 @@ public class BasicStreamingJoinJob {
 
   public static DataStream<Tuple7<Integer, Integer, Integer, Integer, Integer, Integer, Integer>>
       runWindowJoin(
-          DataStream<Tuple4<Integer, Integer, Integer, Integer>> stream1,
-          DataStream<Tuple4<Integer, Integer, Integer, Integer>> stream2,
+          DataStream<Tuple5<Integer, Integer, Integer, Integer, Long>> stream1,
+          DataStream<Tuple5<Integer, Integer, Integer, Integer, Long>> stream2,
           long windowSize) {
 
     return stream1
@@ -178,14 +209,14 @@ public class BasicStreamingJoinJob {
         .window(TumblingEventTimeWindows.of(Time.milliseconds(windowSize)))
         .apply(
             new JoinFunction<
-                Tuple4<Integer, Integer, Integer, Integer>,
-                Tuple4<Integer, Integer, Integer, Integer>,
+                Tuple5<Integer, Integer, Integer, Integer, Long>,
+                Tuple5<Integer, Integer, Integer, Integer, Long>,
                 Tuple7<Integer, Integer, Integer, Integer, Integer, Integer, Integer>>() {
 
               @Override
               public Tuple7<Integer, Integer, Integer, Integer, Integer, Integer, Integer> join(
-                  Tuple4<Integer, Integer, Integer, Integer> first,
-                  Tuple4<Integer, Integer, Integer, Integer> second) {
+                  Tuple5<Integer, Integer, Integer, Integer, Long> first,
+                  Tuple5<Integer, Integer, Integer, Integer, Long> second) {
                 return new Tuple7<Integer, Integer, Integer, Integer, Integer, Integer, Integer>(
                     first.f0, first.f1, first.f2, first.f3, second.f1, second.f2, second.f3);
               }
@@ -193,9 +224,9 @@ public class BasicStreamingJoinJob {
   }
 
   private static class NameKeySelector
-      implements KeySelector<Tuple4<Integer, Integer, Integer, Integer>, Integer> {
+      implements KeySelector<Tuple5<Integer, Integer, Integer, Integer, Long>, Integer> {
     @Override
-    public Integer getKey(Tuple4<Integer, Integer, Integer, Integer> value) {
+    public Integer getKey(Tuple5<Integer, Integer, Integer, Integer, Long> value) {
       return value.f0;
     }
   }
