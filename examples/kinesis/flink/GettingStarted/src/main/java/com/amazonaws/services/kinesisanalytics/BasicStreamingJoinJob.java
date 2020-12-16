@@ -24,6 +24,8 @@ import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.tuple.Tuple4;
 import org.apache.flink.api.java.tuple.Tuple7;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.IterativeStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -100,6 +102,7 @@ public class BasicStreamingJoinJob {
      */
     DataStream<String> stream1 = createSourceFromStaticConfig(env, inputStream1Name);
     DataStream<String> stream2 = createSourceFromStaticConfig(env, inputStream2Name);
+    ObjectMapper jsonParser = new ObjectMapper();
 
     IterativeStream<String> iter1 = stream1.iterate();
     DataStream<Tuple4<Integer, Integer, Integer, Integer>> input1 =
@@ -107,12 +110,12 @@ public class BasicStreamingJoinJob {
             new MapFunction<String, Tuple4<Integer, Integer, Integer, Integer>>() {
               @Override
               public Tuple4<Integer, Integer, Integer, Integer> map(String value) throws Exception {
-                String[] temp = value.split(",");
+                JsonNode jsonNode = jsonParser.readValue(value, JsonNode.class);
                 return new Tuple4<>(
-                    Integer.parseInt(temp[0]),
-                    Integer.parseInt(temp[1]),
-                    Integer.parseInt(temp[2]),
-                    Integer.parseInt(temp[3]));
+                    jsonNode.get("attr_1").asInt(),
+                    jsonNode.get("attr_2").asInt(),
+                    jsonNode.get("attr_3").asInt(),
+                    jsonNode.get("attr_4").asInt());
               }
             });
 
@@ -122,12 +125,12 @@ public class BasicStreamingJoinJob {
             new MapFunction<String, Tuple4<Integer, Integer, Integer, Integer>>() {
               @Override
               public Tuple4<Integer, Integer, Integer, Integer> map(String value) throws Exception {
-                String[] temp = value.split(",");
+                JsonNode jsonNode = jsonParser.readValue(value, JsonNode.class);
                 return new Tuple4<>(
-                    Integer.parseInt(temp[0]),
-                    Integer.parseInt(temp[1]),
-                    Integer.parseInt(temp[2]),
-                    Integer.parseInt(temp[3]));
+                    jsonNode.get("attr_1").asInt(),
+                    jsonNode.get("attr_5").asInt(),
+                    jsonNode.get("attr_6").asInt(),
+                    jsonNode.get("attr_7").asInt());
               }
             });
 
