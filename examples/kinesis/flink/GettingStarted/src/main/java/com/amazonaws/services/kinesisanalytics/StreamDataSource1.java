@@ -34,7 +34,7 @@ public class StreamDataSource1
 
     long t = 1000000050000L;
 
-    for (int i = 0; i < 50; ++i) {
+    for (int i = 0; i < 2500; ++i) {
       Tuple5 tuple =
           Tuple5.of(
               getRandomNumberUsingInts(90, 92),
