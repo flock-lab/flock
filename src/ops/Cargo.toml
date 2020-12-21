@@ -18,7 +18,7 @@ rusoto_stepfunctions = "0.45.0"
 rusoto_lambda = "0.45.0"
 openssl = { version = "0.10", features = ["vendored"] }
 rusoto_core = "0.45.0"
-rand = "0.7.3"
+rand = "0.8.0"
 chrono = "0.4"
 
 hyper = "0.13"
