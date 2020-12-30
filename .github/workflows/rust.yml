@@ -85,6 +85,7 @@ jobs:
         run: |
           for f in $LAMBDA_NAME; do
             mv ./target/x86_64-unknown-linux-gnu/release/$f ./bootstrap;
+            strip --strip-all ./bootstrap;
             zip -j $f.zip ./bootstrap;
             GET_FUNCTION_NAME=$(aws lambda list-functions --query \
               "Functions[?FunctionName=='${f}'].FunctionName[]" --output text);
