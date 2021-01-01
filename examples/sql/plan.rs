@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[allow(unused_imports)]
+#[macro_use]
+extern crate more_asserts;
+
 type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
 
 #[tokio::main]
@@ -70,7 +74,7 @@ mod tests {
             .expect("failed to cast version");
         assert_eq!(values.len(), 1);
         // avg(1,2,3,4,5) = 3.0
-        assert_eq!(values.value(0), 3.0_f64);
+        assert_lt!(values.value(0) - 3.0_f64, f64::EPSILON);
         Ok(())
     }
 

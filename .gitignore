@@ -19,3 +19,6 @@ src/ops/test_output
 .classpath
 .project
 .settings
+
+# ServerlessCQ
+.history
