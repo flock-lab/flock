@@ -36,8 +36,6 @@ mod tests {
     use datafusion::execution::context::ExecutionContext;
     use datafusion::physical_plan::collect;
 
-    use serde::{Deserialize, Serialize};
-
     #[tokio::test]
     async fn simple_avg() -> Result<(), Error> {
         let schema = Schema::new(vec![Field::new("a", DataType::Int32, false)]);
@@ -75,32 +73,6 @@ mod tests {
         assert_eq!(values.len(), 1);
         // avg(1,2,3,4,5) = 3.0
         assert_lt!(values.value(0) - 3.0_f64, f64::EPSILON);
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn simple_nested_struct() -> Result<(), Error> {
-        #[derive(Deserialize, Serialize)]
-        struct A {
-            #[serde(with = "serde_with::json::nested")]
-            other_struct: B,
-        }
-
-        #[derive(Deserialize, Serialize)]
-        struct B {
-            value: usize,
-        }
-
-        let v: A = serde_json::from_str(r#"{"other_struct":"{\"value\":5}"}"#).unwrap();
-        assert_eq!(5, v.other_struct.value);
-
-        let x = A {
-            other_struct: B { value: 10 },
-        };
-        assert_eq!(
-            r#"{"other_struct":"{\"value\":10}"}"#,
-            serde_json::to_string(&x).unwrap()
-        );
         Ok(())
     }
 }
