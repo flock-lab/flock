@@ -38,3 +38,7 @@ path = "kinesis/gen_data.rs"
 [[bin]]
 name = "sql"
 path = "sql/plan.rs"
+
+[[bin]]
+name = "serde"
+path = "sql/serde.rs"
