@@ -15,6 +15,7 @@
 use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
 use serde::ser::{SerializeStruct, Serializer};
 use serde::{Deserialize, Serialize};
+use std::any::Any;
 use std::fmt;
 
 struct A {
@@ -256,6 +257,72 @@ mod tests {
             r#"{"other_struct":"{\"value\":10}"}"#,
             serde_json::to_string(&x).unwrap()
         );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn simple_trait() -> Result<(), Error> {
+        trait Event {
+            fn as_any(&self) -> &dyn Any;
+        }
+
+        impl<'a> Serialize for dyn Event + 'a {
+            fn serialize<S>(&self, _: S) -> std::result::Result<S::Ok, S::Error>
+            where
+                S: Serializer,
+            {
+                unimplemented!()
+            }
+        }
+
+        impl<'de> Deserialize<'de> for Box<dyn Event> {
+            fn deserialize<D>(_: D) -> std::result::Result<Self, D::Error>
+            where
+                D: Deserializer<'de>,
+            {
+                unimplemented!()
+            }
+        }
+
+        #[derive(Deserialize, Serialize)]
+        struct C {
+            #[serde(with = "serde_with::json::nested")]
+            other_struct: D,
+        }
+
+        impl Event for C {
+            fn as_any(&self) -> &dyn Any {
+                self
+            }
+        }
+
+        #[derive(Deserialize, Serialize)]
+        struct D {
+            value: usize,
+        }
+
+        impl Event for D {
+            fn as_any(&self) -> &dyn Any {
+                self
+            }
+        }
+
+        let x: Box<dyn Event> = Box::new(C {
+            other_struct: D { value: 10 },
+        });
+
+        if let Some(c) = x.as_any().downcast_ref::<C>() {
+            assert_eq!(
+                r#"{"other_struct":"{\"value\":10}"}"#,
+                serde_json::to_string(&c).unwrap()
+            );
+        } else if let Some(d) = x.as_any().downcast_ref::<D>() {
+            assert_eq!(
+                r#"{"other_struct":"{\"value\":10}"}"#,
+                serde_json::to_string(&d).unwrap()
+            );
+        }
+
         Ok(())
     }
 
