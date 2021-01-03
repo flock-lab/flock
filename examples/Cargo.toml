@@ -19,7 +19,6 @@ more-asserts = "0.2.1"
 arrow = { git = "https://github.com/apache/arrow", branch = "master" }
 datafusion = { git = "https://github.com/apache/arrow", branch = "master" }
 typetag = "0.1"
-# erased-serde = "0.3.13"
 heck = "0.3.1"
 
 [[bin]]
