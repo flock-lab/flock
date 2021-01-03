@@ -329,24 +329,24 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn derialize_tagged_trait() -> Result<(), Error> {
-        #[typetag::deserialize(tag = "plan")]
+    async fn serde_tagged_trait() -> Result<(), Error> {
+        #[typetag::serde(tag = "plan")]
         trait ExecutionPlan: Debug {
             fn as_any(&self) -> &dyn Any;
             fn execute(&self) -> &str;
         }
 
-        #[derive(Debug, Deserialize)]
+        #[derive(Debug, Serialize, Deserialize)]
         struct FilterExec {
             value: usize,
         }
 
-        #[derive(Debug, Deserialize)]
+        #[derive(Debug, Serialize, Deserialize)]
         struct ProjectionExec {
             input: Arc<dyn ExecutionPlan>,
         }
 
-        #[typetag::deserialize(name = "filter")]
+        #[typetag::serde(name = "filter")]
         impl ExecutionPlan for FilterExec {
             fn as_any(&self) -> &dyn Any {
                 self
@@ -356,7 +356,7 @@ mod tests {
             }
         }
 
-        #[typetag::deserialize(name = "projection")]
+        #[typetag::serde(name = "projection")]
         impl ExecutionPlan for ProjectionExec {
             fn as_any(&self) -> &dyn Any {
                 self
@@ -366,6 +366,7 @@ mod tests {
             }
         }
 
+        // Deserializaton
         let f = r#"
         {
           "plan": "filter",
@@ -394,6 +395,17 @@ mod tests {
                 assert_eq!(10, input.value);
             }
         }
+
+        // Serialization
+        let f: Box<dyn ExecutionPlan> = Box::new(ProjectionExec {
+            input: Arc::new(FilterExec { value: 10 }),
+        });
+
+        let f_x = serde_json::to_string(&f).unwrap();
+        assert_eq!(
+            r#"{"plan":"projection","input":{"plan":"filter","value":10}}"#,
+            f_x
+        );
 
         Ok(())
     }
