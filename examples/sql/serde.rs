@@ -15,7 +15,6 @@
 use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
 use serde::ser::{SerializeStruct, Serializer};
 use serde::{Deserialize, Serialize};
-use std::any::Any;
 use std::fmt;
 
 struct A {
@@ -233,6 +232,9 @@ async fn main() -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::any::Any;
+    use std::fmt::Debug;
+    use std::sync::Arc;
 
     #[tokio::test]
     async fn simple_nested_struct() -> Result<(), Error> {
@@ -322,6 +324,69 @@ mod tests {
                 serde_json::to_string(&d).unwrap()
             );
         }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn derialize_tagged_trait() -> Result<(), Error> {
+        #[typetag::deserialize(tag = "plan")]
+        trait ExecutionPlan: Debug {
+            fn as_any(&self) -> &dyn Any;
+            fn execute(&self) -> &str;
+        }
+
+        #[derive(Debug, Deserialize)]
+        struct FilterExec {
+            value: usize,
+        }
+
+        #[derive(Debug, Deserialize)]
+        struct ProjectionExec {
+            input: Arc<dyn ExecutionPlan>,
+        }
+
+        #[typetag::deserialize(name = "filter")]
+        impl ExecutionPlan for FilterExec {
+            fn as_any(&self) -> &dyn Any {
+                self
+            }
+            fn execute(&self) -> &str {
+                "filter op"
+            }
+        }
+
+        #[typetag::deserialize(name = "projection")]
+        impl ExecutionPlan for ProjectionExec {
+            fn as_any(&self) -> &dyn Any {
+                self
+            }
+            fn execute(&self) -> &str {
+                "projection op"
+            }
+        }
+
+        let f = r#"
+        {
+          "plan": "filter",
+          "value": 10
+        }
+        "#;
+        let f: Box<dyn ExecutionPlan> = serde_json::from_str(f).unwrap();
+        assert_eq!(r#"filter op"#, f.execute());
+
+        let f = r#"
+        {
+          "plan": "projection",
+          "input":
+          {
+            "plan": "filter",
+            "value": 10
+          }
+        }
+        "#;
+        let f: Box<dyn ExecutionPlan> = serde_json::from_str(f).unwrap();
+        assert_eq!(r#"projection op"#, f.execute());
 
         Ok(())
     }
