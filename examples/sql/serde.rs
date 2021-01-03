@@ -389,6 +389,7 @@ mod tests {
         assert_eq!(r#"projection op"#, f.execute());
 
         if let Some(project) = f.as_any().downcast_ref::<ProjectionExec>() {
+            assert_eq!(r#"filter op"#, project.input.execute());
             if let Some(input) = project.input.as_any().downcast_ref::<FilterExec>() {
                 assert_eq!(10, input.value);
             }
