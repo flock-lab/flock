@@ -343,7 +343,7 @@ mod tests {
 
         #[derive(Debug, Serialize, Deserialize)]
         struct ProjectionExec {
-            input: Arc<dyn ExecutionPlan>,
+            input: Vec<Arc<dyn ExecutionPlan>>,
         }
 
         #[typetag::serde(name = "filter")]
@@ -378,33 +378,62 @@ mod tests {
 
         let f = r#"
         {
-          "plan": "projection",
-          "input":
-          {
-            "plan": "filter",
-            "value": 10
-          }
+            "plan": "projection",
+            "input": [
+              {
+                "plan": "filter",
+                "value": 10
+              },
+              {
+                "plan": "filter",
+                "value": 11
+              },
+              {
+                "plan": "projection",
+                "input": [
+                  {
+                    "plan": "filter",
+                    "value": 12
+                  }
+                ]
+              }
+            ]
         }
         "#;
         let f: Box<dyn ExecutionPlan> = serde_json::from_str(f).unwrap();
         assert_eq!(r#"projection op"#, f.execute());
 
         if let Some(project) = f.as_any().downcast_ref::<ProjectionExec>() {
-            assert_eq!(r#"filter op"#, project.input.execute());
-            if let Some(input) = project.input.as_any().downcast_ref::<FilterExec>() {
+            assert_eq!(r#"filter op"#, project.input[0].execute());
+            if let Some(input) = project.input[0].as_any().downcast_ref::<FilterExec>() {
                 assert_eq!(10, input.value);
+            }
+            assert_eq!(r#"filter op"#, project.input[1].execute());
+            if let Some(input) = project.input[1].as_any().downcast_ref::<FilterExec>() {
+                assert_eq!(11, input.value);
+            }
+            assert_eq!(r#"projection op"#, project.input[2].execute());
+            if let Some(project) = project.input[2].as_any().downcast_ref::<ProjectionExec>() {
+                assert_eq!(r#"filter op"#, project.input[0].execute());
+                if let Some(input) = project.input[0].as_any().downcast_ref::<FilterExec>() {
+                    assert_eq!(12, input.value);
+                };
             }
         }
 
         // Serialization
-        let f: Box<dyn ExecutionPlan> = Box::new(ProjectionExec {
-            input: Arc::new(FilterExec { value: 10 }),
+        let plan1: Arc<dyn ExecutionPlan> = Arc::new(FilterExec { value: 10 });
+        let plan2: Arc<dyn ExecutionPlan> = Arc::new(FilterExec { value: 11 });
+        let plan3: Arc<dyn ExecutionPlan> = Arc::new(ProjectionExec {
+            input: vec![Arc::new(FilterExec { value: 12 })],
         });
 
-        let f_x = serde_json::to_string(&f).unwrap();
+        let f: Box<dyn ExecutionPlan> = Box::new(ProjectionExec {
+            input: vec![plan1, plan2, plan3],
+        });
         assert_eq!(
-            r#"{"plan":"projection","input":{"plan":"filter","value":10}}"#,
-            f_x
+            r#"{"plan":"projection","input":[{"plan":"filter","value":10},{"plan":"filter","value":11},{"plan":"projection","input":[{"plan":"filter","value":12}]}]}"#,
+            serde_json::to_string(&f).unwrap()
         );
 
         Ok(())
