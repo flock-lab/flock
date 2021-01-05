@@ -595,4 +595,46 @@ mod tests {
 
         Ok(())
     }
+
+    // This example uses a serializable structure (enum) to replace the closure
+    // function in the struct, and after successful deserialization, the target
+    // closure function is found through the mapping relationship.
+    #[tokio::test]
+    async fn serde_closure_mapping() -> Result<(), Error> {
+        type ScalarFunc = dyn Fn(usize) -> Result<usize, Error>;
+        fn dec(a: usize) -> Result<usize, Error> {
+            Ok(a - 1)
+        }
+
+        #[derive(Serialize, Deserialize)]
+        enum MathExpression {
+            Dec,
+        }
+
+        impl MathExpression {
+            fn as_ref(&self) -> Box<Arc<ScalarFunc>> {
+                match self {
+                    MathExpression::Dec => Box::new(Arc::new(dec)),
+                }
+            }
+        }
+
+        #[derive(Serialize, Deserialize)]
+        struct Abc {
+            name: String,
+            // use enum to replace ScalarFunc
+            func: MathExpression,
+        }
+
+        let abc = Abc {
+            name: String::from("dec_one"),
+            func: MathExpression::Dec,
+        };
+        let cba = serde_json::to_string_pretty(&abc).unwrap();
+        let abc: Abc = serde_json::from_str(&cba).unwrap();
+        assert_eq!("dec_one", abc.name);
+        assert_eq!(0, abc.func.as_ref()(1)?);
+
+        Ok(())
+    }
 }
