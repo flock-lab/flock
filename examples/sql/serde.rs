@@ -619,6 +619,12 @@ mod tests {
             }
         }
 
+        macro_rules! math_unary_function {
+            ($FUNC:ident, $EXPR:expr) => {
+                $FUNC.func.as_ref()($EXPR)?
+            };
+        }
+
         #[derive(Serialize, Deserialize)]
         struct Abc {
             name: String,
@@ -634,6 +640,8 @@ mod tests {
         let abc: Abc = serde_json::from_str(&cba).unwrap();
         assert_eq!("dec_one", abc.name);
         assert_eq!(0, abc.func.as_ref()(1)?);
+        assert_eq!(0, math_unary_function!(abc, 1));
+        assert_eq!(5, math_unary_function!(abc, 6));
 
         Ok(())
     }
