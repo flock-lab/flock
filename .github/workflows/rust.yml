@@ -33,7 +33,9 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-serverlesscq-${{ hashFiles('**/Cargo.lock') }}
       - name: Test
-        run: cargo +nightly test
+        run: |
+          cargo update --package arrow
+          cargo +nightly test
 
   # deploy on pushes to master branch
   # assumes aws credentials (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
@@ -74,6 +76,7 @@ jobs:
       - name: Build
         run: |
           rustup override set nightly
+          xargo update --package arrow
           xargo build --target ${{ matrix.target }} --release
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
