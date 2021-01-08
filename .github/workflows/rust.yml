@@ -19,6 +19,8 @@ jobs:
     steps:
       - name: Setup Rust
         uses: hecrj/setup-rust-action@v1
+        with:
+          rust-version: nightly
       - name: Checkout
         uses: actions/checkout@v2
       - name: Cache cargo and xargo
@@ -33,7 +35,7 @@ jobs:
       - name: Test
         run: |
           cargo update --package arrow
-          cargo test
+          cargo +nightly test
 
   # deploy on pushes to master branch
   # assumes aws credentials (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
