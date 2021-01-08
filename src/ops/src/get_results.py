@@ -18,7 +18,7 @@ import time
 
 kinesis = kinesis.connect_to_region("us-east-1")
 shard_id = 'shardId-000000000000'  #we only have one shard!
-shard_it = kinesis.get_shard_iterator("joinResults", shard_id,
+shard_it = kinesis.get_shard_iterator("FlinkJoinResults", shard_id,
                                       "LATEST")["ShardIterator"]
 while 1 == 1:
     out = kinesis.get_records(shard_it, limit=1)
