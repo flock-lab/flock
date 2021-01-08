@@ -9,7 +9,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
-  LAMBDA_NAME: hello step_1 step_2 gen_data gen_data_1 gen_data_2 join_nested_loop join_scheduler stream1partition stream2partition lambda_check join_distributed
+  LAMBDA_NAME: hello step_1 step_2 gen_data
   AWS_LAMBDA_ROLE: ${{ secrets.AWS_LAMBDA_ROLE }}
 
 jobs:
@@ -33,7 +33,9 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-serverlesscq-${{ hashFiles('**/Cargo.lock') }}
       - name: Test
-        run: cargo +nightly test
+        run: |
+          cargo update --package arrow
+          cargo +nightly test
 
   # deploy on pushes to master branch
   # assumes aws credentials (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
@@ -74,6 +76,7 @@ jobs:
       - name: Build
         run: |
           rustup override set nightly
+          xargo update --package arrow
           xargo build --target ${{ matrix.target }} --release
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -85,6 +88,7 @@ jobs:
         run: |
           for f in $LAMBDA_NAME; do
             mv ./target/x86_64-unknown-linux-gnu/release/$f ./bootstrap;
+            strip --strip-all ./bootstrap;
             zip -j $f.zip ./bootstrap;
             GET_FUNCTION_NAME=$(aws lambda list-functions --query \
               "Functions[?FunctionName=='${f}'].FunctionName[]" --output text);

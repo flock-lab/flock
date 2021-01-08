@@ -10,4 +10,4 @@ autobins = false
 
 [dependencies]
 sqlparser = "0.6.1"
-arrow = { git = "https://github.com/apache/arrow", branch = "master" }
+arrow = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq" }

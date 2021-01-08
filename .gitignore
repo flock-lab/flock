@@ -13,4 +13,12 @@ Cargo.lock
 
 .DS_Store
 
-src/ops/test_output
+src/ops
+
+# Maven
+.classpath
+.project
+.settings
+
+# ServerlessCQ
+.history

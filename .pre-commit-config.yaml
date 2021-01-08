@@ -58,3 +58,4 @@ repos:
       - id: fmt
       - id: cargo-check
       - id: clippy
+        args: ['--all-targets', '--', '-D', 'clippy::all']

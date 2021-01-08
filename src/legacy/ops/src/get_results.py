@@ -25,7 +25,11 @@ print("listening:", args.name)
 
 kinesis = kinesis.connect_to_region("us-east-1")
 shard_id = 'shardId-000000000000'  #we only have one shard!
+<<<<<<< HEAD:src/ops/src/get_results.py
 shard_it = kinesis.get_shard_iterator(args.name, shard_id,
+=======
+shard_it = kinesis.get_shard_iterator("FlinkJoinResults", shard_id,
+>>>>>>> master:src/legacy/ops/src/get_results.py
                                       "LATEST")["ShardIterator"]
 while 1:
     out = kinesis.get_records(shard_it, limit=1)
