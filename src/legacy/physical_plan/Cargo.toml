@@ -1,5 +1,5 @@
 [package]
-name = "logical_plan"
+name = "physical_plan"
 version = "0.1.0"
 authors = ["Gang Liao <gangliao@cs.umd.edu>"]
 license = "Apache-2.0"
@@ -9,6 +9,12 @@ autobins = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+bytes = "0.6.0"
 sqlparser = "0.6.1"
-arrow = { git = "https://github.com/apache/arrow", branch = "master" }
+async-trait = "0.1.41"
+futures = "0.3"
+rusoto_core = "0.45.0"
+rusoto_kinesis = "0.45.0"
+serde_json = "1.0"
 common = {path = "../common"}
+arrow = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq" }

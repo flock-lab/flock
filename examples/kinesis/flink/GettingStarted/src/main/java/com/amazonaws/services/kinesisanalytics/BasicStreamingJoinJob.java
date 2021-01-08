@@ -20,14 +20,16 @@ import java.util.Map;
 import java.util.Properties;
 import org.apache.flink.api.common.functions.JoinFunction;
 import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.api.common.serialization.SimpleStringEncoder;
 import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.tuple.Tuple5;
 import org.apache.flink.api.java.tuple.Tuple7;
+import org.apache.flink.core.fs.Path;
 import org.apache.flink.streaming.api.TimeCharacteristic;
 import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.streaming.api.datastream.IterativeStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.sink.filesystem.StreamingFileSink;
 import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.time.Time;
@@ -43,9 +45,10 @@ public class BasicStreamingJoinJob {
   private static final String inputStream1Name = "stream1";
   private static final String inputStream2Name = "stream2";
   private static final String outputStreamName = "joinResults";
-  private static final long windowSize = 2000L;
+  private static final String s3SinkPath = "s3a://gangliao-meme/data";
+  private static final long windowSize = 500L;
   private static final long rate = 3L;
-  private static final long delay = 5L;
+  private static final long delay = 50L;
 
   private static DataStream<String> createSourceFromStaticConfig(
       StreamExecutionEnvironment env, String streamName) {
@@ -94,6 +97,15 @@ public class BasicStreamingJoinJob {
     return sink;
   }
 
+  private static StreamingFileSink<String> createS3SinkFromStaticConfig() {
+
+    final StreamingFileSink<String> sink =
+        StreamingFileSink.forRowFormat(
+                new Path(s3SinkPath), new SimpleStringEncoder<String>("UTF-8"))
+            .build();
+    return sink;
+  }
+
   public static void main(String[] args) throws Exception {
     // set up the streaming execution environment
     final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
@@ -139,9 +151,9 @@ public class BasicStreamingJoinJob {
     //         });
 
     DataStream<Tuple5<Integer, Integer, Integer, Integer, Long>> stream1 =
-        env.addSource(new StreamDataSource1()).name("Demo Source1");
+        env.addSource(new StreamDataSource1()).name("Stream1");
     DataStream<Tuple5<Integer, Integer, Integer, Integer, Long>> stream2 =
-        env.addSource(new StreamDataSource2()).name("Demo Source2");
+        env.addSource(new StreamDataSource2()).name("Stream2");
 
     DataStream<Tuple5<Integer, Integer, Integer, Integer, Long>> input1 =
         stream1.assignTimestampsAndWatermarks(
@@ -174,12 +186,10 @@ public class BasicStreamingJoinJob {
         runWindowJoin(input1, input2, windowSize);
 
     // print the results with a single thread, rather than in parallel
-    joinedStream.print().setParallelism(1);
+    // joinedStream.print().setParallelism(1);
 
-    IterativeStream<Tuple7<Integer, Integer, Integer, Integer, Integer, Integer, Integer>> iter3 =
-        joinedStream.iterate();
     DataStream<String> output =
-        iter3.map(
+        joinedStream.map(
             new MapFunction<
                 Tuple7<Integer, Integer, Integer, Integer, Integer, Integer, Integer>, String>() {
               @Override
