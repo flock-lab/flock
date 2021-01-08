@@ -645,4 +645,35 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn fetch_record_batch() -> Result<(), Error> {
+        use arrow::json;
+        use arrow::json::reader::infer_json_schema;
+        use arrow::record_batch::RecordBatch;
+        use std::io::BufReader;
+
+        let data = r#"
+        {"a":1, "b":2.0, "c":false, "d":"4"}
+        {"a":-10, "b":-3.5, "c":true, "d":"4"}
+        {"a":2, "b":0.6, "c":false, "d":"text"}
+        {"a":1, "b":2.0, "c":false, "d":"4"}
+        {"a":7, "b":-3.5, "c":true, "d":"4"}
+        {"a":1, "b":0.6, "c":false, "d":"text"}
+        {"a":1, "b":2.0, "c":false, "d":"4"}
+        {"a":5, "b":-3.5, "c":true, "d":"4"}
+        {"a":1, "b":0.6, "c":false, "d":"text"}
+        {"a":1, "b":2.0, "c":false, "d":"4"}
+        {"a":1, "b":-3.5, "c":true, "d":"4"}
+        {"a":100000000000000, "b":0.6, "c":false, "d":"text"}
+        "#;
+        let mut reader = BufReader::new(data.as_bytes());
+        let inferred_schema = infer_json_schema(&mut reader, Some(2)).unwrap();
+        let mut json = json::Reader::new(reader, inferred_schema, 12, None);
+
+        let batch: RecordBatch = json.next().unwrap().unwrap();
+        println!("{:#?}", batch);
+
+        Ok(())
+    }
 }
