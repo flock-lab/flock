@@ -18,10 +18,10 @@ jobs:
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v1
-      # - uses: actions-rs/toolchain@v1
-      #   with:
-      #     toolchain: nightly
-      #     override: true
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
       - name: Cache cargo and xargo
         uses: actions/cache@v2
         with:
