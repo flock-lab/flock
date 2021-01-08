@@ -648,16 +648,17 @@ mod tests {
 
         Ok(())
     }
-    #[derive(Debug, Deserialize, Serialize)]
-    // Partial FlightData defination
-    pub struct FlightDataDef {
-        pub data_header: std::vec::Vec<u8>,
-        pub data_body: std::vec::Vec<u8>,
-    }
 
     #[tokio::test]
     // This test shows an example of conversion between FlightData and RecordBatch
     async fn recordbatch_flightdata_conversion() -> Result<(), Error> {
+        #[derive(Deserialize, Serialize)]
+        // Partial FlightData defination
+        pub struct FlightDataDef {
+            pub data_header: std::vec::Vec<u8>,
+            pub data_body: std::vec::Vec<u8>,
+        }
+
         // lambda 1
         let schema = Arc::new(Schema::new(vec![
             Field::new("c1", DataType::Int64, false),
@@ -690,7 +691,8 @@ mod tests {
 
         // lambda 2
         let fake_flight_data: FlightDataDef = serde_json::from_value(flight_data_json).unwrap();
-        // In `arrow_flight::utils::flight_data_from_arrow_batch`, `flight_descriptor` and `app_metadata` do not contain data
+        // In `arrow_flight::utils::flight_data_from_arrow_batch`, `flight_descriptor`
+        // and `app_metadata` do not contain data
         let flight_data_de = arrow_flight::FlightData {
             flight_descriptor: None,
             app_metadata: vec![],

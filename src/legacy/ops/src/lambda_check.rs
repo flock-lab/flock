@@ -35,11 +35,11 @@ type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
 #[derive(Debug, Serialize, Deserialize)]
 struct ProjectionOutputMsg {
     stream_name: String,
-    data: Vec<ProjectionOutputRecord>,
-    join_args: JoinArgs,
+    data:        Vec<ProjectionOutputRecord>,
+    join_args:   JoinArgs,
 
-    key: String,
-    is_last: bool,
+    key:       String,
+    is_last:   bool,
     batch_num: i32,
 }
 
@@ -47,18 +47,18 @@ struct ProjectionOutputMsg {
 // One record
 struct ProjectionOutputRecord {
     result_cols: HashMap<String, String>,
-    join_cols: HashMap<String, String>,
+    join_cols:   HashMap<String, String>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct JoinArgs {
-    join_method: String, // "0": Nested loop; "1": Hash join
-    join_type: String,   // Inner, Left ...
-    left_stream: String,
-    left_attr: String,
+    join_method:  String, // "0": Nested loop; "1": Hash join
+    join_type:    String, // Inner, Left ...
+    left_stream:  String,
+    left_attr:    String,
     right_stream: String,
-    right_attr: String,
-    op: String, // "=", ">", "<"
+    right_attr:   String,
+    op:           String, // "=", ">", "<"
 }
 
 #[tokio::main]
