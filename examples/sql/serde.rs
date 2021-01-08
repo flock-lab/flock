@@ -650,7 +650,6 @@ mod tests {
     }
 
     #[tokio::test]
-<<<<<<< Updated upstream
     async fn fetch_record_batch() -> Result<(), Error> {
         use arrow::json;
         use arrow::json::reader::infer_json_schema;
@@ -678,14 +677,17 @@ mod tests {
         let batch: RecordBatch = json.next().unwrap().unwrap();
         println!("{:#?}", batch);
 
-=======
+        Ok(())
+    }
+
     // This test shows an example of conversion between FlightData and RecordBatch
+    #[tokio::test]
     async fn recordbatch_flightdata_conversion() -> Result<(), Error> {
         #[derive(Deserialize, Serialize)]
         // Partial FlightData defination
         pub struct FlightDataDef {
             pub data_header: std::vec::Vec<u8>,
-            pub data_body: std::vec::Vec<u8>,
+            pub data_body:   std::vec::Vec<u8>,
         }
 
         // lambda 1
@@ -724,14 +726,13 @@ mod tests {
         // and `app_metadata` do not contain data
         let flight_data_de = arrow_flight::FlightData {
             flight_descriptor: None,
-            app_metadata: vec![],
-            data_header: fake_flight_data.data_header,
-            data_body: fake_flight_data.data_body,
+            app_metadata:      vec![],
+            data_header:       fake_flight_data.data_header,
+            data_body:         fake_flight_data.data_body,
         };
         let arrow_batch =
             arrow_flight::utils::flight_data_to_arrow_batch(&flight_data_de, schema).unwrap()?;
         println!("arrow_batch: \n{:?}", arrow_batch);
->>>>>>> Stashed changes
         Ok(())
     }
 }
