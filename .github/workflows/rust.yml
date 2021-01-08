@@ -22,15 +22,6 @@ jobs:
         with:
           toolchain: nightly
           override: true
-      - name: Cache cargo and xargo
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            ~/.xargo
-            target
-          key: ${{ runner.os }}-cargo-serverlesscq-${{ hashFiles('**/Cargo.lock') }}
       - name: update umd-arrow
         run: |
           cargo update --package arrow
