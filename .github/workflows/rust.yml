@@ -35,7 +35,6 @@ jobs:
       - name: Test
         run: |
           cargo update --package arrow
-          rustup component add rustfmt
           cargo +nightly test
 
   # deploy on pushes to master branch
