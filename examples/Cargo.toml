@@ -18,6 +18,7 @@ base64 = "0.13"
 more-asserts = "0.2.1"
 arrow = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq" }
 datafusion = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq" }
+arrow-flight = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq" }
 typetag = "0.1"
 serde_traitobject = "0.2.7"
 serde_closure = "0.3.2"
