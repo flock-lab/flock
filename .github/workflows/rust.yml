@@ -23,7 +23,9 @@ jobs:
           toolchain: nightly
           override: true
       - name: update umd-arrow
-        run: cargo update --package arrow
+        run: |
+          cargo update --package arrow
+          cargo build -j8
       - uses: actions-rs/cargo@v1
         with:
           command: test
