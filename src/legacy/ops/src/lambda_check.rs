@@ -87,7 +87,7 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
     match client.get_function_configuration(req).await {
         Ok(func) => {
             // Find function, invoke.
-            println!("{:#?}", func);
+            println!("Find func: {:?}", func_name);
             func_arn = func.function_arn.unwrap();
             let request = InvocationRequest {
                 function_name: func_name.clone(),
@@ -96,7 +96,7 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
                 ..InvocationRequest::default()
             };
             let result = client.invoke(request).await;
-            println!("result: {:#?}", result);
+            // println!("result: {:#?}", result);
         }
         Err(e) => {
             // Doesn't exist, create one.
@@ -113,7 +113,7 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
                     // println!("code info: {:?}", resp.configuration);
                     if let Some(code_location) = resp.code {
                         let url = code_location.location.unwrap();
-                        println!("code loacation: {:?}", url);
+                        // println!("code loacation: {:?}", url);
                         let https = HttpsConnector::new();
                         let codeClient = Client::builder().build::<_, hyper::Body>(https);
 
@@ -163,17 +163,16 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
     Ok(json!({ "msg": func_arn }))
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use std::fs::File;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::File;
 
-//     #[tokio::test]
-//     async fn stream1() {
-//         let event: Value =
-//
-// serde_json::from_slice(include_bytes!("../test_output/proj_output_0.json"))
-//                 .expect("invalid kinesis event");
-//         handler(event, Context::default()).await.ok().unwrap();
-//     }
-// }
+    #[tokio::test]
+    async fn stream1() {
+        let event: Value =
+            serde_json::from_slice(include_bytes!("../test_output/proj_output_1.json"))
+                .expect("invalid kinesis event");
+        handler(event, Context::default()).await.ok().unwrap();
+    }
+}

@@ -233,6 +233,9 @@ async fn main() -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use arrow::array::*;
+    use arrow::datatypes::{DataType, Field, Schema};
+    use serde_json::json;
     use std::any::Any;
     use std::fmt::Debug;
     use std::sync::Arc;
@@ -647,6 +650,7 @@ mod tests {
     }
 
     #[tokio::test]
+<<<<<<< Updated upstream
     async fn fetch_record_batch() -> Result<(), Error> {
         use arrow::json;
         use arrow::json::reader::infer_json_schema;
@@ -674,6 +678,60 @@ mod tests {
         let batch: RecordBatch = json.next().unwrap().unwrap();
         println!("{:#?}", batch);
 
+=======
+    // This test shows an example of conversion between FlightData and RecordBatch
+    async fn recordbatch_flightdata_conversion() -> Result<(), Error> {
+        #[derive(Deserialize, Serialize)]
+        // Partial FlightData defination
+        pub struct FlightDataDef {
+            pub data_header: std::vec::Vec<u8>,
+            pub data_body: std::vec::Vec<u8>,
+        }
+
+        // lambda 1
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("c1", DataType::Int64, false),
+            Field::new("c2", DataType::Float64, false),
+            Field::new("c3", DataType::Utf8, false),
+        ]));
+        let record_batch = arrow::record_batch::RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![90, 100, 91, 101, 92, 102, 93, 103])),
+                Arc::new(Float64Array::from(vec![
+                    92.1, 93.2, 95.3, 96.4, 98.5, 99.6, 100.7, 101.8,
+                ])),
+                Arc::new(StringArray::from(vec![
+                    "a", "a", "a", "b", "b", "b", "c", "c",
+                ])),
+            ],
+        )?;
+
+        let options = arrow::ipc::writer::IpcWriteOptions::default();
+        let flight_data =
+            &arrow_flight::utils::flight_data_from_arrow_batch(&record_batch, &options)[0];
+        let data_header = flight_data.data_header.clone();
+        let data_body = flight_data.data_body.clone();
+
+        let flight_data_json = json!(FlightDataDef {
+            data_header,
+            data_body
+        });
+
+        // lambda 2
+        let fake_flight_data: FlightDataDef = serde_json::from_value(flight_data_json).unwrap();
+        // In `arrow_flight::utils::flight_data_from_arrow_batch`, `flight_descriptor`
+        // and `app_metadata` do not contain data
+        let flight_data_de = arrow_flight::FlightData {
+            flight_descriptor: None,
+            app_metadata: vec![],
+            data_header: fake_flight_data.data_header,
+            data_body: fake_flight_data.data_body,
+        };
+        let arrow_batch =
+            arrow_flight::utils::flight_data_to_arrow_batch(&flight_data_de, schema).unwrap()?;
+        println!("arrow_batch: \n{:?}", arrow_batch);
+>>>>>>> Stashed changes
         Ok(())
     }
 }
