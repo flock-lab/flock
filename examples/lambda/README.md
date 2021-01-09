@@ -37,4 +37,4 @@ c3: ["a", "a", "a", "b", "b", "b", "c", "c"]
 
 ### Plan Details
 
-See plan_0.json
+See plan_details
