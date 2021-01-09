@@ -12,13 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use arrow::datatypes::{DataType, Schema};
+use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
 use arrow_flight::FlightData;
-use datafusion::physical_plan::expressions::*;
-use datafusion::physical_plan::hash_aggregate::{AggregateMode, HashAggregateExec};
+use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
 use datafusion::physical_plan::memory::MemoryExec;
-use datafusion::physical_plan::{common, AggregateExpr, ExecutionPlan, PhysicalExpr};
+use datafusion::physical_plan::{common, ExecutionPlan};
 use lambda::{handler_fn, Context};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -75,26 +74,14 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
     )?;
 
     // Construct HashAggregateExec
-    let mode = AggregateMode::Partial;
-    let mut group_expr: Vec<(Arc<dyn PhysicalExpr>, String)> = Vec::new();
-    group_expr.push((Arc::new(Column::new("c3")), "c3".to_string()));
+    let plan_json =   "{\"mode\":\"Partial\",\"group_expr\":[[{\"physical_expr\":\"column\",\"name\":\"c3\"},\"c3\"]],\"aggr_expr\":[{\"aggregate_expr\":\"max\",\"name\":\"MAX(c1)\",\"data_type\":\"Int64\",\"nullable\":true,\"expr\":{\"physical_expr\":\"column\",\"name\":\"c1\"}},{\"aggregate_expr\":\"min\",\"name\":\"MIN(c2)\",\"data_type\":\"Float64\",\"nullable\":true,\"expr\":{\"physical_expr\":\"column\",\"name\":\"c2\"}}],\"input\":{\"execution_plan\":\"dummy_exec\"},\"schema\":{\"fields\":[{\"name\":\"c3\",\"data_type\":\"Utf8\",\"nullable\":false,\"dict_id\":0,\"dict_is_ordered\":false},{\"name\":\"MAX(c1)[max]\",\"data_type\":\"Int64\",\"nullable\":true,\"dict_id\":0,\"dict_is_ordered\":false},{\"name\":\"MIN(c2)[min]\",\"data_type\":\"Float64\",\"nullable\":true,\"dict_id\":0,\"dict_is_ordered\":false}],\"metadata\":{}}}";
+    let dummy_plan: HashAggregateExec = serde_json::from_str(&plan_json).unwrap();
 
-    let mut aggr_expr: Vec<Arc<dyn AggregateExpr>> = Vec::new();
-    aggr_expr.push(Arc::new(Max::new(
-        Arc::new(Column::new("c1")),
-        "MAX(c1)".to_string(),
-        DataType::Int64,
-    )));
-    aggr_expr.push(Arc::new(Min::new(
-        Arc::new(Column::new("c2")),
-        "MIN(c2)".to_string(),
-        DataType::Float64,
-    )));
-
-    let plan = HashAggregateExec::try_new(mode, group_expr, aggr_expr, Arc::new(mem_plan))
+    let plan = dummy_plan.try_new_from_plan(Arc::new(mem_plan))
         .unwrap()
         .execute(0)
         .await?;
+
     let output_schema = plan.schema();
     let result = common::collect(plan).await?;
     pretty::print_batches(&result)?;
@@ -117,7 +104,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn handler_handles() {
+    async fn agg1_test() {
         let data = r#"{
             "data": "{\"data_header\":[16,0,0,0,12,0,26,0,24,0,23,0,4,0,8,0,12,0,0,0,32,0,0,0,136,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,3,0,10,0,24,0,12,0,8,0,4,0,10,0,0,0,76,0,0,0,16,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,3,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,0,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,40,0,0,0,0,0,0,0,48,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,56,0,0,0,0,0,0,0,40,0,0,0,0,0,0,0,96,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,104,0,0,0,0,0,0,0,24,0,0,0,0,0,0,0,128,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0],\"data_body\":[255,0,0,0,0,0,0,0,90,0,0,0,0,0,0,0,100,0,0,0,0,0,0,0,91,0,0,0,0,0,0,0,101,0,0,0,0,0,0,0,92,0,0,0,0,0,0,0,255,0,0,0,0,0,0,0,102,102,102,102,102,6,87,64,205,204,204,204,204,76,87,64,51,51,51,51,51,211,87,64,154,153,153,153,153,25,88,64,0,0,0,0,0,160,88,64,255,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,2,0,0,0,3,0,0,0,4,0,0,0,5,0,0,0,97,97,97,98,98,0,0,0]}",
             "schema": "{\"fields\":[{\"name\":\"c1\",\"data_type\":\"Int64\",\"nullable\":false,\"dict_id\":0,\"dict_is_ordered\":false},{\"name\":\"c2\",\"data_type\":\"Float64\",\"nullable\":false,\"dict_id\":0,\"dict_is_ordered\":false},{\"name\":\"c3\",\"data_type\":\"Utf8\",\"nullable\":false,\"dict_id\":0,\"dict_is_ordered\":false}]}"

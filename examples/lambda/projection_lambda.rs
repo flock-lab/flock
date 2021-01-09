@@ -15,10 +15,9 @@
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
 use arrow_flight::FlightData;
-use datafusion::physical_plan::expressions::*;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::projection::ProjectionExec;
-use datafusion::physical_plan::{common, ExecutionPlan, PhysicalExpr};
+use datafusion::physical_plan::{common, ExecutionPlan};
 use lambda::{handler_fn, Context};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -75,15 +74,14 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
     )?;
 
     // Construct ProjectionExec
-    let mut expr: Vec<(Arc<dyn PhysicalExpr>, String)> = Vec::new();
-    expr.push((Arc::new(Column::new("MAX(c1)")), "MAX(c1)".to_string()));
-    expr.push((Arc::new(Column::new("MIN(c2)")), "MIN(c2)".to_string()));
-    expr.push((Arc::new(Column::new("c3")), "c3".to_string()));
+    let plan_json =  "{\"expr\":[[{\"physical_expr\":\"column\",\"name\":\"MAX(c1)\"},\"MAX(c1)\"],[{\"physical_expr\":\"column\",\"name\":\"MIN(c2)\"},\"MIN(c2)\"],[{\"physical_expr\":\"column\",\"name\":\"c3\"},\"c3\"]],\"schema\":{\"fields\":[{\"name\":\"MAX(c1)\",\"data_type\":\"Int64\",\"nullable\":true,\"dict_id\":0,\"dict_is_ordered\":false},{\"name\":\"MIN(c2)\",\"data_type\":\"Float64\",\"nullable\":true,\"dict_id\":0,\"dict_is_ordered\":false},{\"name\":\"c3\",\"data_type\":\"Utf8\",\"nullable\":false,\"dict_id\":0,\"dict_is_ordered\":false}],\"metadata\":{}},\"input\":{\"execution_plan\":\"dummy_exec\"}}";
+    let dummy_plan: ProjectionExec = serde_json::from_str(&plan_json).unwrap();
 
-    let plan = ProjectionExec::try_new(expr, Arc::new(mem_plan))
+    let plan = dummy_plan.try_new_from_plan(Arc::new(mem_plan))
         .unwrap()
         .execute(0)
         .await?;
+
     let output_schema = plan.schema();
 
     let result = common::collect(plan).await?;
@@ -107,7 +105,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn handler_handles() {
+    async fn projection_test() {
         let data = r#"{
             "data": "{\"data_header\":[16,0,0,0,12,0,26,0,24,0,23,0,4,0,8,0,12,0,0,0,32,0,0,0,80,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,3,0,10,0,24,0,12,0,8,0,4,0,10,0,0,0,76,0,0,0,16,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,3,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,0,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,16,0,0,0,0,0,0,0,24,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,32,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,40,0,0,0,0,0,0,0,16,0,0,0,0,0,0,0,56,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,64,0,0,0,0,0,0,0,16,0,0,0,0,0,0,0],\"data_body\":[255,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,2,0,0,0,0,0,0,0,97,98,0,0,0,0,0,0,255,0,0,0,0,0,0,0,100,0,0,0,0,0,0,0,101,0,0,0,0,0,0,0,255,0,0,0,0,0,0,0,102,102,102,102,102,6,87,64,154,153,153,153,153,25,88,64]}",
             "schema": "{\"fields\":[{\"name\":\"c3\",\"data_type\":\"Utf8\",\"nullable\":false,\"dict_id\":0,\"dict_is_ordered\":false},{\"name\":\"MAX(c1)\",\"data_type\":\"Int64\",\"nullable\":true,\"dict_id\":0,\"dict_is_ordered\":false},{\"name\":\"MIN(c2)\",\"data_type\":\"Float64\",\"nullable\":true,\"dict_id\":0,\"dict_is_ordered\":false}]}"

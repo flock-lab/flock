@@ -12,17 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use arrow::datatypes::{DataType, Schema};
+use arrow::datatypes::Schema;
 use arrow::json;
 use arrow::record_batch::RecordBatch;
 
-use datafusion::logical_plan::Operator;
 use datafusion::physical_plan::common::collect;
-use datafusion::physical_plan::expressions::*;
 use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::ExecutionPlan;
-use datafusion::scalar::ScalarValue;
 
 use arrow::util::pretty;
 use lambda::{handler_fn, Context};
@@ -73,16 +70,12 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
     let mem_plan = MemoryExec::try_new(&partitions, schema.clone(), None)?;
 
     // Construct FilterExec
-    let predicate: Arc<BinaryExpr> = Arc::new(BinaryExpr::new(
-        col("c2"),
-        Operator::Lt,
-        Arc::new(CastExpr::new(lit(ScalarValue::from(99)), DataType::Float64)),
-    ));
+    let plan_json =  "{\"predicate\":{\"physical_expr\":\"binary_expr\",\"left\":{\"physical_expr\":\"column\",\"name\":\"c2\"},\"op\":\"Lt\",\"right\":{\"physical_expr\":\"cast_expr\",\"expr\":{\"physical_expr\":\"literal\",\"value\":{\"Int64\":99}},\"cast_type\":\"Float64\"}},\"input\":{\"execution_plan\":\"dummy_exec\"}}";
+    let dummy_plan: FilterExec = serde_json::from_str(&plan_json).unwrap();
+    // println!("dummy plan:\n{:?}", dummy_plan);
+    
+    let plan = dummy_plan.try_new_from_plan(Arc::new(mem_plan)).unwrap().execute(0).await?;
 
-    let plan = FilterExec::try_new(predicate, Arc::new(mem_plan))
-        .unwrap()
-        .execute(0)
-        .await?;
     let result = collect(plan).await?;
     pretty::print_batches(&result)?;
 
