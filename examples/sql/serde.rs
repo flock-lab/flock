@@ -603,9 +603,9 @@ mod tests {
     // closure function is found through the mapping relationship.
     #[tokio::test]
     async fn serde_closure_mapping() -> Result<(), Error> {
-        type ScalarFunc = dyn Fn(usize) -> Result<usize, Error>;
-        fn dec(a: usize) -> Result<usize, Error> {
-            Ok(a - 1)
+        type ScalarFunc = dyn Fn(usize) -> usize;
+        fn dec(a: usize) -> usize {
+            a - 1
         }
 
         #[derive(Serialize, Deserialize)]
@@ -623,7 +623,7 @@ mod tests {
 
         macro_rules! math_unary_function {
             ($FUNC:ident, $EXPR:expr) => {
-                $FUNC.func.as_ref()($EXPR)?
+                $FUNC.func.as_ref()($EXPR)
             };
         }
 
@@ -641,7 +641,7 @@ mod tests {
         let cba = serde_json::to_string_pretty(&abc).unwrap();
         let abc: Abc = serde_json::from_str(&cba).unwrap();
         assert_eq!("dec_one", abc.name);
-        assert_eq!(0, abc.func.as_ref()(1)?);
+        assert_eq!(0, abc.func.as_ref()(1));
         assert_eq!(0, math_unary_function!(abc, 1));
         assert_eq!(5, math_unary_function!(abc, 6));
 

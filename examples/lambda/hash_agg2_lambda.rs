@@ -30,7 +30,7 @@ type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
 
 #[derive(Debug, Deserialize, Serialize)]
 struct Data {
-    data: String,
+    data:   String,
     schema: String,
 }
 
@@ -39,7 +39,7 @@ pub struct FlightDataRef {
     #[serde(with = "serde_bytes")]
     pub data_header: std::vec::Vec<u8>,
     #[serde(with = "serde_bytes")]
-    pub data_body: std::vec::Vec<u8>,
+    pub data_body:   std::vec::Vec<u8>,
 }
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -56,9 +56,9 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
 
     let flight_data_de = FlightData {
         flight_descriptor: None,
-        app_metadata: vec![],
-        data_header: fake_flight_data.data_header,
-        data_body: fake_flight_data.data_body,
+        app_metadata:      vec![],
+        data_header:       fake_flight_data.data_header,
+        data_body:         fake_flight_data.data_body,
     };
     let arrow_batch = arrow_flight::utils::flight_data_to_arrow_batch(
         &flight_data_de,
@@ -106,7 +106,7 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
 
     let flight_data_ref = FlightDataRef {
         data_header: flight_data.data_header.clone(),
-        data_body: flight_data.data_body.clone(),
+        data_body:   flight_data.data_body.clone(),
     };
     let data_str = serde_json::to_string(&flight_data_ref).unwrap();
 

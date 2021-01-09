@@ -17,7 +17,7 @@ use arrow::json;
 use arrow::record_batch::RecordBatch;
 
 use datafusion::logical_plan::Operator;
-use datafusion::physical_plan::common;
+use datafusion::physical_plan::common::collect;
 use datafusion::physical_plan::expressions::*;
 use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::memory::MemoryExec;
@@ -44,7 +44,7 @@ pub struct FlightDataRef {
     #[serde(with = "serde_bytes")]
     pub data_header: std::vec::Vec<u8>,
     #[serde(with = "serde_bytes")]
-    pub data_body: std::vec::Vec<u8>,
+    pub data_body:   std::vec::Vec<u8>,
 }
 
 #[tokio::main]
@@ -56,7 +56,10 @@ async fn main() -> Result<(), Error> {
 async fn handler(event: Value, _: Context) -> Result<Value, Error> {
     // Construct BatchRecord
     let input: Data = serde_json::from_value(event).unwrap();
-    let schema_str = "{\"fields\":[{\"name\":\"c1\",\"data_type\":\"Int64\",\"nullable\":false,\"dict_id\":0,\"dict_is_ordered\":false},{\"name\":\"c2\",\"data_type\":\"Float64\",\"nullable\":false,\"dict_id\":0,\"dict_is_ordered\":false},{\"name\":\"c3\",\"data_type\":\"Utf8\",\"nullable\":false,\"dict_id\":0,\"dict_is_ordered\":false}]}";
+    let schema_str = r#"{"fields":[{"name":"c1","data_type":"Int64","nullable":false,"dict_id":0,
+    "dict_is_ordered":false},{"name":"c2","data_type":"Float64","nullable":false,"dict_id":0,
+    "dict_is_ordered":false},{"name":"c3","data_type":"Utf8","nullable":false,"dict_id":0,
+    "dict_is_ordered":false}]}"#;
     let schema: Arc<Schema> = serde_json::from_str(schema_str).unwrap();
 
     let data_str = input.data;
@@ -71,19 +74,16 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
 
     // Construct FilterExec
     let predicate: Arc<BinaryExpr> = Arc::new(BinaryExpr::new(
-        Arc::new(Column::new("c2")),
+        col("c2"),
         Operator::Lt,
-        Arc::new(CastExpr::new(
-            Arc::new(Literal::new(ScalarValue::Int64(Some(99)))),
-            DataType::Float64,
-        )),
+        Arc::new(CastExpr::new(lit(ScalarValue::from(99)), DataType::Float64)),
     ));
 
     let plan = FilterExec::try_new(predicate, Arc::new(mem_plan))
         .unwrap()
         .execute(0)
         .await?;
-    let result = common::collect(plan).await?;
+    let result = collect(plan).await?;
     pretty::print_batches(&result)?;
 
     // RecordBatch to FlightData
@@ -92,7 +92,7 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
 
     let flight_data_ref = FlightDataRef {
         data_header: flight_data.data_header.clone(),
-        data_body: flight_data.data_body.clone(),
+        data_body:   flight_data.data_body.clone(),
     };
     let data_str = serde_json::to_string(&flight_data_ref).unwrap();
 
