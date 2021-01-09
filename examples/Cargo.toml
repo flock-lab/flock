@@ -64,3 +64,7 @@ path = "lambda/hash_agg2_lambda.rs"
 [[bin]]
 name = "projection_lambda"
 path = "lambda/projection_lambda.rs"
+
+[[bin]]
+name = "partitioned_plan"
+path = "lambda/partitioned_plan.rs"
