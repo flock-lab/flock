@@ -48,3 +48,23 @@ path = "sql/plan.rs"
 [[bin]]
 name = "serde"
 path = "sql/serde.rs"
+
+[[bin]]
+name = "mem_filter_lambda"
+path = "lambda/mem_filter_lambda.rs"
+
+[[bin]]
+name = "hash_agg1_lambda"
+path = "lambda/hash_agg1_lambda.rs"
+
+[[bin]]
+name = "hash_agg2_lambda"
+path = "lambda/hash_agg2_lambda.rs"
+
+[[bin]]
+name = "projection_lambda"
+path = "lambda/projection_lambda.rs"
+
+[[bin]]
+name = "partitioned_plan"
+path = "lambda/partitioned_plan.rs"
