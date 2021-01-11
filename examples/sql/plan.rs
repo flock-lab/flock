@@ -82,7 +82,7 @@ mod tests {
 
         // Seralization
         let serialized = serde_json::to_string(&physical_plan_clone).unwrap();
-        println!("{}", serialized);
+        // println!("{}", serialized);
         assert_eq!(
             r#"{"execution_plan":"hash_aggregate_exec","mode":"Final","group_expr":[],"aggr_expr":[{"aggregate_expr":"avg","name":"AVG(a)","data_type":"Float64","nullable":true,"expr":{"physical_expr":"column","name":"a"}}],"input":{"execution_plan":"merge_exec","input":{"execution_plan":"hash_aggregate_exec","mode":"Partial","group_expr":[],"aggr_expr":[{"aggregate_expr":"avg","name":"AVG(a)","data_type":"Float64","nullable":true,"expr":{"physical_expr":"column","name":"a"}}],"input":{"execution_plan":"memory_exec","schema":{"fields":[{"name":"a","data_type":"Int32","nullable":false,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"projection":[0]},"schema":{"fields":[{"name":"AVG(a)[count]","data_type":"UInt64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"AVG(a)[sum]","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}}}},"schema":{"fields":[{"name":"AVG(a)","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}}}"#,
             serialized

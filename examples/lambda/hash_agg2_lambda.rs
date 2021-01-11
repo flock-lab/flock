@@ -13,11 +13,10 @@
 // limitations under the License.
 
 use arrow::datatypes::Schema;
-use arrow::record_batch::RecordBatch;
 use arrow_flight::FlightData;
 use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
-use datafusion::physical_plan::memory::MemoryExec;
-use datafusion::physical_plan::{common, ExecutionPlan};
+use datafusion::physical_plan::LambdaExecPlan;
+use datafusion::physical_plan::{collect, ExecutionPlan};
 use lambda::{handler_fn, Context};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -40,6 +39,7 @@ pub struct FlightDataRef {
     #[serde(with = "serde_bytes")]
     pub data_body:   std::vec::Vec<u8>,
 }
+
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     lambda::run(handler_fn(handler)).await?;
@@ -62,38 +62,26 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
     let arrow_batch = arrow_flight::utils::flight_data_to_arrow_batch(
         &flight_data_de,
         Arc::new(prev_schema.clone()),
+        &[],
     )
-    .unwrap()?;
+    .unwrap();
 
-    // Construct MemoryExec
-    let partitions: Vec<Vec<RecordBatch>> = vec![vec![arrow_batch]];
-    let mem_plan = MemoryExec::try_new(
-        &partitions,
-        Arc::new(prev_schema.clone()),
-        Some(vec![0, 1, 2]),
-    )?;
+    // Construct HashAggregateExec with MemoryExec
+    let plan_json = r#"{"mode":"Final","group_expr":[[{"physical_expr":"column","name":"c3"},"c3"]],"aggr_expr":[{"aggregate_expr":"max","name":"MAX(c1)","data_type":"Int64","nullable":true,"expr":{"physical_expr":"column","name":"c1"}},{"aggregate_expr":"min","name":"MIN(c2)","data_type":"Float64","nullable":true,"expr":{"physical_expr":"column","name":"c2"}}],"input":{"execution_plan":"memory_exec","schema":{"fields":[{"name":"c3","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"MAX(c1)","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"MIN(c2)","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"projection":null},"schema":{"fields":[{"name":"c3","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"MAX(c1)","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"MIN(c2)","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}}}"#;
+    let mut hash_agg_exec: HashAggregateExec = serde_json::from_str(&plan_json).unwrap();
 
-    // Construct HashAggregateExec
-    let plan_json = "{\"mode\":\"Final\",\"group_expr\":[[{\"physical_expr\":\"column\",\"name\":\"c3\"},\"c3\"]],\"aggr_expr\":[{\"aggregate_expr\":\"max\",\"name\":\"MAX(c1)\",\"data_type\":\"Int64\",\"nullable\":true,\"expr\":{\"physical_expr\":\"column\",\"name\":\"c1\"}},{\"aggregate_expr\":\"min\",\"name\":\"MIN(c2)\",\"data_type\":\"Float64\",\"nullable\":true,\"expr\":{\"physical_expr\":\"column\",\"name\":\"c2\"}}],\"input\":{\"execution_plan\":\"dummy_exec\"},\"schema\":{\"fields\":[{\"name\":\"c3\",\"data_type\":\"Utf8\",\"nullable\":false,\"dict_id\":0,\"dict_is_ordered\":false},{\"name\":\"MAX(c1)\",\"data_type\":\"Int64\",\"nullable\":true,\"dict_id\":0,\"dict_is_ordered\":false},{\"name\":\"MIN(c2)\",\"data_type\":\"Float64\",\"nullable\":true,\"dict_id\":0,\"dict_is_ordered\":false}],\"metadata\":{}}}";
-    let dummy_plan: HashAggregateExec = serde_json::from_str(&plan_json).unwrap();
-
-    let plan = dummy_plan.try_new_from_plan(Arc::new(mem_plan))
-        .unwrap()
-        .execute(0)
-        .await?;
-
-    let output_schema = plan.schema();
-
-    let result = common::collect(plan).await?;
+    hash_agg_exec.feed_batches(vec![vec![arrow_batch]]);
+    let output_schema = hash_agg_exec.schema();
+    let result = collect(Arc::new(hash_agg_exec)).await?;
     pretty::print_batches(&result)?;
 
     // RecordBatch to FlightData
     let options = arrow::ipc::writer::IpcWriteOptions::default();
-    let flight_data = &arrow_flight::utils::flight_data_from_arrow_batch(&result[0], &options)[0];
+    let (_, flight_data) = arrow_flight::utils::flight_data_from_arrow_batch(&result[0], &options);
 
     let flight_data_ref = FlightDataRef {
-        data_header: flight_data.data_header.clone(),
-        data_body:   flight_data.data_body.clone(),
+        data_header: flight_data.data_header,
+        data_body:   flight_data.data_body,
     };
     let data_str = serde_json::to_string(&flight_data_ref).unwrap();
 

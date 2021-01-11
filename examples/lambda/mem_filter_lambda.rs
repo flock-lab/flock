@@ -14,13 +14,12 @@
 
 use arrow::datatypes::Schema;
 use arrow::json;
-use arrow::record_batch::RecordBatch;
 
-use datafusion::physical_plan::common::collect;
+use datafusion::physical_plan::collect;
 use datafusion::physical_plan::filter::FilterExec;
-use datafusion::physical_plan::memory::MemoryExec;
-use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::LambdaExecPlan;
 
+#[allow(unused_imports)]
 use arrow::util::pretty;
 use lambda::{handler_fn, Context};
 use serde::{Deserialize, Serialize};
@@ -62,34 +61,29 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
     let data_str = input.data;
     let reader = BufReader::new(data_str.as_bytes());
     let mut json = json::Reader::new(reader, schema.clone(), 1024, None);
-    let record_batch: RecordBatch = json.next().unwrap().unwrap();
+    let record_batch = json.next().unwrap().unwrap();
     // println!("batch:\n{:?}", record_batch);
 
-    // Construct MemoryExec
-    let partitions: Vec<Vec<RecordBatch>> = vec![vec![record_batch.clone()]];
-    let mem_plan = MemoryExec::try_new(&partitions, schema.clone(), None)?;
+    // Construct FilterExec with MemoryExec
+    let plan_json = r#"{"predicate":{"physical_expr":"binary_expr","left":{"physical_expr":"column","name":"c2"},"op":"Lt","right":{"physical_expr":"cast_expr","expr":{"physical_expr":"literal","value":{"Int64":99}},"cast_type":"Float64"}},"input":{"execution_plan":"memory_exec","schema":{"fields":[{"name":"c1","data_type":"Int64","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"c2","data_type":"Float64","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"c3","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"projection":[0,1,2]}}"#;
+    let mut filter_exec: FilterExec = serde_json::from_str(&plan_json).unwrap();
 
-    // Construct FilterExec
-    let plan_json =  "{\"predicate\":{\"physical_expr\":\"binary_expr\",\"left\":{\"physical_expr\":\"column\",\"name\":\"c2\"},\"op\":\"Lt\",\"right\":{\"physical_expr\":\"cast_expr\",\"expr\":{\"physical_expr\":\"literal\",\"value\":{\"Int64\":99}},\"cast_type\":\"Float64\"}},\"input\":{\"execution_plan\":\"dummy_exec\"}}";
-    let dummy_plan: FilterExec = serde_json::from_str(&plan_json).unwrap();
-    // println!("dummy plan:\n{:?}", dummy_plan);
-    
-    let plan = dummy_plan.try_new_from_plan(Arc::new(mem_plan)).unwrap().execute(0).await?;
-
-    let result = collect(plan).await?;
+    // Plan Execution
+    filter_exec.feed_batches(vec![vec![record_batch]]);
+    let result = collect(Arc::new(filter_exec)).await?;
     pretty::print_batches(&result)?;
 
     // RecordBatch to FlightData
     let options = arrow::ipc::writer::IpcWriteOptions::default();
-    let flight_data = &arrow_flight::utils::flight_data_from_arrow_batch(&result[0], &options)[0];
+    let (_, flight_data) = arrow_flight::utils::flight_data_from_arrow_batch(&result[0], &options);
 
     let flight_data_ref = FlightDataRef {
-        data_header: flight_data.data_header.clone(),
-        data_body:   flight_data.data_body.clone(),
+        data_header: flight_data.data_header,
+        data_body:   flight_data.data_body,
     };
     let data_str = serde_json::to_string(&flight_data_ref).unwrap();
 
-    Ok(json!({ "data": data_str, "schema": schema_str.to_string()}))
+    Ok(json!({ "data": data_str, "schema": schema_str}))
 }
 
 #[cfg(test)]

@@ -43,7 +43,7 @@ mod tests {
     use std::io::BufReader;
 
     #[tokio::test]
-    async fn simple_avg() -> Result<(), Error> {
+    async fn simple_query() -> Result<(), Error> {
         #[derive(Debug, Deserialize, Serialize)]
         struct Data {
             data: String,
@@ -118,25 +118,40 @@ mod tests {
             None => panic!("Plan mismatch Error"),
         };
 
-        assert_eq!("MemoryExec { partitions: [], schema: Schema { fields: [Field { name: \"c1\", data_type: Int64, nullable: false, dict_id: 0, dict_is_ordered: false }, Field { name: \"c2\", data_type: Float64, nullable: false, dict_id: 0, dict_is_ordered: false }, Field { name: \"c3\", data_type: Utf8, nullable: false, dict_id: 0, dict_is_ordered: false }], metadata: {} }, projection: Some([0, 1, 2]) }", format!("{:?}", memory_exec));
+        assert_eq!(
+            r#"{"schema":{"fields":[{"name":"c1","data_type":"Int64","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"c2","data_type":"Float64","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"c3","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"projection":[0,1,2]}"#,
+            serde_json::to_string(&memory_exec).unwrap()
+        );
 
         let filter = filter_exec.new_orphan();
-        assert_eq!("FilterExec { predicate: BinaryExpr { left: Column { name: \"c2\" }, op: Lt, right: CastExpr { expr: Literal { value: Int64(99) }, cast_type: Float64 } }, input: DummyExec }", format!("{:?}", filter));
+        assert_eq!(
+            r#"{"predicate":{"physical_expr":"binary_expr","left":{"physical_expr":"column","name":"c2"},"op":"Lt","right":{"physical_expr":"cast_expr","expr":{"physical_expr":"literal","value":{"Int64":99}},"cast_type":"Float64"}},"input":{"execution_plan":"memory_exec","schema":{"fields":[{"name":"c1","data_type":"Int64","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"c2","data_type":"Float64","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"c3","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"projection":[0,1,2]}}"#,
+            serde_json::to_string(&filter).unwrap()
+        );
 
         let coalesce = coalesce_exec.new_orphan();
         assert_eq!(
-            "CoalesceBatchesExec { input: DummyExec, target_batch_size: 16384 }",
-            format!("{:?}", coalesce)
+            r#"{"input":{"execution_plan":"memory_exec","schema":{"fields":[{"name":"c1","data_type":"Int64","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"c2","data_type":"Float64","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"c3","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"projection":null},"target_batch_size":16384}"#,
+            serde_json::to_string(&coalesce).unwrap()
         );
 
         let hash_agg_1 = hash_agg_1_exec.new_orphan();
-        assert_eq!("HashAggregateExec { mode: Partial, group_expr: [(Column { name: \"c3\" }, \"c3\")], aggr_expr: [Max { name: \"MAX(c1)\", data_type: Int64, nullable: true, expr: Column { name: \"c1\" } }, Min { name: \"MIN(c2)\", data_type: Float64, nullable: true, expr: Column { name: \"c2\" } }], input: DummyExec, schema: Schema { fields: [Field { name: \"c3\", data_type: Utf8, nullable: false, dict_id: 0, dict_is_ordered: false }, Field { name: \"MAX(c1)[max]\", data_type: Int64, nullable: true, dict_id: 0, dict_is_ordered: false }, Field { name: \"MIN(c2)[min]\", data_type: Float64, nullable: true, dict_id: 0, dict_is_ordered: false }], metadata: {} } }", format!("{:?}", hash_agg_1));
+        assert_eq!(
+            r#"{"mode":"Partial","group_expr":[[{"physical_expr":"column","name":"c3"},"c3"]],"aggr_expr":[{"aggregate_expr":"max","name":"MAX(c1)","data_type":"Int64","nullable":true,"expr":{"physical_expr":"column","name":"c1"}},{"aggregate_expr":"min","name":"MIN(c2)","data_type":"Float64","nullable":true,"expr":{"physical_expr":"column","name":"c2"}}],"input":{"execution_plan":"memory_exec","schema":{"fields":[{"name":"c3","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"MAX(c1)[max]","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"MIN(c2)[min]","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"projection":null},"schema":{"fields":[{"name":"c3","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"MAX(c1)[max]","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"MIN(c2)[min]","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}}}"#,
+            serde_json::to_string(&hash_agg_1).unwrap()
+        );
 
         let hash_agg_2 = hash_agg_2_exec.new_orphan();
-        assert_eq!("HashAggregateExec { mode: Final, group_expr: [(Column { name: \"c3\" }, \"c3\")], aggr_expr: [Max { name: \"MAX(c1)\", data_type: Int64, nullable: true, expr: Column { name: \"c1\" } }, Min { name: \"MIN(c2)\", data_type: Float64, nullable: true, expr: Column { name: \"c2\" } }], input: DummyExec, schema: Schema { fields: [Field { name: \"c3\", data_type: Utf8, nullable: false, dict_id: 0, dict_is_ordered: false }, Field { name: \"MAX(c1)\", data_type: Int64, nullable: true, dict_id: 0, dict_is_ordered: false }, Field { name: \"MIN(c2)\", data_type: Float64, nullable: true, dict_id: 0, dict_is_ordered: false }], metadata: {} } }", format!("{:?}", hash_agg_2));
+        assert_eq!(
+            r#"{"mode":"Final","group_expr":[[{"physical_expr":"column","name":"c3"},"c3"]],"aggr_expr":[{"aggregate_expr":"max","name":"MAX(c1)","data_type":"Int64","nullable":true,"expr":{"physical_expr":"column","name":"c1"}},{"aggregate_expr":"min","name":"MIN(c2)","data_type":"Float64","nullable":true,"expr":{"physical_expr":"column","name":"c2"}}],"input":{"execution_plan":"memory_exec","schema":{"fields":[{"name":"c3","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"MAX(c1)","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"MIN(c2)","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"projection":null},"schema":{"fields":[{"name":"c3","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"MAX(c1)","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"MIN(c2)","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}}}"#,
+            serde_json::to_string(&hash_agg_2).unwrap()
+        );
 
         let projection = projection_exec.new_orphan();
-        assert_eq!("ProjectionExec { expr: [(Column { name: \"MAX(c1)\" }, \"MAX(c1)\"), (Column { name: \"MIN(c2)\" }, \"MIN(c2)\"), (Column { name: \"c3\" }, \"c3\")], schema: Schema { fields: [Field { name: \"MAX(c1)\", data_type: Int64, nullable: true, dict_id: 0, dict_is_ordered: false }, Field { name: \"MIN(c2)\", data_type: Float64, nullable: true, dict_id: 0, dict_is_ordered: false }, Field { name: \"c3\", data_type: Utf8, nullable: false, dict_id: 0, dict_is_ordered: false }], metadata: {} }, input: DummyExec }", format!("{:?}", projection));
+        assert_eq!(
+            r#"{"expr":[[{"physical_expr":"column","name":"MAX(c1)"},"MAX(c1)"],[{"physical_expr":"column","name":"MIN(c2)"},"MIN(c2)"],[{"physical_expr":"column","name":"c3"},"c3"]],"schema":{"fields":[{"name":"MAX(c1)","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"MIN(c2)","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c3","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"input":{"execution_plan":"memory_exec","schema":{"fields":[{"name":"MAX(c1)","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"MIN(c2)","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c3","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"projection":null}}"#,
+            serde_json::to_string(&projection).unwrap()
+        );
 
         Ok(())
     }

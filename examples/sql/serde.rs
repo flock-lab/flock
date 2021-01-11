@@ -675,8 +675,8 @@ mod tests {
 
         let batch: RecordBatch = json.next().unwrap().unwrap();
         assert_eq!(
-            r#"a: Int64, b: Float64, c: Boolean, d: Utf8"#,
-            format!("{}", batch.schema())
+            r#"{"fields":[{"name":"a","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"b","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c","data_type":"Boolean","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"d","data_type":"Utf8","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}}"#,
+            serde_json::to_string(&batch.schema()).unwrap()
         );
 
         Ok(())
@@ -718,11 +718,11 @@ mod tests {
         )?;
 
         let options = IpcWriteOptions::default();
-        let flight_data = &flight_data_from_arrow_batch(&record_batch, &options)[0];
+        let (_, flight_data) = flight_data_from_arrow_batch(&record_batch, &options);
 
         let flight_data_ref = FlightDataRef {
-            data_header: flight_data.data_header.clone(),
-            data_body:   flight_data.data_body.clone(),
+            data_header: flight_data.data_header,
+            data_body:   flight_data.data_body,
         };
         let json = serde_json::to_string(&flight_data_ref).unwrap();
         assert_eq!(
@@ -739,11 +739,11 @@ mod tests {
             data_body:         fake_flight_data.data_body,
         };
 
-        let arrow_batch = flight_data_to_arrow_batch(&flight_data, schema).unwrap()?;
+        let arrow_batch = flight_data_to_arrow_batch(&flight_data, schema, &[])?;
         assert_eq!(8, arrow_batch.num_rows());
         assert_eq!(3, arrow_batch.num_columns());
         assert_eq!(
-            r#"c1: Int64, c2: Float64, c3: Utf8"#,
+            "Field { name: \"c1\", data_type: Int64, nullable: false, dict_id: 0, dict_is_ordered: false, metadata: None }, Field { name: \"c2\", data_type: Float64, nullable: false, dict_id: 0, dict_is_ordered: false, metadata: None }, Field { name: \"c3\", data_type: Utf8, nullable: false, dict_id: 0, dict_is_ordered: false, metadata: None }",
             format!("{}", arrow_batch.schema())
         );
         assert_eq!(
