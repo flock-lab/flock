@@ -1,4 +1,4 @@
-// Copyright (c) 2020 UMD Database Group. All rights reserved.
+// Copyright (c) 2020-2021, UMD Database Group. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ lazy_static! {
 
 ServerlessCQ: Continuous Queries on Cloud Function Services (https://github.com/DSLAM-UMD/ServerlessCQ)
 
-Copyright (c) 2020 UMD Database Group. All rights reserved.
+Copyright (c) 2020-2021, UMD Database Group. All rights reserved.
 
 This is the standard command line interactive contoller for ServerlessCQ.
 This has all the right tools installed required to execute a query against cloud function services.
