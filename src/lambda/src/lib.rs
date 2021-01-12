@@ -19,10 +19,12 @@
     clippy::module_inception,
     clippy::new_without_default,
     clippy::ptr_arg,
-    clippy::type_complexity
+    clippy::type_complexity,
+    clippy::wrong_self_convention
 )]
 
 //! scq_lambda is a library to simplify the code generation of the physical plan
 //! in lambda functions.
 
+pub mod dataframe;
 pub mod error;

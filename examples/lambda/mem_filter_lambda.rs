@@ -12,21 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use arrow::datatypes::Schema;
-use arrow::json;
-
-use datafusion::physical_plan::collect;
 use datafusion::physical_plan::filter::FilterExec;
-use datafusion::physical_plan::LambdaExecPlan;
+use datafusion::physical_plan::{common, ExecutionPlan, LambdaExecPlan};
 
-#[allow(unused_imports)]
 use arrow::util::pretty;
 use lambda::{handler_fn, Context};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
-use std::sync::Arc;
+use serde_json::Value;
 
-use std::io::BufReader;
+use std::sync::Once;
+
+use scq_lambda::dataframe::{DataFrame, Source};
 
 type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
 
@@ -35,55 +31,119 @@ struct Data {
     data: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-pub struct FlightDataRef {
-    #[serde(with = "serde_bytes")]
-    pub data_header: std::vec::Vec<u8>,
-    #[serde(with = "serde_bytes")]
-    pub data_body:   std::vec::Vec<u8>,
-}
-
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     lambda::run(handler_fn(handler)).await?;
     Ok(())
 }
 
+/// JSON representation of the physical plan.
+const PLAN_JSON: &str = r#"
+    {
+        "predicate":{
+        "physical_expr":"binary_expr",
+        "left":{
+            "physical_expr":"column",
+            "name":"c2"
+        },
+        "op":"Lt",
+        "right":{
+            "physical_expr":"cast_expr",
+            "expr":{
+                "physical_expr":"literal",
+                "value":{
+                    "Int64":99
+                }
+            },
+            "cast_type":"Float64"
+        }
+        },
+        "input":{
+        "execution_plan":"memory_exec",
+        "schema":{
+            "fields":[
+                {
+                    "name":"c1",
+                    "data_type":"Int64",
+                    "nullable":false,
+                    "dict_id":0,
+                    "dict_is_ordered":false
+                },
+                {
+                    "name":"c2",
+                    "data_type":"Float64",
+                    "nullable":false,
+                    "dict_id":0,
+                    "dict_is_ordered":false
+                },
+                {
+                    "name":"c3",
+                    "data_type":"Utf8",
+                    "nullable":false,
+                    "dict_id":0,
+                    "dict_is_ordered":false
+                }
+            ],
+            "metadata":{
+
+            }
+        },
+        "projection":[
+            0,
+            1,
+            2
+        ]
+        }
+    }
+    "#;
+
+static mut PLAN: Option<FilterExec> = None;
+static INIT: Once = Once::new();
+
+/// Performs an initialization routine once and only once.
+macro_rules! init {
+    () => {{
+        unsafe {
+            INIT.call_once(|| {
+                PLAN = Some(serde_json::from_str(&PLAN_JSON).unwrap());
+            });
+        }
+    }};
+}
+
+/// Get DataFrame's schema.
+macro_rules! schema {
+    () => {{
+        unsafe {
+            match &PLAN {
+                Some(plan) => plan.schema().clone(),
+                None => panic!("Unexpected plan!"),
+            }
+        }
+    }};
+}
+
 async fn handler(event: Value, _: Context) -> Result<Value, Error> {
-    // Construct BatchRecord
-    let input: Data = serde_json::from_value(event).unwrap();
-    let schema_str = r#"{"fields":[{"name":"c1","data_type":"Int64","nullable":false,"dict_id":0,
-    "dict_is_ordered":false},{"name":"c2","data_type":"Float64","nullable":false,"dict_id":0,
-    "dict_is_ordered":false},{"name":"c3","data_type":"Utf8","nullable":false,"dict_id":0,
-    "dict_is_ordered":false}]}"#;
-    let schema: Arc<Schema> = serde_json::from_str(schema_str).unwrap();
+    init!();
+    let schema = schema!();
+    let record_batch = Source::to_batch(event, schema.clone());
 
-    let data_str = input.data;
-    let reader = BufReader::new(data_str.as_bytes());
-    let mut json = json::Reader::new(reader, schema.clone(), 1024, None);
-    let record_batch = json.next().unwrap().unwrap();
-    // println!("batch:\n{:?}", record_batch);
+    unsafe {
+        match &mut PLAN {
+            Some(plan) => {
+                // Plan Execution
+                plan.feed_batches(vec![vec![record_batch]]);
+                let it = plan.execute(0).await?;
+                let result = common::collect(it).await?;
+                pretty::print_batches(&result)?;
 
-    // Construct FilterExec with MemoryExec
-    let plan_json = r#"{"predicate":{"physical_expr":"binary_expr","left":{"physical_expr":"column","name":"c2"},"op":"Lt","right":{"physical_expr":"cast_expr","expr":{"physical_expr":"literal","value":{"Int64":99}},"cast_type":"Float64"}},"input":{"execution_plan":"memory_exec","schema":{"fields":[{"name":"c1","data_type":"Int64","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"c2","data_type":"Float64","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"c3","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"projection":[0,1,2]}}"#;
-    let mut filter_exec: FilterExec = serde_json::from_str(&plan_json).unwrap();
-
-    // Plan Execution
-    filter_exec.feed_batches(vec![vec![record_batch]]);
-    let result = collect(Arc::new(filter_exec)).await?;
-    pretty::print_batches(&result)?;
-
-    // RecordBatch to FlightData
-    let options = arrow::ipc::writer::IpcWriteOptions::default();
-    let (_, flight_data) = arrow_flight::utils::flight_data_from_arrow_batch(&result[0], &options);
-
-    let flight_data_ref = FlightDataRef {
-        data_header: flight_data.data_header,
-        data_body:   flight_data.data_body,
-    };
-    let data_str = serde_json::to_string(&flight_data_ref).unwrap();
-
-    Ok(json!({ "data": data_str, "schema": schema_str}))
+                // RecordBatch to DataFrame
+                let datafame = DataFrame::from(&result[0], schema);
+                Ok(serde_json::to_value(&datafame)?)
+            }
+            None => panic!("Unexpected plan!"),
+        }
+    }
 }
 
 #[cfg(test)]
