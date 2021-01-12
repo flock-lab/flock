@@ -24,6 +24,7 @@ typetag = "0.1"
 serde_traitobject = "0.2.7"
 serde_closure = "0.3.2"
 heck = "0.3.1"
+scq_lambda = { path = "../src/lambda" }
 
 [[bin]]
 name = "hello"

@@ -43,7 +43,7 @@ COPYRIGHT_HEADER = None
 
 NEW_LINE_MARK = '\n'
 COPYRIGHT_HEADER = COPYRIGHT.split(NEW_LINE_MARK)[1]
-p = re.search('(\d{4})', COPYRIGHT_HEADER).group(0)
+p = re.search('(-\d{4})', COPYRIGHT_HEADER).group(1)[1:]
 process = subprocess.Popen(["date", "+%Y"], stdout=subprocess.PIPE)
 date, err = process.communicate()
 date = date.decode("utf-8").rstrip("\n")
