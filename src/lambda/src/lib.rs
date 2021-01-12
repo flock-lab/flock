@@ -12,17 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::common::Common;
-use json::JsonValue;
+#![warn(missing_docs)]
+// Clippy lints, some should be disabled incrementally
+#![allow(
+    clippy::float_cmp,
+    clippy::module_inception,
+    clippy::new_without_default,
+    clippy::ptr_arg,
+    clippy::type_complexity
+)]
 
-#[allow(dead_code)]
-pub struct Choice {
-    /// Common state fields.
-    pub common:  Common,
-    /// The name of the state to transition to if none of the transitions in
-    /// Choices is taken.
-    pub default: Option<String>,
-    /// An array of Choice Rules that determines which state the state machine
-    /// transitions to next.
-    pub choices: JsonValue,
-}
+//! scq_lambda is a library to simplify the code generation of the physical plan
+//! in lambda functions.
+
+pub mod error;

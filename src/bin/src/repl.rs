@@ -13,9 +13,9 @@
 // limitations under the License.
 
 use clap::{crate_version, App, Arg};
-use common::error::Result;
 use lazy_static::lazy_static;
 use rustyline::Editor;
+use scq_lambda::error::Result;
 use std::env;
 
 lazy_static! {

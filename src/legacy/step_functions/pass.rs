@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::common::Common;
-use crate::paths::{Parameters, ResultPath};
+use crate::step_functions::common::Common;
+use crate::step_functions::paths::{Parameters, ResultPath};
 use json::JsonValue;
 
 #[allow(dead_code)]

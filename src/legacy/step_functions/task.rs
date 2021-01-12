@@ -26,8 +26,8 @@
 //!    "HeartbeatSeconds": 60
 //! }
 
-use crate::common::Common;
-use crate::paths::{Parameters, ResultPath, ResultSelector};
+use crate::step_functions::common::Common;
+use crate::step_functions::paths::{Parameters, ResultPath, ResultSelector};
 
 /// A Task state ("Type": "Task") represents a single unit of work performed by
 /// a state machine.

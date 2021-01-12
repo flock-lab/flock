@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::common::Common;
+use crate::step_functions::common::Common;
 
 /// A Wait state ("Type": "Wait") delays the state machine from continuing for a
 /// specified time. You can choose either a relative time, specified in seconds

@@ -18,7 +18,7 @@ cli = ["rustyline"]
 sqlparser = {version = "0.7.0", features = ["json_example"]}
 tokio = { version = "0.2", features = ["macros"] }
 rustyline = {version = "7.0", optional = true}
-common = {path = "../common"}
+scq_lambda = {path = "../lambda"}
 clap = "2.33.3"
 lazy_static = "1.4.0"
 ctrlc = "3.1.1"

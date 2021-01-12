@@ -15,8 +15,8 @@
 use arrow::datatypes::{Schema, SchemaRef};
 use arrow::json::reader::infer_json_schema;
 use bytes::Buf;
-use common::error::{Result, ServerlessCQError};
 use futures::executor::block_on;
+use lambda::error::{Result, ServerlessCQError};
 use rusoto_core::Region;
 use rusoto_kinesis::{GetRecordsInput, GetShardIteratorInput, Kinesis, KinesisClient};
 use std::io::{BufReader, Read};

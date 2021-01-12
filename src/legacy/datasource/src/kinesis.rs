@@ -21,7 +21,7 @@ use std::any::Any;
 use std::string::String;
 
 use arrow::datatypes::*;
-use common::error::Result;
+use lambda::error::Result;
 use physical_plan::KinesisStreamExec;
 
 use crate::datasource::Statistics;
