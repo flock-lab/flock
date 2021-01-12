@@ -3,6 +3,7 @@
 members = [
     "src/bin",
     "src/lambda",
+    "src/driver",
     "examples",
 ]
 
