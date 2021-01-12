@@ -1,4 +1,4 @@
-// Copyright (c) 2020 UMD Database Group. All rights reserved.
+// Copyright (c) 2020-2021, UMD Database Group. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,4 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod error;
+/// A Succeed state ("Type": "Succeed") stops an execution successfully. The
+/// Succeed state is a useful target for Choice state branches that don't do
+/// anything but stop the execution.
+///
+/// Because `Succeed` states are terminal states, they have no `Next` field,
+/// and don't need an `End` field.
+#[allow(dead_code)]
+pub struct Succeed {
+    pub name:   String,
+    pub family: String,
+}

@@ -2,7 +2,7 @@
 
 members = [
     "src/bin",
-    "src/dataflow",
+    "src/lambda",
     "examples",
 ]
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2020 UMD Database Group. All rights reserved.
+// Copyright (c) 2020-2021, UMD Database Group. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ use std::any::Any;
 use std::string::String;
 
 use arrow::datatypes::*;
-use common::error::Result;
+use lambda::error::Result;
 use physical_plan::KinesisStreamExec;
 
 use crate::datasource::Statistics;

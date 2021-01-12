@@ -1,4 +1,4 @@
-// Copyright (c) 2020 UMD Database Group. All rights reserved.
+// Copyright (c) 2020-2021, UMD Database Group. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::common::Common;
-use crate::paths::{ResultPath, ResultSelector};
-use crate::state_machine::StateMachine;
+use crate::step_functions::common::Common;
+use crate::step_functions::paths::{ResultPath, ResultSelector};
+use crate::step_functions::state_machine::StateMachine;
 
 /// The Map state ("Type": "Map") can be used to run a set of steps for each
 /// element of an input array. While the Parallel state executes multiple

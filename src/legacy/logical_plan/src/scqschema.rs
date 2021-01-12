@@ -1,4 +1,4 @@
-// Copyright (c) 2020 UMD Database Group. All rights reserved.
+// Copyright (c) 2020-2021, UMD Database Group. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use common::error::{Result, ServerlessCQError};
+use lambda::error::{Result, ServerlessCQError};
 
 use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use std::fmt::{Display, Formatter};
