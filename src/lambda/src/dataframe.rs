@@ -56,15 +56,16 @@ pub struct DataFrame {
 
 impl DataFrame {
     /// Convert incoming dataframe to record batch in Arrow.
-    pub fn to_batch(self) -> RecordBatch {
+    pub fn to_batch(event: Value) -> RecordBatch {
+        let input: DataFrame = serde_json::from_value(event).unwrap();
         flight_data_to_arrow_batch(
             &FlightData {
-                data_body:         self.body,
-                data_header:       self.header,
+                data_body:         input.body,
+                data_header:       input.header,
                 app_metadata:      vec![],
                 flight_descriptor: None,
             },
-            Arc::new(self.schema),
+            Arc::new(input.schema),
             &[],
         )
         .unwrap()

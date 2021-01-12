@@ -26,11 +26,6 @@ use scq_lambda::dataframe::{DataFrame, Source};
 
 type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
 
-#[derive(Debug, Deserialize, Serialize)]
-struct Data {
-    data: String,
-}
-
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     lambda::run(handler_fn(handler)).await?;
