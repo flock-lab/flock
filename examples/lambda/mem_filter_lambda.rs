@@ -17,7 +17,6 @@ use datafusion::physical_plan::{common, ExecutionPlan, LambdaExecPlan};
 
 use arrow::util::pretty;
 use lambda::{handler_fn, Context};
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use std::sync::Once;
