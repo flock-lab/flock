@@ -2,21 +2,22 @@
 name = "scq_lambda"
 version = "0.1.0"
 description = "A library to split the physical plan and map its input/output to lambda functions."
-authors = ["Gang Liao <gangliao@cs.umd.edu>", "Zejun Liu <zliu1238@cs.umd.edu>"]
+authors = [ "Gang Liao <gangliao@cs.umd.edu>", "Zejun Liu <zliu1238@cs.umd.edu>" ]
 license = "Apache-2.0"
-keywords = ["AWS", "sql", "physical-plan", "dataflow"]
+keywords = [ "AWS", "sql", "physical-plan", "dataflow" ]
 edition = "2018"
 
 [dependencies]
-json = "0.12.4"
-sqlparser = "0.6.1"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-serde_bytes = "0.11"
 arrow = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq" }
 arrow-flight = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq" }
+
+json = "0.12.4"
+serde = { version = "1.0", features = [ "derive" ] }
+serde_bytes = "0.11"
+serde_json = "1.0"
+sqlparser = "0.6.1"
 
 [lib]
 name = "scq_lambda"
 path = "src/lib.rs"
-crate-type = ["lib"]
+crate-type = [ "lib" ]

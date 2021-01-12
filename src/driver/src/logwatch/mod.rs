@@ -12,5 +12,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! This crate collects execution logs and helps users lambda functions for
-//! further adaptive query optimization.
+//! This crate collects execution logs and helps users analyze lambda functions
+//! for further adaptive query optimization.

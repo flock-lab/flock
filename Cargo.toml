@@ -1,10 +1,9 @@
 [workspace]
-
 members = [
-    "src/bin",
-    "src/lambda",
-    "src/driver",
     "examples",
+    "src/bin",
+    "src/driver",
+    "src/lambda",
 ]
 
 [profile.release]

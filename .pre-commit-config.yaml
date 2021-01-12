@@ -59,3 +59,11 @@ repos:
       - id: cargo-check
       - id: clippy
         args: ['--all-targets', '--', '-D', 'clippy::all']
+  - repo: local
+    hooks:
+      - id: cargo-sort-ck
+        name: sort-ck
+        entry: cargo sort-ck -w # cargo install cargo-sort-ck
+        language: system
+        exclude: src/legacy
+        files: (Cargo.toml)$
