@@ -10,7 +10,6 @@ edition = "2018"
 [dependencies]
 arrow = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq" }
 arrow-flight = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq" }
-
 json = "0.12.4"
 serde = { version = "1.0", features = [ "derive" ] }
 serde_bytes = "0.11"
