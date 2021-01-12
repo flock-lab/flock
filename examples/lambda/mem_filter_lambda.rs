@@ -39,63 +39,63 @@ async fn main() -> Result<(), Error> {
 
 /// JSON representation of the physical plan.
 const PLAN_JSON: &str = r#"
-    {
-        "predicate":{
-        "physical_expr":"binary_expr",
-        "left":{
-            "physical_expr":"column",
-            "name":"c2"
-        },
-        "op":"Lt",
-        "right":{
-            "physical_expr":"cast_expr",
-            "expr":{
-                "physical_expr":"literal",
-                "value":{
-                    "Int64":99
-                }
-            },
-            "cast_type":"Float64"
-        }
-        },
-        "input":{
-        "execution_plan":"memory_exec",
-        "schema":{
-            "fields":[
-                {
-                    "name":"c1",
-                    "data_type":"Int64",
-                    "nullable":false,
-                    "dict_id":0,
-                    "dict_is_ordered":false
-                },
-                {
-                    "name":"c2",
-                    "data_type":"Float64",
-                    "nullable":false,
-                    "dict_id":0,
-                    "dict_is_ordered":false
-                },
-                {
-                    "name":"c3",
-                    "data_type":"Utf8",
-                    "nullable":false,
-                    "dict_id":0,
-                    "dict_is_ordered":false
-                }
-            ],
-            "metadata":{
-
+{
+    "predicate":{
+    "physical_expr":"binary_expr",
+    "left":{
+        "physical_expr":"column",
+        "name":"c2"
+    },
+    "op":"Lt",
+    "right":{
+        "physical_expr":"cast_expr",
+        "expr":{
+            "physical_expr":"literal",
+            "value":{
+                "Int64":99
             }
         },
-        "projection":[
-            0,
-            1,
-            2
-        ]
-        }
+        "cast_type":"Float64"
     }
-    "#;
+    },
+    "input":{
+    "execution_plan":"memory_exec",
+    "schema":{
+        "fields":[
+            {
+                "name":"c1",
+                "data_type":"Int64",
+                "nullable":false,
+                "dict_id":0,
+                "dict_is_ordered":false
+            },
+            {
+                "name":"c2",
+                "data_type":"Float64",
+                "nullable":false,
+                "dict_id":0,
+                "dict_is_ordered":false
+            },
+            {
+                "name":"c3",
+                "data_type":"Utf8",
+                "nullable":false,
+                "dict_id":0,
+                "dict_is_ordered":false
+            }
+        ],
+        "metadata":{
+
+        }
+    },
+    "projection":[
+        0,
+        1,
+        2
+    ]
+    }
+}
+"#;
 
 static mut PLAN: Option<FilterExec> = None;
 static INIT: Once = Once::new();
