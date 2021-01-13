@@ -169,5 +169,12 @@ mod tests {
         });
 
         println!("{}", hbs.render("lambda", &data).unwrap());
+
+        hbs.register_template_string("toml", include_str!("templates/toml.hbs"))
+            .unwrap();
+        let data = json!({
+            "name": "mem_filter",
+        });
+        println!("{}", hbs.render("toml", &data).unwrap());
     }
 }
