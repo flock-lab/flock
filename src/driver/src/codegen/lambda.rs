@@ -91,4 +91,83 @@ mod tests {
 
         println!("{}", format!("{}{}", license, scope.to_string()));
     }
+
+    #[test]
+    fn lambda_template() {
+        use handlebars::Handlebars;
+        use serde_json::json;
+
+        // The cool thing about this macro `include_str!` is that it includes the
+        // content of the file at compile time, yielding a &'static str. This means the
+        // template strings will be included in the compiled binary and we won’t need to
+        // load files at runtime.
+        let mut hbs = Handlebars::new();
+        hbs.register_template_string("lambda", include_str!("templates/lambda_test.hbs"))
+            .unwrap();
+
+        let plan = r#"{
+    "predicate":{
+    "physical_expr":"binary_expr",
+    "left":{
+        "physical_expr":"column",
+        "name":"c2"
+    },
+    "op":"Lt",
+    "right":{
+        "physical_expr":"cast_expr",
+        "expr":{
+            "physical_expr":"literal",
+            "value":{
+                "Int64":99
+            }
+        },
+        "cast_type":"Float64"
+    }
+    },
+    "input":{
+    "execution_plan":"memory_exec",
+    "schema":{
+        "fields":[
+            {
+                "name":"c1",
+                "data_type":"Int64",
+                "nullable":false,
+                "dict_id":0,
+                "dict_is_ordered":false
+            },
+            {
+                "name":"c2",
+                "data_type":"Float64",
+                "nullable":false,
+                "dict_id":0,
+                "dict_is_ordered":false
+            },
+            {
+                "name":"c3",
+                "data_type":"Utf8",
+                "nullable":false,
+                "dict_id":0,
+                "dict_is_ordered":false
+            }
+        ],
+        "metadata":{
+
+        }
+    },
+    "projection":[
+        0,
+        1,
+        2
+    ]
+    }
+}
+"#;
+
+        let data = json!({
+            "plan_json": plan,
+            "plan_name": "FilterExec",
+        });
+
+        println!("{}", hbs.render("lambda", &data).unwrap());
+    }
 }
