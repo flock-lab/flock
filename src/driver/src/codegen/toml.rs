@@ -12,10 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! This crate generates lambda functions through parititioned physical plans.
+//! Generate a toml file for each lambda function
 
-#[macro_use]
-mod utils;
-
-pub mod lambda;
-pub mod toml;
+/// A TOML-formatted struct
+pub struct Toml {}
