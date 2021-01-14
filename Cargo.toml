@@ -5,6 +5,9 @@ members = [
     "src/driver",
     "src/lambda",
 ]
+exclude = [
+    "target/scq/lambda",
+]
 
 [profile.release]
 # Cargo defaults its optimization level to 3 for release builds, which optimizes the binary for speed.
