@@ -25,8 +25,8 @@
 
 //! Driver API is the core component of the command-line interface for
 //! ServerlessCQ, and it supports direct calls from other high-level languages.
+pub mod build;
 pub mod codegen;
-pub mod compile;
 pub mod deploy;
 pub mod logwatch;
 pub mod monitor;

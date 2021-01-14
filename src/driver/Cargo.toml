@@ -12,12 +12,19 @@ arrow = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq" }
 arrow-flight = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq" }
 cargo = "0.50.0"
 codegen = "0.1.3"
+filetime = "0.2"
+glob = "0.3"
 handlebars = "3.5.2"
 json = "0.12.4"
+lazy_static = "1.4"
+num_cpus = "1.13.0"
+
 regex = "1.4.3"
+remove_dir_all = "0.6"
 serde = { version = "1.0", features = [ "derive" ] }
 serde_bytes = "0.11"
 serde_json = "1.0"
+url = "2.0"
 
 [lib]
 name = "scq_driver"

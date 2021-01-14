@@ -93,7 +93,9 @@ mod tests {
     }
 
     #[test]
+    #[ignore] // it is too expensive
     fn lambda_template() {
+        use crate::build::project;
         use handlebars::Handlebars;
         use serde_json::json;
 
@@ -163,18 +165,29 @@ mod tests {
 }
 "#;
 
+        // source code
         let data = json!({
             "plan_json": plan,
             "plan_name": "FilterExec",
         });
+        let file = hbs.render("lambda", &data).unwrap();
 
-        println!("{}", hbs.render("lambda", &data).unwrap());
-
-        hbs.register_template_string("toml", include_str!("templates/toml.hbs"))
+        // toml file
+        hbs.register_template_string("toml", include_str!("templates/Cargo.hbs"))
             .unwrap();
         let data = json!({
             "name": "mem_filter",
         });
-        println!("{}", hbs.render("toml", &data).unwrap());
+        let toml = hbs.render("toml", &data).unwrap();
+
+        // cargo build
+        let p = project("lambda")
+            .file("Cargo.toml", toml.as_str())
+            .file("Xargo.toml", include_str!("templates/Xargo.hbs"))
+            .file("src/mem_filter.rs", file.as_str())
+            .build();
+
+        let build = format!("build -j{}", num_cpus::get());
+        p.cargo(build.as_str()).run();
     }
 }
