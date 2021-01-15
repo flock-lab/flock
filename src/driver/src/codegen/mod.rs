@@ -14,8 +14,13 @@
 
 //! This crate generates lambda functions through parititioned physical plans.
 
-#[macro_use]
-mod utils;
+/// Generates a workspace layout
+pub fn workspace(name: &str) -> workspace::Workspace {
+    workspace::Workspace::new(name)
+}
 
 pub mod lambda;
 pub mod toml;
+pub mod workspace;
+
+pub use lambda::LambdaRequest;

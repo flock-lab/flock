@@ -12,7 +12,64 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Generate a toml file for each lambda function
+//! Generate toml files for each query.
 
-/// A TOML-formatted struct
-pub struct Toml {}
+use handlebars::Handlebars;
+use serde_json::json;
+
+const TOML: &str = r#"
+[[bin]]
+name = "{{ name }}"
+path = "src/{{ name }}.rs"
+"#;
+
+/// A TOML-formatted struct to generate the cargo workspace.
+pub struct Toml {
+    /// Cargo.toml in a crate
+    cargo: String,
+    /// Xargo.toml in a crate
+    xargo: String,
+    /// All binaries to be generated
+    bins:  Vec<String>,
+}
+
+impl Toml {
+    /// Create a new toml
+    pub fn new(name: &str) -> Self {
+        let mut hbs = Handlebars::new();
+        hbs.register_template_string(name, include_str!("templates/Cargo.hbs"))
+            .unwrap();
+        let ws_name = json!({
+            "name": name.to_string(),
+        });
+
+        Self {
+            cargo: hbs.render(name, &ws_name).unwrap(),
+            xargo: include_str!("templates/Xargo.hbs").to_string(),
+            bins:  vec![],
+        }
+    }
+
+    /// Add a new binary description.
+    pub fn add_bin(&mut self, name: &str) {
+        let mut hbs = Handlebars::new();
+        hbs.register_template_string(name, TOML).unwrap();
+        let bin_name = json!({
+            "name": name.to_string(),
+        });
+        let bin = hbs.render(name, &bin_name).unwrap();
+        self.bins.push(bin);
+    }
+
+    /// Return a Cargo.toml for code generation.
+    pub fn cargo(&mut self) -> &str {
+        self.cargo.push_str(self.bins.join("\n").as_str());
+        self.bins.clear();
+        self.cargo.as_str()
+    }
+
+    /// Return a Xargo.toml for code generation.
+    pub fn xargo(&self) -> &str {
+        self.xargo.as_str()
+    }
+}

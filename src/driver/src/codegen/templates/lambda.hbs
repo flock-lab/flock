@@ -20,7 +20,6 @@ use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
 use datafusion::physical_plan::{common, ExecutionPlan, LambdaExecPlan};
 
-use arrow::util::pretty;
 use lambda::{handler_fn, Context};
 use serde_json::Value;
 
@@ -80,7 +79,6 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
                 plan.feed_batches(vec![vec![record_batch]]);
                 let it = plan.execute(0).await?;
                 let result = common::collect(it).await?;
-                pretty::print_batches(&result)?;
 
                 // RecordBatch to DataFrame
                 let datafame = DataFrame::from(&result[0], schema);

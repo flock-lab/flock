@@ -6,7 +6,7 @@ members = [
     "src/lambda",
 ]
 exclude = [
-    "target/scq/lambda",
+    "target/scq",
 ]
 
 [profile.release]
