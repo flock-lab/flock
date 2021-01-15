@@ -197,7 +197,7 @@ impl ProjectBuilder {
 
     /// Creates the project.
     pub fn build(mut self) -> Project {
-        // FIXME: We want to cache lambda function's depedencies
+        // FIXME: We want to cache lambda function's dependencies
         // First, clean the directory if it already exists
         // self.rm_root();
 

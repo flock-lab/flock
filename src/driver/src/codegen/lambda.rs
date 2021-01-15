@@ -90,7 +90,7 @@ impl Lambda {
 #[cfg(test)]
 mod tests {
     #[test]
-    // #[ignore] // it is too expensive
+    #[ignore] // it is too expensive
     fn lambda_template() {
         use crate::codegen::workspace;
         use crate::codegen::LambdaRequest;
