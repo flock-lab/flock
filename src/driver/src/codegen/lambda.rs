@@ -12,102 +12,90 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Generate a AWS Lambda function.
+//! Generate lambda functions
+
+use handlebars::Handlebars;
+use scq_lambda::error::{Result, ServerlessCQError};
+use serde_json::json;
+
+const LAMBDA_TEMPLATE: &str = include_str!("templates/lambda.hbs");
+
+/// `LambdaRequest` is used to init `Lambda`.
+pub struct LambdaRequest<'a> {
+    /// The serialized JSON format of the physical plan.
+    pub plan_json: &'a str,
+    /// The struct name of the physical plan, which is from `datafusion` crate.
+    /// For example, FilterExec, HashAggregateExec, ProjectionExec.
+    pub plan_name: &'a str,
+    /// The filename of the generated lambda function.
+    pub file_name: &'a str,
+}
+
+/// A Lambda-formatted struct to generate lambda functions with hard-coded
+/// information.
+#[allow(dead_code)]
+pub struct Lambda {
+    /// The serialized JSON format of the physical plan.
+    pub plan_json:    String,
+    /// The struct name of the physical plan, which is from `datafusion` crate.
+    /// For example, FilterExec, HashAggregateExec, ProjectionExec.
+    pub plan_name:    String,
+    /// The filename of the generated lambda function.
+    pub file_name:    String,
+    /// The filepath of the generated lambda function (src/file_name.rs).
+    pub file_path:    String,
+    /// The generated source code.
+    pub code:         String,
+    /// Cloud function names of the next physical plan for invocation
+    /// asynchronously.
+    pub async_invoke: Option<Vec<String>>,
+}
+
+impl Lambda {
+    /// Create a new `Lambda` without DAG and cloud information.
+    pub fn try_new(request: LambdaRequest) -> Result<Lambda> {
+        if request.plan_json.is_empty()
+            || request.plan_name.is_empty()
+            || request.file_name.is_empty()
+        {
+            return Err(ServerlessCQError::CodeGeneration(
+                "LambdaRequest can't contain any empty field.".to_string(),
+            ));
+        }
+
+        let mut hbs = Handlebars::new();
+        hbs.register_template_string(&request.file_name, LAMBDA_TEMPLATE)
+            .unwrap();
+        let code = json!({
+            "plan_json": request.plan_json,
+            "plan_name": request.plan_name,
+        });
+        let code = hbs.render(&request.file_name, &code).unwrap();
+
+        let mut path = String::from("src/");
+        path.push_str(&request.file_name);
+        path.push_str(".rs");
+
+        Ok(Lambda {
+            plan_json: request.plan_json.to_string(),
+            plan_name: request.plan_name.to_string(),
+            file_name: request.file_name.to_string(),
+            code,
+            file_path: path,
+            async_invoke: None,
+        })
+    }
+}
 
 #[cfg(test)]
 mod tests {
-    use codegen::*;
-    use regex::Regex;
-
-    #[test]
-    fn single_struct() {
-        let mut scope = Scope::new();
-        scope
-            .new_struct("Foo")
-            .field("one", "usize")
-            .field("two", "String");
-
-        assert_eq!(
-            "struct Foo { one: usize, two: String, }",
-            scope_format!(scope)
-        );
-    }
-
-    #[test]
-    fn struct_with_pushed_field() {
-        let mut scope = Scope::new();
-        let mut struct_ = Struct::new("Foo");
-        let field = Field::new("one", "usize");
-        struct_.push_field(field);
-        scope.push_struct(struct_);
-
-        assert_eq!("struct Foo { one: usize, }", scope_format!(scope));
-    }
-
-    #[test]
-    fn single_lambda() {
-        let mut scope = Scope::new();
-
-        let license = r#"
-// Copyright (c) 2020-2021, UMD Database Group. All rights reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-"#;
-        scope.import("lambda", "handler_fn");
-        scope.import("lambda", "Context");
-        scope.import("serde_json", "json");
-        scope.import("serde_json", "Value");
-
-        scope.raw(r#"type Error = Box<dyn std::error::Error + Sync + Send + 'static>;"#);
-
-        scope
-            .new_fn("handler")
-            .set_async(true)
-            .arg("event", Type::new("Value"))
-            .arg("_", Type::new("Context"))
-            .ret(Type::new("Result<Value, Error>"))
-            .line("let message = event[\"input\"].as_str().unwrap();")
-            .line("let event = json!({ \"input\": format!(\"{} {}\", \"Hello!\", message) });")
-            .line("Ok(event)");
-
-        scope
-            .new_fn("main")
-            .set_async(true)
-            .ret(Type::new("Result<(), Error>"))
-            .attr("tokio::main")
-            .line("lambda::run(handler_fn(handler)).await?;")
-            .line("Ok(())");
-
-        println!("{}", format!("{}{}", license, scope.to_string()));
-    }
-
     #[test]
     #[ignore] // it is too expensive
     fn lambda_template() {
-        use crate::build::project;
-        use handlebars::Handlebars;
-        use serde_json::json;
+        use crate::codegen::workspace;
+        use crate::codegen::LambdaRequest;
 
-        // The cool thing about this macro `include_str!` is that it includes the
-        // content of the file at compile time, yielding a &'static str. This means the
-        // template strings will be included in the compiled binary and we won’t need to
-        // load files at runtime.
-        let mut hbs = Handlebars::new();
-        hbs.register_template_string("lambda", include_str!("templates/lambda_test.hbs"))
-            .unwrap();
-
-        let plan = r#"{
+        let plan_json = r#"{
     "predicate":{
     "physical_expr":"binary_expr",
     "left":{
@@ -165,29 +153,16 @@ mod tests {
 }
 "#;
 
-        // source code
-        let data = json!({
-            "plan_json": plan,
-            "plan_name": "FilterExec",
-        });
-        let file = hbs.render("lambda", &data).unwrap();
+        let plan_name = "FilterExec";
+        let file_name = "mem_filter";
+        let proj_name = "lambda_codegen";
 
-        // toml file
-        hbs.register_template_string("toml", include_str!("templates/Cargo.hbs"))
-            .unwrap();
-        let data = json!({
-            "name": "mem_filter",
-        });
-        let toml = hbs.render("toml", &data).unwrap();
+        let req = LambdaRequest {
+            plan_json,
+            plan_name,
+            file_name,
+        };
 
-        // cargo build
-        let p = project("lambda")
-            .file("Cargo.toml", toml.as_str())
-            .file("Xargo.toml", include_str!("templates/Xargo.hbs"))
-            .file("src/mem_filter.rs", file.as_str())
-            .build();
-
-        let build = format!("build -j{}", num_cpus::get());
-        p.cargo(build.as_str()).run();
+        workspace(proj_name).lambda(req).build();
     }
 }

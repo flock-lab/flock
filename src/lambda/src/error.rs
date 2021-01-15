@@ -50,6 +50,8 @@ pub enum ServerlessCQError {
     /// Error returned during execution of the query.
     /// Examples include files not found, errors in parsing certain types.
     Execution(String),
+    /// Error returned during code generation.
+    CodeGeneration(String),
 }
 
 impl From<io::Error> for ServerlessCQError {
@@ -80,6 +82,9 @@ impl Display for ServerlessCQError {
             ),
             ServerlessCQError::Plan(ref desc) => write!(f, "Error during planning: {}", desc),
             ServerlessCQError::Execution(ref desc) => write!(f, "Execution error: {}", desc),
+            ServerlessCQError::CodeGeneration(ref desc) => {
+                write!(f, "Code generation error: {}", desc)
+            }
         }
     }
 }
