@@ -21,7 +21,7 @@ use serde_json::Value;
 
 use std::sync::Once;
 
-use scq_lambda::dataframe::{DataFrame, Source};
+use scq_lambda::dataframe::{DataFrame, DataSource};
 
 type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
 
@@ -120,7 +120,7 @@ macro_rules! schema {
 async fn handler(event: Value, _: Context) -> Result<Value, Error> {
     init!();
     let schema = schema!();
-    let record_batch = Source::to_batch(event, schema.clone());
+    let record_batch = DataSource::to_batch(event, schema.clone());
 
     unsafe {
         match &mut PLAN {

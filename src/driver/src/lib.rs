@@ -30,3 +30,4 @@ pub mod codegen;
 pub mod deploy;
 pub mod logwatch;
 pub mod monitor;
+pub mod query;
