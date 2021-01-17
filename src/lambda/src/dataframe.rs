@@ -70,6 +70,7 @@ pub fn from_kinesis_to_batch(event: KinesisEvent) -> RecordBatch {
     let schema = infer_json_schema(&mut reader, Some(1)).unwrap();
 
     // get all data from Kinesis event
+    let batch_size = event.records.len();
     let input: &[u8] = &event
         .records
         .into_par_iter()
@@ -78,7 +79,7 @@ pub fn from_kinesis_to_batch(event: KinesisEvent) -> RecordBatch {
 
     // transform data to record batch in Arrow
     reader = BufReader::with_capacity(input.len(), input);
-    let mut json = json::Reader::new(reader, schema, input.len(), None);
+    let mut json = json::Reader::new(reader, schema, batch_size, None);
     json.next().unwrap().unwrap()
 }
 
