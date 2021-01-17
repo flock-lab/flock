@@ -28,6 +28,8 @@ use arrow_flight::FlightData;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use rayon::prelude::*;
+
 use std::io::BufReader;
 use std::sync::Arc;
 
@@ -67,12 +69,11 @@ pub fn from_kinesis_to_batch(event: KinesisEvent) -> RecordBatch {
     let mut reader = BufReader::new(record);
     let schema = infer_json_schema(&mut reader, Some(1)).unwrap();
 
-    // get all data from Kinesis event
-    let mut input: Vec<u8> = Vec::new();
-    for mut record in event.records {
-        input.append(&mut record.kinesis.data.0);
-    }
-    let input: &[u8] = &input;
+    let input: &[u8] = &event
+        .records
+        .into_par_iter()
+        .flat_map(|r| r.kinesis.data.0)
+        .collect::<Vec<u8>>();
 
     // transform data to record batch in Arrow
     reader = BufReader::new(input);
