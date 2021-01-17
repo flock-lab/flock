@@ -63,7 +63,7 @@ pub enum DataSource {
 }
 
 /// Convert Kinesis event to record batch in Arrow.
-pub fn from_kinesis_to_batch(event: KinesisEvent) -> RecordBatch {
+pub fn from_kinesis_to_batch(event: KinesisEvent) -> (RecordBatch, SchemaRef) {
     // infer schema based on the first record
     let record: &[u8] = &event.records[0].kinesis.data.0.clone();
     let mut reader = BufReader::new(record);
@@ -79,8 +79,8 @@ pub fn from_kinesis_to_batch(event: KinesisEvent) -> RecordBatch {
 
     // transform data to record batch in Arrow
     reader = BufReader::with_capacity(input.len(), input);
-    let mut json = json::Reader::new(reader, schema, batch_size, None);
-    json.next().unwrap().unwrap()
+    let mut json = json::Reader::new(reader, schema.clone(), batch_size, None);
+    (json.next().unwrap().unwrap(), schema)
 }
 
 /// DataFrame is the deserialization format of the payload passed between lambda

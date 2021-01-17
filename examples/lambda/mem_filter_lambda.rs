@@ -15,20 +15,15 @@
 use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::{common, ExecutionPlan, LambdaExecPlan};
 
-use arrow::json;
-use arrow::json::reader::infer_json_schema;
-use arrow::record_batch::RecordBatch;
 use arrow::util::pretty;
+use aws_lambda_events::event::kinesis::KinesisEvent;
 
 use lambda::{handler_fn, Context};
 
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
-
-use std::io::BufReader;
 use std::sync::Once;
 
-use scq_lambda::dataframe::DataFrame;
+use scq_lambda::dataframe::{from_kinesis_to_batch, DataFrame};
 
 type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
 
@@ -117,26 +112,10 @@ macro_rules! init_plan {
     }};
 }
 
-/// Streaming data sources
-#[derive(Debug, Deserialize, Serialize)]
-pub struct DataSource {
-    data: String,
-}
-
-impl DataSource {
-    /// Convert streaming data source to record batch in Arrow.
-    pub fn record_batch(event: Value) -> RecordBatch {
-        let input: DataSource = serde_json::from_value(event).unwrap();
-        let mut reader = BufReader::new(input.data.as_bytes());
-        let inferred_schema = infer_json_schema(&mut reader, Some(1)).unwrap();
-        let mut json = json::Reader::new(reader, inferred_schema, 1024, None);
-        json.next().unwrap().unwrap()
-    }
-}
-
-async fn handler(event: Value, _: Context) -> Result<Value, Error> {
+async fn handler(event: KinesisEvent, _: Context) -> Result<Value, Error> {
     let schema = init_plan!();
-    let record_batch = DataSource::record_batch(event);
+
+    let (record_batch, _) = from_kinesis_to_batch(event);
 
     unsafe {
         match &mut PLAN {
@@ -162,9 +141,8 @@ mod tests {
 
     #[tokio::test]
     async fn filter_test() {
-        let data = r#"{"data": "{\"c1\": 90, \"c2\": 92.1, \"c3\": \"a\"}\n{\"c1\": 100, \"c2\": 93.2, \"c3\": \"a\"}\n{\"c1\": 91, \"c2\": 95.3, \"c3\": \"a\"}\n{\"c1\": 101, \"c2\": 96.4, \"c3\": \"b\"}\n{\"c1\": 92, \"c2\": 98.5, \"c3\": \"b\"}\n{\"c1\": 102, \"c2\": 99.6, \"c3\": \"b\"}\n{\"c1\": 93, \"c2\": 100.7, \"c3\": \"c\"}\n{\"c1\": 103, \"c2\": 101.8, \"c3\": \"c\"}"}"#;
-        let event: Value = serde_json::from_str(data).unwrap();
-
+        let data = include_str!("example-kinesis-event.json");
+        let event: KinesisEvent = serde_json::from_str(data).unwrap();
         handler(event, Context::default()).await.ok().unwrap();
     }
 }
