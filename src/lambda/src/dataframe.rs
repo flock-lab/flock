@@ -30,14 +30,14 @@ use std::sync::Arc;
 
 /// Streaming data sources
 #[derive(Debug, Deserialize, Serialize)]
-pub struct Source {
+pub struct DataSource {
     data: String,
 }
 
-impl Source {
+impl DataSource {
     /// Convert streaming data source to record batch in Arrow.
     pub fn to_batch(event: Value, schema: SchemaRef) -> RecordBatch {
-        let input: Source = serde_json::from_value(event).unwrap();
+        let input: DataSource = serde_json::from_value(event).unwrap();
         let mut json = json::Reader::new(BufReader::new(input.data.as_bytes()), schema, 1024, None);
         json.next().unwrap().unwrap()
     }
