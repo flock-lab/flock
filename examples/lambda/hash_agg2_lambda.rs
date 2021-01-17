@@ -134,7 +134,7 @@ static mut PLAN: Option<HashAggregateExec> = None;
 static INIT: Once = Once::new();
 
 /// Performs an initialization routine once and only once.
-macro_rules! init {
+macro_rules! init_plan {
     () => {{
         unsafe {
             INIT.call_once(|| {
@@ -150,7 +150,7 @@ macro_rules! init {
 }
 
 async fn handler(event: Value, _: Context) -> Result<Value, Error> {
-    let schema = init!();
+    let schema = init_plan!();
     let record_batch = DataFrame::to_batch(event);
 
     unsafe {

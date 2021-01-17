@@ -102,7 +102,7 @@ static mut PLAN: Option<FilterExec> = None;
 static INIT: Once = Once::new();
 
 /// Performs an initialization routine once and only once.
-macro_rules! init {
+macro_rules! init_plan {
     () => {{
         unsafe {
             INIT.call_once(|| {
@@ -135,7 +135,7 @@ impl DataSource {
 }
 
 async fn handler(event: Value, _: Context) -> Result<Value, Error> {
-    let schema = init!();
+    let schema = init_plan!();
     let record_batch = DataSource::record_batch(event);
 
     unsafe {
