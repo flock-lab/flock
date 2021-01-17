@@ -35,6 +35,9 @@ pub trait Query {
 /// - For a time-based windowed query, you specify the window size in terms of
 ///   time (for example, a one-minute window).
 ///
+/// Schedule expressions using rate or cron:
+/// https://docs.aws.amazon.com/lambda/latest/dg/services-cloudwatchevents-expressions.html
+///
 /// Reference:
 /// https://docs.microsoft.com/en-us/stream-analytics-query/windowing-azure-stream-analytics
 pub enum StreamWindow {
