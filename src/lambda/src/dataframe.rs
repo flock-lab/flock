@@ -15,8 +15,11 @@
 //! DataFrame API for building and executing query plans in cloud function
 //! services.
 
+use aws_lambda_events::event::kinesis::KinesisEvent;
+
 use arrow::datatypes::{Schema, SchemaRef};
 use arrow::json;
+use arrow::json::reader::infer_json_schema;
 use arrow::record_batch::RecordBatch;
 
 use arrow_flight::utils::{flight_data_from_arrow_batch, flight_data_to_arrow_batch};
@@ -28,19 +31,53 @@ use serde_json::Value;
 use std::io::BufReader;
 use std::sync::Arc;
 
-/// Streaming data sources
-#[derive(Debug, Deserialize, Serialize)]
-pub struct DataSource {
-    data: String,
+/// A data source is the location where data that is being used originates from.
+pub enum DataSource {
+    /// Amazon Kinesis Data Streams (KDS) is a massively scalable and durable
+    /// real-time data streaming service.
+    KinesisEvent,
+    /// Apache Kafka is a community distributed event streaming platform capable
+    /// of handling trillions of events a day.
+    KafkaEvent,
+    /// Amazon Simple Queue Service (SQS) is a fully managed message queuing
+    /// service that enables you to decouple and scale microservices,
+    /// distributed systems, and serverless applications. SQS eliminates the
+    /// complexity and overhead associated with managing and operating message
+    /// oriented middleware, and empowers developers to focus on differentiating
+    /// work. Using SQS, you can send, store, and receive messages between
+    /// software components at any volume, without losing messages or requiring
+    /// other services to be available.
+    SqsEvent,
+    /// Amazon Simple Notification Service (Amazon SNS) is a fully managed
+    /// messaging service for both application-to-application (A2A) and
+    /// application-to-person (A2P) communication.
+    SnsEvent,
+    /// The AWS IoT Button is a programmable button based on the Amazon Dash
+    /// Button hardware. This simple Wi-Fi device is easy to configure and
+    /// designed for developers to get started with AWS IoT Core, AWS Lambda,
+    /// Amazon DynamoDB, Amazon SNS, and many other Amazon Web Services without
+    /// writing device-specific code.
+    IoTButtonEvent,
 }
 
-impl DataSource {
-    /// Convert streaming data source to record batch in Arrow.
-    pub fn to_batch(event: Value, schema: SchemaRef) -> RecordBatch {
-        let input: DataSource = serde_json::from_value(event).unwrap();
-        let mut json = json::Reader::new(BufReader::new(input.data.as_bytes()), schema, 1024, None);
-        json.next().unwrap().unwrap()
+/// Convert Kinesis event to record batch in Arrow.
+pub fn from_kinesis_to_batch(event: KinesisEvent) -> RecordBatch {
+    // infer schema based on the first record
+    let record: &[u8] = &event.records[0].kinesis.data.0.clone();
+    let mut reader = BufReader::new(record);
+    let schema = infer_json_schema(&mut reader, Some(1)).unwrap();
+
+    // get all data from Kinesis event
+    let mut input: Vec<u8> = Vec::new();
+    for mut record in event.records {
+        input.append(&mut record.kinesis.data.0);
     }
+    let input: &[u8] = &input;
+
+    // transform data to record batch in Arrow
+    reader = BufReader::new(input);
+    let mut json = json::Reader::new(reader, schema, input.len(), None);
+    json.next().unwrap().unwrap()
 }
 
 /// DataFrame is the deserialization format of the payload passed between lambda
