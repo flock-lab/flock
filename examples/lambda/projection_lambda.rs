@@ -125,20 +125,13 @@ static mut PLAN: Option<ProjectionExec> = None;
 static INIT: Once = Once::new();
 
 /// Performs an initialization routine once and only once.
-macro_rules! init {
+macro_rules! init_plan {
     () => {{
         unsafe {
             INIT.call_once(|| {
                 PLAN = Some(serde_json::from_str(&PLAN_JSON).unwrap());
             });
-        }
-    }};
-}
 
-/// Get DataFrame's schema.
-macro_rules! schema {
-    () => {{
-        unsafe {
             match &PLAN {
                 Some(plan) => plan.schema().clone(),
                 None => panic!("Unexpected plan!"),
@@ -148,8 +141,7 @@ macro_rules! schema {
 }
 
 async fn handler(event: Value, _: Context) -> Result<Value, Error> {
-    init!();
-    let schema = schema!();
+    let schema = init_plan!();
     let record_batch = DataFrame::to_batch(event);
 
     unsafe {

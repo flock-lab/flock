@@ -25,7 +25,7 @@ use serde_json::Value;
 
 use std::sync::Once;
 
-use scq_lambda::dataframe::{DataFrame, DataSource};
+use scq_lambda::dataframe::{DataFrame, from_kinesis_to_batch};
 
 type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
 
@@ -45,20 +45,13 @@ static mut PLAN: Option<{{{ plan_name }}}> = None;
 static INIT: Once = Once::new();
 
 /// Performs an initialization routine once and only once.
-macro_rules! init {
-    () => \{{
+macro_rules! init_plan {
+    () => {{
         unsafe {
             INIT.call_once(|| {
                 PLAN = Some(serde_json::from_str(&PLAN_JSON).unwrap());
             });
-        }
-    }};
-}
 
-/// Get DataFrame's schema.
-macro_rules! schema {
-    () => \{{
-        unsafe {
             match &PLAN {
                 Some(plan) => plan.schema().clone(),
                 None => panic!("Unexpected plan!"),
@@ -68,9 +61,8 @@ macro_rules! schema {
 }
 
 async fn handler(event: Value, _: Context) -> Result<Value, Error> {
-    init!();
-    let schema = schema!();
-    let record_batch = DataSource::to_batch(event, schema.clone());
+    let schema = init_plan!();
+    let record_batch = from_kinesis_to_batch(event);
 
     unsafe {
         match &mut PLAN {

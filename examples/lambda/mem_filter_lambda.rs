@@ -15,13 +15,20 @@
 use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::{common, ExecutionPlan, LambdaExecPlan};
 
+use arrow::json;
+use arrow::json::reader::infer_json_schema;
+use arrow::record_batch::RecordBatch;
 use arrow::util::pretty;
+
 use lambda::{handler_fn, Context};
+
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use std::io::BufReader;
 use std::sync::Once;
 
-use scq_lambda::dataframe::{DataFrame, DataSource};
+use scq_lambda::dataframe::DataFrame;
 
 type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
 
@@ -95,20 +102,13 @@ static mut PLAN: Option<FilterExec> = None;
 static INIT: Once = Once::new();
 
 /// Performs an initialization routine once and only once.
-macro_rules! init {
+macro_rules! init_plan {
     () => {{
         unsafe {
             INIT.call_once(|| {
                 PLAN = Some(serde_json::from_str(&PLAN_JSON).unwrap());
             });
-        }
-    }};
-}
 
-/// Get DataFrame's schema.
-macro_rules! schema {
-    () => {{
-        unsafe {
             match &PLAN {
                 Some(plan) => plan.schema().clone(),
                 None => panic!("Unexpected plan!"),
@@ -117,10 +117,26 @@ macro_rules! schema {
     }};
 }
 
+/// Streaming data sources
+#[derive(Debug, Deserialize, Serialize)]
+pub struct DataSource {
+    data: String,
+}
+
+impl DataSource {
+    /// Convert streaming data source to record batch in Arrow.
+    pub fn record_batch(event: Value) -> RecordBatch {
+        let input: DataSource = serde_json::from_value(event).unwrap();
+        let mut reader = BufReader::new(input.data.as_bytes());
+        let inferred_schema = infer_json_schema(&mut reader, Some(1)).unwrap();
+        let mut json = json::Reader::new(reader, inferred_schema, 1024, None);
+        json.next().unwrap().unwrap()
+    }
+}
+
 async fn handler(event: Value, _: Context) -> Result<Value, Error> {
-    init!();
-    let schema = schema!();
-    let record_batch = DataSource::to_batch(event, schema.clone());
+    let schema = init_plan!();
+    let record_batch = DataSource::record_batch(event);
 
     unsafe {
         match &mut PLAN {
