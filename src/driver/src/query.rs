@@ -25,6 +25,48 @@ pub trait Query {
     fn deploy() -> Result<()>;
 }
 
+/// You can set up a rule to run an AWS Lambda function on a schedule.
+#[rustfmt::skip]
+pub enum Schedule {
+    /// Where Unit can be minute(s), hour(s), or day(s). For a singular value
+    /// the unit must be singular (for example,rate(1 day)), otherwise plural
+    /// (for example, rate(5 days)).
+    ///
+    /// Rate expression examples
+    ///
+    /// | Frequency        | Expression      |
+    /// |------------------|-----------------|
+    /// | Every 5 minutes  | rate(5 minutes) |
+    /// | Every hour       | rate(1 hour)    |
+    /// | Every seven days | rate(7 days)    |
+    ///
+    /// Standard rate for frequencies of up to once per minute.
+    LowRate(String),
+    /// CloudWatch Events does not provide second-level precision in schedule
+    /// expressions. When 0 < rate < 60 seconds, cloud functions are
+    /// directly triggered by user.
+    HighRate(u8),
+    /// Cron expressions have the following format:
+    ///
+    /// Cron(`Minutes` `Hours` `Day-of-month` `Month` `Day-of-week` `Year`)
+    ///
+    /// Cron expression examples
+    ///
+    /// | Frequency                                            | Expression                   |
+    /// |------------------------------------------------------|------------------------------|
+    /// | 10:15 AM (UTC) every day                             | cron(15 10 * * ? *)          |
+    /// | 6:00 PM Monday through Friday                        | cron(0 18 ? * MON-FRI *)     |
+    /// | 8:00 AM on the first day of the month                | cron(0 8 1 * ? *)            |
+    /// | Every 10 min on weekdays                             | cron(0/10 * ? * MON-FRI *)   |
+    /// | Every 5 minutes between 8:00 AM and 5:55 PM weekdays | cron(0/5 8-17 ? * MON-FRI *) |
+    /// | 9:00 AM on the first Monday of each month            | cron(0 9 ? * 2#1 *)          |
+    ///
+    /// Cron expressionsfor frequencies of up to once per minute.
+    Cron(String),
+    /// The window size in terms of the number of rows.
+    Rows(u64),
+}
+
 /// An in-application stream represents unbounded data that flows continuously
 /// through your application. Therefore, to get result sets from this
 /// continuously updating input, you often bound queries using a window defined
@@ -45,10 +87,10 @@ pub enum StreamWindow {
     /// and close at regular intervals. In this case, each record on an
     /// in-application stream belongs to a specific window. It is processed only
     /// once (when the query processes the window to which the record belongs).
-    TumblingWindow(String, u64),
+    TumblingWindow(Schedule),
     /// A query that aggregates data continuously, using a fixed time or
     /// rowcount interval.
-    SlidingWindow(String, u64),
+    SlidingWindow(Schedule),
     /// Session windows group events that arrive at similar times, filtering out
     /// periods of time where there is no data. Session window function has
     /// three main parameters: timeout, maximum duration, and partitioning key
@@ -74,6 +116,8 @@ pub struct StreamQuery {
     pub ansi_sql:   String,
     /// The windows group stream elements by time or rows.
     pub window:     StreamWindow,
+    /// Whether the time schedule is triggered by cloud watch or by the user.
+    pub cloudwatch: bool,
     /// A streaming data source.
     pub datasource: DataSource,
     /// A Cargo workspace for code generation and compilation.
