@@ -15,7 +15,6 @@
 //! A Query API to associate front-end CLI with back-end code generation and
 //! continuous deployment.
 
-use crate::codegen::workspace::Workspace;
 use scq_lambda::dataframe::DataSource;
 use scq_lambda::error::Result;
 
@@ -120,8 +119,6 @@ pub struct StreamQuery {
     pub cloudwatch: bool,
     /// A streaming data source.
     pub datasource: DataSource,
-    /// A Cargo workspace for code generation and compilation.
-    pub workspace:  Workspace,
 }
 
 /// Batch processing is the processing of a large volume of data all at once.

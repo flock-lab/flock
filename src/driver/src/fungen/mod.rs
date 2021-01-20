@@ -12,23 +12,4 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![warn(missing_docs)]
-// Clippy lints, some should be disabled incrementally
-#![allow(
-    clippy::float_cmp,
-    clippy::module_inception,
-    clippy::new_without_default,
-    clippy::ptr_arg,
-    clippy::type_complexity,
-    clippy::wrong_self_convention
-)]
-
-//! Driver API is the core component of the command-line interface for
-//! ServerlessCQ, and it supports direct calls from other high-level languages.
-
-pub mod build;
-pub mod deploy;
-pub mod fungen;
-pub mod logwatch;
-pub mod monitor;
-pub mod query;
+//! Create a cloud function for each physical sub-plan of the query.

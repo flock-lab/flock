@@ -12,4 +12,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! This crate deploys the compiled lambda binary to the cloud.
+//! This crate creates lambda functions for sub-plans of the query statement and
+//! configure the executable environment.

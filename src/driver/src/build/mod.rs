@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! This crate compiles the generated code and its dependencies and optimize the
-//! binary size to reduce a cold start's impact.
+//! This crate is used to compile user-defined functions (UDF).
 //!
 //! reference:
 //! https://github.com/rust-lang/cargo/blob/master/crates/cargo-test-support/src/lib.rs
