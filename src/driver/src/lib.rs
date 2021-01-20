@@ -28,7 +28,7 @@
 
 pub mod build;
 pub mod deploy;
-pub mod fungen;
+pub mod funcgen;
 pub mod logwatch;
 pub mod monitor;
 pub mod query;
