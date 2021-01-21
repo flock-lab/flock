@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Convert the physical plan into lambda functions for deployment.
+//! Create a cloud function for each physical sub-plan of the query.
 
-pub mod bin;
+pub mod kinesis;
+pub mod ops;

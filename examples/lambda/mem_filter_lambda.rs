@@ -12,18 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use datafusion::physical_plan::filter::FilterExec;
-use datafusion::physical_plan::{common, ExecutionPlan, LambdaExecPlan};
-
-use arrow::util::pretty;
 use aws_lambda_events::event::kinesis::KinesisEvent;
 
-use lambda::{handler_fn, Context};
+use datafusion::physical_plan::{common, ExecutionPlan};
 
+use arrow::util::pretty;
+use lambda::{handler_fn, Context};
 use serde_json::Value;
+
 use std::sync::Once;
 
 use scq_lambda::dataframe::{from_kinesis_to_batch, DataFrame};
+use scq_lambda::plan::*;
+use scq_lambda::{exec_plan, init_plan};
 
 type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
 
@@ -33,106 +34,21 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-/// JSON representation of the physical plan.
-const PLAN_JSON: &str = r#"
-{
-    "predicate":{
-    "physical_expr":"binary_expr",
-    "left":{
-        "physical_expr":"column",
-        "name":"c2"
-    },
-    "op":"Lt",
-    "right":{
-        "physical_expr":"cast_expr",
-        "expr":{
-            "physical_expr":"literal",
-            "value":{
-                "Int64":99
-            }
-        },
-        "cast_type":"Float64"
-    }
-    },
-    "input":{
-    "execution_plan":"memory_exec",
-    "schema":{
-        "fields":[
-            {
-                "name":"c1",
-                "data_type":"Int64",
-                "nullable":false,
-                "dict_id":0,
-                "dict_is_ordered":false
-            },
-            {
-                "name":"c2",
-                "data_type":"Float64",
-                "nullable":false,
-                "dict_id":0,
-                "dict_is_ordered":false
-            },
-            {
-                "name":"c3",
-                "data_type":"Utf8",
-                "nullable":false,
-                "dict_id":0,
-                "dict_is_ordered":false
-            }
-        ],
-        "metadata":{
-
-        }
-    },
-    "projection":[
-        0,
-        1,
-        2
-    ]
-    }
-}
-"#;
-
-static mut PLAN: Option<FilterExec> = None;
+/// Initialize the lambda function once and only once.
 static INIT: Once = Once::new();
 
-/// Performs an initialization routine once and only once.
-macro_rules! init_plan {
-    () => {{
-        unsafe {
-            INIT.call_once(|| {
-                PLAN = Some(serde_json::from_str(&PLAN_JSON).unwrap());
-            });
-
-            match &PLAN {
-                Some(plan) => plan.schema().clone(),
-                None => panic!("Unexpected plan!"),
-            }
-        }
-    }};
-}
+/// Empty Plan before initializing the cloud environment.
+static mut PLAN: LambdaPlan = LambdaPlan::None;
 
 async fn handler(event: KinesisEvent, _: Context) -> Result<Value, Error> {
-    let schema = init_plan!();
+    let (schema, plan) = init_plan!(INIT, PLAN);
 
     let (record_batch, _) = from_kinesis_to_batch(event);
+    let result = exec_plan!(plan, vec![vec![record_batch]]);
+    pretty::print_batches(&result)?;
 
-    unsafe {
-        match &mut PLAN {
-            Some(plan) => {
-                // Plan Execution
-                plan.feed_batches(vec![vec![record_batch]]);
-                let it = plan.execute(0).await?;
-                let result = common::collect(it).await?;
-                pretty::print_batches(&result)?;
-
-                // RecordBatch to DataFrame
-                let datafame = DataFrame::from(&result[0], schema);
-                Ok(serde_json::to_value(&datafame)?)
-            }
-            None => panic!("Unexpected plan!"),
-        }
-    }
+    let dataframe = DataFrame::from(&result[0], schema);
+    Ok(serde_json::to_value(&dataframe)?)
 }
 
 #[cfg(test)]
@@ -141,6 +57,68 @@ mod tests {
 
     #[tokio::test]
     async fn filter_test() {
+        let plan_key = "PLAN_JSON";
+        let plan_val = r#"
+        {
+            "execution_plan":"filter_exec",
+            "predicate":{
+            "physical_expr":"binary_expr",
+            "left":{
+                "physical_expr":"column",
+                "name":"c2"
+            },
+            "op":"Lt",
+            "right":{
+                "physical_expr":"cast_expr",
+                "expr":{
+                    "physical_expr":"literal",
+                    "value":{
+                        "Int64":99
+                    }
+                },
+                "cast_type":"Float64"
+            }
+            },
+            "input":{
+            "execution_plan":"memory_exec",
+            "schema":{
+                "fields":[
+                    {
+                        "name":"c1",
+                        "data_type":"Int64",
+                        "nullable":false,
+                        "dict_id":0,
+                        "dict_is_ordered":false
+                    },
+                    {
+                        "name":"c2",
+                        "data_type":"Float64",
+                        "nullable":false,
+                        "dict_id":0,
+                        "dict_is_ordered":false
+                    },
+                    {
+                        "name":"c3",
+                        "data_type":"Utf8",
+                        "nullable":false,
+                        "dict_id":0,
+                        "dict_is_ordered":false
+                    }
+                ],
+                "metadata":{
+
+                }
+            },
+            "projection":[
+                0,
+                1,
+                2
+            ]
+            }
+        }
+        "#;
+        std::env::set_var(plan_key, plan_val);
+
         let data = include_str!("example-kinesis-event.json");
         let event: KinesisEvent = serde_json::from_str(data).unwrap();
         handler(event, Context::default()).await.ok().unwrap();
