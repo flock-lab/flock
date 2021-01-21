@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
-
-use datafusion::physical_plan::{common, ExecutionPlan, LambdaExecPlan};
+use datafusion::physical_plan::{common, ExecutionPlan};
 
 use arrow::util::pretty;
 use lambda::{handler_fn, Context};
@@ -23,6 +21,8 @@ use serde_json::Value;
 use std::sync::Once;
 
 use scq_lambda::dataframe::DataFrame;
+use scq_lambda::plan::*;
+use scq_lambda::{exec_plan, init_plan};
 
 type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
 
@@ -32,143 +32,21 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-/// JSON representation of the physical plan.
-const PLAN_JSON: &str = r#"
-{
-    "mode":"Partial",
-    "group_expr":[
-       [
-          {
-             "physical_expr":"column",
-             "name":"c3"
-          },
-          "c3"
-       ]
-    ],
-    "aggr_expr":[
-       {
-          "aggregate_expr":"max",
-          "name":"MAX(c1)",
-          "data_type":"Int64",
-          "nullable":true,
-          "expr":{
-             "physical_expr":"column",
-             "name":"c1"
-          }
-       },
-       {
-          "aggregate_expr":"min",
-          "name":"MIN(c2)",
-          "data_type":"Float64",
-          "nullable":true,
-          "expr":{
-             "physical_expr":"column",
-             "name":"c2"
-          }
-       }
-    ],
-    "input":{
-       "execution_plan":"memory_exec",
-       "schema":{
-          "fields":[
-             {
-                "name":"c3",
-                "data_type":"Utf8",
-                "nullable":false,
-                "dict_id":0,
-                "dict_is_ordered":false
-             },
-             {
-                "name":"MAX(c1)[max]",
-                "data_type":"Int64",
-                "nullable":true,
-                "dict_id":0,
-                "dict_is_ordered":false
-             },
-             {
-                "name":"MIN(c2)[min]",
-                "data_type":"Float64",
-                "nullable":true,
-                "dict_id":0,
-                "dict_is_ordered":false
-             }
-          ],
-          "metadata":{
-
-          }
-       },
-       "projection":null
-    },
-    "schema":{
-       "fields":[
-          {
-             "name":"c3",
-             "data_type":"Utf8",
-             "nullable":false,
-             "dict_id":0,
-             "dict_is_ordered":false
-          },
-          {
-             "name":"MAX(c1)[max]",
-             "data_type":"Int64",
-             "nullable":true,
-             "dict_id":0,
-             "dict_is_ordered":false
-          },
-          {
-             "name":"MIN(c2)[min]",
-             "data_type":"Float64",
-             "nullable":true,
-             "dict_id":0,
-             "dict_is_ordered":false
-          }
-       ],
-       "metadata":{
-
-       }
-    }
-}
-"#;
-
-static mut PLAN: Option<HashAggregateExec> = None;
+/// Initialize the lambda function once and only once.
 static INIT: Once = Once::new();
 
-/// Performs an initialization routine once and only once.
-macro_rules! init_plan {
-    () => {{
-        unsafe {
-            INIT.call_once(|| {
-                PLAN = Some(serde_json::from_str(&PLAN_JSON).unwrap());
-            });
-
-            match &PLAN {
-                Some(plan) => plan.schema().clone(),
-                None => panic!("Unexpected plan!"),
-            }
-        }
-    }};
-}
+/// Empty Plan before initializing the cloud environment.
+static mut PLAN: LambdaPlan = LambdaPlan::None;
 
 async fn handler(event: Value, _: Context) -> Result<Value, Error> {
-    let schema = init_plan!();
+    let (schema, plan) = init_plan!(INIT, PLAN);
+
     let record_batch = DataFrame::to_batch(event);
+    let result = exec_plan!(plan, vec![vec![record_batch]]);
+    pretty::print_batches(&result)?;
 
-    unsafe {
-        match &mut PLAN {
-            Some(plan) => {
-                // Plan Execution
-                plan.feed_batches(vec![vec![record_batch]]);
-                let it = plan.execute(0).await?;
-                let result = common::collect(it).await?;
-                pretty::print_batches(&result)?;
-
-                // RecordBatch to DataFrame
-                let datafame = DataFrame::from(&result[0], schema);
-                Ok(serde_json::to_value(&datafame)?)
-            }
-            None => panic!("Unexpected plan!"),
-        }
-    }
+    let dataframe = DataFrame::from(&result[0], schema);
+    Ok(serde_json::to_value(&dataframe)?)
 }
 
 #[cfg(test)]
@@ -180,6 +58,107 @@ mod tests {
         let data = r#"
             {"header":[16,0,0,0,12,0,26,0,24,0,23,0,4,0,8,0,12,0,0,0,32,0,0,0,136,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,3,0,10,0,24,0,12,0,8,0,4,0,10,0,0,0,76,0,0,0,16,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,3,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,0,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,40,0,0,0,0,0,0,0,48,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,56,0,0,0,0,0,0,0,40,0,0,0,0,0,0,0,96,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,104,0,0,0,0,0,0,0,24,0,0,0,0,0,0,0,128,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0],"body":[255,0,0,0,0,0,0,0,90,0,0,0,0,0,0,0,100,0,0,0,0,0,0,0,91,0,0,0,0,0,0,0,101,0,0,0,0,0,0,0,92,0,0,0,0,0,0,0,255,0,0,0,0,0,0,0,102,102,102,102,102,6,87,64,205,204,204,204,204,76,87,64,51,51,51,51,51,211,87,64,154,153,153,153,153,25,88,64,0,0,0,0,0,160,88,64,255,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,2,0,0,0,3,0,0,0,4,0,0,0,5,0,0,0,97,97,97,98,98,0,0,0],"schema":{"fields":[{"name":"c1","data_type":"Int64","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"c2","data_type":"Float64","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"c3","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false}],"metadata":{}}}
         "#;
+
+        let plan_key = "PLAN_JSON";
+        let plan_val = r#"
+        {
+            "execution_plan":"hash_aggregate_exec",
+            "mode":"Partial",
+            "group_expr":[
+               [
+                  {
+                     "physical_expr":"column",
+                     "name":"c3"
+                  },
+                  "c3"
+               ]
+            ],
+            "aggr_expr":[
+               {
+                  "aggregate_expr":"max",
+                  "name":"MAX(c1)",
+                  "data_type":"Int64",
+                  "nullable":true,
+                  "expr":{
+                     "physical_expr":"column",
+                     "name":"c1"
+                  }
+               },
+               {
+                  "aggregate_expr":"min",
+                  "name":"MIN(c2)",
+                  "data_type":"Float64",
+                  "nullable":true,
+                  "expr":{
+                     "physical_expr":"column",
+                     "name":"c2"
+                  }
+               }
+            ],
+            "input":{
+               "execution_plan":"memory_exec",
+               "schema":{
+                  "fields":[
+                     {
+                        "name":"c3",
+                        "data_type":"Utf8",
+                        "nullable":false,
+                        "dict_id":0,
+                        "dict_is_ordered":false
+                     },
+                     {
+                        "name":"MAX(c1)[max]",
+                        "data_type":"Int64",
+                        "nullable":true,
+                        "dict_id":0,
+                        "dict_is_ordered":false
+                     },
+                     {
+                        "name":"MIN(c2)[min]",
+                        "data_type":"Float64",
+                        "nullable":true,
+                        "dict_id":0,
+                        "dict_is_ordered":false
+                     }
+                  ],
+                  "metadata":{
+
+                  }
+               },
+               "projection":null
+            },
+            "schema":{
+               "fields":[
+                  {
+                     "name":"c3",
+                     "data_type":"Utf8",
+                     "nullable":false,
+                     "dict_id":0,
+                     "dict_is_ordered":false
+                  },
+                  {
+                     "name":"MAX(c1)[max]",
+                     "data_type":"Int64",
+                     "nullable":true,
+                     "dict_id":0,
+                     "dict_is_ordered":false
+                  },
+                  {
+                     "name":"MIN(c2)[min]",
+                     "data_type":"Float64",
+                     "nullable":true,
+                     "dict_id":0,
+                     "dict_is_ordered":false
+                  }
+               ],
+               "metadata":{
+
+               }
+            }
+        }
+        "#;
+        std::env::set_var(plan_key, plan_val);
+
         let event: Value = serde_json::from_str(data).unwrap();
         handler(event, Context::default()).await.ok().unwrap();
     }
