@@ -80,6 +80,11 @@ impl LambdaDag {
         self.dag.add_node(node)
     }
 
+    /// Return a node for a given id.
+    pub fn get_node(&self, id: NodeIndex) -> Option<&DagNode> {
+        self.dag.node_weight(id)
+    }
+
     /// Add a new child node to the node at the given `NodeIndex`.
     /// Returns the node's `NodeIndex`.
     ///

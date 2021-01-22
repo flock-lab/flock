@@ -147,6 +147,14 @@ mod tests {
         let f = lambda_dag.add_child(c, filter);
         let m = lambda_dag.add_child(f, memory);
 
+        assert_eq!(
+            r#"String("hash_aggregate_exec")"#,
+            format!(
+                "{:?}",
+                serde_json::to_value(&*lambda_dag.get_node(p).unwrap()).unwrap()["execution_plan"]
+            )
+        );
+
         let plans = lambda_dag.get_sub_plans(p);
         let mut iter = plans.iter();
 
