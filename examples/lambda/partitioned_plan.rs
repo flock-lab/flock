@@ -102,9 +102,10 @@ mod tests {
             None => panic!("Plan mismatch Error"),
         };
 
+        let memory = Arc::new(memory_exec.clone()) as Arc<dyn ExecutionPlan>;
         assert_eq!(
-            r#"{"schema":{"fields":[{"name":"c1","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c2","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c3","data_type":"Utf8","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"projection":[0,1,2]}"#,
-            serde_json::to_string(&memory_exec).unwrap()
+            r#"{"execution_plan":"memory_exec","schema":{"fields":[{"name":"c1","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c2","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c3","data_type":"Utf8","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"projection":[0,1,2]}"#,
+            serde_json::to_string(&memory).unwrap()
         );
 
         let filter = filter_exec.new_orphan() as Arc<dyn ExecutionPlan>;
@@ -139,15 +140,14 @@ mod tests {
 
         // Construct a DAG for the physical plan partition
         let mut lambda_dag = LambdaDag::new();
-        let dag = lambda_dag.context();
 
-        let parent = dag.add_node(hash_agg_2);
-        let (_, h1) = dag.add_child(parent, (), hash_agg_1);
-        let (_, c) = dag.add_child(h1, (), coalesce);
-        let (_, f) = dag.add_child(c, (), filter);
-        let (_, m) = dag.add_child(f, (), Arc::new(memory_exec.clone()));
+        let p = lambda_dag.add_node(hash_agg_2);
+        let h = lambda_dag.add_child(p, hash_agg_1);
+        let c = lambda_dag.add_child(h, coalesce);
+        let f = lambda_dag.add_child(c, filter);
+        let m = lambda_dag.add_child(f, memory);
 
-        let plans = lambda_dag.get_sub_plans(parent);
+        let plans = lambda_dag.get_sub_plans(p);
         let mut iter = plans.iter();
 
         assert_eq!(

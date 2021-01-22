@@ -71,6 +71,26 @@ impl LambdaDag {
             .count()
     }
 
+    /// Add a new node to the `Dag`.
+    ///
+    /// Computes in **O(1)** time.
+    ///
+    /// Returns the index of the new node.
+    pub fn add_node(&mut self, node: DagNode) -> NodeIndex {
+        self.dag.add_node(node)
+    }
+
+    /// Add a new child node to the node at the given `NodeIndex`.
+    /// Returns the node's `NodeIndex`.
+    ///
+    /// child -> edge -> node
+    ///
+    /// Computes in **O(1)** time.
+    pub fn add_child(&mut self, parent: NodeIndex, node: DagNode) -> NodeIndex {
+        let (_, n) = self.dag.add_child(parent, (), node);
+        n
+    }
+
     /// Return a **Vec** with all depended subplans for the given node.
     pub fn get_depended_plans(&self, node: NodeIndex) -> Vec<(DagNode, NodeIndex)> {
         self.dag
