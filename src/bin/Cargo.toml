@@ -22,7 +22,7 @@ lazy_static = "1.4.0"
 rustyline = { version = "7.0", optional = true }
 scq_lambda = { path = "../lambda" }
 sqlparser = { version = "0.7.0", features = [ "json_example" ] }
-tokio = { version = "0.2", features = [ "macros" ] }
+tokio = { version = "1.0", features = [ "macros" ] }
 
 [[bin]]
 name = "serverlesscq-cli"

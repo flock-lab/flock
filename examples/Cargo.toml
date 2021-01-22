@@ -19,7 +19,7 @@ scq_driver = { path = "../src/driver" }
 scq_lambda = { path = "../src/lambda" }
 serde = { version = "1.0", features = [ "derive" ] }
 serde_json = "1.0"
-tokio = { version = "0.2", features = [ "macros" ] }
+tokio = { version = "1.0", features = [ "macros" ] }
 
 [dev-dependencies]
 base64 = "0.13"
