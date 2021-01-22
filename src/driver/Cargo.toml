@@ -10,8 +10,10 @@ edition = "2018"
 [dependencies]
 aws_lambda_events = "0.4"
 cargo = "0.50.0"
+daggy = "0.7.0"
 datafusion = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq" }
 filetime = "0.2"
+fixedbitset = "0.3.1"
 glob = "0.3"
 lambda = { git = "https://github.com/awslabs/aws-lambda-rust-runtime/", branch = "master" }
 lazy_static = "1.4"
@@ -21,7 +23,6 @@ remove_dir_all = "0.6"
 scq_lambda = { path = "../../src/lambda" }
 serde_json = "1.0"
 tokio = { version = "0.2", features = [ "macros" ] }
-
 url = "2.0"
 
 [lib]

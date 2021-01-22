@@ -35,6 +35,7 @@ mod tests {
     use datafusion::physical_plan::projection::ProjectionExec;
     use datafusion::physical_plan::ExecutionPlan;
 
+    use scq_driver::funcgen::dag::LambdaDag;
     use scq_lambda::dataframe::from_kinesis_to_batch;
     use std::sync::Arc;
 
@@ -134,6 +135,86 @@ mod tests {
         assert_eq!(
             r#"{"execution_plan":"projection_exec","expr":[[{"physical_expr":"column","name":"MAX(c1)"},"MAX(c1)"],[{"physical_expr":"column","name":"MIN(c2)"},"MIN(c2)"],[{"physical_expr":"column","name":"c3"},"c3"]],"schema":{"fields":[{"name":"MAX(c1)","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"MIN(c2)","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c3","data_type":"Utf8","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"input":{"execution_plan":"memory_exec","schema":{"fields":[{"name":"MAX(c1)","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"MIN(c2)","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c3","data_type":"Utf8","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"projection":null}}"#,
             serde_json::to_string(&projection).unwrap()
+        );
+
+        // Construct a DAG for the physical plan partition
+        let mut lambda_dag = LambdaDag::new();
+        let dag = lambda_dag.context();
+
+        let parent = dag.add_node(hash_agg_2);
+        let (_, h1) = dag.add_child(parent, (), hash_agg_1);
+        let (_, c) = dag.add_child(h1, (), coalesce);
+        let (_, f) = dag.add_child(c, (), filter);
+        let (_, m) = dag.add_child(f, (), Arc::new(memory_exec.clone()));
+
+        let plans = lambda_dag.get_sub_plans(parent);
+        let mut iter = plans.iter();
+
+        assert_eq!(
+            r#"String("hash_aggregate_exec")"#,
+            format!(
+                "{:?}",
+                serde_json::to_value(&iter.next().unwrap().0).unwrap()["execution_plan"]
+            )
+        );
+
+        assert_eq!(
+            r#"String("coalesce_batches_exec")"#,
+            format!(
+                "{:?}",
+                serde_json::to_value(&iter.next().unwrap().0).unwrap()["execution_plan"]
+            )
+        );
+
+        assert_eq!(
+            r#"String("filter_exec")"#,
+            format!(
+                "{:?}",
+                serde_json::to_value(&iter.next().unwrap().0).unwrap()["execution_plan"]
+            )
+        );
+
+        assert_eq!(
+            r#"String("memory_exec")"#,
+            format!(
+                "{:?}",
+                serde_json::to_value(&iter.next().unwrap().0).unwrap()["execution_plan"]
+            )
+        );
+
+        let plans = lambda_dag.get_depended_plans(m);
+        let mut iter = plans.iter();
+
+        assert_eq!(
+            r#"String("filter_exec")"#,
+            format!(
+                "{:?}",
+                serde_json::to_value(&iter.next().unwrap().0).unwrap()["execution_plan"]
+            )
+        );
+
+        assert_eq!(
+            r#"String("coalesce_batches_exec")"#,
+            format!(
+                "{:?}",
+                serde_json::to_value(&iter.next().unwrap().0).unwrap()["execution_plan"]
+            )
+        );
+
+        assert_eq!(
+            r#"String("hash_aggregate_exec")"#,
+            format!(
+                "{:?}",
+                serde_json::to_value(&iter.next().unwrap().0).unwrap()["execution_plan"]
+            )
+        );
+
+        assert_eq!(
+            r#"String("hash_aggregate_exec")"#,
+            format!(
+                "{:?}",
+                serde_json::to_value(&iter.next().unwrap().0).unwrap()["execution_plan"]
+            )
         );
 
         Ok(())
