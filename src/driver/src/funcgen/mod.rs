@@ -15,3 +15,4 @@
 //! Convert the physical plan into lambda functions for deployment.
 
 pub mod bin;
+pub mod dag;

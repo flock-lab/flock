@@ -11,19 +11,23 @@ autobins = false
 arrow = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq" }
 arrow-flight = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq" }
 aws_lambda_events = "0.4"
-base64 = "0.13"
 datafusion = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq" }
-heck = "0.3.1"
 lambda = { git = "https://github.com/awslabs/aws-lambda-rust-runtime/", branch = "master" }
 more-asserts = "0.2.1"
+
+scq_driver = { path = "../src/driver" }
 scq_lambda = { path = "../src/lambda" }
 serde = { version = "1.0", features = [ "derive" ] }
+serde_json = "1.0"
+tokio = { version = "0.2", features = [ "macros" ] }
+
+[dev-dependencies]
+base64 = "0.13"
+heck = "0.3.2"
 serde_bytes = "0.11"
 serde_closure = "0.3.2"
-serde_json = "1.0"
 serde_traitobject = "0.2.7"
 serde_with = { version = "1.6.0", features = [ "json" ] }
-tokio = { version = "0.2", features = [ "macros" ] }
 typetag = "0.1"
 
 [[bin]]
