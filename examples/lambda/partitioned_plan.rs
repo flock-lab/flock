@@ -142,62 +142,34 @@ mod tests {
         // Construct a DAG for the physical plan partition
         let mut lambda_dag = LambdaDag::new();
 
-        let p = lambda_dag.add_node(hash_agg_2);
-        let h = lambda_dag.add_child(p, hash_agg_1);
-        let c = lambda_dag.add_child(h, coalesce);
-        let f = lambda_dag.add_child(c, filter);
-        let m = lambda_dag.add_child(f, memory);
+        let p = lambda_dag.add_node(format!("{}", serde_json::to_value(&hash_agg_2).unwrap()));
+        let h = lambda_dag.add_child(p, format!("{}", serde_json::to_value(&hash_agg_1).unwrap()));
+        let c = lambda_dag.add_child(h, format!("{}", serde_json::to_value(&coalesce).unwrap()));
+        let f = lambda_dag.add_child(c, format!("{}", serde_json::to_value(&filter).unwrap()));
+        let m = lambda_dag.add_child(f, format!("{}", serde_json::to_value(&memory).unwrap()));
 
-        assert_eq!(
-            json!("hash_aggregate_exec"),
-            serde_json::to_value(&*lambda_dag.get_node(p).unwrap())?["execution_plan"]
-        );
+        assert!(lambda_dag
+            .get_node(p)
+            .unwrap()
+            .contains("hash_aggregate_exec"));
 
+        // Forward traversal from root
         let plans = lambda_dag.get_sub_plans(p);
         let mut iter = plans.iter();
 
-        assert_eq!(
-            json!("hash_aggregate_exec"),
-            serde_json::to_value(&iter.next().unwrap().0)?["execution_plan"]
-        );
+        assert!(iter.next().unwrap().0.contains("hash_aggregate_exec"));
+        assert!(iter.next().unwrap().0.contains("coalesce_batches_exec"));
+        assert!(iter.next().unwrap().0.contains("filter_exec"));
+        assert!(iter.next().unwrap().0.contains("memory_exec"));
 
-        assert_eq!(
-            json!("coalesce_batches_exec"),
-            serde_json::to_value(&iter.next().unwrap().0)?["execution_plan"]
-        );
-
-        assert_eq!(
-            json!("filter_exec"),
-            serde_json::to_value(&iter.next().unwrap().0)?["execution_plan"]
-        );
-
-        assert_eq!(
-            json!("memory_exec"),
-            serde_json::to_value(&iter.next().unwrap().0)?["execution_plan"]
-        );
-
+        // Backward traversal from leaf
         let plans = lambda_dag.get_depended_plans(m);
         let mut iter = plans.iter();
 
-        assert_eq!(
-            json!("filter_exec"),
-            serde_json::to_value(&iter.next().unwrap().0)?["execution_plan"]
-        );
-
-        assert_eq!(
-            json!("coalesce_batches_exec"),
-            serde_json::to_value(&iter.next().unwrap().0)?["execution_plan"]
-        );
-
-        assert_eq!(
-            json!("hash_aggregate_exec"),
-            serde_json::to_value(&iter.next().unwrap().0)?["execution_plan"]
-        );
-
-        assert_eq!(
-            json!("hash_aggregate_exec"),
-            serde_json::to_value(&iter.next().unwrap().0)?["execution_plan"]
-        );
+        assert!(iter.next().unwrap().0.contains("filter_exec"));
+        assert!(iter.next().unwrap().0.contains("coalesce_batches_exec"));
+        assert!(iter.next().unwrap().0.contains("hash_aggregate_exec"));
+        assert!(iter.next().unwrap().0.contains("hash_aggregate_exec"));
 
         Ok(())
     }
@@ -208,32 +180,20 @@ mod tests {
 
         let plan: Arc<dyn ExecutionPlan> = serde_json::from_str(&plan).unwrap();
 
-        let mut root = serde_json::to_value(&plan).unwrap();
-        let mut json = &mut root;
-        loop {
-            if !json.is_object() {
-                break;
-            }
-            match json["execution_plan"].as_str() {
-                Some("hash_aggregate_exec") => {
-                    if let Some("Final") = json["mode"].as_str() {
-                        let object = (*json["input"].take().as_object().unwrap()).clone();
-                        assert_eq!(
-                            r#"{"execution_plan":"projection_exec","expr":[[{"physical_expr":"column","name":"MAX(c1)"},"MAX(c1)"],[{"physical_expr":"column","name":"MIN(c2)"},"MIN(c2)"],[{"physical_expr":"column","name":"c3"},"c3"]],"schema":{"fields":[{"name":"MAX(c1)","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"MIN(c2)","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c3","data_type":"Utf8","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"input":{"execution_plan":"hash_aggregate_exec","mode":"Final","group_expr":[[{"physical_expr":"column","name":"c3"},"c3"]],"aggr_expr":[{"aggregate_expr":"max","name":"MAX(c1)","data_type":"Int64","nullable":true,"expr":{"physical_expr":"column","name":"c1"}},{"aggregate_expr":"min","name":"MIN(c2)","data_type":"Float64","nullable":true,"expr":{"physical_expr":"column","name":"c2"}}],"input":null,"schema":{"fields":[{"name":"c3","data_type":"Utf8","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"MAX(c1)","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"MIN(c2)","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}}}}"#,
-                            format!("{}", root)
-                        );
-                        root = Value::Object(object);
-                        json = &mut root;
-                    } else {
-                        json = &mut json["input"];
-                    }
-                }
-                _ => json = &mut json["input"],
-            }
-        }
-        assert_eq!(
-            r#"{"execution_plan":"hash_aggregate_exec","mode":"Partial","group_expr":[[{"physical_expr":"column","name":"c3"},"c3"]],"aggr_expr":[{"aggregate_expr":"max","name":"MAX(c1)","data_type":"Int64","nullable":true,"expr":{"physical_expr":"column","name":"c1"}},{"aggregate_expr":"min","name":"MIN(c2)","data_type":"Float64","nullable":true,"expr":{"physical_expr":"column","name":"c2"}}],"input":{"execution_plan":"coalesce_batches_exec","input":{"execution_plan":"filter_exec","predicate":{"physical_expr":"binary_expr","left":{"physical_expr":"column","name":"c2"},"op":"Lt","right":{"physical_expr":"cast_expr","expr":{"physical_expr":"literal","value":{"Int64":99}},"cast_type":"Float64"}},"input":{"execution_plan":"memory_exec","schema":{"fields":[{"name":"c1","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c2","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c3","data_type":"Utf8","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"projection":[0,1,2],"input":null}},"target_batch_size":16384},"schema":{"fields":[{"name":"c3","data_type":"Utf8","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"MAX(c1)[max]","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"MIN(c2)[min]","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}}}"#,
-            format!("{}", root)
-        );
+        let dag = &mut LambdaDag::from(plan);
+        assert_eq!(2, dag.node_count());
+        assert_eq!(1, dag.edge_count());
+
+        let mut iter = dag.node_weights_mut();
+        let mut subplan = iter.next().unwrap();
+        assert!(subplan.contains(r#"execution_plan":"projection_exec"#));
+        assert!(subplan.contains(r#"execution_plan":"hash_aggregate_exec","mode":"Final"#));
+        assert!(subplan.contains(r#"execution_plan":"memory_exec"#));
+
+        subplan = iter.next().unwrap();
+        assert!(subplan.contains(r#"execution_plan":"hash_aggregate_exec","mode":"Partial"#));
+        assert!(subplan.contains(r#"execution_plan":"coalesce_batches_exec"#));
+        assert!(subplan.contains(r#"execution_plan":"filter_exec"#));
+        assert!(subplan.contains(r#"execution_plan":"memory_exec"#));
     }
 }
