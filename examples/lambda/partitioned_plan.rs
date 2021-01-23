@@ -202,30 +202,30 @@ mod tests {
     // Mem -> Proj
     #[tokio::test]
     async fn simple_select() {
-        let sql = concat!("SELECT c1 FROM test_table").to_string();
+        let sql = concat!("SELECT c1 FROM test_table");
         quick_init(&sql);
     }
 
     #[tokio::test]
     async fn select_alias() {
-        let sql = concat!("SELECT c1 as col_1 FROM test_table").to_string();
+        let sql = concat!("SELECT c1 as col_1 FROM test_table");
         quick_init(&sql);
     }
 
     #[tokio::test]
     async fn cast() {
-        let sql = concat!("SELECT CAST(c2 AS int) FROM test_table").to_string();
+        let sql = concat!("SELECT CAST(c2 AS int) FROM test_table");
         quick_init(&sql);
     }
     #[tokio::test]
     async fn math() {
-        let sql = concat!("SELECT c1+c2 FROM test_table").to_string();
+        let sql = concat!("SELECT c1+c2 FROM test_table");
         quick_init(&sql);
     }
 
     #[tokio::test]
     async fn math_sqrt() {
-        let sql = concat!("SELECT c1>=c2 FROM test_table").to_string();
+        let sql = concat!("SELECT c1>=c2 FROM test_table");
         quick_init(&sql);
     }
 
@@ -233,14 +233,14 @@ mod tests {
     // Memory -> Filter -> CoalesceBatches -> Projection
     #[tokio::test]
     async fn filter_query() {
-        let sql = concat!("SELECT c1, c2 ", "FROM test_table ", "WHERE c2 < 99").to_string();
+        let sql = concat!("SELECT c1, c2 FROM test_table WHERE c2 < 99");
         quick_init(&sql);
     }
 
     // Mem -> Filter -> Coalesce
     #[tokio::test]
     async fn filter_select_all() {
-        let sql = concat!("SELECT * ", "FROM test_table ", "WHERE c2 < 99").to_string();
+        let sql = concat!("SELECT * FROM test_table WHERE c2 < 99");
         quick_init(&sql);
     }
 
@@ -248,13 +248,25 @@ mod tests {
     // Mem -> HashAgg -> HashAgg
     #[tokio::test]
     async fn aggregate_query_no_group_by_count_distinct_wide() {
-        let sql = concat!("SELECT COUNT(DISTINCT c1) FROM test_table").to_string();
-        quick_init(&sql);
+        let sql = concat!("SELECT COUNT(DISTINCT c1) FROM test_table");
+        let dag = &mut quick_init(&sql);
+
+        assert_eq!(2, dag.node_count());
+        assert_eq!(1, dag.edge_count());
+
+        let mut iter = dag.node_weights_mut();
+        let mut subplan = iter.next().unwrap();
+        assert!(subplan.contains(r#"execution_plan":"hash_aggregate_exec","mode":"Final"#));
+        assert!(subplan.contains(r#"execution_plan":"memory_exec"#));
+
+        subplan = iter.next().unwrap();
+        assert!(subplan.contains(r#"execution_plan":"hash_aggregate_exec","mode":"Partial"#));
+        assert!(subplan.contains(r#"execution_plan":"memory_exec"#));
     }
 
     #[tokio::test]
     async fn aggregate_query_no_group_by() {
-        let sql = concat!("SELECT MIN(c1), AVG(c4), COUNT(c3) FROM test_table").to_string();
+        let sql = concat!("SELECT MIN(c1), AVG(c4), COUNT(c3) FROM test_table");
         quick_init(&sql);
     }
 
@@ -266,16 +278,28 @@ mod tests {
             "SELECT MIN(c1), AVG(c4), COUNT(c3) as c3_count ",
             "FROM test_table ",
             "GROUP BY c3"
-        )
-        .to_string();
-        quick_init(&sql);
+        );
+        let dag = &mut quick_init(&sql);
+
+        assert_eq!(2, dag.node_count());
+        assert_eq!(1, dag.edge_count());
+
+        let mut iter = dag.node_weights_mut();
+        let mut subplan = iter.next().unwrap();
+        assert!(subplan.contains(r#"execution_plan":"projection_exec"#));
+        assert!(subplan.contains(r#"execution_plan":"hash_aggregate_exec","mode":"Final"#));
+        assert!(subplan.contains(r#"execution_plan":"memory_exec"#));
+
+        subplan = iter.next().unwrap();
+        assert!(subplan.contains(r#"execution_plan":"hash_aggregate_exec","mode":"Partial"#));
+        assert!(subplan.contains(r#"execution_plan":"memory_exec"#));
     }
 
     // Sort
     // Mem -> Project -> Sort
     #[tokio::test]
     async fn sort() {
-        let sql = concat!("SELECT c1, c2, c3 ", "FROM test_table ", "ORDER BY c1 ",).to_string();
+        let sql = concat!("SELECT c1, c2, c3 ", "FROM test_table ", "ORDER BY c1 ");
         quick_init(&sql);
     }
 
@@ -288,8 +312,7 @@ mod tests {
             "FROM test_table ",
             "ORDER BY c1 ",
             "LIMIT 4"
-        )
-        .to_string();
+        );
         quick_init(&sql);
     }
 
@@ -301,8 +324,7 @@ mod tests {
             "SELECT MIN(c1), AVG(c4), COUNT(c3) as c3_count ",
             "FROM test_table ",
             "WHERE c2 < 99"
-        )
-        .to_string();
+        );
         let dag = &mut quick_init(&sql);
 
         assert_eq!(2, dag.node_count());
@@ -329,8 +351,7 @@ mod tests {
             "FROM test_table ",
             "WHERE c2 < 101 AND c1 > 91 ",
             "GROUP BY c3"
-        )
-        .to_string();
+        );
         let dag = &mut quick_init(&sql);
 
         assert_eq!(2, dag.node_count());
@@ -360,8 +381,7 @@ mod tests {
             "GROUP BY c3 ",
             "ORDER BY c3 ",
             "LIMIT 3"
-        )
-        .to_string();
+        );
         let dag = &mut quick_init(&sql);
 
         assert_eq!(2, dag.node_count());
