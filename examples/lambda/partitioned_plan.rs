@@ -37,6 +37,7 @@ mod tests {
 
     use scq_driver::funcgen::dag::LambdaDag;
     use scq_lambda::dataframe::from_kinesis_to_batch;
+    use serde_json::{json, Value};
     use std::sync::Arc;
 
     #[tokio::test]
@@ -65,8 +66,8 @@ mod tests {
             serialized
         );
 
-        // let physical_plan: Arc<dyn ExecutionPlan> =
-        // serde_json::from_str(&serialized).unwrap();
+        let physical_plan: Arc<dyn ExecutionPlan> = serde_json::from_str(&serialized).unwrap();
+
         let projection_exec = match physical_plan.as_any().downcast_ref::<ProjectionExec>() {
             Some(projection_exec) => projection_exec,
             None => panic!("Plan mismatch Error"),
@@ -148,83 +149,91 @@ mod tests {
         let m = lambda_dag.add_child(f, memory);
 
         assert_eq!(
-            r#"String("hash_aggregate_exec")"#,
-            format!(
-                "{:?}",
-                serde_json::to_value(&*lambda_dag.get_node(p).unwrap()).unwrap()["execution_plan"]
-            )
+            json!("hash_aggregate_exec"),
+            serde_json::to_value(&*lambda_dag.get_node(p).unwrap())?["execution_plan"]
         );
 
         let plans = lambda_dag.get_sub_plans(p);
         let mut iter = plans.iter();
 
         assert_eq!(
-            r#"String("hash_aggregate_exec")"#,
-            format!(
-                "{:?}",
-                serde_json::to_value(&iter.next().unwrap().0).unwrap()["execution_plan"]
-            )
+            json!("hash_aggregate_exec"),
+            serde_json::to_value(&iter.next().unwrap().0)?["execution_plan"]
         );
 
         assert_eq!(
-            r#"String("coalesce_batches_exec")"#,
-            format!(
-                "{:?}",
-                serde_json::to_value(&iter.next().unwrap().0).unwrap()["execution_plan"]
-            )
+            json!("coalesce_batches_exec"),
+            serde_json::to_value(&iter.next().unwrap().0)?["execution_plan"]
         );
 
         assert_eq!(
-            r#"String("filter_exec")"#,
-            format!(
-                "{:?}",
-                serde_json::to_value(&iter.next().unwrap().0).unwrap()["execution_plan"]
-            )
+            json!("filter_exec"),
+            serde_json::to_value(&iter.next().unwrap().0)?["execution_plan"]
         );
 
         assert_eq!(
-            r#"String("memory_exec")"#,
-            format!(
-                "{:?}",
-                serde_json::to_value(&iter.next().unwrap().0).unwrap()["execution_plan"]
-            )
+            json!("memory_exec"),
+            serde_json::to_value(&iter.next().unwrap().0)?["execution_plan"]
         );
 
         let plans = lambda_dag.get_depended_plans(m);
         let mut iter = plans.iter();
 
         assert_eq!(
-            r#"String("filter_exec")"#,
-            format!(
-                "{:?}",
-                serde_json::to_value(&iter.next().unwrap().0).unwrap()["execution_plan"]
-            )
+            json!("filter_exec"),
+            serde_json::to_value(&iter.next().unwrap().0)?["execution_plan"]
         );
 
         assert_eq!(
-            r#"String("coalesce_batches_exec")"#,
-            format!(
-                "{:?}",
-                serde_json::to_value(&iter.next().unwrap().0).unwrap()["execution_plan"]
-            )
+            json!("coalesce_batches_exec"),
+            serde_json::to_value(&iter.next().unwrap().0)?["execution_plan"]
         );
 
         assert_eq!(
-            r#"String("hash_aggregate_exec")"#,
-            format!(
-                "{:?}",
-                serde_json::to_value(&iter.next().unwrap().0).unwrap()["execution_plan"]
-            )
+            json!("hash_aggregate_exec"),
+            serde_json::to_value(&iter.next().unwrap().0)?["execution_plan"]
         );
 
         assert_eq!(
-            r#"String("hash_aggregate_exec")"#,
-            format!(
-                "{:?}",
-                serde_json::to_value(&iter.next().unwrap().0).unwrap()["execution_plan"]
-            )
+            json!("hash_aggregate_exec"),
+            serde_json::to_value(&iter.next().unwrap().0)?["execution_plan"]
         );
 
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn partition_json() {
+        let plan = r#"{"execution_plan":"projection_exec","expr":[[{"physical_expr":"column","name":"MAX(c1)"},"MAX(c1)"],[{"physical_expr":"column","name":"MIN(c2)"},"MIN(c2)"],[{"physical_expr":"column","name":"c3"},"c3"]],"schema":{"fields":[{"name":"MAX(c1)","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"MIN(c2)","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c3","data_type":"Utf8","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"input":{"execution_plan":"hash_aggregate_exec","mode":"Final","group_expr":[[{"physical_expr":"column","name":"c3"},"c3"]],"aggr_expr":[{"aggregate_expr":"max","name":"MAX(c1)","data_type":"Int64","nullable":true,"expr":{"physical_expr":"column","name":"c1"}},{"aggregate_expr":"min","name":"MIN(c2)","data_type":"Float64","nullable":true,"expr":{"physical_expr":"column","name":"c2"}}],"input":{"execution_plan":"hash_aggregate_exec","mode":"Partial","group_expr":[[{"physical_expr":"column","name":"c3"},"c3"]],"aggr_expr":[{"aggregate_expr":"max","name":"MAX(c1)","data_type":"Int64","nullable":true,"expr":{"physical_expr":"column","name":"c1"}},{"aggregate_expr":"min","name":"MIN(c2)","data_type":"Float64","nullable":true,"expr":{"physical_expr":"column","name":"c2"}}],"input":{"execution_plan":"coalesce_batches_exec","input":{"execution_plan":"filter_exec","predicate":{"physical_expr":"binary_expr","left":{"physical_expr":"column","name":"c2"},"op":"Lt","right":{"physical_expr":"cast_expr","expr":{"physical_expr":"literal","value":{"Int64":99}},"cast_type":"Float64"}},"input":{"execution_plan":"memory_exec","schema":{"fields":[{"name":"c1","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c2","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c3","data_type":"Utf8","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"projection":[0,1,2]}},"target_batch_size":16384},"schema":{"fields":[{"name":"c3","data_type":"Utf8","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"MAX(c1)[max]","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"MIN(c2)[min]","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}}},"schema":{"fields":[{"name":"c3","data_type":"Utf8","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"MAX(c1)","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"MIN(c2)","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}}}}"#;
+
+        let plan: Arc<dyn ExecutionPlan> = serde_json::from_str(&plan).unwrap();
+
+        let mut root = serde_json::to_value(&plan).unwrap();
+        let mut json = &mut root;
+        loop {
+            if !json.is_object() {
+                break;
+            }
+            match json["execution_plan"].as_str() {
+                Some("hash_aggregate_exec") => {
+                    if let Some("Final") = json["mode"].as_str() {
+                        let object = (*json["input"].take().as_object().unwrap()).clone();
+                        assert_eq!(
+                            r#"{"execution_plan":"projection_exec","expr":[[{"physical_expr":"column","name":"MAX(c1)"},"MAX(c1)"],[{"physical_expr":"column","name":"MIN(c2)"},"MIN(c2)"],[{"physical_expr":"column","name":"c3"},"c3"]],"schema":{"fields":[{"name":"MAX(c1)","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"MIN(c2)","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c3","data_type":"Utf8","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"input":{"execution_plan":"hash_aggregate_exec","mode":"Final","group_expr":[[{"physical_expr":"column","name":"c3"},"c3"]],"aggr_expr":[{"aggregate_expr":"max","name":"MAX(c1)","data_type":"Int64","nullable":true,"expr":{"physical_expr":"column","name":"c1"}},{"aggregate_expr":"min","name":"MIN(c2)","data_type":"Float64","nullable":true,"expr":{"physical_expr":"column","name":"c2"}}],"input":null,"schema":{"fields":[{"name":"c3","data_type":"Utf8","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"MAX(c1)","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"MIN(c2)","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}}}}"#,
+                            format!("{}", root)
+                        );
+                        root = Value::Object(object);
+                        json = &mut root;
+                    } else {
+                        json = &mut json["input"];
+                    }
+                }
+                _ => json = &mut json["input"],
+            }
+        }
+        assert_eq!(
+            r#"{"execution_plan":"hash_aggregate_exec","mode":"Partial","group_expr":[[{"physical_expr":"column","name":"c3"},"c3"]],"aggr_expr":[{"aggregate_expr":"max","name":"MAX(c1)","data_type":"Int64","nullable":true,"expr":{"physical_expr":"column","name":"c1"}},{"aggregate_expr":"min","name":"MIN(c2)","data_type":"Float64","nullable":true,"expr":{"physical_expr":"column","name":"c2"}}],"input":{"execution_plan":"coalesce_batches_exec","input":{"execution_plan":"filter_exec","predicate":{"physical_expr":"binary_expr","left":{"physical_expr":"column","name":"c2"},"op":"Lt","right":{"physical_expr":"cast_expr","expr":{"physical_expr":"literal","value":{"Int64":99}},"cast_type":"Float64"}},"input":{"execution_plan":"memory_exec","schema":{"fields":[{"name":"c1","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c2","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c3","data_type":"Utf8","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"projection":[0,1,2],"input":null}},"target_batch_size":16384},"schema":{"fields":[{"name":"c3","data_type":"Utf8","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"MAX(c1)[max]","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"MIN(c2)[min]","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}}}"#,
+            format!("{}", root)
+        );
     }
 }
