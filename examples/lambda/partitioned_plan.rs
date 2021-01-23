@@ -23,6 +23,9 @@ async fn main() -> Result<(), Error> {
 mod tests {
     use super::*;
 
+    use arrow::array::*;
+    use arrow::datatypes::{DataType, Field, Schema};
+    use arrow::record_batch::RecordBatch;
     use aws_lambda_events::event::kinesis::KinesisEvent;
 
     use datafusion::datasource::MemTable;
@@ -37,7 +40,6 @@ mod tests {
 
     use scq_driver::funcgen::dag::LambdaDag;
     use scq_lambda::dataframe::from_kinesis_to_batch;
-    use serde_json::{json, Value};
     use std::sync::Arc;
 
     #[tokio::test]
@@ -195,5 +197,237 @@ mod tests {
         assert!(subplan.contains(r#"execution_plan":"coalesce_batches_exec"#));
         assert!(subplan.contains(r#"execution_plan":"filter_exec"#));
         assert!(subplan.contains(r#"execution_plan":"memory_exec"#));
+    }
+
+    // Mem -> Proj
+    #[tokio::test]
+    async fn simple_select() {
+        let sql = concat!("SELECT c1 FROM test_table").to_string();
+        quick_init(&sql);
+    }
+
+    #[tokio::test]
+    async fn select_alias() {
+        let sql = concat!("SELECT c1 as col_1 FROM test_table").to_string();
+        quick_init(&sql);
+    }
+
+    #[tokio::test]
+    async fn cast() {
+        let sql = concat!("SELECT CAST(c2 AS int) FROM test_table").to_string();
+        quick_init(&sql);
+    }
+    #[tokio::test]
+    async fn math() {
+        let sql = concat!("SELECT c1+c2 FROM test_table").to_string();
+        quick_init(&sql);
+    }
+
+    #[tokio::test]
+    async fn math_sqrt() {
+        let sql = concat!("SELECT c1>=c2 FROM test_table").to_string();
+        quick_init(&sql);
+    }
+
+    // Filter
+    // Memory -> Filter -> CoalesceBatches -> Projection
+    #[tokio::test]
+    async fn filter_query() {
+        let sql = concat!("SELECT c1, c2 ", "FROM test_table ", "WHERE c2 < 99").to_string();
+        quick_init(&sql);
+    }
+
+    // Mem -> Filter -> Coalesce
+    #[tokio::test]
+    async fn filter_select_all() {
+        let sql = concat!("SELECT * ", "FROM test_table ", "WHERE c2 < 99").to_string();
+        quick_init(&sql);
+    }
+
+    // Aggregate
+    // Mem -> HashAgg -> HashAgg
+    #[tokio::test]
+    async fn aggregate_query_no_group_by_count_distinct_wide() {
+        let sql = concat!("SELECT COUNT(DISTINCT c1) FROM test_table").to_string();
+        quick_init(&sql);
+    }
+
+    #[tokio::test]
+    async fn aggregate_query_no_group_by() {
+        let sql = concat!("SELECT MIN(c1), AVG(c4), COUNT(c3) FROM test_table").to_string();
+        quick_init(&sql);
+    }
+
+    // Aggregate + Group By
+    // Mem -> HashAgg -> HashAgg -> Proj
+    #[tokio::test]
+    async fn aggregate_query_group_by() {
+        let sql = concat!(
+            "SELECT MIN(c1), AVG(c4), COUNT(c3) as c3_count ",
+            "FROM test_table ",
+            "GROUP BY c3"
+        )
+        .to_string();
+        quick_init(&sql);
+    }
+
+    // Sort
+    // Mem -> Project -> Sort
+    #[tokio::test]
+    async fn sort() {
+        let sql = concat!("SELECT c1, c2, c3 ", "FROM test_table ", "ORDER BY c1 ",).to_string();
+        quick_init(&sql);
+    }
+
+    // Sort limit
+    // Mem -> Project -> Sort -> GlobalLimit
+    #[tokio::test]
+    async fn sort_and_limit_by_int() {
+        let sql = concat!(
+            "SELECT c1, c2, c3 ",
+            "FROM test_table ",
+            "ORDER BY c1 ",
+            "LIMIT 4"
+        )
+        .to_string();
+        quick_init(&sql);
+    }
+
+    // Agg + Filter
+    // Mem -> Filter -> Coalesce -> HashAgg -> HashAgg -> Proj
+    #[tokio::test]
+    async fn aggregate_query_filter() {
+        let sql = concat!(
+            "SELECT MIN(c1), AVG(c4), COUNT(c3) as c3_count ",
+            "FROM test_table ",
+            "WHERE c2 < 99"
+        )
+        .to_string();
+        let dag = &mut quick_init(&sql);
+
+        assert_eq!(2, dag.node_count());
+        assert_eq!(1, dag.edge_count());
+
+        let mut iter = dag.node_weights_mut();
+        let mut subplan = iter.next().unwrap();
+        assert!(subplan.contains(r#"execution_plan":"projection_exec"#));
+        assert!(subplan.contains(r#"execution_plan":"hash_aggregate_exec","mode":"Final"#));
+        assert!(subplan.contains(r#"execution_plan":"memory_exec"#));
+
+        subplan = iter.next().unwrap();
+        assert!(subplan.contains(r#"execution_plan":"hash_aggregate_exec","mode":"Partial"#));
+        assert!(subplan.contains(r#"execution_plan":"coalesce_batches_exec"#));
+        assert!(subplan.contains(r#"execution_plan":"filter_exec"#));
+        assert!(subplan.contains(r#"execution_plan":"memory_exec"#));
+    }
+
+    // Mem -> Filter -> Coalesce -> HashAgg -> HashAgg -> Proj
+    #[tokio::test]
+    async fn agg_query2() {
+        let sql = concat!(
+            "SELECT MAX(c1), MIN(c2), c3 ",
+            "FROM test_table ",
+            "WHERE c2 < 101 AND c1 > 91 ",
+            "GROUP BY c3"
+        )
+        .to_string();
+        let dag = &mut quick_init(&sql);
+
+        assert_eq!(2, dag.node_count());
+        assert_eq!(1, dag.edge_count());
+
+        let mut iter = dag.node_weights_mut();
+        let mut subplan = iter.next().unwrap();
+        assert!(subplan.contains(r#"execution_plan":"projection_exec"#));
+        assert!(subplan.contains(r#"execution_plan":"hash_aggregate_exec","mode":"Final"#));
+        assert!(subplan.contains(r#"execution_plan":"memory_exec"#));
+
+        subplan = iter.next().unwrap();
+        assert!(subplan.contains(r#"execution_plan":"hash_aggregate_exec","mode":"Partial"#));
+        assert!(subplan.contains(r#"execution_plan":"coalesce_batches_exec"#));
+        assert!(subplan.contains(r#"execution_plan":"filter_exec"#));
+        assert!(subplan.contains(r#"execution_plan":"memory_exec"#));
+    }
+
+    // Mem -> Filter -> Coalesce -> HashAgg -> HashAgg -> Proj -> Sort ->
+    // GlobalLimit
+    #[tokio::test]
+    async fn filter_agg_sort() {
+        let sql = concat!(
+            "SELECT MAX(c1), MIN(c2), c3 ",
+            "FROM test_table ",
+            "WHERE c2 < 101 ",
+            "GROUP BY c3 ",
+            "ORDER BY c3 ",
+            "LIMIT 3"
+        )
+        .to_string();
+        let dag = &mut quick_init(&sql);
+
+        assert_eq!(2, dag.node_count());
+        assert_eq!(1, dag.edge_count());
+
+        let mut iter = dag.node_weights_mut();
+        let mut subplan = iter.next().unwrap();
+        assert!(subplan.contains(r#"execution_plan":"global_limit_exec"#));
+        assert!(subplan.contains(r#"execution_plan":"sort_exec"#));
+        assert!(subplan.contains(r#"execution_plan":"projection_exec"#));
+        assert!(subplan.contains(r#"execution_plan":"hash_aggregate_exec","mode":"Final"#));
+        assert!(subplan.contains(r#"execution_plan":"memory_exec"#));
+
+        subplan = iter.next().unwrap();
+        assert!(subplan.contains(r#"execution_plan":"hash_aggregate_exec","mode":"Partial"#));
+        assert!(subplan.contains(r#"execution_plan":"coalesce_batches_exec"#));
+        assert!(subplan.contains(r#"execution_plan":"filter_exec"#));
+        assert!(subplan.contains(r#"execution_plan":"memory_exec"#));
+    }
+
+    fn quick_init<'a>(sql: &'a str) -> LambdaDag {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("c1", DataType::Int64, false),
+            Field::new("c2", DataType::Float64, false),
+            Field::new("c3", DataType::Utf8, false),
+            Field::new("c4", DataType::UInt64, false),
+            Field::new("c5", DataType::Utf8, false),
+            Field::new("neg", DataType::Int64, false),
+        ]));
+
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![90, 90, 91, 101, 92, 102, 93, 103])),
+                Arc::new(Float64Array::from(vec![
+                    92.1, 93.2, 95.3, 96.4, 98.5, 99.6, 100.7, 101.8,
+                ])),
+                Arc::new(StringArray::from(vec![
+                    "a", "a", "d", "b", "b", "d", "c", "c",
+                ])),
+                Arc::new(UInt64Array::from(vec![33, 1, 54, 33, 12, 75, 2, 87])),
+                Arc::new(StringArray::from(vec![
+                    "rapport",
+                    "pedantic",
+                    "mimesis",
+                    "haptic",
+                    "baksheesh",
+                    "amok",
+                    "devious",
+                    "c",
+                ])),
+                Arc::new(Int64Array::from(vec![
+                    -90, -90, -91, -101, -92, -102, -93, -103,
+                ])),
+            ],
+        )
+        .unwrap();
+
+        let mut ctx = ExecutionContext::new();
+        // batch? Only support 1 RecordBatch now.
+        let provider = MemTable::try_new(schema.clone(), vec![vec![batch.clone()]]).unwrap();
+        ctx.register_table("test_table", Box::new(provider));
+
+        let logical_plan = ctx.create_logical_plan(sql).unwrap();
+        let optimized_plan = ctx.optimize(&logical_plan).unwrap();
+        let physical_plan = ctx.create_physical_plan(&optimized_plan).unwrap();
+        LambdaDag::from(physical_plan)
     }
 }
