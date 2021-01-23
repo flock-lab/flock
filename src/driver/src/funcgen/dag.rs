@@ -18,12 +18,15 @@
 extern crate daggy;
 use daggy::{Dag, NodeIndex, Walker};
 
+use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::ExecutionPlan;
 
-use std::ops::Deref;
+use serde_json::Value;
+
+use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
-type DagNode = Arc<dyn ExecutionPlan>;
+type DagNode = String;
 type DagEdge = ();
 type DagPlan = Dag<DagNode, DagEdge>;
 
@@ -44,6 +47,12 @@ impl Deref for LambdaDag {
     }
 }
 
+impl DerefMut for LambdaDag {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.dag
+    }
+}
+
 impl LambdaDag {
     /// Create a new `LambdaDag`.
     pub fn new() -> Self {
@@ -57,10 +66,9 @@ impl LambdaDag {
         self.dag.node_count()
     }
 
-    /// Build a Dag representation of the given plan.
+    /// Build a Dag representation of a given plan.
     pub fn from(plan: Arc<dyn ExecutionPlan>) -> Self {
-        let dag = Self::build_dag(plan);
-        LambdaDag { dag }
+        Self::build_dag(plan)
     }
 
     /// Return the depth for the given node in the dag.
@@ -71,13 +79,16 @@ impl LambdaDag {
             .count()
     }
 
-    /// Add a new node to the `Dag`.
+    /// Add a new node to the `LambdaDag`.
     ///
     /// Computes in **O(1)** time.
     ///
     /// Returns the index of the new node.
-    pub fn add_node(&mut self, node: DagNode) -> NodeIndex {
-        self.dag.add_node(node)
+    pub fn add_node<S>(&mut self, node: S) -> NodeIndex
+    where
+        S: Into<DagNode>,
+    {
+        self.dag.add_node(node.into())
     }
 
     /// Return a node for a given id.
@@ -121,7 +132,52 @@ impl LambdaDag {
     }
 
     /// Build a new daggy from a physical plan.
-    fn build_dag(_plan: Arc<dyn ExecutionPlan>) -> DagPlan {
-        unimplemented!();
+    fn build_dag(plan: Arc<dyn ExecutionPlan>) -> Self {
+        let mut dag = LambdaDag::new();
+        Self::fission(&mut dag, plan);
+        dag
+    }
+
+    /// Add a new node to the `LambdaDag`.
+    fn insert_dag(dag: &mut LambdaDag, leaf: NodeIndex, node: Value) -> NodeIndex {
+        if leaf == NodeIndex::end() {
+            dag.add_node(format!("{}", node))
+        } else {
+            dag.add_child(leaf, format!("{}", node))
+        }
+    }
+
+    /// Transform a physical plan for cloud environment execution.
+    fn fission(dag: &mut LambdaDag, plan: Arc<dyn ExecutionPlan>) {
+        let mut root = serde_json::to_value(&plan).unwrap();
+        let mut json = &mut root;
+        let mut leaf = NodeIndex::end();
+        let mut curr = plan.clone();
+        loop {
+            match json["execution_plan"].as_str() {
+                Some("hash_aggregate_exec") => match json["mode"].as_str() {
+                    Some("Final") => {
+                        // Split the plan into two subplans
+                        let object = (*json["input"].take().as_object().unwrap()).clone();
+                        // Add a input for the new subplan
+                        let input: Arc<dyn ExecutionPlan> =
+                            Arc::new(MemoryExec::try_new(&vec![], curr.schema(), None).unwrap());
+                        json["input"] = serde_json::to_value(input).unwrap();
+                        // Add the new subplan to DAG
+                        leaf = Self::insert_dag(dag, leaf, root);
+                        // Point to the next subplan
+                        root = Value::Object(object);
+                        json = &mut root;
+                    }
+                    _ => json = &mut json["input"],
+                },
+                _ => json = &mut json["input"],
+            }
+            if !json.is_object() {
+                break;
+            }
+            curr = curr.children()[0].clone();
+        }
+        Self::insert_dag(dag, leaf, root);
     }
 }
