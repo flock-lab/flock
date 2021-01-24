@@ -31,12 +31,14 @@ mod tests {
     use datafusion::datasource::MemTable;
     use datafusion::execution::context::ExecutionContext;
 
+    use datafusion::logical_plan::col;
     use datafusion::physical_plan::coalesce_batches::CoalesceBatchesExec;
     use datafusion::physical_plan::filter::FilterExec;
     use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
     use datafusion::physical_plan::memory::MemoryExec;
     use datafusion::physical_plan::projection::ProjectionExec;
     use datafusion::physical_plan::ExecutionPlan;
+    use datafusion::prelude::JoinType;
 
     use scq_driver::funcgen::dag::LambdaDag;
     use scq_lambda::dataframe::from_kinesis_to_batch;
@@ -449,5 +451,108 @@ mod tests {
         let optimized_plan = ctx.optimize(&logical_plan).unwrap();
         let physical_plan = ctx.create_physical_plan(&optimized_plan).unwrap();
         LambdaDag::from(physical_plan)
+    }
+
+    #[tokio::test]
+    async fn simple_join() -> Result<(), Error> {
+        let schema1 = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Utf8, false),
+            Field::new("b", DataType::Int32, false),
+        ]));
+        let schema2 = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Utf8, false),
+            Field::new("c", DataType::Int32, false),
+        ]));
+
+        // define data.
+        let batch1 = RecordBatch::try_new(
+            schema1.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["a", "b", "c", "d"])),
+                Arc::new(Int32Array::from(vec![1, 10, 10, 100])),
+            ],
+        )?;
+        // define data.
+        let batch2 = RecordBatch::try_new(
+            schema2.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["a", "b", "c", "d"])),
+                Arc::new(Int32Array::from(vec![1, 10, 10, 100])),
+            ],
+        )?;
+
+        let mut ctx = ExecutionContext::new();
+
+        let table1 = MemTable::try_new(schema1, vec![vec![batch1]])?;
+        let table2 = MemTable::try_new(schema2, vec![vec![batch2]])?;
+
+        ctx.register_table("t1", Box::new(table1));
+        let df1 = ctx.table("t1")?;
+
+        ctx.register_table("t2", Box::new(table2));
+        let df2 = ctx.table("t2")?;
+
+        // Datafusion doesn't support SQL join functions yet.
+        // The query in here:
+        //   SELECT b, c FROM t1, t2
+        //   WHERE t1 INNER JOIN t2 ON t1.a = t2.a
+        //   LIMIT 3 ORDER BY b ASC;
+        let df = df1.join(df2, JoinType::Inner, &["a"], &["a"])?;
+        let df = df.select_columns(vec!["b", "c"])?.limit(3)?;
+        let df = df.sort(vec![col("b").sort(true, true)])?;
+
+        let plan = df.to_logical_plan();
+        let plan = ctx.optimize(&plan).unwrap();
+        let plan = ctx.create_physical_plan(&plan).unwrap();
+
+        //           +---------+
+        //           |sort_exec|
+        //           +----+----+
+        //                |
+        //       +--------v--------+
+        //       |global_limit_exec|
+        //       +--------+--------+
+        //                |
+        //        +-------v-------+
+        //        |projection_exec|
+        //        +-------+-------+
+        //                |
+        //     +----------v----------+
+        //     |coalesce_batches_exec|
+        //     +----------+----------+
+        //                |
+        //         +------v-------+
+        //         |hash_join_exec|
+        //         +------+-------+
+        //                |
+        //       +--------v---------+
+        //       |                  |
+        // +-----v-----+      +-----v-----+
+        // |memory_exec|      |memory_exec|
+        // +-----------+      +-----------+
+
+        let json = serde_json::to_string(&plan).unwrap();
+        assert_eq!(
+            r#"{"execution_plan":"sort_exec","input":{"execution_plan":"global_limit_exec","input":{"execution_plan":"projection_exec","expr":[[{"physical_expr":"column","name":"b"},"b"],[{"physical_expr":"column","name":"c"},"c"]],"schema":{"fields":[{"name":"b","data_type":"Int32","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"c","data_type":"Int32","nullable":false,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"input":{"execution_plan":"coalesce_batches_exec","input":{"execution_plan":"hash_join_exec","left":{"execution_plan":"memory_exec","schema":{"fields":[{"name":"a","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"b","data_type":"Int32","nullable":false,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"projection":[0,1]},"right":{"execution_plan":"memory_exec","schema":{"fields":[{"name":"a","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"c","data_type":"Int32","nullable":false,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"projection":[0,1]},"on":[["a","a"]],"join_type":"Inner","schema":{"fields":[{"name":"a","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"b","data_type":"Int32","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"c","data_type":"Int32","nullable":false,"dict_id":0,"dict_is_ordered":false}],"metadata":{}}},"target_batch_size":16384}},"limit":3,"concurrency":8},"expr":[{"expr":{"physical_expr":"column","name":"b"},"options":{"descending":false,"nulls_first":true}}],"concurrency":8}"#,
+            json
+        );
+
+        let batches = df.collect().await?;
+        let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
+        let actual_lines: Vec<&str> = formatted.trim().lines().collect();
+
+        let expected = vec![
+            "+----+----+",
+            "| b  | c  |",
+            "+----+----+",
+            "| 1  | 1  |",
+            "| 10 | 10 |",
+            "| 10 | 10 |",
+            "+----+----+",
+        ];
+
+        assert_eq!(expected, actual_lines);
+
+        Ok(())
     }
 }
