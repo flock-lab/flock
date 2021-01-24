@@ -10,5 +10,5 @@ autobins = false
 
 [dependencies]
 sqlparser = "0.6.1"
-arrow = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq" }
+arrow = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq", features = ["simd"] }
 common = {path = "../common"}

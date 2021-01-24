@@ -8,10 +8,10 @@ keywords = [ "AWS", "sql", "physical-plan", "dataflow" ]
 edition = "2018"
 
 [dependencies]
-arrow = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq" }
+arrow = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq", features = [ "simd" ] }
 arrow-flight = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq" }
 aws_lambda_events = "0.4"
-datafusion = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq" }
+datafusion = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq", features = [ "simd" ] }
 json = "0.12.4"
 rayon = "1.5"
 serde = { version = "1.0", features = [ "derive" ] }
