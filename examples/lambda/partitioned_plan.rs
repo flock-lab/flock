@@ -532,10 +532,13 @@ mod tests {
         // +-----------+      +-----------+
 
         let json = serde_json::to_string(&plan).unwrap();
-        assert_eq!(
-            r#"{"execution_plan":"sort_exec","input":{"execution_plan":"global_limit_exec","input":{"execution_plan":"projection_exec","expr":[[{"physical_expr":"column","name":"b"},"b"],[{"physical_expr":"column","name":"c"},"c"]],"schema":{"fields":[{"name":"b","data_type":"Int32","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"c","data_type":"Int32","nullable":false,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"input":{"execution_plan":"coalesce_batches_exec","input":{"execution_plan":"hash_join_exec","left":{"execution_plan":"memory_exec","schema":{"fields":[{"name":"a","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"b","data_type":"Int32","nullable":false,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"projection":[0,1]},"right":{"execution_plan":"memory_exec","schema":{"fields":[{"name":"a","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"c","data_type":"Int32","nullable":false,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"projection":[0,1]},"on":[["a","a"]],"join_type":"Inner","schema":{"fields":[{"name":"a","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"b","data_type":"Int32","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"c","data_type":"Int32","nullable":false,"dict_id":0,"dict_is_ordered":false}],"metadata":{}}},"target_batch_size":16384}},"limit":3,"concurrency":8},"expr":[{"expr":{"physical_expr":"column","name":"b"},"options":{"descending":false,"nulls_first":true}}],"concurrency":8}"#,
-            json
-        );
+        assert!(json.contains(r#"execution_plan":"sort_exec"#));
+        assert!(json.contains(r#"execution_plan":"global_limit_exec"#));
+        assert!(json.contains(r#"execution_plan":"projection_exec"#));
+        assert!(json.contains(r#"execution_plan":"coalesce_batches_exec"#));
+        assert!(json.contains(r#"execution_plan":"hash_join_exec"#));
+        assert!(json.contains(r#"left":{"execution_plan":"memory_exec"#));
+        assert!(json.contains(r#"right":{"execution_plan":"memory_exec"#));
 
         let batches = df.collect().await?;
         let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
