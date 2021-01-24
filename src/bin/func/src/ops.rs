@@ -27,6 +27,10 @@ use scq_lambda::{exec_plan, init_plan};
 
 type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
 
+#[cfg(feature = "snmalloc")]
+#[global_allocator]
+static ALLOC: snmalloc_rs::SnMalloc = snmalloc_rs::SnMalloc;
+
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     lambda::run(handler_fn(handler)).await?;

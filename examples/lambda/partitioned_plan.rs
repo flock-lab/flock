@@ -402,7 +402,7 @@ mod tests {
         assert!(subplan.contains(r#"execution_plan":"memory_exec"#));
     }
 
-    fn quick_init<'a>(sql: &'a str) -> LambdaDag {
+    fn quick_init(sql: &str) -> LambdaDag {
         let schema = Arc::new(Schema::new(vec![
             Field::new("c1", DataType::Int64, false),
             Field::new("c2", DataType::Float64, false),
@@ -442,7 +442,7 @@ mod tests {
 
         let mut ctx = ExecutionContext::new();
         // batch? Only support 1 RecordBatch now.
-        let provider = MemTable::try_new(schema.clone(), vec![vec![batch.clone()]]).unwrap();
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
         ctx.register_table("test_table", Box::new(provider));
 
         let logical_plan = ctx.create_logical_plan(sql).unwrap();
