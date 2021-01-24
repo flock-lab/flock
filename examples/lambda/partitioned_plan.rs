@@ -31,14 +31,13 @@ mod tests {
     use datafusion::datasource::MemTable;
     use datafusion::execution::context::ExecutionContext;
 
-    use datafusion::logical_plan::col;
     use datafusion::physical_plan::coalesce_batches::CoalesceBatchesExec;
+    use datafusion::physical_plan::collect;
     use datafusion::physical_plan::filter::FilterExec;
     use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
     use datafusion::physical_plan::memory::MemoryExec;
     use datafusion::physical_plan::projection::ProjectionExec;
     use datafusion::physical_plan::ExecutionPlan;
-    use datafusion::prelude::JoinType;
 
     use scq_driver::funcgen::dag::LambdaDag;
     use scq_lambda::dataframe::from_kinesis_to_batch;
@@ -460,8 +459,8 @@ mod tests {
             Field::new("b", DataType::Int32, false),
         ]));
         let schema2 = Arc::new(Schema::new(vec![
-            Field::new("a", DataType::Utf8, false),
-            Field::new("c", DataType::Int32, false),
+            Field::new("c", DataType::Utf8, false),
+            Field::new("d", DataType::Int32, false),
         ]));
 
         // define data.
@@ -487,31 +486,26 @@ mod tests {
         let table2 = MemTable::try_new(schema2, vec![vec![batch2]])?;
 
         ctx.register_table("t1", Box::new(table1));
-        let df1 = ctx.table("t1")?;
-
         ctx.register_table("t2", Box::new(table2));
-        let df2 = ctx.table("t2")?;
 
-        // Datafusion doesn't support SQL join functions yet.
-        // The query in here:
-        //   SELECT b, c FROM t1, t2
-        //   WHERE t1 INNER JOIN t2 ON t1.a = t2.a
-        //   LIMIT 3 ORDER BY b ASC;
-        let df = df1.join(df2, JoinType::Inner, &["a"], &["a"])?;
-        let df = df.select_columns(vec!["b", "c"])?.limit(3)?;
-        let df = df.sort(vec![col("b").sort(true, true)])?;
+        let sql = concat!(
+            "SELECT a, b, d ",
+            "FROM t1 JOIN t2 ON a = c ",
+            "ORDER BY b ASC ",
+            "LIMIT 3"
+        );
 
-        let plan = df.to_logical_plan();
-        let plan = ctx.optimize(&plan).unwrap();
-        let plan = ctx.create_physical_plan(&plan).unwrap();
+        let plan = ctx.create_logical_plan(&sql)?;
+        let plan = ctx.optimize(&plan)?;
+        let plan = ctx.create_physical_plan(&plan)?;
 
-        //           +---------+
-        //           |sort_exec|
-        //           +----+----+
-        //                |
-        //       +--------v--------+
+        //       +-----------------+
         //       |global_limit_exec|
         //       +--------+--------+
+        //                |
+        //           +----v----+
+        //           |sort_exec|
+        //           +----+----+
         //                |
         //        +-------v-------+
         //        |projection_exec|
@@ -532,26 +526,26 @@ mod tests {
         // +-----------+      +-----------+
 
         let json = serde_json::to_string(&plan).unwrap();
-        assert!(json.contains(r#"execution_plan":"sort_exec"#));
         assert!(json.contains(r#"execution_plan":"global_limit_exec"#));
+        assert!(json.contains(r#"execution_plan":"sort_exec"#));
         assert!(json.contains(r#"execution_plan":"projection_exec"#));
         assert!(json.contains(r#"execution_plan":"coalesce_batches_exec"#));
         assert!(json.contains(r#"execution_plan":"hash_join_exec"#));
         assert!(json.contains(r#"left":{"execution_plan":"memory_exec"#));
         assert!(json.contains(r#"right":{"execution_plan":"memory_exec"#));
 
-        let batches = df.collect().await?;
+        let batches = collect(plan).await?;
         let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
         let actual_lines: Vec<&str> = formatted.trim().lines().collect();
 
         let expected = vec![
-            "+----+----+",
-            "| b  | c  |",
-            "+----+----+",
-            "| 1  | 1  |",
-            "| 10 | 10 |",
-            "| 10 | 10 |",
-            "+----+----+",
+            "+---+----+----+",
+            "| a | b  | d  |",
+            "+---+----+----+",
+            "| a | 1  | 1  |",
+            "| b | 10 | 10 |",
+            "| c | 10 | 10 |",
+            "+---+----+----+",
         ];
 
         assert_eq!(expected, actual_lines);
