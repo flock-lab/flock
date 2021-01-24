@@ -29,11 +29,3 @@ url = "2.0"
 name = "scq_driver"
 path = "src/lib.rs"
 crate-type = [ "lib" ]
-
-[[bin]]
-name = "lambda_ops"
-path = "src/funcgen/bin/ops.rs"
-
-[[bin]]
-name = "lambda_kinesis"
-path = "src/funcgen/bin/kinesis.rs"
