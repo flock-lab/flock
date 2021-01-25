@@ -67,7 +67,7 @@ impl LambdaDag {
     }
 
     /// Build a Dag representation of a given plan.
-    pub fn from(plan: Arc<dyn ExecutionPlan>) -> Self {
+    pub fn from(plan: &Arc<dyn ExecutionPlan>) -> Self {
         Self::build_dag(plan)
     }
 
@@ -132,9 +132,9 @@ impl LambdaDag {
     }
 
     /// Build a new daggy from a physical plan.
-    fn build_dag(plan: Arc<dyn ExecutionPlan>) -> Self {
+    fn build_dag(plan: &Arc<dyn ExecutionPlan>) -> Self {
         let mut dag = LambdaDag::new();
-        Self::fission(&mut dag, plan);
+        Self::fission(&mut dag, &plan);
         dag
     }
 
@@ -148,7 +148,7 @@ impl LambdaDag {
     }
 
     /// Transform a physical plan for cloud environment execution.
-    fn fission(dag: &mut LambdaDag, plan: Arc<dyn ExecutionPlan>) {
+    fn fission(dag: &mut LambdaDag, plan: &Arc<dyn ExecutionPlan>) {
         let mut root = serde_json::to_value(&plan).unwrap();
         let mut json = &mut root;
         let mut leaf = NodeIndex::end();
@@ -171,6 +171,15 @@ impl LambdaDag {
                     }
                     _ => json = &mut json["input"],
                 },
+                Some("hash_join_exec") => {
+                    let object = (*json.take().as_object().unwrap()).clone();
+                    let input: Arc<dyn ExecutionPlan> =
+                        Arc::new(MemoryExec::try_new(&vec![], curr.schema(), None).unwrap());
+                    *json = serde_json::to_value(input).unwrap();
+                    leaf = Self::insert_dag(dag, leaf, root);
+                    root = Value::Object(object);
+                    break;
+                }
                 _ => json = &mut json["input"],
             }
             if !json.is_object() {

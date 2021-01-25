@@ -183,7 +183,7 @@ mod tests {
 
         let plan: Arc<dyn ExecutionPlan> = serde_json::from_str(&plan).unwrap();
 
-        let dag = &mut LambdaDag::from(plan);
+        let dag = &mut LambdaDag::from(&plan);
         assert_eq!(2, dag.node_count());
         assert_eq!(1, dag.edge_count());
 
@@ -449,7 +449,7 @@ mod tests {
         let logical_plan = ctx.create_logical_plan(sql).unwrap();
         let optimized_plan = ctx.optimize(&logical_plan).unwrap();
         let physical_plan = ctx.create_physical_plan(&optimized_plan).unwrap();
-        LambdaDag::from(physical_plan)
+        LambdaDag::from(&physical_plan)
     }
 
     #[tokio::test]
@@ -533,6 +533,24 @@ mod tests {
         assert!(json.contains(r#"execution_plan":"hash_join_exec"#));
         assert!(json.contains(r#"left":{"execution_plan":"memory_exec"#));
         assert!(json.contains(r#"right":{"execution_plan":"memory_exec"#));
+
+        let dag = &mut LambdaDag::from(&plan);
+
+        assert_eq!(2, dag.node_count());
+        assert_eq!(1, dag.edge_count());
+
+        let mut iter = dag.node_weights_mut();
+        let mut subplan = iter.next().unwrap();
+        assert!(subplan.contains(r#"execution_plan":"global_limit_exec"#));
+        assert!(subplan.contains(r#"execution_plan":"sort_exec"#));
+        assert!(subplan.contains(r#"execution_plan":"projection_exec"#));
+        assert!(subplan.contains(r#"execution_plan":"coalesce_batches_exec"#));
+        assert!(subplan.contains(r#"execution_plan":"memory_exec"#));
+
+        subplan = iter.next().unwrap();
+        assert!(subplan.contains(r#"execution_plan":"hash_join_exec"#));
+        assert!(subplan.contains(r#"right":{"execution_plan":"memory_exec"#));
+        assert!(subplan.contains(r#"left":{"execution_plan":"memory_exec"#));
 
         let batches = collect(plan).await?;
         let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
