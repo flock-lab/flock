@@ -18,6 +18,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
+      - name: cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
@@ -30,14 +38,6 @@ jobs:
           rustup component add rustfmt --toolchain nightly-x86_64-unknown-linux-gnu
           cargo build -j8
           cargo test
-      - name: cache
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-squirtle-${{ hashFiles('**/Cargo.lock') }}
       # - name: Coveralls upload
       #   uses: coverallsapp/github-action@master
       #   with:
