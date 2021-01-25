@@ -26,9 +26,45 @@ use serde_json::Value;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
-type DagNode = String;
+/// Concurrency is the number of requests that your function is serving at any
+/// given time. When your function is invoked, Lambda allocates an instance of
+/// it to process the event. When the function code finishes running, it can
+/// handle another request. If the function is invoked again while a request is
+/// still being processed, another instance is allocated, which increases the
+/// function's concurrency.
+/// Lambda function with concurrency = 1
+pub const CONCURRENCY_1: u8 = 1;
+/// Lambda function with concurrency = 8
+pub const CONCURRENCY_8: u8 = 8;
+
 type DagEdge = ();
 type DagPlan = Dag<DagNode, DagEdge>;
+
+/// A node representation of the subplan of a query statement.
+#[derive(Debug, Clone)]
+pub struct DagNode {
+    /// Subplan string.
+    pub plan:        String,
+    /// Lambda concurrency in cloud environment.
+    pub concurrency: u8,
+}
+
+impl From<String> for DagNode {
+    fn from(s: String) -> DagNode {
+        DagNode {
+            plan:        s,
+            concurrency: CONCURRENCY_8,
+        }
+    }
+}
+
+impl Deref for DagNode {
+    type Target = String;
+
+    fn deref(&self) -> &Self::Target {
+        &self.plan
+    }
+}
 
 /// A simple directed acyclic graph representation of the physical plan of a
 /// query statement. This graph allows the traversal of subplans in a
@@ -112,7 +148,7 @@ impl LambdaDag {
         self.dag
             .recursive_walk(node, |g, n| g.parents(n).walk_next(g))
             .iter(&self.dag)
-            .map(|(_, n)| ((&*self.dag.node_weight(n).unwrap()).clone(), n))
+            .map(|(_, n)| (self.dag.node_weight(n).unwrap().clone(), n))
             .collect()
     }
 
@@ -120,7 +156,7 @@ impl LambdaDag {
     pub fn get_sub_plans(&self, node: NodeIndex) -> Vec<(DagNode, NodeIndex)> {
         let mut children = Vec::new();
         for (_, n) in self.dag.children(node).iter(&self.dag) {
-            children.push(((&*self.dag.node_weight(n).unwrap()).clone(), n));
+            children.push((self.dag.node_weight(n).unwrap().clone(), n));
             children.append(&mut self.get_sub_plans(n));
         }
         children
@@ -139,11 +175,20 @@ impl LambdaDag {
     }
 
     /// Add a new node to the `LambdaDag`.
-    fn insert_dag(dag: &mut LambdaDag, leaf: NodeIndex, node: Value) -> NodeIndex {
+    fn insert_dag(dag: &mut LambdaDag, leaf: NodeIndex, node: Value, concurrency: u8) -> NodeIndex {
         if leaf == NodeIndex::end() {
-            dag.add_node(format!("{}", node))
+            dag.add_node(DagNode {
+                plan: format!("{}", node),
+                concurrency,
+            })
         } else {
-            dag.add_child(leaf, format!("{}", node))
+            dag.add_child(
+                leaf,
+                DagNode {
+                    plan: format!("{}", node),
+                    concurrency,
+                },
+            )
         }
     }
 
@@ -164,13 +209,22 @@ impl LambdaDag {
                             Arc::new(MemoryExec::try_new(&vec![], curr.schema(), None).unwrap());
                         json["input"] = serde_json::to_value(input).unwrap();
                         // Add the new subplan to DAG
-                        leaf = Self::insert_dag(dag, leaf, root);
+                        leaf = Self::insert_dag(dag, leaf, root, CONCURRENCY_1);
                         // Point to the next subplan
                         root = Value::Object(object);
                         json = &mut root;
                     }
                     _ => json = &mut json["input"],
                 },
+                Some("hash_join_exec") => {
+                    let object = (*json.take().as_object().unwrap()).clone();
+                    let input: Arc<dyn ExecutionPlan> =
+                        Arc::new(MemoryExec::try_new(&vec![], curr.schema(), None).unwrap());
+                    *json = serde_json::to_value(input).unwrap();
+                    leaf = Self::insert_dag(dag, leaf, root, CONCURRENCY_1);
+                    root = Value::Object(object);
+                    break;
+                }
                 _ => json = &mut json["input"],
             }
             if !json.is_object() {
@@ -178,6 +232,6 @@ impl LambdaDag {
             }
             curr = curr.children()[0].clone();
         }
-        Self::insert_dag(dag, leaf, root);
+        Self::insert_dag(dag, leaf, root, CONCURRENCY_8);
     }
 }

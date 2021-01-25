@@ -39,7 +39,7 @@ mod tests {
     use datafusion::physical_plan::projection::ProjectionExec;
     use datafusion::physical_plan::ExecutionPlan;
 
-    use scq_driver::funcgen::dag::LambdaDag;
+    use scq_driver::funcgen::dag::{DagNode, LambdaDag};
     use scq_lambda::dataframe::from_kinesis_to_batch;
     use std::sync::Arc;
 
@@ -145,11 +145,20 @@ mod tests {
         // Construct a DAG for the physical plan partition
         let mut lambda_dag = LambdaDag::new();
 
-        let p = lambda_dag.add_node(format!("{}", serde_json::to_value(&hash_agg_2).unwrap()));
-        let h = lambda_dag.add_child(p, format!("{}", serde_json::to_value(&hash_agg_1).unwrap()));
-        let c = lambda_dag.add_child(h, format!("{}", serde_json::to_value(&coalesce).unwrap()));
-        let f = lambda_dag.add_child(c, format!("{}", serde_json::to_value(&filter).unwrap()));
-        let m = lambda_dag.add_child(f, format!("{}", serde_json::to_value(&memory).unwrap()));
+        let node = DagNode::from(format!("{}", serde_json::to_value(&hash_agg_2).unwrap()));
+        let p = lambda_dag.add_node(node);
+
+        let node = DagNode::from(format!("{}", serde_json::to_value(&hash_agg_1).unwrap()));
+        let h = lambda_dag.add_child(p, node);
+
+        let node = DagNode::from(format!("{}", serde_json::to_value(&coalesce).unwrap()));
+        let c = lambda_dag.add_child(h, node);
+
+        let node = DagNode::from(format!("{}", serde_json::to_value(&filter).unwrap()));
+        let f = lambda_dag.add_child(c, node);
+
+        let node = DagNode::from(format!("{}", serde_json::to_value(&memory).unwrap()));
+        let m = lambda_dag.add_child(f, node);
 
         assert!(lambda_dag
             .get_node(p)
