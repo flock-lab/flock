@@ -32,7 +32,9 @@ use std::sync::Arc;
 /// handle another request. If the function is invoked again while a request is
 /// still being processed, another instance is allocated, which increases the
 /// function's concurrency.
+/// Lambda function with concurrency = 1
 pub const CONCURRENCY_1: u8 = 1;
+/// Lambda function with concurrency = 8
 pub const CONCURRENCY_8: u8 = 8;
 
 type DagEdge = ();
@@ -44,14 +46,14 @@ pub struct DagNode {
     /// Subplan string.
     pub plan:        String,
     /// Lambda concurrency in cloud environment.
-    pub concurrency: usize,
+    pub concurrency: u8,
 }
 
 impl From<String> for DagNode {
     fn from(s: String) -> DagNode {
         DagNode {
             plan:        s,
-            concurrency: 1,
+            concurrency: CONCURRENCY_8,
         }
     }
 }
@@ -173,12 +175,7 @@ impl LambdaDag {
     }
 
     /// Add a new node to the `LambdaDag`.
-    fn insert_dag(
-        dag: &mut LambdaDag,
-        leaf: NodeIndex,
-        node: Value,
-        concurrency: usize,
-    ) -> NodeIndex {
+    fn insert_dag(dag: &mut LambdaDag, leaf: NodeIndex, node: Value, concurrency: u8) -> NodeIndex {
         if leaf == NodeIndex::end() {
             dag.add_node(DagNode {
                 plan: format!("{}", node),
