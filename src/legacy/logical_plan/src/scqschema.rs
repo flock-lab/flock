@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! SCQSchema is an extended schema struct that ServerlessCQ uses to provide
+//! SCQSchema is an extended schema struct that Squirtle uses to provide
 //! support for fields with optional relation names.
 
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use lambda::error::{Result, ServerlessCQError};
+use lambda::error::{Result, SquirtleError};
 
 use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use std::fmt::{Display, Formatter};
@@ -46,13 +46,13 @@ impl SCQSchema {
         for field in &fields {
             if let Some(qualifier) = field.qualifier() {
                 if !qualified_names.insert((qualifier, field.name())) {
-                    return Err(ServerlessCQError::Plan(format!(
+                    return Err(SquirtleError::Plan(format!(
                         "Schema contains duplicate qualified field name '{}'",
                         field.qualified_name()
                     )));
                 }
             } else if !unqualified_names.insert(field.name()) {
-                return Err(ServerlessCQError::Plan(format!(
+                return Err(SquirtleError::Plan(format!(
                     "Schema contains duplicate unqualified field name '{}'",
                     field.name()
                 )));
@@ -73,7 +73,7 @@ impl SCQSchema {
         });
         for (qualifier, name) in &qualified_names {
             if unqualified_names.contains(name) {
-                return Err(ServerlessCQError::Plan(format!(
+                return Err(SquirtleError::Plan(format!(
                     "Schema contains qualified field name '{}.{}' \
                     and unqualified field name '{}' which would be ambiguous",
                     qualifier, name, name
@@ -136,10 +136,7 @@ impl SCQSchema {
                 return Ok(i);
             }
         }
-        Err(ServerlessCQError::Plan(format!(
-            "No field named '{}'",
-            name
-        )))
+        Err(SquirtleError::Plan(format!("No field named '{}'", name)))
     }
 
     /// Find the field with the given name
@@ -159,12 +156,9 @@ impl SCQSchema {
             .filter(|field| field.name() == name)
             .collect();
         match matches.len() {
-            0 => Err(ServerlessCQError::Plan(format!(
-                "No field named '{}'",
-                name
-            ))),
+            0 => Err(SquirtleError::Plan(format!("No field named '{}'", name))),
             1 => Ok(matches[0].to_owned()),
-            _ => Err(ServerlessCQError::Plan(format!(
+            _ => Err(SquirtleError::Plan(format!(
                 "Ambiguous reference to field named '{}'",
                 name
             ))),
@@ -181,12 +175,12 @@ impl SCQSchema {
             })
             .collect();
         match matches.len() {
-            0 => Err(ServerlessCQError::Plan(format!(
+            0 => Err(SquirtleError::Plan(format!(
                 "No field named '{}.{}'",
                 relation_name, name
             ))),
             1 => Ok(matches[0].to_owned()),
-            _ => Err(ServerlessCQError::Internal(format!(
+            _ => Err(SquirtleError::Internal(format!(
                 "Ambiguous reference to qualified field named '{}.{}'",
                 relation_name, name
             ))),

@@ -4,7 +4,7 @@ members = [
     "src/bin/cli",
     "src/bin/func",
     "src/driver",
-    "src/lambda",
+    "src/runtime",
 ]
 exclude = [
     "target/scq",

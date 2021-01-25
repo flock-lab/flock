@@ -23,7 +23,7 @@
     clippy::wrong_self_convention
 )]
 
-//! scq_lambda is a library to simplify the code generation of the physical plan
+//! runtime is a library to simplify the code generation of the physical plan
 //! in lambda functions.
 
 pub mod dataframe;

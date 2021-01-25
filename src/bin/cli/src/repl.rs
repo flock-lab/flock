@@ -14,13 +14,12 @@
 
 use clap::{crate_version, App, Arg};
 use lazy_static::lazy_static;
+use runtime::error::Result;
 use rustyline::Editor;
-use scq_lambda::error::Result;
 use std::env;
 
 lazy_static! {
-    static ref SERVERLESS_CQ: &'static str =
-    "
+    static ref SERVERLESS_CQ: &'static str = "
 ███████╗███████╗██████╗ ██╗   ██╗███████╗██████╗ ██╗     ███████╗███████╗███████╗ ██████╗ ██████╗
 ██╔════╝██╔════╝██╔══██╗██║   ██║██╔════╝██╔══██╗██║     ██╔════╝██╔════╝██╔════╝██╔════╝██╔═══██╗
 ███████╗█████╗  ██████╔╝██║   ██║█████╗  ██████╔╝██║     █████╗  ███████╗███████╗██║     ██║   ██║
@@ -28,11 +27,11 @@ lazy_static! {
 ███████║███████╗██║  ██║ ╚████╔╝ ███████╗██║  ██║███████╗███████╗███████║███████║╚██████╗╚██████╔╝
 ╚══════╝╚══════╝╚═╝  ╚═╝  ╚═══╝  ╚══════╝╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚══════╝ ╚═════╝ ╚══▀▀═╝
 
-ServerlessCQ: Continuous Queries on Cloud Function Services (https://github.com/DSLAM-UMD/ServerlessCQ)
+Squirtle: Continuous Queries on Cloud Function Services (https://github.com/DSLAM-UMD/Squirtle)
 
 Copyright (c) 2020-2021, UMD Database Group. All rights reserved.
 
-This is the standard command line interactive contoller for ServerlessCQ.
+This is the standard command line interactive contoller for Squirtle.
 This has all the right tools installed required to execute a query against cloud function services.
     ";
 }
@@ -40,9 +39,9 @@ This has all the right tools installed required to execute a query against cloud
 #[tokio::main]
 pub async fn main() {
     // Command line arg parsing for scqsql itself
-    let matches = App::new("ServerlessCQ")
+    let matches = App::new("Squirtle")
         .version(crate_version!())
-        .about("Command Line Interactive Contoller for ServerlessCQ")
+        .about("Command Line Interactive Contoller for Squirtle")
         .arg(
             Arg::with_name("config")
                 .short("c")

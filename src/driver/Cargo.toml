@@ -1,5 +1,5 @@
 [package]
-name = "scq_driver"
+name = "driver"
 version = "0.1.0"
 description = "A library to generate, compile and deploy lambda functions to the cloud."
 authors = [ "Gang Liao <gangliao@cs.umd.edu>", "Zejun Liu <zliu1238@cs.umd.edu>" ]
@@ -16,7 +16,7 @@ daggy = "0.7.0"
 datafusion = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq", features = [ "simd" ] }
 lambda = { git = "https://github.com/awslabs/aws-lambda-rust-runtime/", branch = "master" }
 lazy_static = "1.4"
-scq_lambda = { path = "../../src/lambda" }
+runtime = { path = "../../src/runtime" }
 serde_json = "1.0"
 tokio = { version = "0.2", features = [ "macros" ] }
 
@@ -32,6 +32,6 @@ remove_dir_all = { version = "0.6", optional = true }
 url = { version = "2.0", optional = true }
 
 [lib]
-name = "scq_driver"
+name = "driver"
 path = "src/lib.rs"
 crate-type = [ "lib" ]

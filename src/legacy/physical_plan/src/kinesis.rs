@@ -16,7 +16,7 @@ use arrow::datatypes::{Schema, SchemaRef};
 use arrow::json::reader::infer_json_schema;
 use bytes::Buf;
 use futures::executor::block_on;
-use lambda::error::{Result, ServerlessCQError};
+use lambda::error::{Result, SquirtleError};
 use rusoto_core::Region;
 use rusoto_kinesis::{GetRecordsInput, GetShardIteratorInput, Kinesis, KinesisClient};
 use std::io::{BufReader, Read};
@@ -97,9 +97,7 @@ impl KinesisStreamExec {
                     batch_size,
                 ))
             }
-            Err(e) => Err(ServerlessCQError::Plan(
-                "No stream record found".to_string(),
-            )),
+            Err(e) => Err(SquirtleError::Plan("No stream record found".to_string())),
         }
     }
 

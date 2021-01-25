@@ -23,9 +23,9 @@ use serde_json::Value;
 
 use std::sync::Once;
 
-use scq_lambda::dataframe::{from_kinesis_to_batch, DataFrame};
-use scq_lambda::plan::*;
-use scq_lambda::{exec_plan, init_plan};
+use runtime::dataframe::{from_kinesis_to_batch, DataFrame};
+use runtime::plan::*;
+use runtime::{exec_plan, init_plan};
 
 type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
 
