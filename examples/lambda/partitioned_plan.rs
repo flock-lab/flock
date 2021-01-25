@@ -40,7 +40,7 @@ mod tests {
     use datafusion::physical_plan::ExecutionPlan;
 
     use driver::funcgen::dag::{DagNode, LambdaDag};
-    use runtime::dataframe::from_kinesis_to_batch;
+    use runtime::datasource::kinesis;
     use std::sync::Arc;
 
     #[tokio::test]
@@ -48,7 +48,7 @@ mod tests {
         let input = include_str!("example-kinesis-event.json");
         let input: KinesisEvent = serde_json::from_str(input).unwrap();
 
-        let (record_batch, schema) = from_kinesis_to_batch(input);
+        let (record_batch, schema) = kinesis::to_batch(input);
 
         let partitions = vec![vec![record_batch]];
 

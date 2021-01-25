@@ -12,18 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! A Query API to associate front-end CLI with back-end code generation and
-//! continuous deployment.
-
-use runtime::dataframe::DataSource;
-use runtime::error::Result;
-
-/// A SQL query to pull the desired data.
-pub trait Query {
-    /// Deploy the query to the cloud.
-    fn deploy() -> Result<()>;
-}
-
 /// You can set up a rule to run an AWS Lambda function on a schedule.
 #[rustfmt::skip]
 pub enum Schedule {
@@ -120,13 +108,3 @@ pub struct StreamQuery {
     /// A streaming data source.
     pub datasource: DataSource,
 }
-
-/// Batch processing is the processing of a large volume of data all at once.
-/// You can store the preceding reference data as an object in Amazon Simple
-/// Storage Service (Amazon S3).  Squirtle reads the Amazon S3 object and
-/// creates an in-application reference table that you can query in your
-/// application code. In your application code, you write a join query to join
-/// the in-application stream with the in-application reference table, to obtain
-/// more accurate results.
-#[allow(dead_code)]
-pub struct BatchQuery {}

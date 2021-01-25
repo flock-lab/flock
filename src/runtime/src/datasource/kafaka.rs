@@ -11,26 +11,3 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-#![warn(missing_docs)]
-// Clippy lints, some should be disabled incrementally
-#![allow(
-    clippy::float_cmp,
-    clippy::module_inception,
-    clippy::new_without_default,
-    clippy::ptr_arg,
-    clippy::type_complexity,
-    clippy::wrong_self_convention
-)]
-
-//! The runtime contains the context information needed by the lambda function,
-//! such as execution plan and the next lambda functions, which instructs the
-//! lambda instance to perform the correct operation.
-
-pub mod context;
-pub mod datasource;
-pub mod error;
-pub mod payload;
-pub mod plan;
-
-pub use payload::Payload;
