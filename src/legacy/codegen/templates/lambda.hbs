@@ -27,7 +27,7 @@ use serde_json::Value;
 
 use std::sync::Once;
 
-use runtime::dataframe::{DataFrame, from_kinesis_to_batch};
+use runtime::payload::{Payload, kinesis::to_batch};
 
 type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
 
@@ -64,7 +64,7 @@ macro_rules! init_plan {
 
 async fn handler(event: KinesisEvent, _: Context) -> Result<Value, Error> {
     let schema = init_plan!();
-    let (record_batch, _) = from_kinesis_to_batch(event);
+    let (record_batch, _) = kinesis::to_batch(event);
 
     unsafe {
         match &mut PLAN {
@@ -74,8 +74,8 @@ async fn handler(event: KinesisEvent, _: Context) -> Result<Value, Error> {
                 let it = plan.execute(0).await?;
                 let result = common::collect(it).await?;
 
-                // RecordBatch to DataFrame
-                let datafame = DataFrame::from(&result[0], schema);
+                // RecordBatch to Payload
+                let datafame = Payload::from(&result[0], schema);
                 Ok(serde_json::to_value(&datafame)?)
             }
             None => panic!("Unexpected plan!"),

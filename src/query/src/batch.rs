@@ -12,25 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![warn(missing_docs)]
-// Clippy lints, some should be disabled incrementally
-#![allow(
-    clippy::float_cmp,
-    clippy::module_inception,
-    clippy::new_without_default,
-    clippy::ptr_arg,
-    clippy::type_complexity,
-    clippy::wrong_self_convention
-)]
-
-//! The runtime contains the context information needed by the lambda function,
-//! such as execution plan and the next lambda functions, which instructs the
-//! lambda instance to perform the correct operation.
-
-pub mod context;
-pub mod datasource;
-pub mod error;
-pub mod payload;
-pub mod plan;
-
-pub use payload::Payload;
+/// Batch processing is the processing of a large volume of data all at once.
+/// You can store the preceding reference data as an object in Amazon Simple
+/// Storage Service (Amazon S3).  Squirtle reads the Amazon S3 object and
+/// creates an in-application reference table that you can query in your
+/// application code. In your application code, you write a join query to join
+/// the in-application stream with the in-application reference table, to obtain
+/// more accurate results.
+#[allow(dead_code)]
+pub struct BatchQuery {}

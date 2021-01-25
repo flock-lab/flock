@@ -22,8 +22,9 @@ use serde_json::Value;
 
 use std::sync::Once;
 
-use runtime::dataframe::{from_kinesis_to_batch, DataFrame};
+use runtime::datasource::kinesis;
 use runtime::plan::*;
+use runtime::Payload;
 use runtime::{exec_plan, init_plan};
 
 type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
@@ -43,12 +44,12 @@ static mut PLAN: LambdaPlan = LambdaPlan::None;
 async fn handler(event: KinesisEvent, _: Context) -> Result<Value, Error> {
     let (schema, plan) = init_plan!(INIT, PLAN);
 
-    let (record_batch, _) = from_kinesis_to_batch(event);
+    let (record_batch, _) = kinesis::to_batch(event);
     let result = exec_plan!(plan, vec![vec![record_batch]]);
     pretty::print_batches(&result)?;
 
-    let dataframe = DataFrame::from(&result[0], schema);
-    Ok(serde_json::to_value(&dataframe)?)
+    let payload = Payload::from(&result[0], schema);
+    Ok(serde_json::to_value(&payload)?)
 }
 
 #[cfg(test)]

@@ -21,8 +21,8 @@ use serde_json::Value;
 
 use std::sync::Once;
 
-use runtime::dataframe::DataFrame;
 use runtime::plan::*;
+use runtime::Payload;
 use runtime::{exec_plan, init_plan};
 
 type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
@@ -49,9 +49,9 @@ static mut PLAN: LambdaPlan = LambdaPlan::None;
 async fn handler(event: Value, _: Context) -> Result<Value, Error> {
     let (schema, plan) = init_plan!(INIT, PLAN);
 
-    let record_batch = DataFrame::to_batch(event);
+    let record_batch = Payload::to_batch(event);
     let result = exec_plan!(plan, vec![vec![record_batch]]);
 
-    let dataframe = DataFrame::from(&result[0], schema);
-    Ok(serde_json::to_value(&dataframe)?)
+    let payload = Payload::from(&result[0], schema);
+    Ok(serde_json::to_value(&payload)?)
 }
