@@ -24,7 +24,7 @@
 )]
 
 //! Driver API is the core component of the command-line interface for
-//! ServerlessCQ, and it supports direct calls from other high-level languages.
+//! Squirtle, and it supports direct calls from other high-level languages.
 
 #[cfg(feature = "build")]
 pub mod build;

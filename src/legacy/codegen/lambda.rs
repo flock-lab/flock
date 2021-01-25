@@ -15,7 +15,7 @@
 //! Generate lambda functions
 
 use handlebars::Handlebars;
-use scq_lambda::error::{Result, ServerlessCQError};
+use runtime::error::{Result, SquirtleError};
 use serde_json::json;
 
 const LAMBDA_TEMPLATE: &str = include_str!("templates/lambda.hbs");
@@ -58,7 +58,7 @@ impl Lambda {
             || request.plan_name.is_empty()
             || request.file_name.is_empty()
         {
-            return Err(ServerlessCQError::CodeGeneration(
+            return Err(SquirtleError::CodeGeneration(
                 "LambdaRequest can't contain any empty field.".to_string(),
             ));
         }

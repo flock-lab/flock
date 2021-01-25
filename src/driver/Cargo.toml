@@ -16,7 +16,7 @@ daggy = "0.7.0"
 datafusion = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq", features = [ "simd" ] }
 lambda = { git = "https://github.com/awslabs/aws-lambda-rust-runtime/", branch = "master" }
 lazy_static = "1.4"
-scq_lambda = { path = "../../src/lambda" }
+runtime = { path = "../../src/runtime" }
 serde_json = "1.0"
 tokio = { version = "0.2", features = [ "macros" ] }
 

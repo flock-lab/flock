@@ -15,8 +15,8 @@ datafusion = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq", featu
 lambda = { git = "https://github.com/awslabs/aws-lambda-rust-runtime/", branch = "master" }
 more-asserts = "0.2.1"
 
+runtime = { path = "../src/runtime" }
 scq_driver = { path = "../src/driver" }
-scq_lambda = { path = "../src/lambda" }
 serde = { version = "1.0", features = [ "derive" ] }
 serde_json = "1.0"
 tokio = { version = "0.2", features = [ "macros" ] }

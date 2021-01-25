@@ -1,10 +1,10 @@
 [package]
-name = "serverlesscq-cli"
+name = "squirtle-cli"
 version = "0.1.0"
-description = "A command-line REPL for ServerlessCQ that integrates into existing cli workflows"
+description = "A command-line REPL for Squirtle that integrates into existing cli workflows"
 authors = [ "Gang Liao <gangliao@cs.umd.edu>" ]
 license = "Apache-2.0"
-keywords = [ "ServerlessCQ", "repl", "client", "cli" ]
+keywords = [ "Squirtle", "repl", "client", "cli" ]
 categories = [ "command-line-interface", "command-line-utilities" ]
 edition = "2018"
 
@@ -19,11 +19,11 @@ clap = "2.33.3"
 ctrlc = "3.1.1"
 
 lazy_static = "1.4.0"
+runtime = { path = "../../runtime" }
 rustyline = { version = "7.0", optional = true }
-scq_lambda = { path = "../../lambda" }
 sqlparser = { version = "0.7.0", features = [ "json_example" ] }
 tokio = { version = "0.2", features = [ "macros" ] }
 
 [[bin]]
-name = "serverlesscq-cli"
+name = "squirtle-cli"
 path = "src/main.rs"

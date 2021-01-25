@@ -39,8 +39,8 @@ mod tests {
     use datafusion::physical_plan::projection::ProjectionExec;
     use datafusion::physical_plan::ExecutionPlan;
 
+    use runtime::dataframe::from_kinesis_to_batch;
     use scq_driver::funcgen::dag::{DagNode, LambdaDag};
-    use scq_lambda::dataframe::from_kinesis_to_batch;
     use std::sync::Arc;
 
     #[tokio::test]

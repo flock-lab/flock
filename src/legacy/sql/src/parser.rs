@@ -31,7 +31,7 @@ macro_rules! parser_err {
     };
 }
 
-/// ServerlessCQ extension DDL for `EXPLAIN` and `EXPLAIN VERBOSE`
+/// Squirtle extension DDL for `EXPLAIN` and `EXPLAIN VERBOSE`
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExplainPlan {
     /// If true, dumps more intermediate plans and results of optimizaton passes
@@ -40,7 +40,7 @@ pub struct ExplainPlan {
     pub statement: Box<Statement>,
 }
 
-/// ServerlessCQ Statement representations.
+/// Squirtle Statement representations.
 ///
 /// Tokens parsed by `SCQParser` are converted into these values.
 #[derive(Debug, Clone, PartialEq)]

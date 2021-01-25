@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! ServerlessCQ error types
+//! Squirtle error types
 
 use std::error;
 use std::fmt::{Display, Formatter};
@@ -21,14 +21,14 @@ use std::result;
 
 use sqlparser::parser::ParserError;
 
-/// Result type for operations that could result in an [ServerlessCQError]
-pub type Result<T> = result::Result<T, ServerlessCQError>;
+/// Result type for operations that could result in an [SquirtleError]
+pub type Result<T> = result::Result<T, SquirtleError>;
 
-/// ServerlessCQ error
+/// Squirtle error
 #[derive(Debug)]
 #[allow(missing_docs)]
 #[allow(dead_code)]
-pub enum ServerlessCQError {
+pub enum SquirtleError {
     /// Error associated to I/O operations and associated traits.
     IoError(io::Error),
     /// Error returned when SQL is syntatically incorrect.
@@ -37,9 +37,9 @@ pub enum ServerlessCQError {
     /// still have no implementation for. Often, these errors are tracked in our
     /// issue tracker.
     NotImplemented(String),
-    /// Error returned as a consequence of an error in ServerlessCQ.
-    /// This error should not happen in normal usage of ServerlessCQ.
-    /// ServerlessCQ has internal invariants that we are unable to ask the
+    /// Error returned as a consequence of an error in Squirtle.
+    /// This error should not happen in normal usage of Squirtle.
+    /// Squirtle has internal invariants that we are unable to ask the
     /// compiler to check for us. This error is raised when one of those
     /// invariants is not verified during execution.
     Internal(String),
@@ -54,39 +54,39 @@ pub enum ServerlessCQError {
     CodeGeneration(String),
 }
 
-impl From<io::Error> for ServerlessCQError {
+impl From<io::Error> for SquirtleError {
     fn from(e: io::Error) -> Self {
-        ServerlessCQError::IoError(e)
+        SquirtleError::IoError(e)
     }
 }
 
-impl From<ParserError> for ServerlessCQError {
+impl From<ParserError> for SquirtleError {
     fn from(e: ParserError) -> Self {
-        ServerlessCQError::SQL(e)
+        SquirtleError::SQL(e)
     }
 }
 
-impl Display for ServerlessCQError {
+impl Display for SquirtleError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match *self {
-            ServerlessCQError::IoError(ref desc) => write!(f, "IO error: {}", desc),
-            ServerlessCQError::SQL(ref desc) => write!(f, "SQL error: {:?}", desc),
-            ServerlessCQError::NotImplemented(ref desc) => {
+            SquirtleError::IoError(ref desc) => write!(f, "IO error: {}", desc),
+            SquirtleError::SQL(ref desc) => write!(f, "SQL error: {:?}", desc),
+            SquirtleError::NotImplemented(ref desc) => {
                 write!(f, "This feature is not implemented: {}", desc)
             }
-            ServerlessCQError::Internal(ref desc) => write!(
+            SquirtleError::Internal(ref desc) => write!(
                 f,
-                "Internal error: {}. This was likely caused by a bug in ServerlessCQ's \
+                "Internal error: {}. This was likely caused by a bug in Squirtle's \
                     code and we would welcome that you file an bug report in our issue tracker",
                 desc
             ),
-            ServerlessCQError::Plan(ref desc) => write!(f, "Error during planning: {}", desc),
-            ServerlessCQError::Execution(ref desc) => write!(f, "Execution error: {}", desc),
-            ServerlessCQError::CodeGeneration(ref desc) => {
+            SquirtleError::Plan(ref desc) => write!(f, "Error during planning: {}", desc),
+            SquirtleError::Execution(ref desc) => write!(f, "Execution error: {}", desc),
+            SquirtleError::CodeGeneration(ref desc) => {
                 write!(f, "Code generation error: {}", desc)
             }
         }
     }
 }
 
-impl error::Error for ServerlessCQError {}
+impl error::Error for SquirtleError {}

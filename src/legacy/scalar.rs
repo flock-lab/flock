@@ -31,7 +31,7 @@ use arrow::{
     datatypes::DateUnit,
 };
 
-use crate::error::{Result, ServerlessCQError};
+use crate::error::{Result, SquirtleError};
 
 /// Represents a dynamically typed, nullable single value.
 /// This is the single-valued counter-part of arrow’s `Array`.
@@ -231,7 +231,7 @@ impl ScalarValue {
             DataType::LargeUtf8 => typed_cast!(array, index, LargeStringArray, LargeUtf8),
             DataType::List(nested_type) => {
                 let list_array = array.as_any().downcast_ref::<ListArray>().ok_or_else(|| {
-                    ServerlessCQError::Internal("Failed to downcast ListArray".to_string())
+                    SquirtleError::Internal("Failed to downcast ListArray".to_string())
                 })?;
                 let value = match list_array.is_null(index) {
                     true => None,
@@ -247,7 +247,7 @@ impl ScalarValue {
             }
             DataType::Date32(DateUnit::Day) => typed_cast!(array, index, Date32Array, Date32),
             other => {
-                return Err(ServerlessCQError::NotImplemented(format!(
+                return Err(SquirtleError::NotImplemented(format!(
                     "Can't create a scalar of array of type \"{:?}\"",
                     other
                 )))
@@ -325,12 +325,12 @@ impl From<u64> for ScalarValue {
 macro_rules! impl_try_from {
     ($SCALAR:ident, $NATIVE:ident) => {
         impl TryFrom<ScalarValue> for $NATIVE {
-            type Error = ServerlessCQError;
+            type Error = SquirtleError;
 
             fn try_from(value: ScalarValue) -> Result<Self> {
                 match value {
                     ScalarValue::$SCALAR(Some(inner_value)) => Ok(inner_value),
-                    _ => Err(ServerlessCQError::Internal(format!(
+                    _ => Err(SquirtleError::Internal(format!(
                         "Cannot convert {:?} to {}",
                         value,
                         std::any::type_name::<Self>()
@@ -346,14 +346,14 @@ impl_try_from!(Int16, i16);
 
 // special implementation for i32 because of Date32
 impl TryFrom<ScalarValue> for i32 {
-    type Error = ServerlessCQError;
+    type Error = SquirtleError;
 
     fn try_from(value: ScalarValue) -> Result<Self> {
         match value {
             ScalarValue::Int32(Some(inner_value)) | ScalarValue::Date32(Some(inner_value)) => {
                 Ok(inner_value)
             }
-            _ => Err(ServerlessCQError::Internal(format!(
+            _ => Err(SquirtleError::Internal(format!(
                 "Cannot convert {:?} to {}",
                 value,
                 std::any::type_name::<Self>()
@@ -372,7 +372,7 @@ impl_try_from!(Float64, f64);
 impl_try_from!(Boolean, bool);
 
 impl TryFrom<&DataType> for ScalarValue {
-    type Error = ServerlessCQError;
+    type Error = SquirtleError;
 
     fn try_from(datatype: &DataType) -> Result<Self> {
         Ok(match *datatype {
@@ -393,7 +393,7 @@ impl TryFrom<&DataType> for ScalarValue {
                 ScalarValue::List(None, nested_type.data_type().clone())
             }
             _ => {
-                return Err(ServerlessCQError::NotImplemented(format!(
+                return Err(SquirtleError::NotImplemented(format!(
                     "Can't create a scalar of type \"{:?}\"",
                     datatype
                 )))

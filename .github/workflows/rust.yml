@@ -37,7 +37,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-serverlesscq-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-squirtle-${{ hashFiles('**/Cargo.lock') }}
       # - name: Coveralls upload
       #   uses: coverallsapp/github-action@master
       #   with:
@@ -67,7 +67,7 @@ jobs:
   #           ~/.cargo/git
   #           ~/.xargo
   #           target
-  #         key: ${{ runner.os }}-cargo-serverlesscq-${{ hashFiles('**/Cargo.lock') }}
+  #         key: ${{ runner.os }}-cargo-squirtle-${{ hashFiles('**/Cargo.lock') }}
   #     - name: Install nightly
   #       uses: actions-rs/toolchain@v1
   #       with:
@@ -102,7 +102,7 @@ jobs:
   #           echo "${GET_FUNCTION_NAME}";
   #           if [ "${GET_FUNCTION_NAME}" == "${f}" ]; then
   #             aws lambda update-function-code --function-name $f --zip-file fileb://./$f.zip;
-  #             echo "Congratulations! You've successfully upgraded ServerlessCQ.";
+  #             echo "Congratulations! You've successfully upgraded Squirtle.";
   #           else
   #             aws lambda create-function --function-name $f \
   #               --runtime provided.al2 \
@@ -111,6 +111,6 @@ jobs:
   #               --zip-file fileb://./$f.zip \
   #               --environment Variables={RUST_BACKTRACE=1} \
   #               --tracing-config Mode=Active;
-  #             echo "Congratulations! You've successfully deployed ServerlessCQ.";
+  #             echo "Congratulations! You've successfully deployed Squirtle.";
   #           fi
   #         done
