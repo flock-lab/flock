@@ -13,4 +13,5 @@ The following diagram highlights some of the integrations that will be possible 
 
 ## License
 
-ServerlessCQ resources in this repository are released under the Apache License 2.0.
+Copyright (c) 2020-2021, UMD Database Group. All rights reserved.
+The library, examples, and all source code are released under Apache 2.0.
