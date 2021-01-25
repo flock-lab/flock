@@ -1,4 +1,4 @@
-<img src="https://i.imgur.com/NWgvrwh.png" width=13%>
+<img src="docs/squirtle.png" width=20%>
 
 ## Squirtle: Serverless SQL Query Engine for Real-Time and Batch Analytics
 
