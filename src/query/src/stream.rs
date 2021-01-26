@@ -12,6 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! An in-application stream represents unbounded data that flows continuously
+//! through your application. Therefore, to get result sets from this
+//! continuously updating input, you often bound queries using a window defined
+//! in terms of time or rows. These are also called windowed SQL.
+//!
+//! - For a row-based windowed query, you specify the window size in terms of
+//!   the number of rows.
+//! - For a time-based windowed query, you specify the window size in terms of
+//!   time (for example, a one-minute window).
+//!
+//! Schedule expressions using rate or cron:
+//! https://docs.aws.amazon.com/lambda/latest/dg/services-cloudwatchevents-expressions.html
+//!
+//! Reference:
+//! https://docs.microsoft.com/en-us/stream-analytics-query/windowing-azure-stream-analytics
+
+use super::Query;
+use arrow::datatypes::SchemaRef;
+use datafusion::physical_plan::ExecutionPlan;
+use runtime::datasource::DataSource;
+use std::sync::Arc;
+
 /// You can set up a rule to run an AWS Lambda function on a schedule.
 #[rustfmt::skip]
 pub enum Schedule {
@@ -54,21 +76,7 @@ pub enum Schedule {
     Rows(u64),
 }
 
-/// An in-application stream represents unbounded data that flows continuously
-/// through your application. Therefore, to get result sets from this
-/// continuously updating input, you often bound queries using a window defined
-/// in terms of time or rows. These are also called windowed SQL.
-///
-/// - For a row-based windowed query, you specify the window size in terms of
-///   the number of rows.
-/// - For a time-based windowed query, you specify the window size in terms of
-///   time (for example, a one-minute window).
-///
-/// Schedule expressions using rate or cron:
-/// https://docs.aws.amazon.com/lambda/latest/dg/services-cloudwatchevents-expressions.html
-///
-/// Reference:
-/// https://docs.microsoft.com/en-us/stream-analytics-query/windowing-azure-stream-analytics
+/// A enum `StreamWindow` to define different window types.
 pub enum StreamWindow {
     /// A query that aggregates data using distinct time-based windows that open
     /// and close at regular intervals. In this case, each record on an
@@ -94,17 +102,36 @@ pub enum StreamWindow {
 
 /// SQL queries in your application code execute continuously over
 /// in-application streams.
-#[allow(dead_code)]
 pub struct StreamQuery {
     /// ANSI 2008 SQL standard with extensions.
     /// SQL is a domain-specific language used in programming and designed for
     /// managing data held in a relational database management system, or for
     /// stream processing in a relational data stream management system.
     pub ansi_sql:   String,
+    /// A schema that is the skeleton structure that represents the logical view
+    /// of streaming data.
+    pub schema:     Option<SchemaRef>,
     /// The windows group stream elements by time or rows.
     pub window:     StreamWindow,
     /// Whether the time schedule is triggered by cloud watch or by the user.
     pub cloudwatch: bool,
     /// A streaming data source.
     pub datasource: DataSource,
+}
+
+impl Query for StreamQuery {
+    /// Returns a SQL query.
+    fn sql(&self) -> &String {
+        &self.ansi_sql
+    }
+
+    /// Returns the data schema for a given query.
+    fn schema(&self) -> &Option<SchemaRef> {
+        &self.schema
+    }
+
+    /// Returns the entire physical plan for a given query.
+    fn plan(&self) -> Arc<dyn ExecutionPlan> {
+        unimplemented!();
+    }
 }

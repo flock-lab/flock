@@ -15,17 +15,33 @@
 //! A Query API to associate front-end CLI with back-end function generation and
 //! continuous deployment.
 
-use runtime::datasource::DataSource;
-use runtime::error::Result;
+#![warn(missing_docs)]
+// Clippy lints, some should be disabled incrementally
+#![allow(
+    clippy::float_cmp,
+    clippy::module_inception,
+    clippy::new_without_default,
+    clippy::ptr_arg,
+    clippy::type_complexity,
+    clippy::wrong_self_convention
+)]
 
-/// A SQL query to pull the desired data.
+use arrow::datatypes::SchemaRef;
+use datafusion::physical_plan::ExecutionPlan;
+use std::sync::Arc;
+
+/// A `Query` trait to decouple CLI and back-end cloud function generation.
 pub trait Query {
-    /// Deploy the query to the cloud.
-    fn deploy() -> Result<()>;
+    /// Returns a SQL query.
+    fn sql(&self) -> &String;
+    /// Returns the data schema for a given query.
+    fn schema(&self) -> &Option<SchemaRef>;
+    /// Returns the entire physical plan for a given query.
+    fn plan(&self) -> Arc<dyn ExecutionPlan>;
 }
 
 pub mod batch;
 pub mod stream;
 
-use batch::BatchQuery;
-use stream::StreamQuery;
+pub use batch::BatchQuery;
+pub use stream::StreamQuery;

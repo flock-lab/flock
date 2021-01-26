@@ -1,5 +1,5 @@
 [package]
-name = "runtime"
+name = "query"
 version = "0.1.0"
 description = "A query module to unify data analytics over streams and batches."
 authors = [ "Gang Liao <gangliao@cs.umd.edu>" ]
@@ -8,6 +8,8 @@ keywords = [ "streaming", "batch", "data analytics", "sql" ]
 edition = "2018"
 
 [dependencies]
+arrow = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq", features = [ "simd" ] }
+datafusion = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq", features = [ "simd" ] }
 runtime = { path = "../../src/runtime" }
 
 [lib]
