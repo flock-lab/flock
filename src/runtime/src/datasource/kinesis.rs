@@ -12,19 +12,57 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Payload API for building and executing query plans in cloud function
-//! services.
+//! Amazon Kinesis Data Streams is a managed service that scales elastically for
+//! real-time processing of streaming big data.
 
 use aws_lambda_events::event::kinesis::KinesisEvent;
 
 use arrow::datatypes::SchemaRef;
-use arrow::json;
-use arrow::json::reader::infer_json_schema;
+use arrow::json::{self, reader::infer_json_schema};
 use arrow::record_batch::RecordBatch;
 
 use rayon::prelude::*;
 
+use serde::{Deserialize, Serialize};
 use std::io::BufReader;
+
+/// A struct to manage all Kinesis info in cloud environment.
+#[derive(Deserialize, Serialize)]
+pub struct Kinesis {
+    /// The shard ID of the Kinesis Data Streams shard to get the iterator for.
+    pub shard_id:                 String,
+    /// Determines how the shard iterator is used to start reading data records
+    /// from the shard. The following are the valid Amazon Kinesis shard
+    /// iterator types:
+    /// - `SEQUENCE_NUMBER`: Start reading from the position denoted by a
+    ///   specific sequence number, provided in the value
+    ///   `StartingSequenceNumber`.
+    /// - `AFTER_SEQUENCE_NUMBER`: Start reading right after the position
+    ///   denoted by a specific sequence number, provided in the value
+    ///   `StartingSequenceNumber`.
+    /// - `TIMESTAMP`: Start reading from the position denoted by a specific
+    ///   time stamp, provided in the value `Timestamp`.
+    /// - `TRIM_HORIZON`: Start reading at the last untrimmed record in the
+    ///   shard in the system, which is the oldest data record in the shard.
+    /// - `LATEST`: Start reading just after the most recent record in the
+    ///   shard, so that you always read the most recent data in the shard.
+    pub shard_iterator_type:      String,
+    /// The sequence number of the data record in the shard from which to start
+    /// reading. Used with shard iterator type `AT_SEQUENCE_NUMBER` and
+    /// `AFTER_SEQUENCE_NUMBER`.
+    pub starting_sequence_number: Option<String>,
+    /// The name of the Amazon Kinesis data stream.
+    pub stream_name:              String,
+    /// The time stamp of the data record from which to start reading. Used with
+    /// shard iterator type `AT_TIMESTAMP`. A time stamp is the Unix epoch date
+    /// with precision in milliseconds. For example,
+    /// `2016-04-04T19:58:46.480-00:00` or `1459799926.480`. If a record with
+    /// this exact time stamp does not exist, the iterator returned is for the
+    /// next (later) record. If the time stamp is older than the current trim
+    /// horizon, the iterator returned is for the oldest untrimmed data record
+    /// (`TRIM_HORIZON`).
+    pub timestamp:                Option<f64>,
+}
 
 /// Convert Kinesis event to record batch in Arrow.
 pub fn to_batch(event: KinesisEvent) -> (RecordBatch, SchemaRef) {
