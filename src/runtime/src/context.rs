@@ -15,10 +15,13 @@
 //! When the lambda function is called for the first time, it deserializes the
 //! corresponding execution context from the cloud environment variable.
 
+use serde::{Deserialize, Serialize};
+
 type PhysicalPlan = String;
 type LambdaFunctionName = String;
 
 /// Execution environment context for lambda functions.
+#[derive(Debug, Deserialize, Serialize)]
 pub struct LambdaContext {
     /// JSON formatted string for a specific physical plan.
     pub plan: PhysicalPlan,

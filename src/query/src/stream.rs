@@ -32,6 +32,7 @@ use super::Query;
 use arrow::datatypes::SchemaRef;
 use datafusion::physical_plan::ExecutionPlan;
 use runtime::datasource::DataSource;
+use std::any::Any;
 use std::sync::Arc;
 
 /// You can set up a rule to run an AWS Lambda function on a schedule.
@@ -120,6 +121,11 @@ pub struct StreamQuery {
 }
 
 impl Query for StreamQuery {
+    /// Return a reference to Any that can be used for downcasting
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
     /// Returns a SQL query.
     fn sql(&self) -> &String {
         &self.ansi_sql

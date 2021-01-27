@@ -28,10 +28,14 @@
 
 use arrow::datatypes::SchemaRef;
 use datafusion::physical_plan::ExecutionPlan;
+use std::any::Any;
 use std::sync::Arc;
 
 /// A `Query` trait to decouple CLI and back-end cloud function generation.
 pub trait Query {
+    /// Returns the query as [`Any`](std::any::Any) so that it can be
+    /// downcast to a specific implementation.
+    fn as_any(&self) -> &dyn Any;
     /// Returns a SQL query.
     fn sql(&self) -> &String;
     /// Returns the data schema for a given query.

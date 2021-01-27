@@ -23,6 +23,9 @@ async fn main() -> Result<(), Error> {
 mod tests {
     use super::*;
 
+    extern crate daggy;
+    use daggy::NodeIndex;
+
     use arrow::array::*;
     use arrow::datatypes::{DataType, Field, Schema};
     use arrow::record_batch::RecordBatch;
@@ -547,6 +550,18 @@ mod tests {
 
         assert_eq!(2, dag.node_count());
         assert_eq!(1, dag.edge_count());
+
+        let subplan = dag.node_weight(NodeIndex::new(0)).unwrap();
+        assert!(subplan.contains(r#"execution_plan":"global_limit_exec"#));
+        assert!(subplan.contains(r#"execution_plan":"sort_exec"#));
+        assert!(subplan.contains(r#"execution_plan":"projection_exec"#));
+        assert!(subplan.contains(r#"execution_plan":"coalesce_batches_exec"#));
+        assert!(subplan.contains(r#"execution_plan":"memory_exec"#));
+
+        let subplan = dag.node_weight(NodeIndex::new(1)).unwrap();
+        assert!(subplan.contains(r#"execution_plan":"hash_join_exec"#));
+        assert!(subplan.contains(r#"right":{"execution_plan":"memory_exec"#));
+        assert!(subplan.contains(r#"left":{"execution_plan":"memory_exec"#));
 
         let mut iter = dag.node_weights_mut();
         let mut subplan = iter.next().unwrap();

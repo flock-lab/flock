@@ -23,20 +23,38 @@
 use super::Query;
 use arrow::datatypes::SchemaRef;
 use datafusion::physical_plan::ExecutionPlan;
+use runtime::datasource::DataSource;
+use std::any::Any;
 use std::sync::Arc;
 
 /// SQL queries in your application code execute over in-application batches.
-pub struct BatchQuery {}
+pub struct BatchQuery {
+    /// ANSI 2008 SQL standard with extensions.
+    /// SQL is a domain-specific language used in programming and designed for
+    /// managing data held in a relational database management system, or for
+    /// stream processing in a relational data stream management system.
+    pub ansi_sql:   String,
+    /// A schema that is the skeleton structure that represents the logical view
+    /// of streaming data.
+    pub schema:     Option<SchemaRef>,
+    /// A streaming data source.
+    pub datasource: DataSource,
+}
 
 impl Query for BatchQuery {
+    /// Return a reference to Any that can be used for downcasting
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
     /// Returns a SQL query.
     fn sql(&self) -> &String {
-        unimplemented!();
+        &self.ansi_sql
     }
 
     /// Returns the data schema for a given query.
     fn schema(&self) -> &Option<SchemaRef> {
-        unimplemented!();
+        &self.schema
     }
 
     /// Returns the entire physical plan for a given query.
