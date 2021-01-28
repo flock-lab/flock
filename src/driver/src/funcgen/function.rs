@@ -33,6 +33,7 @@ const PAYLOAD_SIZE: usize = 256;
 
 /// A struct `LambdaFunction` to generate cloud function names via `Query` and
 /// `LambdaDag`.
+#[derive(Debug)]
 pub struct LambdaFunction {
     /// A query information received from the client-side.
     pub query:  Box<dyn Query>,
@@ -77,8 +78,9 @@ impl LambdaFunction {
     where
         S: Into<String>,
     {
-        dag.add_parent(
-            NodeIndex::new(0),
+        let parent = dag.node_count() - 1;
+        dag.add_child(
+            NodeIndex::new(parent),
             DagNode {
                 plan:        plan.into(),
                 concurrency: CONCURRENCY_1,
@@ -110,7 +112,7 @@ impl LambdaFunction {
                 ctx.insert(
                     node,
                     LambdaContext {
-                        plan:       dag.node_weight(node).unwrap().plan.clone(),
+                        plan:       dag.get_node(node).unwrap().plan.clone(),
                         next:       None,
                         datasource: DataSource::Payload(PAYLOAD_SIZE),
                     },
@@ -119,5 +121,186 @@ impl LambdaFunction {
             }
         }
         ctx
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Arc;
+
+    use arrow::array::*;
+    use arrow::datatypes::{DataType, Field, Schema};
+    use arrow::record_batch::RecordBatch;
+
+    use query::stream::StreamWindow;
+
+    use datafusion::datasource::MemTable;
+    use datafusion::execution::context::ExecutionContext;
+
+    async fn init_lambda_contex(sql: &str) -> Result<LambdaFunction> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Utf8, false),
+            Field::new("b", DataType::Int32, false),
+        ]));
+
+        // define data.
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["a", "b", "c", "d"])),
+                Arc::new(Int32Array::from(vec![1, 10, 10, 100])),
+            ],
+        )?;
+
+        let mut ctx = ExecutionContext::new();
+
+        let table = MemTable::try_new(schema.clone(), vec![vec![batch]])?;
+
+        ctx.register_table("t", Box::new(table));
+
+        let plan = ctx.create_logical_plan(&sql)?;
+        let plan = ctx.optimize(&plan)?;
+        let plan = ctx.create_physical_plan(&plan)?;
+
+        let json = serde_json::to_string(&plan).unwrap();
+        let query: Box<dyn Query> = Box::new(StreamQuery {
+            ansi_sql:   json,
+            schema:     Some(schema),
+            window:     StreamWindow::SessionWindow,
+            cloudwatch: false,
+            datasource: DataSource::UnknownEvent,
+        });
+
+        let mut dag = LambdaDag::from(&plan);
+        LambdaFunction::add_source(
+            format!("{}", serde_json::to_value(&plan).unwrap()),
+            &mut dag,
+        );
+        let ctx = LambdaFunction::build_context(&query, &mut dag);
+
+        Ok(LambdaFunction {
+            query,
+            dag,
+            ctx,
+            stream: true,
+        })
+    }
+
+    #[tokio::test]
+    async fn lambda_context_with_select() -> Result<()> {
+        let sql = concat!("SELECT b FROM t ORDER BY b ASC LIMIT 3");
+        let mut lambda_functions = init_lambda_contex(&sql).await?;
+        assert_eq!(
+            "UnknownEvent",
+            format!(
+                "{:?}",
+                lambda_functions
+                    .ctx
+                    .get(&NodeIndex::new(0))
+                    .unwrap()
+                    .datasource
+            )
+        );
+        assert_eq!(
+            "Payload(256)",
+            format!(
+                "{:?}",
+                lambda_functions
+                    .ctx
+                    .get(&NodeIndex::new(1))
+                    .unwrap()
+                    .datasource
+            )
+        );
+
+        let dag = &mut lambda_functions.dag;
+        assert_eq!(2, dag.node_count());
+        assert_eq!(1, dag.edge_count());
+
+        let mut iter = dag.node_weights_mut();
+        let mut node = iter.next().unwrap();
+        assert!(node.plan.contains(r#"execution_plan":"projection_exec"#));
+        assert!(node.plan.contains(r#"execution_plan":"memory_exec"#));
+        assert_eq!(8, node.concurrency);
+
+        node = iter.next().unwrap();
+        assert!(node.plan.contains(r#"execution_plan":"projection_exec"#));
+        assert!(node.plan.contains(r#"execution_plan":"memory_exec"#));
+        assert_eq!(1, node.concurrency);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn lambda_context_with_agg() -> Result<()> {
+        let sql = concat!("SELECT MIN(a), AVG(b) ", "FROM t ", "GROUP BY b");
+        let mut lambda_functions = init_lambda_contex(&sql).await?;
+        assert_eq!(
+            "UnknownEvent",
+            format!(
+                "{:?}",
+                lambda_functions
+                    .ctx
+                    .get(&NodeIndex::new(0))
+                    .unwrap()
+                    .datasource
+            )
+        );
+        assert_eq!(
+            "Payload(256)",
+            format!(
+                "{:?}",
+                lambda_functions
+                    .ctx
+                    .get(&NodeIndex::new(1))
+                    .unwrap()
+                    .datasource
+            )
+        );
+        assert_eq!(
+            "Payload(256)",
+            format!(
+                "{:?}",
+                lambda_functions
+                    .ctx
+                    .get(&NodeIndex::new(2))
+                    .unwrap()
+                    .datasource
+            )
+        );
+
+        let dag = &mut lambda_functions.dag;
+        assert_eq!(3, dag.node_count());
+        assert_eq!(2, dag.edge_count());
+
+        let mut iter = dag.node_weights_mut();
+        let mut node = iter.next().unwrap();
+        assert!(node.plan.contains(r#"execution_plan":"projection_exec"#));
+        assert!(node
+            .plan
+            .contains(r#"execution_plan":"hash_aggregate_exec"#));
+        assert!(node.plan.contains(r#"execution_plan":"memory_exec"#));
+        assert_eq!(1, node.concurrency);
+
+        node = iter.next().unwrap();
+        assert!(node
+            .plan
+            .contains(r#"execution_plan":"hash_aggregate_exec"#));
+        assert!(node.plan.contains(r#"execution_plan":"memory_exec"#));
+        assert_eq!(8, node.concurrency);
+
+        node = iter.next().unwrap();
+        assert!(node.plan.contains(r#"execution_plan":"projection_exec"#));
+        assert!(node
+            .plan
+            .contains(r#"execution_plan":"hash_aggregate_exec"#));
+        assert!(node
+            .plan
+            .contains(r#"execution_plan":"hash_aggregate_exec"#));
+        assert!(node.plan.contains(r#"execution_plan":"memory_exec"#));
+        assert_eq!(1, node.concurrency);
+
+        Ok(())
     }
 }

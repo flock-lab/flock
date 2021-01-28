@@ -30,10 +30,11 @@ use arrow::datatypes::SchemaRef;
 use datafusion::physical_plan::ExecutionPlan;
 use runtime::datasource::DataSource;
 use std::any::Any;
+use std::fmt::Debug;
 use std::sync::Arc;
 
 /// A `Query` trait to decouple CLI and back-end cloud function generation.
-pub trait Query {
+pub trait Query: Debug + Send + Sync {
     /// Returns the query as [`Any`](std::any::Any) so that it can be
     /// downcast to a specific implementation.
     fn as_any(&self) -> &dyn Any;

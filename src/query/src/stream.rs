@@ -37,6 +37,7 @@ use std::sync::Arc;
 
 /// You can set up a rule to run an AWS Lambda function on a schedule.
 #[rustfmt::skip]
+#[derive(Debug)]
 pub enum Schedule {
     /// Where Unit can be minute(s), hour(s), or day(s). For a singular value
     /// the unit must be singular (for example,rate(1 day)), otherwise plural
@@ -78,6 +79,7 @@ pub enum Schedule {
 }
 
 /// A enum `StreamWindow` to define different window types.
+#[derive(Debug)]
 pub enum StreamWindow {
     /// A query that aggregates data using distinct time-based windows that open
     /// and close at regular intervals. In this case, each record on an
@@ -103,6 +105,7 @@ pub enum StreamWindow {
 
 /// SQL queries in your application code execute continuously over
 /// in-application streams.
+#[derive(Debug)]
 pub struct StreamQuery {
     /// ANSI 2008 SQL standard with extensions.
     /// SQL is a domain-specific language used in programming and designed for

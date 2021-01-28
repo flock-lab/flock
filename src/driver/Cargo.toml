@@ -32,6 +32,10 @@ regex = { version = "1.4.3", optional = true }
 remove_dir_all = { version = "0.6", optional = true }
 url = { version = "2.0", optional = true }
 
+[dev-dependencies]
+arrow = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq", features = [ "simd" ] }
+tokio = { version = "0.2", features = [ "macros" ] }
+
 [lib]
 name = "driver"
 path = "src/lib.rs"

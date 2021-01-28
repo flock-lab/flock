@@ -14,6 +14,9 @@
 
 //! Squirtle error types
 
+use arrow::error::ArrowError;
+use datafusion::error::DataFusionError;
+
 use std::error;
 use std::fmt::{Display, Formatter};
 use std::io;
@@ -33,6 +36,10 @@ pub enum SquirtleError {
     IoError(io::Error),
     /// Error returned when SQL is syntatically incorrect.
     SQL(ParserError),
+    /// Error returned when Arrow is unexpectedly executed.
+    Arrow(ArrowError),
+    /// Error returned when DataFusion is unexpectedly executed.
+    DataFusion(DataFusionError),
     /// Error returned on a branch that we know it is possible but to which we
     /// still have no implementation for. Often, these errors are tracked in our
     /// issue tracker.
@@ -66,11 +73,25 @@ impl From<ParserError> for SquirtleError {
     }
 }
 
+impl From<DataFusionError> for SquirtleError {
+    fn from(e: DataFusionError) -> Self {
+        SquirtleError::DataFusion(e)
+    }
+}
+
+impl From<ArrowError> for SquirtleError {
+    fn from(e: ArrowError) -> Self {
+        SquirtleError::Arrow(e)
+    }
+}
+
 impl Display for SquirtleError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match *self {
             SquirtleError::IoError(ref desc) => write!(f, "IO error: {}", desc),
             SquirtleError::SQL(ref desc) => write!(f, "SQL error: {:?}", desc),
+            SquirtleError::Arrow(ref desc) => write!(f, "Arrow error: {}", desc),
+            SquirtleError::DataFusion(ref desc) => write!(f, "DataFusion error: {:?}", desc),
             SquirtleError::NotImplemented(ref desc) => {
                 write!(f, "This feature is not implemented: {}", desc)
             }

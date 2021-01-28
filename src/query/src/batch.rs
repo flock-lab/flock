@@ -28,6 +28,7 @@ use std::any::Any;
 use std::sync::Arc;
 
 /// SQL queries in your application code execute over in-application batches.
+#[derive(Debug)]
 pub struct BatchQuery {
     /// ANSI 2008 SQL standard with extensions.
     /// SQL is a domain-specific language used in programming and designed for
