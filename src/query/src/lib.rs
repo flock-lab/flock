@@ -28,16 +28,24 @@
 
 use arrow::datatypes::SchemaRef;
 use datafusion::physical_plan::ExecutionPlan;
+use runtime::datasource::DataSource;
+use std::any::Any;
+use std::fmt::Debug;
 use std::sync::Arc;
 
 /// A `Query` trait to decouple CLI and back-end cloud function generation.
-pub trait Query {
+pub trait Query: Debug + Send + Sync {
+    /// Returns the query as [`Any`](std::any::Any) so that it can be
+    /// downcast to a specific implementation.
+    fn as_any(&self) -> &dyn Any;
     /// Returns a SQL query.
     fn sql(&self) -> &String;
     /// Returns the data schema for a given query.
     fn schema(&self) -> &Option<SchemaRef>;
     /// Returns the entire physical plan for a given query.
     fn plan(&self) -> Arc<dyn ExecutionPlan>;
+    /// Returns the data source for a given query.
+    fn datasource(&self) -> &DataSource;
 }
 
 pub mod batch;

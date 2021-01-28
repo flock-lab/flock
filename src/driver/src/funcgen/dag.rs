@@ -120,11 +120,18 @@ impl LambdaDag {
     /// Computes in **O(1)** time.
     ///
     /// Returns the index of the new node.
-    pub fn add_node<S>(&mut self, node: S) -> NodeIndex
-    where
-        S: Into<DagNode>,
-    {
-        self.dag.add_node(node.into())
+    pub fn add_node(&mut self, node: DagNode) -> NodeIndex {
+        self.dag.add_node(node)
+    }
+
+    /// Add a root node to the `LambdaDag`.
+    ///
+    /// Computes in **O(1)** time.
+    ///
+    /// Returns the index of the new root.
+    pub fn add_parent(&mut self, child: NodeIndex, node: DagNode) -> NodeIndex {
+        let (_, n) = self.dag.add_parent(child, (), node);
+        n
     }
 
     /// Return a node for a given id.
@@ -171,6 +178,7 @@ impl LambdaDag {
     fn build_dag(plan: &Arc<dyn ExecutionPlan>) -> Self {
         let mut dag = LambdaDag::new();
         Self::fission(&mut dag, &plan);
+        assert!(dag.node_count() >= 1);
         dag
     }
 

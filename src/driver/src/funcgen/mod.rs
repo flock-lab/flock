@@ -14,31 +14,5 @@
 
 //! Convert the physical plan into lambda functions for cloud execution.
 
-use crate::funcgen::dag::LambdaDag;
-use query::Query;
-
 pub mod dag;
-
-/// A struct `FuncGenerator` to generate cloud function names via `Query` and
-/// `LambdaDag`.
-pub struct FuncGenerator {
-    /// A query information received from the client-side.
-    pub query:  Box<dyn Query>,
-    /// A DAG structure representing the partitioned subplans from a given
-    /// query.
-    pub dag:    LambdaDag,
-    /// Query continuous data stream or offline batches.
-    pub stream: bool,
-}
-
-impl FuncGenerator {
-    /// Creates a new `FuncGenerator` from a given query.
-    pub fn new(query: Box<dyn Query>) -> Self {
-        let plan = query.plan();
-        Self {
-            query,
-            dag: LambdaDag::from(&plan),
-            stream: true,
-        }
-    }
-}
+pub mod function;

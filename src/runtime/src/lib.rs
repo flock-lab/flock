@@ -33,4 +33,5 @@ pub mod error;
 pub mod payload;
 pub mod plan;
 
+pub use datasource::DataSource;
 pub use payload::Payload;
