@@ -138,6 +138,8 @@ mod tests {
     use datafusion::datasource::MemTable;
     use datafusion::execution::context::ExecutionContext;
 
+    use blake2::{Blake2b, Digest};
+
     async fn init_lambda_contex(sql: &str) -> Result<LambdaFunction> {
         let schema = Arc::new(Schema::new(vec![
             Field::new("a", DataType::Utf8, false),
@@ -301,6 +303,20 @@ mod tests {
         assert!(node.plan.contains(r#"execution_plan":"memory_exec"#));
         assert_eq!(1, node.concurrency);
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn lambda_function_name() -> Result<()> {
+        let hash = Blake2b::digest(b"SELECT b FROM t ORDER BY b ASC LIMIT 3");
+        let mut s1 = base64::encode(&hash);
+        s1.truncate(16);
+
+        let s2 = "00";
+        let s3 = chrono::offset::Utc::now();
+
+        let name = format!("{:?}-{:?}-{:?}", s1, s2, s3);
+        println!("{}", name);
         Ok(())
     }
 }

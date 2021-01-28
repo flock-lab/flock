@@ -34,7 +34,10 @@ url = { version = "2.0", optional = true }
 
 [dev-dependencies]
 arrow = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq", features = [ "simd" ] }
-tokio = { version = "0.2", features = [ "macros" ] }
+base64 = "0.13.0"
+
+blake2 = "0.9"
+chrono = "0.4.19"
 
 [lib]
 name = "driver"
