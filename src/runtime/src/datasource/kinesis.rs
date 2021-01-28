@@ -27,7 +27,7 @@ use serde::{Deserialize, Serialize};
 use std::io::BufReader;
 
 /// A struct to manage all Kinesis info in cloud environment.
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Kinesis {
     /// The shard ID of the Kinesis Data Streams shard to get the iterator for.
     pub shard_id:                 String,

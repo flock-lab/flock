@@ -28,6 +28,7 @@
 
 use arrow::datatypes::SchemaRef;
 use datafusion::physical_plan::ExecutionPlan;
+use runtime::datasource::DataSource;
 use std::any::Any;
 use std::sync::Arc;
 
@@ -42,6 +43,8 @@ pub trait Query {
     fn schema(&self) -> &Option<SchemaRef>;
     /// Returns the entire physical plan for a given query.
     fn plan(&self) -> Arc<dyn ExecutionPlan>;
+    /// Returns the data source for a given query.
+    fn datasource(&self) -> &DataSource;
 }
 
 pub mod batch;

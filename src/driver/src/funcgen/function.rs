@@ -23,7 +23,13 @@ use crate::funcgen::dag::{DagNode, LambdaDag, CONCURRENCY_1};
 use query::{Query, StreamQuery};
 use runtime::context::LambdaContext;
 use runtime::error::Result;
+use runtime::DataSource;
 use std::collections::{HashMap, VecDeque};
+
+/// Lambda function invocation payload (request and response)
+/// - 6 MB (synchronous)
+/// - 256 KB (asynchronous)
+const PAYLOAD_SIZE: usize = 256;
 
 /// A struct `LambdaFunction` to generate cloud function names via `Query` and
 /// `LambdaDag`.
@@ -81,9 +87,10 @@ impl LambdaFunction {
     }
 
     /// Creates the environmental execution context for all lambda functions.
-    fn build_context<T>(_query: &T, dag: &mut LambdaDag) -> HashMap<NodeIndex, LambdaContext> {
-        let dag = dag.context();
-
+    fn build_context(
+        query: &Box<dyn Query>,
+        dag: &mut LambdaDag,
+    ) -> HashMap<NodeIndex, LambdaContext> {
         let mut ctx = HashMap::new();
         let mut queue = VecDeque::new();
 
@@ -91,8 +98,9 @@ impl LambdaFunction {
         ctx.insert(
             root,
             LambdaContext {
-                plan: dag.node_weight(root).unwrap().plan.clone(),
-                next: None,
+                plan:       dag.get_node(root).unwrap().plan.clone(),
+                next:       None,
+                datasource: (*query.datasource()).clone(),
             },
         );
 
@@ -102,8 +110,9 @@ impl LambdaFunction {
                 ctx.insert(
                     node,
                     LambdaContext {
-                        plan: dag.node_weight(node).unwrap().plan.clone(),
-                        next: None,
+                        plan:       dag.node_weight(node).unwrap().plan.clone(),
+                        next:       None,
+                        datasource: DataSource::Payload(PAYLOAD_SIZE),
                     },
                 );
                 queue.push_back(node);

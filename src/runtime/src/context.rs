@@ -15,6 +15,7 @@
 //! When the lambda function is called for the first time, it deserializes the
 //! corresponding execution context from the cloud environment variable.
 
+use super::datasource::DataSource;
 use serde::{Deserialize, Serialize};
 
 type PhysicalPlan = String;
@@ -24,10 +25,12 @@ type LambdaFunctionName = String;
 #[derive(Debug, Deserialize, Serialize)]
 pub struct LambdaContext {
     /// JSON formatted string for a specific physical plan.
-    pub plan: PhysicalPlan,
+    pub plan:       PhysicalPlan,
     /// Lambda function name(s) for next invocation(s).
     /// - if it's `None`, then the current function is a sink operation.
     /// - if vec.len() = 1, then the next function's concurrency > 1.
     /// - if vec.len() > 1, then the next function's concurrency = 1.
-    pub next: Option<Vec<LambdaFunctionName>>,
+    pub next:       Option<Vec<LambdaFunctionName>>,
+    /// Data source where data that is being used originates from.
+    pub datasource: DataSource,
 }

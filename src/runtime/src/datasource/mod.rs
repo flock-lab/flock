@@ -18,7 +18,7 @@ use kinesis::Kinesis;
 use serde::{Deserialize, Serialize};
 
 /// A Data Source for either streaming processing or batch processing.
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum DataSource {
     /// Amazon Kinesis Data Streams (KDS) is a massively scalable and durable
     /// real-time data streaming service.
@@ -45,6 +45,11 @@ pub enum DataSource {
     /// Amazon DynamoDB, Amazon SNS, and many other Amazon Web Services without
     /// writing device-specific code.
     IoTButtonEvent,
+    /// Lambda function invocation payload (request and response)
+    /// - 6 MB (synchronous)
+    /// - 256 KB (asynchronous)
+    /// https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html
+    Payload(usize),
     /// Unknown data source.
     UnknownEvent,
 }

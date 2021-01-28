@@ -61,4 +61,9 @@ impl Query for BatchQuery {
     fn plan(&self) -> Arc<dyn ExecutionPlan> {
         unimplemented!();
     }
+
+    /// Returns the data source for a given query.
+    fn datasource(&self) -> &DataSource {
+        &self.datasource
+    }
 }
