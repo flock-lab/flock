@@ -26,10 +26,8 @@ use runtime::error::Result;
 use runtime::DataSource;
 use std::collections::{HashMap, VecDeque};
 
-/// Lambda function invocation payload (request and response)
-/// - 6 MB (synchronous)
-/// - 256 KB (asynchronous)
-const PAYLOAD_SIZE: usize = 256;
+use blake2::{Blake2b, Digest};
+use chrono::{DateTime, Utc};
 
 /// A struct `LambdaFunction` to generate cloud function names via `Query` and
 /// `LambdaDag`.
@@ -74,6 +72,7 @@ impl LambdaFunction {
     }
 
     /// Adds a data source node into `LambdaDag`.
+    #[inline]
     fn add_source<S>(plan: S, dag: &mut LambdaDag)
     where
         S: Into<String>,
@@ -88,23 +87,38 @@ impl LambdaFunction {
         );
     }
 
+    #[inline]
+    fn lambda_name(query_code: &String, node: &NodeIndex, timestamp: &DateTime<Utc>) -> String {
+        let plan_index = format!("{:0>2}", node.index());
+        format!("{}-{}-{:?}", query_code, plan_index, timestamp)
+    }
+
     /// Creates the environmental execution context for all lambda functions.
     fn build_context(
         query: &Box<dyn Query>,
         dag: &mut LambdaDag,
     ) -> HashMap<NodeIndex, LambdaContext> {
-        let mut ctx = HashMap::new();
-        let mut queue = VecDeque::new();
+        let mut query_code = base64::encode(&Blake2b::digest(query.sql().as_bytes()));
+        query_code.truncate(16);
+        let timestamp = chrono::offset::Utc::now();
 
+        let mut ctx = HashMap::new();
         let root = NodeIndex::new(0);
         ctx.insert(
             root,
             LambdaContext {
                 plan:       dag.get_node(root).unwrap().plan.clone(),
-                next:       None,
-                datasource: (*query.datasource()).clone(),
+                name:       Self::lambda_name(&query_code, &root, &timestamp),
+                next:       vec![],
+                datasource: DataSource::Payload,
             },
         );
+
+        let ncount = dag.node_count();
+        assert!((1..=99).contains(&ncount));
+
+        // Breadth-first search
+        let mut queue = VecDeque::new();
 
         queue.push_back(root);
         while let Some(parent) = queue.pop_front() {
@@ -113,8 +127,15 @@ impl LambdaFunction {
                     node,
                     LambdaContext {
                         plan:       dag.get_node(node).unwrap().plan.clone(),
-                        next:       None,
-                        datasource: DataSource::Payload(PAYLOAD_SIZE),
+                        name:       Self::lambda_name(&query_code, &node, &timestamp),
+                        next:       vec![ctx.get(&parent).unwrap().name.clone()],
+                        datasource: {
+                            if node.index() == ncount - 1 {
+                                (*query.datasource()).clone()
+                            } else {
+                                DataSource::Payload
+                            }
+                        },
                     },
                 );
                 queue.push_back(node);
@@ -189,46 +210,40 @@ mod tests {
         })
     }
 
+    fn datasource(func: &LambdaFunction, idx: usize) -> String {
+        format!(
+            "{:?}",
+            func.ctx.get(&NodeIndex::new(idx)).unwrap().datasource
+        )
+    }
+
+    fn lambda_name(func: &LambdaFunction, idx: usize) -> String {
+        func.ctx.get(&NodeIndex::new(idx)).unwrap().name.clone()
+    }
+
     #[tokio::test]
     async fn lambda_context_with_select() -> Result<()> {
         let sql = concat!("SELECT b FROM t ORDER BY b ASC LIMIT 3");
-        let mut lambda_functions = init_lambda_contex(&sql).await?;
-        assert_eq!(
-            "UnknownEvent",
-            format!(
-                "{:?}",
-                lambda_functions
-                    .ctx
-                    .get(&NodeIndex::new(0))
-                    .unwrap()
-                    .datasource
-            )
-        );
-        assert_eq!(
-            "Payload(256)",
-            format!(
-                "{:?}",
-                lambda_functions
-                    .ctx
-                    .get(&NodeIndex::new(1))
-                    .unwrap()
-                    .datasource
-            )
-        );
 
-        let dag = &mut lambda_functions.dag;
+        let mut functions = init_lambda_contex(&sql).await?;
+        assert_eq!("Payload", datasource(&functions, 0));
+        assert_eq!("UnknownEvent", datasource(&functions, 1));
+        assert!(lambda_name(&functions, 0).contains("00"));
+        assert!(lambda_name(&functions, 1).contains("01"));
+
+        let dag = &mut functions.dag;
         assert_eq!(2, dag.node_count());
         assert_eq!(1, dag.edge_count());
 
         let mut iter = dag.node_weights_mut();
         let mut node = iter.next().unwrap();
-        assert!(node.plan.contains(r#"execution_plan":"projection_exec"#));
-        assert!(node.plan.contains(r#"execution_plan":"memory_exec"#));
+        assert!(node.plan.contains(r#"projection_exec"#));
+        assert!(node.plan.contains(r#"memory_exec"#));
         assert_eq!(8, node.concurrency);
 
         node = iter.next().unwrap();
-        assert!(node.plan.contains(r#"execution_plan":"projection_exec"#));
-        assert!(node.plan.contains(r#"execution_plan":"memory_exec"#));
+        assert!(node.plan.contains(r#"projection_exec"#));
+        assert!(node.plan.contains(r#"memory_exec"#));
         assert_eq!(1, node.concurrency);
 
         Ok(())
@@ -237,70 +252,36 @@ mod tests {
     #[tokio::test]
     async fn lambda_context_with_agg() -> Result<()> {
         let sql = concat!("SELECT MIN(a), AVG(b) ", "FROM t ", "GROUP BY b");
-        let mut lambda_functions = init_lambda_contex(&sql).await?;
-        assert_eq!(
-            "UnknownEvent",
-            format!(
-                "{:?}",
-                lambda_functions
-                    .ctx
-                    .get(&NodeIndex::new(0))
-                    .unwrap()
-                    .datasource
-            )
-        );
-        assert_eq!(
-            "Payload(256)",
-            format!(
-                "{:?}",
-                lambda_functions
-                    .ctx
-                    .get(&NodeIndex::new(1))
-                    .unwrap()
-                    .datasource
-            )
-        );
-        assert_eq!(
-            "Payload(256)",
-            format!(
-                "{:?}",
-                lambda_functions
-                    .ctx
-                    .get(&NodeIndex::new(2))
-                    .unwrap()
-                    .datasource
-            )
-        );
 
-        let dag = &mut lambda_functions.dag;
+        let mut functions = init_lambda_contex(&sql).await?;
+        assert_eq!("Payload", datasource(&functions, 0));
+        assert_eq!("Payload", datasource(&functions, 1));
+        assert_eq!("UnknownEvent", datasource(&functions, 2));
+        assert!(lambda_name(&functions, 0).contains("00"));
+        assert!(lambda_name(&functions, 1).contains("01"));
+        assert!(lambda_name(&functions, 2).contains("02"));
+
+        let dag = &mut functions.dag;
         assert_eq!(3, dag.node_count());
         assert_eq!(2, dag.edge_count());
 
         let mut iter = dag.node_weights_mut();
         let mut node = iter.next().unwrap();
-        assert!(node.plan.contains(r#"execution_plan":"projection_exec"#));
-        assert!(node
-            .plan
-            .contains(r#"execution_plan":"hash_aggregate_exec"#));
-        assert!(node.plan.contains(r#"execution_plan":"memory_exec"#));
+        assert!(node.plan.contains(r#"projection_exec"#));
+        assert!(node.plan.contains(r#"hash_aggregate_exec"#));
+        assert!(node.plan.contains(r#"memory_exec"#));
         assert_eq!(1, node.concurrency);
 
         node = iter.next().unwrap();
-        assert!(node
-            .plan
-            .contains(r#"execution_plan":"hash_aggregate_exec"#));
-        assert!(node.plan.contains(r#"execution_plan":"memory_exec"#));
+        assert!(node.plan.contains(r#"hash_aggregate_exec"#));
+        assert!(node.plan.contains(r#"memory_exec"#));
         assert_eq!(8, node.concurrency);
 
         node = iter.next().unwrap();
-        assert!(node.plan.contains(r#"execution_plan":"projection_exec"#));
-        assert!(node
-            .plan
-            .contains(r#"execution_plan":"hash_aggregate_exec"#));
-        assert!(node
-            .plan
-            .contains(r#"execution_plan":"hash_aggregate_exec"#));
-        assert!(node.plan.contains(r#"execution_plan":"memory_exec"#));
+        assert!(node.plan.contains(r#"projection_exec"#));
+        assert!(node.plan.contains(r#"hash_aggregate_exec"#));
+        assert!(node.plan.contains(r#"hash_aggregate_exec"#));
+        assert!(node.plan.contains(r#"memory_exec"#));
         assert_eq!(1, node.concurrency);
 
         Ok(())
@@ -308,15 +289,25 @@ mod tests {
 
     #[tokio::test]
     async fn lambda_function_name() -> Result<()> {
+        // query code
         let hash = Blake2b::digest(b"SELECT b FROM t ORDER BY b ASC LIMIT 3");
         let mut s1 = base64::encode(&hash);
         s1.truncate(16);
 
-        let s2 = "00";
+        // plan index
+        let s2 = format!("{:0>2}", 0);
+        //                  |||
+        //                  ||+-- width
+        //                  |+--- align
+        //                  +---- fill
+        assert_eq!("00", s2);
+
+        // timestamp
         let s3 = chrono::offset::Utc::now();
 
-        let name = format!("{:?}-{:?}-{:?}", s1, s2, s3);
+        let name = format!("{}-{}-{:?}", s1, s2, s3);
         println!("{}", name);
+
         Ok(())
     }
 }
