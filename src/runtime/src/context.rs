@@ -79,9 +79,6 @@ pub struct LambdaContext {
     /// SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836Z
     pub name:       String,
     /// Lambda function name(s) for next invocation(s).
-    /// - if Vec size = 0, then the current function is a sink operation.
-    /// - if Vec size = 1, then the next function's concurrency > 1.
-    /// - if Vec size > 1, then the next function's concurrency = 1.
     pub next:       LambdaCall,
     /// Data source where data that is being used originates from.
     pub datasource: DataSource,
