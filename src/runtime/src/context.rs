@@ -28,7 +28,8 @@ pub struct LambdaContext {
     pub plan:       PhysicalPlan,
     /// Current lambda function name.
     ///
-    ///               Lambda Naming Convention
+    ///   +---------------------------------------------+
+    ///   |           Lambda Naming Convention          |
     ///   +--------------+----------------+-------------+
     ///   |  query code  -   plan index   -  timestamp  |
     ///   +--------------+----------------+-------------+
