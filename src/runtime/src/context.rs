@@ -20,6 +20,34 @@ use serde::{Deserialize, Serialize};
 
 type PhysicalPlan = String;
 type LambdaFunctionName = String;
+type GroupSize = u8;
+
+/// Next lambda function call.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub enum LambdaCall {
+    /// Next lambda function name with concurrency > 1.
+    ///
+    /// If the next call type is `Solo`, then the name it contains is the lambda
+    /// function.
+    Solo(LambdaFunctionName),
+    /// Next lambda function name with concurrency = 1. To cope with the speed
+    /// and volume of data processed, the system creates a lambda group that
+    /// contains multiple lambda function name to a single function code. When
+    /// traffic increases dramatically, each query can call a function with
+    /// the same code/binary but with different names to avoid delays.
+    ///
+    /// If the next call type is `Chorus`, then the current lambda will pick one
+    /// of function names from the group as the next call according to a certain
+    /// filtering strategy.
+    ///
+    /// The naming rule is:
+    /// If the system picks `i` from the collection [0..`GroupSize`], then the
+    /// next call is `LambdaFunctionName`-`i`.
+    Chorus((LambdaFunctionName, GroupSize)),
+    /// There is no subsequent call to the lambda function at the end.
+    /// TODO: This function must include data sink operation.
+    None,
+}
 
 /// Execution environment context for lambda functions.
 #[derive(Debug, Deserialize, Serialize)]
@@ -51,10 +79,7 @@ pub struct LambdaContext {
     /// SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836Z
     pub name:       String,
     /// Lambda function name(s) for next invocation(s).
-    /// - if Vec size = 0, then the current function is a sink operation.
-    /// - if Vec size = 1, then the next function's concurrency > 1.
-    /// - if Vec size > 1, then the next function's concurrency = 1.
-    pub next:       Vec<LambdaFunctionName>,
+    pub next:       LambdaCall,
     /// Data source where data that is being used originates from.
     pub datasource: DataSource,
 }
