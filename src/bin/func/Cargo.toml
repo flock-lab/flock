@@ -23,7 +23,3 @@ tokio = { version = "0.2", features = [ "macros" ] }
 [[bin]]
 name = "scq_ops"
 path = "src/ops.rs"
-
-[[bin]]
-name = "scq_source"
-path = "src/source.rs"

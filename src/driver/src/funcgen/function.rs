@@ -22,6 +22,7 @@ use daggy::{NodeIndex, Walker};
 use crate::funcgen::dag::{DagNode, LambdaDag, CONCURRENCY_1, CONCURRENCY_8};
 use query::{Query, StreamQuery};
 use runtime::context::{LambdaCall, LambdaContext};
+use runtime::encoding::Encoding;
 use runtime::error::Result;
 use runtime::DataSource;
 use std::collections::{HashMap, VecDeque};
@@ -113,6 +114,7 @@ impl LambdaFunction {
                 name:       Self::lambda_name(&query_code, &root, &timestamp),
                 next:       LambdaCall::None,
                 datasource: DataSource::Payload,
+                encoding:   Encoding::Snappy,
             },
         );
 
@@ -145,6 +147,7 @@ impl LambdaFunction {
                                 DataSource::Payload
                             }
                         },
+                        encoding:   Encoding::Snappy,
                     },
                 );
                 queue.push_back(node);
