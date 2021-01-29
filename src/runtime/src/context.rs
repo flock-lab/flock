@@ -16,11 +16,30 @@
 //! corresponding execution context from the cloud environment variable.
 
 use super::datasource::DataSource;
+use super::encoding::Encoding;
 use serde::{Deserialize, Serialize};
 
 type PhysicalPlan = String;
 type LambdaFunctionName = String;
 type GroupSize = u8;
+
+/// Query Execution Context decides to execute your queries either remotely or
+/// locally.
+#[derive(Debug, Deserialize, Serialize)]
+pub enum ExecutionContext {
+    /// The query is executed on local environment.
+    Local,
+    /// The query is executed on AWS Lambda Functions.
+    Lambda(Box<LambdaContext>),
+    /// The query is executed on Microsoft Azure Functions.
+    Azure,
+    /// The query is executed on Google Cloud Function.
+    GoolgeCloud,
+    /// The query is executed on Aliyun Cloud Functions.
+    AliCloud,
+    /// Unknown execution context.
+    Unknown,
+}
 
 /// Next lambda function call.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -82,4 +101,7 @@ pub struct LambdaContext {
     pub next:       LambdaCall,
     /// Data source where data that is being used originates from.
     pub datasource: DataSource,
+    /// Enable encoding schema to compress `LambdaContext` due to the total size
+    /// of all environment variables doesn't exceed 4 KB.
+    pub encoding:   Encoding,
 }

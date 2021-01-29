@@ -29,6 +29,7 @@
 
 pub mod context;
 pub mod datasource;
+pub mod encoding;
 pub mod error;
 pub mod payload;
 pub mod plan;

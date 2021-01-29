@@ -17,7 +17,12 @@ rayon = "1.5"
 serde = { version = "1.0", features = [ "derive" ] }
 serde_bytes = "0.11"
 serde_json = "1.0"
+snap = "1.0.3"
+
 sqlparser = "0.6.1"
+
+[dev-dependencies]
+tokio = { version = "0.2", features = [ "macros" ] }
 
 [lib]
 name = "runtime"
