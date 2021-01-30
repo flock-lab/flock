@@ -18,7 +18,7 @@ use kinesis::Kinesis;
 use serde::{Deserialize, Serialize};
 
 /// A Data Source for either streaming processing or batch processing.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub enum DataSource {
     /// Amazon Kinesis Data Streams (KDS) is a massively scalable and durable
     /// real-time data streaming service.

@@ -29,8 +29,6 @@ pub type Result<T> = result::Result<T, SquirtleError>;
 
 /// Squirtle error
 #[derive(Debug)]
-#[allow(missing_docs)]
-#[allow(dead_code)]
 pub enum SquirtleError {
     /// Error associated to I/O operations and associated traits.
     IoError(io::Error),

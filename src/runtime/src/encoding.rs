@@ -18,7 +18,7 @@
 use serde::{Deserialize, Serialize};
 
 /// A compressor/decompressor type.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub enum Encoding {
     /// Snappy is a LZ77-type compressor with a fixed, byte-oriented encoding.
     /// It does not aim for maximum compression, or compatibility with any other
@@ -42,12 +42,11 @@ pub enum Encoding {
 
 impl Encoding {
     /// Compress data
-    pub fn encoder(&self, s: &str) -> String {
+    pub fn encoder(&self, s: &[u8]) -> Vec<u8> {
         match *self {
             Encoding::Snappy => {
                 let mut encoder = snap::raw::Encoder::new();
-                let en = encoder.compress_vec(s.as_bytes()).unwrap();
-                unsafe { std::str::from_utf8_unchecked(&en).to_string() }
+                encoder.compress_vec(&s).unwrap()
             }
             _ => {
                 unimplemented!();
@@ -56,12 +55,11 @@ impl Encoding {
     }
 
     /// Decompress data
-    pub fn decoder(&self, s: &str) -> String {
+    pub fn decoder(&self, s: &[u8]) -> Vec<u8> {
         match *self {
             Encoding::Snappy => {
                 let mut decoder = snap::raw::Decoder::new();
-                let de = decoder.decompress_vec(s.as_bytes()).unwrap();
-                unsafe { std::str::from_utf8_unchecked(&de).to_string() }
+                decoder.decompress_vec(&s).unwrap()
             }
             _ => {
                 unimplemented!();
@@ -135,12 +133,13 @@ mod tests {
         let json = serde_json::to_string(&plan).unwrap();
         assert_eq!(1773, json.len());
 
-        let en_json = en.encoder(&json);
+        let en_json = en.encoder(&json.as_bytes());
         assert_eq!(528, en_json.len());
 
         let de_json = en.decoder(&en_json);
         assert_eq!(1773, de_json.len());
-        assert_eq!(json, de_json);
+
+        assert_eq!(json, unsafe { std::str::from_utf8_unchecked(&de_json) });
 
         Ok(())
     }
