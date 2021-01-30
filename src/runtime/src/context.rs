@@ -23,26 +23,21 @@ type PhysicalPlan = String;
 type LambdaFunctionName = String;
 type GroupSize = u8;
 
-/// Query Execution Context decides to execute your queries either remotely or
-/// locally.
-#[derive(Debug, Deserialize, Serialize)]
-pub enum ExecutionContext {
-    /// The query is executed on local environment.
-    Local,
-    /// The query is executed on AWS Lambda Functions.
-    Lambda(Box<LambdaContext>),
-    /// The query is executed on Microsoft Azure Functions.
-    Azure,
-    /// The query is executed on Google Cloud Function.
-    GoolgeCloud,
-    /// The query is executed on Aliyun Cloud Functions.
-    AliCloud,
-    /// Unknown execution context.
-    Unknown,
+/// Lambda environment context is a wrapper to support compression and
+/// serialization.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+pub struct LambdaEnvironment {
+    /// Lambda execution context.
+    /// `context` is the serialized version of `LambdaContext`.
+    #[serde(with = "serde_bytes")]
+    pub context:  Vec<u8>,
+    /// Compress `LambdaContext` to guarantee the total size
+    /// of all environment variables doesn't exceed 4 KB.
+    pub encoding: Encoding,
 }
 
 /// Next lambda function call.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub enum LambdaCall {
     /// Next lambda function name with concurrency > 1.
     ///
@@ -68,8 +63,8 @@ pub enum LambdaCall {
     None,
 }
 
-/// Execution environment context for lambda functions.
-#[derive(Debug, Deserialize, Serialize)]
+/// Lambda execution context.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct LambdaContext {
     /// JSON formatted string for a specific physical plan.
     pub plan:       PhysicalPlan,
@@ -101,7 +96,86 @@ pub struct LambdaContext {
     pub next:       LambdaCall,
     /// Data source where data that is being used originates from.
     pub datasource: DataSource,
-    /// Enable encoding schema to compress `LambdaContext` due to the total size
-    /// of all environment variables doesn't exceed 4 KB.
-    pub encoding:   Encoding,
+}
+
+impl LambdaContext {
+    /// Serialize LambdaContext from client-side.
+    pub fn marshal(&self, encoding: Encoding) -> String {
+        match encoding {
+            Encoding::Snappy => {
+                let encoded: Vec<u8> = bincode::serialize(&self).unwrap();
+                serde_json::to_string(&LambdaEnvironment {
+                    context: encoding.encoder(&encoded),
+                    encoding,
+                })
+                .unwrap()
+            }
+            Encoding::None => serde_json::to_string(&LambdaEnvironment {
+                context: bincode::serialize(&self).unwrap(),
+                encoding,
+            })
+            .unwrap(),
+            _ => unimplemented!(),
+        }
+    }
+
+    /// Deserialize LambdaContext from cloud-side.
+    pub fn unmarshal(s: &str) -> LambdaContext {
+        let env: LambdaEnvironment = serde_json::from_str(&s).unwrap();
+
+        match env.encoding {
+            Encoding::Snappy => {
+                let encoded = env.encoding.decoder(&env.context);
+                bincode::deserialize(&encoded[..]).unwrap()
+            }
+            Encoding::None => bincode::deserialize(&env.context[..]).unwrap(),
+            _ => unimplemented!(),
+        }
+    }
+}
+
+/// Query Execution Context decides to execute your queries either remotely or
+/// locally.
+#[derive(Debug, Deserialize, Serialize)]
+pub enum ExecutionPlatform {
+    /// The query is executed on local environment.
+    Local,
+    /// The query is executed on AWS Lambda Functions.
+    Lambda,
+    /// The query is executed on Microsoft Azure Functions.
+    Azure,
+    /// The query is executed on Google Cloud Functions.
+    GCP,
+    /// The query is executed on Aliyun Cloud Functions.
+    AliCloud,
+    /// Unknown execution context.
+    Unknown,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::error::Result;
+
+    #[tokio::test]
+    async fn lambda_context_marshal() -> Result<()> {
+        let plan = r#"{"execution_plan":"coalesce_batches_exec","input":{"execution_plan":"memory_exec","schema":{"fields":[{"name":"c1","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c2","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c3","data_type":"Utf8","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"projection":null},"target_batch_size":16384}"#.to_owned();
+        let name = "hello".to_owned();
+        let next =
+            LambdaCall::Solo("SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836Z".to_owned());
+        let datasource = DataSource::Payload;
+
+        let lambda_context = LambdaContext {
+            plan,
+            name,
+            next,
+            datasource,
+        };
+
+        let json = lambda_context.marshal(Encoding::Snappy);
+        let de_json = LambdaContext::unmarshal(&json);
+        assert_eq!(lambda_context, de_json);
+
+        Ok(())
+    }
 }
