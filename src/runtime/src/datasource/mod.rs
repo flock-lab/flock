@@ -48,7 +48,7 @@ pub enum DataSource {
     /// Lambda function invocation payload (request and response)
     /// - 6 MB (synchronous)
     /// - 256 KB (asynchronous)
-    /// https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html
+    /// <https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html>
     Payload,
     /// Unknown data source.
     UnknownEvent,

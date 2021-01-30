@@ -23,10 +23,10 @@
 //!   time (for example, a one-minute window).
 //!
 //! Schedule expressions using rate or cron:
-//! https://docs.aws.amazon.com/lambda/latest/dg/services-cloudwatchevents-expressions.html
+//! <https://docs.aws.amazon.com/lambda/latest/dg/services-cloudwatchevents-expressions.html>
 //!
 //! Reference:
-//! https://docs.microsoft.com/en-us/stream-analytics-query/windowing-azure-stream-analytics
+//! <https://docs.microsoft.com/en-us/stream-analytics-query/windowing-azure-stream-analytics>
 
 use super::Query;
 use arrow::datatypes::SchemaRef;

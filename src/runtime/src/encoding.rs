@@ -24,17 +24,17 @@ pub enum Encoding {
     /// It does not aim for maximum compression, or compatibility with any other
     /// compression library; instead, it aims for very high speeds and
     /// reasonable compression.
-    /// https://github.com/burntsushi/rust-snappy
+    /// <https://github.com/burntsushi/rust-snappy>
     Snappy,
     /// LZ4 is a very fast lossless compression algorithm, providing compression
     /// speed at 400 MB/s per core, with near-linear scalability for
     /// multi-threaded applications. It also features an extremely fast decoder,
     /// with speed in multiple GB/s per core, typically reaching RAM speed
     /// limits on multi-core systems.
-    /// https://github.com/bozaro/lz4-rs
+    /// <https://github.com/bozaro/lz4-rs>
     Lz4,
     /// A streaming compression/decompression library DEFLATE-based streams.
-    /// https://github.com/rust-lang/flate2-rs
+    /// <https://github.com/rust-lang/flate2-rs>
     Zlib,
     /// No compression/decompression applied to the context.
     None,
