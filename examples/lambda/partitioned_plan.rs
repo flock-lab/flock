@@ -42,7 +42,7 @@ mod tests {
     use datafusion::physical_plan::projection::ProjectionExec;
     use datafusion::physical_plan::ExecutionPlan;
 
-    use driver::funcgen::dag::{DagNode, LambdaDag};
+    use driver::funcgen::dag::{DagNode, QueryDag};
     use runtime::datasource::kinesis;
     use std::sync::Arc;
 
@@ -146,7 +146,7 @@ mod tests {
         );
 
         // Construct a DAG for the physical plan partition
-        let mut lambda_dag = LambdaDag::new();
+        let mut lambda_dag = QueryDag::new();
 
         let node = DagNode::from(format!("{}", serde_json::to_value(&hash_agg_2).unwrap()));
         let p = lambda_dag.add_node(node);
@@ -195,7 +195,7 @@ mod tests {
 
         let plan: Arc<dyn ExecutionPlan> = serde_json::from_str(&plan).unwrap();
 
-        let dag = &mut LambdaDag::from(&plan);
+        let dag = &mut QueryDag::from(&plan);
         assert_eq!(2, dag.node_count());
         assert_eq!(1, dag.edge_count());
 
@@ -415,7 +415,7 @@ mod tests {
         assert!(subplan.contains(r#"execution_plan":"memory_exec"#));
     }
 
-    fn quick_init(sql: &str) -> LambdaDag {
+    fn quick_init(sql: &str) -> QueryDag {
         let schema = Arc::new(Schema::new(vec![
             Field::new("c1", DataType::Int64, false),
             Field::new("c2", DataType::Float64, false),
@@ -461,7 +461,7 @@ mod tests {
         let logical_plan = ctx.create_logical_plan(sql).unwrap();
         let optimized_plan = ctx.optimize(&logical_plan).unwrap();
         let physical_plan = ctx.create_physical_plan(&optimized_plan).unwrap();
-        LambdaDag::from(&physical_plan)
+        QueryDag::from(&physical_plan)
     }
 
     #[tokio::test]
@@ -546,7 +546,7 @@ mod tests {
         assert!(json.contains(r#"left":{"execution_plan":"memory_exec"#));
         assert!(json.contains(r#"right":{"execution_plan":"memory_exec"#));
 
-        let dag = &mut LambdaDag::from(&plan);
+        let dag = &mut QueryDag::from(&plan);
 
         assert_eq!(2, dag.node_count());
         assert_eq!(1, dag.edge_count());

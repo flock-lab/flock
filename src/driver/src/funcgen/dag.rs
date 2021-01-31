@@ -27,14 +27,14 @@ use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 /// Concurrency is the number of requests that your function is serving at any
-/// given time. When your function is invoked, Lambda allocates an instance of
-/// it to process the event. When the function code finishes running, it can
-/// handle another request. If the function is invoked again while a request is
-/// still being processed, another instance is allocated, which increases the
-/// function's concurrency.
-/// Lambda function with concurrency = 1
+/// given time. When your function is invoked, cloud function services allocates
+/// an instance of it to process the event. When the function code finishes
+/// running, it can handle another request. If the function is invoked again
+/// while a request is still being processed, another instance is allocated,
+/// which increases the function's concurrency.
+/// cloud function with concurrency = 1
 pub const CONCURRENCY_1: u8 = 1;
-/// Lambda function with concurrency = 8
+/// cloud function with concurrency = 8
 pub const CONCURRENCY_8: u8 = 8;
 
 type DagEdge = ();
@@ -45,7 +45,7 @@ type DagPlan = Dag<DagNode, DagEdge>;
 pub struct DagNode {
     /// Subplan string.
     pub plan:        String,
-    /// Lambda concurrency in cloud environment.
+    /// Function concurrency in cloud environment.
     pub concurrency: u8,
 }
 
@@ -71,11 +71,11 @@ impl Deref for DagNode {
 /// topological order.  It is also possible to query subplan or dependencies
 /// for a given subplan.
 #[derive(Debug)]
-pub struct LambdaDag {
+pub struct QueryDag {
     dag: DagPlan,
 }
 
-impl Deref for LambdaDag {
+impl Deref for QueryDag {
     type Target = DagPlan;
 
     fn deref(&self) -> &Self::Target {
@@ -83,16 +83,16 @@ impl Deref for LambdaDag {
     }
 }
 
-impl DerefMut for LambdaDag {
+impl DerefMut for QueryDag {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.dag
     }
 }
 
-impl LambdaDag {
-    /// Creates a new `LambdaDag`.
+impl QueryDag {
+    /// Creates a new `QueryDag`.
     pub fn new() -> Self {
-        LambdaDag {
+        QueryDag {
             dag: DagPlan::new(),
         }
     }
@@ -115,7 +115,7 @@ impl LambdaDag {
             .count()
     }
 
-    /// Adds a new node to the `LambdaDag`.
+    /// Adds a new node to the `QueryDag`.
     ///
     /// Computes in **O(1)** time.
     ///
@@ -124,7 +124,7 @@ impl LambdaDag {
         self.dag.add_node(node)
     }
 
-    /// Adds a root node to the `LambdaDag`.
+    /// Adds a root node to the `QueryDag`.
     ///
     /// Computes in **O(1)** time.
     ///
@@ -176,14 +176,14 @@ impl LambdaDag {
 
     /// Builds a new daggy from a physical plan.
     fn build_dag(plan: &Arc<dyn ExecutionPlan>) -> Self {
-        let mut dag = LambdaDag::new();
+        let mut dag = QueryDag::new();
         Self::fission(&mut dag, &plan);
         assert!(dag.node_count() >= 1);
         dag
     }
 
-    /// Adds a new node to the `LambdaDag`.
-    fn insert_dag(dag: &mut LambdaDag, leaf: NodeIndex, node: Value, concurrency: u8) -> NodeIndex {
+    /// Adds a new node to the `QueryDag`.
+    fn insert_dag(dag: &mut QueryDag, leaf: NodeIndex, node: Value, concurrency: u8) -> NodeIndex {
         if leaf == NodeIndex::end() {
             dag.add_node(DagNode {
                 plan: format!("{}", node),
@@ -201,7 +201,7 @@ impl LambdaDag {
     }
 
     /// Transforms a physical plan for cloud environment execution.
-    fn fission(dag: &mut LambdaDag, plan: &Arc<dyn ExecutionPlan>) {
+    fn fission(dag: &mut QueryDag, plan: &Arc<dyn ExecutionPlan>) {
         let mut root = serde_json::to_value(&plan).unwrap();
         let mut json = &mut root;
         let mut leaf = NodeIndex::end();

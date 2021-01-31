@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! LambdaFunction contains all the context information of the current query
+//! QueryFlow contains all the context information of the current query
 //! plan. It is responsible for deploying lambda functions and execution
 //! context.
 
 extern crate daggy;
 use daggy::{NodeIndex, Walker};
 
-use crate::funcgen::dag::{DagNode, LambdaDag, CONCURRENCY_1, CONCURRENCY_8};
+use crate::funcgen::dag::*;
 use query::{Query, StreamQuery};
-use runtime::context::{LambdaCall, LambdaContext};
+use runtime::context::{CloudFunction, ExecutionContext};
 use runtime::error::Result;
 use runtime::DataSource;
 use std::collections::{HashMap, VecDeque};
@@ -29,37 +29,35 @@ use std::collections::{HashMap, VecDeque};
 use blake2::{Blake2b, Digest};
 use chrono::{DateTime, Utc};
 
-use std::sync::Arc;
-
-/// A struct `LambdaFunction` to generate cloud function names via `Query` and
-/// `LambdaDag`.
+/// A struct `QueryFlow` to generate cloud function names via `Query` and
+/// `QueryDag`.
 #[derive(Debug)]
-pub struct LambdaFunction {
+pub struct QueryFlow {
     /// A query information received from the client-side.
-    pub query:  Arc<dyn Query>,
+    pub query:  Box<dyn Query>,
     /// A DAG structure representing the partitioned subplans from a given
     /// query.
-    pub dag:    LambdaDag,
+    pub dag:    QueryDag,
     /// A Lambda context representing a unique execution environment for the
     /// lambda function. The node in `dag` obtains the corresponding execution
     /// context from `ctx` through NodeIndex.
-    pub ctx:    HashMap<NodeIndex, LambdaContext>,
+    pub ctx:    HashMap<NodeIndex, ExecutionContext>,
     /// Query continuous data stream or offline batches.
     pub stream: bool,
 }
 
-impl LambdaFunction {
-    /// Creates a new `LambdaFunction` from a given query.
-    pub fn from(query: Arc<dyn Query>) -> Self {
+impl QueryFlow {
+    /// Creates a new `QueryFlow` from a given query.
+    pub fn from(query: Box<dyn Query>) -> Self {
         let plan = query.plan();
         let stream = query.as_any().downcast_ref::<StreamQuery>().is_some();
 
-        let mut dag = LambdaDag::from(&plan);
+        let mut dag = QueryDag::from(&plan);
         Self::add_source(
             format!("{}", serde_json::to_value(&plan).unwrap()),
             &mut dag,
         );
-        let ctx = Self::build_context(&query, &mut dag);
+        let ctx = Self::build_context(&*query, &mut dag);
         Self {
             query,
             dag,
@@ -73,9 +71,9 @@ impl LambdaFunction {
         Ok(())
     }
 
-    /// Adds a data source node into `LambdaDag`.
+    /// Adds a data source node into `QueryDag`.
     #[inline]
-    fn add_source<S>(plan: S, dag: &mut LambdaDag)
+    fn add_source<S>(plan: S, dag: &mut QueryDag)
     where
         S: Into<String>,
     {
@@ -90,16 +88,16 @@ impl LambdaFunction {
     }
 
     #[inline]
-    fn lambda_name(query_code: &String, node: &NodeIndex, timestamp: &DateTime<Utc>) -> String {
+    fn function_name(query_code: &String, node: &NodeIndex, timestamp: &DateTime<Utc>) -> String {
         let plan_index = format!("{:0>2}", node.index());
         format!("{}-{}-{:?}", query_code, plan_index, timestamp)
     }
 
     /// Creates the environmental execution context for all lambda functions.
     fn build_context(
-        query: &Arc<dyn Query>,
-        dag: &mut LambdaDag,
-    ) -> HashMap<NodeIndex, LambdaContext> {
+        query: &dyn Query,
+        dag: &mut QueryDag,
+    ) -> HashMap<NodeIndex, ExecutionContext> {
         let mut query_code = base64::encode(&Blake2b::digest(query.sql().as_bytes()));
         query_code.truncate(16);
         let timestamp = chrono::offset::Utc::now();
@@ -108,10 +106,10 @@ impl LambdaFunction {
         let root = NodeIndex::new(0);
         ctx.insert(
             root,
-            LambdaContext {
+            ExecutionContext {
                 plan:       dag.get_node(root).unwrap().plan.clone(),
-                name:       Self::lambda_name(&query_code, &root, &timestamp),
-                next:       LambdaCall::None,
+                name:       Self::function_name(&query_code, &root, &timestamp),
+                next:       CloudFunction::None,
                 datasource: DataSource::Payload,
             },
         );
@@ -127,15 +125,15 @@ impl LambdaFunction {
             for (_, node) in dag.children(parent).iter(&dag) {
                 ctx.insert(
                     node,
-                    LambdaContext {
+                    ExecutionContext {
                         plan:       dag.get_node(node).unwrap().plan.clone(),
-                        name:       Self::lambda_name(&query_code, &node, &timestamp),
+                        name:       Self::function_name(&query_code, &node, &timestamp),
                         next:       {
                             let name = ctx.get(&parent).unwrap().name.clone();
                             if dag.get_node(parent).unwrap().concurrency == 1 {
-                                LambdaCall::Chorus((name, CONCURRENCY_8))
+                                CloudFunction::Chorus((name, CONCURRENCY_8))
                             } else {
-                                LambdaCall::Solo(name)
+                                CloudFunction::Solo(name)
                             }
                         },
                         datasource: {
@@ -170,7 +168,7 @@ mod tests {
 
     use blake2::{Blake2b, Digest};
 
-    async fn init_lambda_contex(sql: &str) -> Result<LambdaFunction> {
+    async fn init_query_flow(sql: &str) -> Result<QueryFlow> {
         let schema = Arc::new(Schema::new(vec![
             Field::new("a", DataType::Utf8, false),
             Field::new("b", DataType::Int32, false),
@@ -196,7 +194,7 @@ mod tests {
         let plan = ctx.create_physical_plan(&plan)?;
 
         let json = serde_json::to_string(&plan).unwrap();
-        let query: Arc<dyn Query> = Arc::new(StreamQuery {
+        let query: Box<dyn Query> = Box::new(StreamQuery {
             ansi_sql:   json,
             schema:     Some(schema),
             window:     StreamWindow::SessionWindow,
@@ -204,14 +202,14 @@ mod tests {
             datasource: DataSource::UnknownEvent,
         });
 
-        let mut dag = LambdaDag::from(&plan);
-        LambdaFunction::add_source(
+        let mut dag = QueryDag::from(&plan);
+        QueryFlow::add_source(
             format!("{}", serde_json::to_value(&plan).unwrap()),
             &mut dag,
         );
-        let ctx = LambdaFunction::build_context(&query, &mut dag);
+        let ctx = QueryFlow::build_context(&*query, &mut dag);
 
-        Ok(LambdaFunction {
+        Ok(QueryFlow {
             query,
             dag,
             ctx,
@@ -219,34 +217,37 @@ mod tests {
         })
     }
 
-    fn datasource(func: &LambdaFunction, idx: usize) -> String {
+    fn datasource(func: &QueryFlow, idx: usize) -> String {
         format!(
             "{:?}",
             func.ctx.get(&NodeIndex::new(idx)).unwrap().datasource
         )
     }
 
-    fn lambda_name(func: &LambdaFunction, idx: usize) -> String {
+    fn function_name(func: &QueryFlow, idx: usize) -> String {
         func.ctx.get(&NodeIndex::new(idx)).unwrap().name.clone()
     }
 
-    fn lambda_next(func: &LambdaFunction, idx: usize) -> LambdaCall {
+    fn next_function(func: &QueryFlow, idx: usize) -> CloudFunction {
         func.ctx.get(&NodeIndex::new(idx)).unwrap().next.clone()
     }
 
     #[tokio::test]
-    async fn lambda_context_with_select() -> Result<()> {
+    async fn execute_context_with_select() -> Result<()> {
         let sql = concat!("SELECT b FROM t ORDER BY b ASC LIMIT 3");
 
-        let mut functions = init_lambda_contex(&sql).await?;
+        let mut functions = init_query_flow(&sql).await?;
         assert_eq!("Payload", datasource(&functions, 0));
         assert_eq!("UnknownEvent", datasource(&functions, 1));
 
-        assert!(lambda_name(&functions, 0).contains("00"));
-        assert!(lambda_name(&functions, 1).contains("01"));
+        assert!(function_name(&functions, 0).contains("00"));
+        assert!(function_name(&functions, 1).contains("01"));
 
-        assert!(matches!(lambda_next(&functions, 0), LambdaCall::None));
-        assert!(matches!(lambda_next(&functions, 1), LambdaCall::Solo(..)));
+        assert!(matches!(next_function(&functions, 0), CloudFunction::None));
+        assert!(matches!(
+            next_function(&functions, 1),
+            CloudFunction::Solo(..)
+        ));
 
         let dag = &mut functions.dag;
         assert_eq!(2, dag.node_count());
@@ -267,21 +268,27 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn lambda_context_with_agg() -> Result<()> {
+    async fn execute_context_with_agg() -> Result<()> {
         let sql = concat!("SELECT MIN(a), AVG(b) ", "FROM t ", "GROUP BY b");
 
-        let mut functions = init_lambda_contex(&sql).await?;
+        let mut functions = init_query_flow(&sql).await?;
         assert_eq!("Payload", datasource(&functions, 0));
         assert_eq!("Payload", datasource(&functions, 1));
         assert_eq!("UnknownEvent", datasource(&functions, 2));
 
-        assert!(lambda_name(&functions, 0).contains("00"));
-        assert!(lambda_name(&functions, 1).contains("01"));
-        assert!(lambda_name(&functions, 2).contains("02"));
+        assert!(function_name(&functions, 0).contains("00"));
+        assert!(function_name(&functions, 1).contains("01"));
+        assert!(function_name(&functions, 2).contains("02"));
 
-        assert!(matches!(lambda_next(&functions, 0), LambdaCall::None));
-        assert!(matches!(lambda_next(&functions, 1), LambdaCall::Chorus(..)));
-        assert!(matches!(lambda_next(&functions, 2), LambdaCall::Solo(..)));
+        assert!(matches!(next_function(&functions, 0), CloudFunction::None));
+        assert!(matches!(
+            next_function(&functions, 1),
+            CloudFunction::Chorus(..)
+        ));
+        assert!(matches!(
+            next_function(&functions, 2),
+            CloudFunction::Solo(..)
+        ));
 
         let dag = &mut functions.dag;
         assert_eq!(3, dag.node_count());
