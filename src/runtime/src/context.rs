@@ -134,24 +134,6 @@ impl ExecutionContext {
     }
 }
 
-/// Query Execution Context decides to execute your queries either remotely or
-/// locally.
-#[derive(Debug, Deserialize, Serialize)]
-pub enum ExecutionEnvironment {
-    /// The query is executed in local environment.
-    Local,
-    /// The query is executed on AWS Lambda Functions.
-    Lambda,
-    /// The query is executed on Microsoft Azure Functions.
-    Azure,
-    /// The query is executed on Google Cloud Functions.
-    GCP,
-    /// The query is executed on Aliyun Cloud Functions.
-    AliCloud,
-    /// Unknown execution context.
-    Unknown,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

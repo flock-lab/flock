@@ -32,3 +32,5 @@ pub mod deploy;
 pub mod funcgen;
 pub mod logwatch;
 pub mod monitor;
+
+pub use funcgen::function::QueryFlow;
