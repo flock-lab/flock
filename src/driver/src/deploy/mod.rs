@@ -20,20 +20,24 @@ use crate::funcgen::function::QueryFlow;
 use lazy_static::lazy_static;
 use runtime::error::{Result, SquirtleError};
 
+/// Your AWS Lambda function's code consists of scripts or compiled programs and
+/// their dependencies. You use a deployment package to deploy your function
+/// code to Lambda. Lambda supports two types of deployment packages: container
+/// images and .zip files. To approach real-time query processing, you **don't
+/// require** to upload the deployment package from your local machine. Squirtle
+/// uploaded the pre-compiled deployment package to Amazon Simple Storage
+/// Service (Amazon S3) in advance.
 struct LambdaDeploymentPackage<'a> {
+    /// S3 bucket for the pre-compiled deployment package.
     pub s3_bucket:         &'a str,
+    /// S3 key for the pre-compiled deployment package.
     pub s3_key:            &'a str,
+    /// S3 object for the pre-compiled deployment package to be compatible with
+    /// the client version.
     pub s3_object_version: &'a str,
 }
 
 lazy_static! {
-    /// Your AWS Lambda function's code consists of scripts or compiled programs and
-    /// their dependencies. You use a deployment package to deploy your function
-    /// code to Lambda. Lambda supports two types of deployment packages: container
-    /// images and .zip files. To approach real-time query processing, you **don't
-    /// require** to upload the deployment package from your local machine. Squirtle
-    /// uploaded the pre-compiled deployment package to Amazon Simple Storage
-    /// Service (Amazon S3) in advance.
     static ref LAMBDA_DEPLOYMENT_PACKAGE: LambdaDeploymentPackage<'static> =
         LambdaDeploymentPackage {
             s3_bucket:         "squirtle",
