@@ -37,7 +37,7 @@ pub struct Payload {
 }
 
 impl Payload {
-    /// Convert incoming payload to record batch in Arrow.
+    /// Converts incoming payload to record batch in Arrow.
     pub fn to_batch(event: Value) -> RecordBatch {
         let input: Payload = serde_json::from_value(event).unwrap();
         flight_data_to_arrow_batch(
@@ -53,7 +53,7 @@ impl Payload {
         .unwrap()
     }
 
-    /// Convert record batch to payload for network transmission.
+    /// Converts record batch to payload for network transmission.
     pub fn from(batch: &RecordBatch, schema: SchemaRef) -> Self {
         let options = arrow::ipc::writer::IpcWriteOptions::default();
         let (_, flight_data) = flight_data_from_arrow_batch(batch, &options);

@@ -64,7 +64,7 @@ pub struct Kinesis {
     pub timestamp:                Option<f64>,
 }
 
-/// Convert Kinesis event to record batch in Arrow.
+/// Converts Kinesis event to record batch in Arrow.
 pub fn to_batch(event: KinesisEvent) -> (RecordBatch, SchemaRef) {
     // infer schema based on the first record
     let record: &[u8] = &event.records[0].kinesis.data.0.clone();

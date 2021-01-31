@@ -37,7 +37,7 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-/// Initialize the lambda function once and only once.
+/// Initializes the lambda function once and only once.
 #[allow(dead_code)]
 static INIT: Once = Once::new();
 

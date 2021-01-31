@@ -43,7 +43,7 @@ pub enum Schedule {
     /// the unit must be singular (for example,rate(1 day)), otherwise plural
     /// (for example, rate(5 days)).
     ///
-    /// Rate expression examples
+    /// # Example
     ///
     /// | Frequency        | Expression      |
     /// |------------------|-----------------|
@@ -61,7 +61,7 @@ pub enum Schedule {
     ///
     /// Cron(`Minutes` `Hours` `Day-of-month` `Month` `Day-of-week` `Year`)
     ///
-    /// Cron expression examples
+    /// # Example
     ///
     /// | Frequency                                            | Expression                   |
     /// |------------------------------------------------------|------------------------------|
@@ -124,7 +124,7 @@ pub struct StreamQuery {
 }
 
 impl Query for StreamQuery {
-    /// Return a reference to Any that can be used for downcasting
+    /// Returns a reference to Any that can be used for downcasting
     fn as_any(&self) -> &dyn Any {
         self
     }

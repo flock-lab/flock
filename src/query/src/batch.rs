@@ -43,7 +43,7 @@ pub struct BatchQuery {
 }
 
 impl Query for BatchQuery {
-    /// Return a reference to Any that can be used for downcasting
+    /// Returns a reference to Any that can be used for downcasting
     fn as_any(&self) -> &dyn Any {
         self
     }

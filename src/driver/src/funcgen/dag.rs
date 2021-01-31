@@ -90,7 +90,7 @@ impl DerefMut for LambdaDag {
 }
 
 impl LambdaDag {
-    /// Create a new `LambdaDag`.
+    /// Creates a new `LambdaDag`.
     pub fn new() -> Self {
         LambdaDag {
             dag: DagPlan::new(),
@@ -102,12 +102,12 @@ impl LambdaDag {
         self.dag.node_count()
     }
 
-    /// Build a Dag representation of a given plan.
+    /// Builds a Dag representation of a given plan.
     pub fn from(plan: &Arc<dyn ExecutionPlan>) -> Self {
         Self::build_dag(plan)
     }
 
-    /// Return the depth for the given node in the dag.
+    /// Returns the depth for the given node in the dag.
     pub fn depth(&self, node: NodeIndex) -> usize {
         self.dag
             .recursive_walk(node, |g, n| g.parents(n).walk_next(g))
@@ -115,7 +115,7 @@ impl LambdaDag {
             .count()
     }
 
-    /// Add a new node to the `LambdaDag`.
+    /// Adds a new node to the `LambdaDag`.
     ///
     /// Computes in **O(1)** time.
     ///
@@ -124,7 +124,7 @@ impl LambdaDag {
         self.dag.add_node(node)
     }
 
-    /// Add a root node to the `LambdaDag`.
+    /// Adds a root node to the `LambdaDag`.
     ///
     /// Computes in **O(1)** time.
     ///
@@ -134,12 +134,12 @@ impl LambdaDag {
         n
     }
 
-    /// Return a node for a given id.
+    /// Returns a node for a given id.
     pub fn get_node(&self, id: NodeIndex) -> Option<&DagNode> {
         self.dag.node_weight(id)
     }
 
-    /// Add a new child node to the node at the given `NodeIndex`.
+    /// Adds a new child node to the node at the given `NodeIndex`.
     /// Returns the node's `NodeIndex`.
     ///
     /// child -> edge -> node
@@ -150,7 +150,7 @@ impl LambdaDag {
         n
     }
 
-    /// Return a **Vec** with all depended subplans for the given node.
+    /// Returns a **Vec** with all depended subplans for the given node.
     pub fn get_depended_plans(&self, node: NodeIndex) -> Vec<(DagNode, NodeIndex)> {
         self.dag
             .recursive_walk(node, |g, n| g.parents(n).walk_next(g))
@@ -159,7 +159,7 @@ impl LambdaDag {
             .collect()
     }
 
-    /// Return a **Vec** with all children for the given node.
+    /// Returns a **Vec** with all children for the given node.
     pub fn get_sub_plans(&self, node: NodeIndex) -> Vec<(DagNode, NodeIndex)> {
         let mut children = Vec::new();
         for (_, n) in self.dag.children(node).iter(&self.dag) {
@@ -169,12 +169,12 @@ impl LambdaDag {
         children
     }
 
-    /// Return the internal daggy.
+    /// Returns the internal daggy.
     pub fn context(&mut self) -> &mut DagPlan {
         &mut self.dag
     }
 
-    /// Build a new daggy from a physical plan.
+    /// Builds a new daggy from a physical plan.
     fn build_dag(plan: &Arc<dyn ExecutionPlan>) -> Self {
         let mut dag = LambdaDag::new();
         Self::fission(&mut dag, &plan);
@@ -182,7 +182,7 @@ impl LambdaDag {
         dag
     }
 
-    /// Add a new node to the `LambdaDag`.
+    /// Adds a new node to the `LambdaDag`.
     fn insert_dag(dag: &mut LambdaDag, leaf: NodeIndex, node: Value, concurrency: u8) -> NodeIndex {
         if leaf == NodeIndex::end() {
             dag.add_node(DagNode {
@@ -200,7 +200,7 @@ impl LambdaDag {
         }
     }
 
-    /// Transform a physical plan for cloud environment execution.
+    /// Transforms a physical plan for cloud environment execution.
     fn fission(dag: &mut LambdaDag, plan: &Arc<dyn ExecutionPlan>) {
         let mut root = serde_json::to_value(&plan).unwrap();
         let mut json = &mut root;
