@@ -30,7 +30,7 @@ lazy_static! {
     /// Your AWS Lambda function's code consists of scripts or compiled programs and
     /// their dependencies. You use a deployment package to deploy your function
     /// code to Lambda. Lambda supports two types of deployment packages: container
-    /// images and .zip files. To approach real time processing, you **doesn't
+    /// images and .zip files. To approach real-time query processing, you **don't
     /// require** to upload the deployment package from your local machine. Squirtle
     /// uploaded the pre-compiled deployment package to Amazon Simple Storage
     /// Service (Amazon S3) in advance.
