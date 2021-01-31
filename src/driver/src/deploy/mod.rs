@@ -20,10 +20,26 @@ use crate::funcgen::function::QueryFlow;
 use lazy_static::lazy_static;
 use runtime::error::{Result, SquirtleError};
 
+struct LambdaDeploymentPackage<'a> {
+    pub s3_bucket:         &'a str,
+    pub s3_key:            &'a str,
+    pub s3_object_version: &'a str,
+}
+
 lazy_static! {
-    static ref S3_BUCKET: &'static str = "squirtle";
-    static ref S3_KEY: &'static str = "one-function-fit-all";
-    static ref S3_OBJECT_VERSION: &'static str = env!("CARGO_PKG_VERSION");
+    /// Your AWS Lambda function's code consists of scripts or compiled programs and
+    /// their dependencies. You use a deployment package to deploy your function
+    /// code to Lambda. Lambda supports two types of deployment packages: container
+    /// images and .zip files. To approach real time processing, you **doesn't
+    /// require** to upload the deployment package from your local machine. Squirtle
+    /// uploaded the pre-compiled deployment package to Amazon Simple Storage
+    /// Service (Amazon S3) in advance.
+    static ref LAMBDA_DEPLOYMENT_PACKAGE: LambdaDeploymentPackage<'static> =
+        LambdaDeploymentPackage {
+            s3_bucket:         "squirtle",
+            s3_key:            "one-function-fits-all",
+            s3_object_version: env!("CARGO_PKG_VERSION"),
+        };
 }
 
 /// Query Execution Context decides to execute your queries either remotely or
@@ -56,11 +72,22 @@ impl ExecutionEnvironment {
             ExecutionEnvironment::Local => Err(SquirtleError::FunctionGeneration(
                 "Local execution doesn't require a deployment.".to_owned(),
             )),
-            ExecutionEnvironment::Lambda => {
-                unimplemented!()
-            }
+            ExecutionEnvironment::Lambda => Self::lambda_deployment(&query),
             _ => unimplemented!(),
         }
+    }
+
+    /// Deploys a query to lambda function services.
+    /// To create a function, you need a [deployment package](https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-package.html) and an execution role.
+    ///
+    /// - The deployment package contains lambda function code.
+    ///
+    /// - The execution role grants the function permission to use AWS services,
+    /// such as Amazon CloudWatch Logs for log streaming and AWS X-Ray for
+    /// request tracing.
+    fn lambda_deployment(query: &QueryFlow) -> Result<()> {
+        for (_, ctx) in query.ctx.iter() {}
+        Ok(())
     }
 }
 
