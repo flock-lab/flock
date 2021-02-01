@@ -21,11 +21,14 @@ lambda = { git = "https://github.com/awslabs/aws-lambda-rust-runtime/", branch =
 lazy_static = "1.4"
 query = { path = "../../src/query" }
 runtime = { path = "../../src/runtime" }
-serde_json = "1.0"
+rusoto_core = "0.45.0"
+rusoto_iam = "0.45.0"
+rusoto_lambda = "0.45.0"
 
 # A list of all of the optional dependencies, some of which are included in the
 # above `features`. They can be opted into by apps.
 cargo = { version = "0.50.0", optional = true }
+serde_json = "1.0"
 filetime = { version = "0.2", optional = true }
 fixedbitset = { version = "0.3.1", optional = true }
 glob = { version = "0.3", optional = true }

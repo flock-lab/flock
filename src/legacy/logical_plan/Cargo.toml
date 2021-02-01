@@ -9,6 +9,6 @@ autobins = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-sqlparser = "0.6.1"
+sqlparser = "0.7.0"
 arrow = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq", features = ["simd"] }
 common = {path = "../common"}

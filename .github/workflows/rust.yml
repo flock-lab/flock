@@ -17,8 +17,8 @@ jobs:
     if: github.ref != 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
-      - name: cache
+      - uses: actions/checkout@v2
+      - name: Cache Cargo
         uses: actions/cache@v2
         with:
           path: |
@@ -30,12 +30,12 @@ jobs:
         with:
           toolchain: nightly
           override: true
+          components: rustfmt, clippy
       - name: update umd-arrow
         run: |
           cargo update --package arrow
       - name: build and tests
         run: |
-          rustup component add rustfmt --toolchain nightly-x86_64-unknown-linux-gnu
           cargo build -j8
           cargo test
       # - name: Coveralls upload
