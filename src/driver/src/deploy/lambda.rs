@@ -41,6 +41,40 @@ struct LambdaDeploymentPackage<'a> {
     pub s3_object_version: &'a str,
 }
 
+/// The price for Duration depends on the amount of memory you allocate to your
+/// function. You can allocate any amount of memory to your function between
+/// 128MB and 10,240MB, in 1MB increments. The table below contains a few
+/// examples of the price per 1ms associated with different memory sizes.
+///
+/// # Example
+///
+/// | Memory (MB) (with larger memory) | Price per 1ms |
+/// |----------------------------------|---------------|
+/// | 128                              | $0.0000000021 |
+/// | 512                              | $0.0000000083 |
+/// | 1024                             | $0.0000000167 |
+/// | 1536                             | $0.0000000250 |
+/// | 2048                             | $0.0000000333 |
+/// | 3072                             | $0.0000000500 |
+/// | 4096                             | $0.0000000667 |
+/// | 5120                             | $0.0000000833 |
+/// | 6144                             | $0.0000001000 |
+/// | 7168                             | $0.0000001167 |
+/// | 8192                             | $0.0000001333 |
+/// | 9216                             | $0.0000001500 |
+/// | 10240                            | $0.0000001667 |
+///
+/// TODO: The follow-up research work here is to use machine learning to
+/// dynamically optimize the memory size setting of each lambda function.
+struct LambdaMemoryFootprint {
+    // regular operator's memory size (MB).
+    pub default:    i64,
+    /// OLAP aggregate operator's memory size (MB).
+    pub agg_batch:  i64,
+    /// Stream aggregate operator's memory size (MB).
+    pub agg_stream: i64,
+}
+
 lazy_static! {
     static ref LAMBDA_DEPLOYMENT_PACKAGE: LambdaDeploymentPackage<'static> =
         LambdaDeploymentPackage {
@@ -55,8 +89,12 @@ lazy_static! {
     /// The Amazon Resource Name (ARN) of the function's execution role.
     static ref ROLE_NAME: &'static str = "squirtle";
 
-    /// The default value is 128 MB.
-    static ref DEFAULT_MEMORY_SIZE: i64 = 128;
+    static ref LAMBDA_MEMORY_FOOTPRINT: LambdaMemoryFootprint =
+        LambdaMemoryFootprint {
+            default: 128,
+            agg_batch: 2048,
+            agg_stream: 512,
+        };
 }
 
 /// The code for the function where we specify an object in Amazon S3.
@@ -134,7 +172,7 @@ pub fn handler() -> String {
 /// 128 MB. The value must be a multiple of 64 MB.
 pub fn memory_size(_ctx: &ExecutionContext) -> Option<i64> {
     // TODO: optimize the memory size for different subplans.
-    Some(*DEFAULT_MEMORY_SIZE)
+    Some(LAMBDA_MEMORY_FOOTPRINT.default)
 }
 
 /// The Amazon Resource Name (ARN) of the function's execution role.
