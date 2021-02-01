@@ -19,6 +19,7 @@
 extern crate daggy;
 use daggy::{NodeIndex, Walker};
 
+use crate::deploy::ExecutionEnvironment;
 use crate::funcgen::dag::*;
 use query::{Query, StreamQuery};
 use runtime::context::{CloudFunction, ExecutionContext};
@@ -67,8 +68,8 @@ impl QueryFlow {
     }
 
     /// Deploys the lambda functions for a given query to the cloud.
-    pub fn deploy() -> Result<()> {
-        Ok(())
+    pub fn deploy(&self, environment: ExecutionEnvironment) -> Result<()> {
+        environment.deploy(&self)
     }
 
     /// Adds a data source node into `QueryDag`.

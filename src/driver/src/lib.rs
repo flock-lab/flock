@@ -23,8 +23,8 @@
     clippy::wrong_self_convention
 )]
 
-//! Driver API is the core component of the command-line interface for
-//! Squirtle, and it supports direct calls from other high-level languages.
+//! The `Driver` crate is a unified API for users to execute queries in either
+//! local environment or cloud environments.
 
 #[cfg(feature = "build")]
 pub mod build;
@@ -32,3 +32,5 @@ pub mod deploy;
 pub mod funcgen;
 pub mod logwatch;
 pub mod monitor;
+
+pub use funcgen::function::QueryFlow;

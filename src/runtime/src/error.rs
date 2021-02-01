@@ -55,8 +55,8 @@ pub enum SquirtleError {
     /// Error returned during execution of the query.
     /// Examples include files not found, errors in parsing certain types.
     Execution(String),
-    /// Error returned during code generation.
-    CodeGeneration(String),
+    /// Error returned during function generation.
+    FunctionGeneration(String),
 }
 
 impl From<io::Error> for SquirtleError {
@@ -101,8 +101,8 @@ impl Display for SquirtleError {
             ),
             SquirtleError::Plan(ref desc) => write!(f, "Error during planning: {}", desc),
             SquirtleError::Execution(ref desc) => write!(f, "Execution error: {}", desc),
-            SquirtleError::CodeGeneration(ref desc) => {
-                write!(f, "Code generation error: {}", desc)
+            SquirtleError::FunctionGeneration(ref desc) => {
+                write!(f, "Function generation error: {}", desc)
             }
         }
     }
