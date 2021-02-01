@@ -17,34 +17,13 @@
 
 use crate::funcgen::function::QueryFlow;
 
-use lazy_static::lazy_static;
 use runtime::error::{Result, SquirtleError};
 
-/// Your AWS Lambda function's code consists of scripts or compiled programs and
-/// their dependencies. You use a deployment package to deploy your function
-/// code to Lambda. Lambda supports two types of deployment packages: container
-/// images and .zip files. To approach real-time query processing, you **don't
-/// require** to upload the deployment package from your local machine. Squirtle
-/// uploaded the pre-compiled deployment package to Amazon Simple Storage
-/// Service (Amazon S3) in advance.
-struct LambdaDeploymentPackage<'a> {
-    /// S3 bucket for the pre-compiled deployment package.
-    pub s3_bucket:         &'a str,
-    /// S3 key for the pre-compiled deployment package.
-    pub s3_key:            &'a str,
-    /// S3 object for the pre-compiled deployment package to be compatible with
-    /// the client version.
-    pub s3_object_version: &'a str,
-}
+use rusoto_core::Region;
 
-lazy_static! {
-    static ref LAMBDA_DEPLOYMENT_PACKAGE: LambdaDeploymentPackage<'static> =
-        LambdaDeploymentPackage {
-            s3_bucket:         "squirtle",
-            s3_key:            "one-function-fits-all",
-            s3_object_version: env!("CARGO_PKG_VERSION"),
-        };
-}
+use rusoto_lambda::{CreateFunctionRequest, Lambda, LambdaClient};
+
+pub mod lambda;
 
 /// Query Execution Context decides to execute your queries either remotely or
 /// locally.
@@ -71,12 +50,12 @@ impl ExecutionEnvironment {
     }
 
     /// Deploys a query to cloud function services on a public cloud.
-    pub fn deploy(&self, query: &QueryFlow) -> Result<()> {
+    pub async fn deploy(&self, query: &QueryFlow) -> Result<()> {
         match &self {
             ExecutionEnvironment::Local => Err(SquirtleError::FunctionGeneration(
                 "Local execution doesn't require a deployment.".to_owned(),
             )),
-            ExecutionEnvironment::Lambda => Self::lambda_deployment(&query),
+            ExecutionEnvironment::Lambda => Self::lambda_deployment(&query).await,
             _ => unimplemented!(),
         }
     }
@@ -89,8 +68,27 @@ impl ExecutionEnvironment {
     /// - The execution role grants the function permission to use AWS services,
     /// such as Amazon CloudWatch Logs for log streaming and AWS X-Ray for
     /// request tracing.
-    fn lambda_deployment(query: &QueryFlow) -> Result<()> {
-        for (_, ctx) in query.ctx.iter() {}
+    #[allow(unused_must_use)]
+    async fn lambda_deployment(query: &QueryFlow) -> Result<()> {
+        let client = &LambdaClient::new(Region::default());
+        for (_, ctx) in query.ctx.iter() {
+            lambda::function_name(&ctx)
+                .into_iter()
+                .map(move |name| async move {
+                    client
+                        .create_function(CreateFunctionRequest {
+                            code: lambda::function_code(),
+                            environment: lambda::environment(&ctx),
+                            function_name: name.to_owned(),
+                            handler: lambda::handler(),
+                            memory_size: lambda::memory_size(&ctx),
+                            role: lambda::role().await,
+                            runtime: lambda::runtime(),
+                            ..CreateFunctionRequest::default()
+                        })
+                        .await
+                });
+        }
         Ok(())
     }
 }
@@ -99,11 +97,27 @@ impl ExecutionEnvironment {
 mod tests {
     use super::*;
     use cargo_toml::Manifest;
+    use rusoto_core::Region;
+    use rusoto_iam::{GetRoleRequest, Iam, IamClient};
 
     #[tokio::test]
     async fn version_check() -> Result<()> {
         let manifest = Manifest::from_str(include_str!("../../Cargo.toml")).unwrap();
         assert_eq!(env!("CARGO_PKG_VERSION"), manifest.package.unwrap().version);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn get_role() -> Result<()> {
+        let iam = IamClient::new(Region::default());
+        let resp = iam
+            .get_role(GetRoleRequest {
+                role_name: "squirtle".to_owned(),
+            })
+            .await
+            .unwrap();
+        println!("{}", resp.role.arn);
         Ok(())
     }
 }

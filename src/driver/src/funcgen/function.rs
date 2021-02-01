@@ -68,8 +68,8 @@ impl QueryFlow {
     }
 
     /// Deploys the lambda functions for a given query to the cloud.
-    pub fn deploy(&self, environment: ExecutionEnvironment) -> Result<()> {
-        environment.deploy(&self)
+    pub async fn deploy(&self, environment: ExecutionEnvironment) -> Result<()> {
+        environment.deploy(&self).await
     }
 
     /// Adds a data source node into `QueryDag`.
