@@ -14,6 +14,7 @@
 
 //! Helper functions to create a Lambda function.
 
+use crate::funcgen::dag::*;
 use runtime::context::{CloudFunction, ExecutionContext};
 use runtime::encoding::Encoding;
 use rusoto_core::Region;
@@ -89,12 +90,29 @@ pub fn environment(ctx: &ExecutionContext) -> Option<Environment> {
 /// - Function ARN: arn:aws:lambda:us-west-2:123456789012:function:my-function.
 /// - Partial ARN: 123456789012:function:my-function.
 ///
-/// The length constraint applies only to the full ARN. If you specify only the
-/// function name, it is limited to 64 characters in length.
+/// The length constraint applies only to the full ARN. If you
+/// specify only the function name, it is limited to 64 characters in length.
+///
+/// - If the next call is `CloudFunction::None`, then the current lambda
+///   function's concurrency = 1 and its type is `CloudFunction::Chorus((name,
+///   group_size))`.
+///
+/// - If the next call is `CloudFunction::Chorus(..)`, then the current lambda
+///   function's concurrency > 1 (default = 8) and its type is
+///   `CloudFunction::Solo(name)`.
+///
+/// - If the next call is `CloudFunction::Solo(..)`, then the current lambda
+///   function's concurrency = 1 and its type is `CloudFunction::Chorus((name,
+///   group_size))`.
 pub fn function_name(ctx: &ExecutionContext) -> Vec<String> {
-    match ctx.next {
-        CloudFunction::None => vec![ctx.name.to_owned()],
-        _ => unimplemented!(),
+    match &ctx.next {
+        CloudFunction::None => (0..CONCURRENCY_8)
+            .map(|idx| format!("{}-{}", ctx.name, idx))
+            .collect(),
+        CloudFunction::Chorus(..) => vec![ctx.name.to_owned()],
+        CloudFunction::Solo(..) => (0..CONCURRENCY_8)
+            .map(|idx| format!("{}-{}", ctx.name, idx))
+            .collect(),
     }
 }
 
