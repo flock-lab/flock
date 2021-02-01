@@ -35,7 +35,6 @@ jobs:
           cargo update --package arrow
       - name: build and tests
         run: |
-          rustup component add rustfmt --toolchain nightly-x86_64-unknown-linux-gnu
           cargo build -j8
           cargo test
       # - name: Coveralls upload
