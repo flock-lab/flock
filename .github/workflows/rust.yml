@@ -35,6 +35,7 @@ jobs:
           cargo update --package arrow
       - name: build and tests
         run: |
+          rustup component add rustfmt
           cargo build -j8
           cargo test
       # - name: Coveralls upload
