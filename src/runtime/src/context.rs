@@ -17,7 +17,12 @@
 
 use super::datasource::DataSource;
 use super::encoding::Encoding;
+use arrow::record_batch::RecordBatch;
+use datafusion::physical_plan::memory::MemoryExec;
+use datafusion::physical_plan::ExecutionPlan;
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
+use std::sync::Arc;
 
 type PhysicalPlan = String;
 type CloudFunctionName = String;
@@ -132,12 +137,52 @@ impl ExecutionContext {
             _ => unimplemented!(),
         }
     }
+
+    /// Feed one data source to the execution plan.
+    pub fn feed_one_source(plan: &mut Arc<dyn ExecutionPlan>, partitions: Vec<Vec<RecordBatch>>) {
+        // Breadth-first search
+        let mut queue = VecDeque::new();
+        queue.push_front(plan.clone());
+
+        while !queue.is_empty() {
+            let mut p = &mut queue.pop_front().unwrap();
+            if p.children().is_empty() {
+                unsafe {
+                    Arc::get_mut_unchecked(&mut p)
+                        .as_mut_any()
+                        .downcast_mut::<MemoryExec>()
+                        .unwrap()
+                        .set_partitions(partitions);
+                }
+                break;
+            }
+
+            p.children()
+                .iter()
+                .enumerate()
+                .for_each(|(i, _)| queue.push_back(p.children()[i].clone()));
+        }
+    }
+
+    /// Feed two data sources to the execution plan like join two tables.
+    pub fn feed_two_source(
+        _plan: &mut Arc<dyn ExecutionPlan>,
+        _left: Vec<Vec<RecordBatch>>,
+        _right: Vec<Vec<RecordBatch>>,
+    ) {
+        unimplemented!();
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::error::Result;
+
+    use crate::datasource::kinesis;
+    use aws_lambda_events::event::kinesis::KinesisEvent;
+    use datafusion::datasource::MemTable;
+    use datafusion::physical_plan::collect;
 
     #[tokio::test]
     async fn lambda_context_marshal() -> Result<()> {
@@ -157,6 +202,50 @@ mod tests {
         let json = lambda_context.marshal(Encoding::Snappy);
         let de_json = ExecutionContext::unmarshal(&json);
         assert_eq!(lambda_context, de_json);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn feed_one_source() -> Result<()> {
+        let input = include_str!("../../../examples/lambda/example-kinesis-event.json");
+        let input: KinesisEvent = serde_json::from_str(input).unwrap();
+
+        let (record_batch, schema) = kinesis::to_batch(input);
+        let partitions = vec![vec![record_batch]];
+
+        let mut ctx = datafusion::execution::context::ExecutionContext::new();
+        let provider = MemTable::try_new(schema, partitions.clone())?;
+
+        ctx.register_table("test", Box::new(provider));
+
+        let sql = "SELECT MAX(c1), MIN(c2), c3 FROM test WHERE c2 < 99 GROUP BY c3";
+        let logical_plan = ctx.create_logical_plan(&sql)?;
+        let logical_plan = ctx.optimize(&logical_plan)?;
+        let physical_plan = ctx.create_physical_plan(&logical_plan)?;
+
+        // Serialize the physical plan and skip its record batches
+        let plan = serde_json::to_string(&physical_plan)?;
+
+        // Deserialize the physical plan that doesn't contain record batches
+        let mut plan: Arc<dyn ExecutionPlan> = serde_json::from_str(&plan)?;
+
+        // Feed record batches back to the plan
+        ExecutionContext::feed_one_source(&mut plan, partitions);
+
+        let batches = collect(plan).await?;
+        let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
+        let actual_lines: Vec<&str> = formatted.trim().lines().collect();
+
+        let expected = vec![
+            "+---------+---------+----+",
+            "| MAX(c1) | MIN(c2) | c3 |",
+            "+---------+---------+----+",
+            "| 90      | 92.1    | a  |",
+            "+---------+---------+----+",
+        ];
+
+        assert_eq!(expected, actual_lines);
 
         Ok(())
     }

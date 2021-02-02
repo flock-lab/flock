@@ -38,6 +38,8 @@ pub enum SquirtleError {
     Arrow(ArrowError),
     /// Error returned when DataFusion is unexpectedly executed.
     DataFusion(DataFusionError),
+    /// Error returned when serde_json failed to serialize or deserialize data.
+    SerdeJson(serde_json::Error),
     /// Error returned on a branch that we know it is possible but to which we
     /// still have no implementation for. Often, these errors are tracked in our
     /// issue tracker.
@@ -83,6 +85,12 @@ impl From<ArrowError> for SquirtleError {
     }
 }
 
+impl From<serde_json::Error> for SquirtleError {
+    fn from(e: serde_json::Error) -> Self {
+        SquirtleError::SerdeJson(e)
+    }
+}
+
 impl Display for SquirtleError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match *self {
@@ -90,6 +98,7 @@ impl Display for SquirtleError {
             SquirtleError::SQL(ref desc) => write!(f, "SQL error: {:?}", desc),
             SquirtleError::Arrow(ref desc) => write!(f, "Arrow error: {}", desc),
             SquirtleError::DataFusion(ref desc) => write!(f, "DataFusion error: {:?}", desc),
+            SquirtleError::SerdeJson(ref desc) => write!(f, "serde_json error: {:?}", desc),
             SquirtleError::NotImplemented(ref desc) => {
                 write!(f, "This feature is not implemented: {}", desc)
             }

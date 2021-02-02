@@ -68,12 +68,11 @@ impl ExecutionEnvironment {
     /// - The execution role grants the function permission to use AWS services,
     /// such as Amazon CloudWatch Logs for log streaming and AWS X-Ray for
     /// request tracing.
-    #[allow(unused_must_use)]
     async fn lambda_deployment(query: &QueryFlow) -> Result<()> {
         let client = &LambdaClient::new(Region::default());
         for (_, ctx) in query.ctx.iter() {
-            lambda::function_name(&ctx)
-                .into_iter()
+            let _: Vec<_> = lambda::function_name(&ctx)
+                .iter()
                 .map(move |name| async move {
                     client
                         .create_function(CreateFunctionRequest {
@@ -87,7 +86,8 @@ impl ExecutionEnvironment {
                             ..CreateFunctionRequest::default()
                         })
                         .await
-                });
+                })
+                .collect();
         }
         Ok(())
     }
