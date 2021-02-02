@@ -145,14 +145,14 @@ impl ExecutionContext {
         queue.push_front(plan.clone());
 
         while !queue.is_empty() {
-            let mut p = &mut queue.pop_front().unwrap();
+            let mut p = queue.pop_front().unwrap();
             if p.children().is_empty() {
                 unsafe {
                     Arc::get_mut_unchecked(&mut p)
                         .as_mut_any()
                         .downcast_mut::<MemoryExec>()
                         .unwrap()
-                        .set_partitions_and_schema(&partitions, partitions[0][0].schema());
+                        .set_partitions(&partitions);
                 }
                 break;
             }
@@ -166,11 +166,36 @@ impl ExecutionContext {
 
     /// Feed two data sources to the execution plan like join two tables.
     pub fn feed_two_source(
-        _plan: &mut Arc<dyn ExecutionPlan>,
-        _left: Vec<Vec<RecordBatch>>,
-        _right: Vec<Vec<RecordBatch>>,
+        plan: &mut Arc<dyn ExecutionPlan>,
+        left: &Vec<Vec<RecordBatch>>,
+        right: &Vec<Vec<RecordBatch>>,
     ) {
-        unimplemented!();
+        // Breadth-first search
+        let mut queue = VecDeque::new();
+        queue.push_front(plan.clone());
+
+        while !queue.is_empty() {
+            let mut p = queue.pop_front().unwrap();
+            if p.children().is_empty() {
+                // Schema comparsion
+                for partition in vec![&left, &right] {
+                    if p.schema() == partition[0][0].schema() {
+                        unsafe {
+                            Arc::get_mut_unchecked(&mut p)
+                                .as_mut_any()
+                                .downcast_mut::<MemoryExec>()
+                                .unwrap()
+                                .set_partitions(&partition);
+                        }
+                    }
+                }
+            }
+
+            p.children()
+                .iter()
+                .enumerate()
+                .for_each(|(i, _)| queue.push_back(p.children()[i].clone()));
+        }
     }
 }
 
