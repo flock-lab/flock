@@ -215,7 +215,8 @@ impl QueryDag {
                         let object = (*json["input"].take().as_object().unwrap()).clone();
                         // Add a input for the new subplan
                         let input: Arc<dyn ExecutionPlan> = Arc::new(
-                            MemoryExec::try_new(&vec![], Arc::new(Schema::empty()), None).unwrap(),
+                            MemoryExec::try_new(&vec![], curr.children()[0].schema().clone(), None)
+                                .unwrap(),
                         );
                         json["input"] = serde_json::to_value(input).unwrap();
                         // Add the new subplan to DAG

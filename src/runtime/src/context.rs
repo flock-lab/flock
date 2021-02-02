@@ -17,7 +17,7 @@
 
 use super::datasource::DataSource;
 use super::encoding::Encoding;
-use arrow::record_batch::{RecordBatch, RecordBatchOptions};
+use arrow::record_batch::RecordBatch;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::ExecutionPlan;
 use serde::{Deserialize, Serialize};
@@ -152,7 +152,7 @@ impl ExecutionContext {
                         .as_mut_any()
                         .downcast_mut::<MemoryExec>()
                         .unwrap()
-                        .set_partitions_and_schema(&partitions, partitions[0][0].schema());
+                        .set_partitions(&partitions);
                 }
                 break;
             }
@@ -172,34 +172,21 @@ impl ExecutionContext {
     ) {
         // Breadth-first search
         let mut queue = VecDeque::new();
-        queue.push_front((plan.schema(), plan.clone()));
+        queue.push_front(plan.clone());
 
         while !queue.is_empty() {
-            let (schema, mut p) = queue.pop_front().unwrap();
+            let mut p = queue.pop_front().unwrap();
             if p.children().is_empty() {
-                if RecordBatch::validate_new_batch(
-                    &schema,
-                    left[0][0].columns(),
-                    &RecordBatchOptions {
-                        match_field_names: false,
-                    },
-                )
-                .is_ok()
-                {
-                    unsafe {
-                        Arc::get_mut_unchecked(&mut p)
-                            .as_mut_any()
-                            .downcast_mut::<MemoryExec>()
-                            .unwrap()
-                            .set_partitions_and_schema(&left, left[0][0].schema());
-                    }
-                } else {
-                    unsafe {
-                        Arc::get_mut_unchecked(&mut p)
-                            .as_mut_any()
-                            .downcast_mut::<MemoryExec>()
-                            .unwrap()
-                            .set_partitions_and_schema(&right, right[0][0].schema());
+                // Schema comparsion
+                for partition in vec![&left, &right] {
+                    if p.schema() == partition[0][0].schema() {
+                        unsafe {
+                            Arc::get_mut_unchecked(&mut p)
+                                .as_mut_any()
+                                .downcast_mut::<MemoryExec>()
+                                .unwrap()
+                                .set_partitions(&partition);
+                        }
                     }
                 }
             }
@@ -207,7 +194,7 @@ impl ExecutionContext {
             p.children()
                 .iter()
                 .enumerate()
-                .for_each(|(i, _)| queue.push_back((p.schema(), p.children()[i].clone())));
+                .for_each(|(i, _)| queue.push_back(p.children()[i].clone()));
         }
     }
 }
