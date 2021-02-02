@@ -104,19 +104,21 @@ mod tests {
                         .as_any()
                         .downcast_ref::<MemoryExec>()
                     {
-                        let schema = Schema::new(vec![Field::new("a", DataType::Int32, false)]);
+                        let schema =
+                            Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
                         let batch1 = RecordBatch::try_new(
-                            Arc::new(schema.clone()),
+                            schema.clone(),
                             vec![Arc::new(Int32Array::from(vec![1, 2, 3]))],
                         )?;
                         let batch2 = RecordBatch::try_new(
-                            Arc::new(schema),
+                            schema.clone(),
                             vec![Arc::new(Int32Array::from(vec![4, 5]))],
                         )?;
 
                         // Workflow
                         let mut memory = (*memory).clone();
-                        memory.set_partitions(vec![vec![batch1], vec![batch2]]);
+                        let partitions = vec![vec![batch1], vec![batch2]];
+                        memory.set_partitions_and_schema(&partitions, schema);
 
                         let workflow = (memory, hash_aggregate, merge);
                         let _batch_stream = workflow.0.execute(0);
