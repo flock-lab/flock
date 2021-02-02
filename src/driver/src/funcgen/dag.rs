@@ -18,6 +18,7 @@
 extern crate daggy;
 use daggy::{Dag, NodeIndex, Walker};
 
+use arrow::datatypes::Schema;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::ExecutionPlan;
 
@@ -213,8 +214,9 @@ impl QueryDag {
                         // Split the plan into two subplans
                         let object = (*json["input"].take().as_object().unwrap()).clone();
                         // Add a input for the new subplan
-                        let input: Arc<dyn ExecutionPlan> =
-                            Arc::new(MemoryExec::try_new(&vec![], curr.schema(), None).unwrap());
+                        let input: Arc<dyn ExecutionPlan> = Arc::new(
+                            MemoryExec::try_new(&vec![], Arc::new(Schema::empty()), None).unwrap(),
+                        );
                         json["input"] = serde_json::to_value(input).unwrap();
                         // Add the new subplan to DAG
                         leaf = Self::insert_dag(dag, leaf, root, CONCURRENCY_1);
@@ -226,8 +228,9 @@ impl QueryDag {
                 },
                 Some("hash_join_exec") => {
                     let object = (*json.take().as_object().unwrap()).clone();
-                    let input: Arc<dyn ExecutionPlan> =
-                        Arc::new(MemoryExec::try_new(&vec![], curr.schema(), None).unwrap());
+                    let input: Arc<dyn ExecutionPlan> = Arc::new(
+                        MemoryExec::try_new(&vec![], Arc::new(Schema::empty()), None).unwrap(),
+                    );
                     *json = serde_json::to_value(input).unwrap();
                     leaf = Self::insert_dag(dag, leaf, root, CONCURRENCY_1);
                     root = Value::Object(object);

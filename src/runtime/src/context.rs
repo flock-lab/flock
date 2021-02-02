@@ -139,7 +139,7 @@ impl ExecutionContext {
     }
 
     /// Feed one data source to the execution plan.
-    pub fn feed_one_source(plan: &mut Arc<dyn ExecutionPlan>, partitions: Vec<Vec<RecordBatch>>) {
+    pub fn feed_one_source(plan: &mut Arc<dyn ExecutionPlan>, partitions: &Vec<Vec<RecordBatch>>) {
         // Breadth-first search
         let mut queue = VecDeque::new();
         queue.push_front(plan.clone());
@@ -152,7 +152,7 @@ impl ExecutionContext {
                         .as_mut_any()
                         .downcast_mut::<MemoryExec>()
                         .unwrap()
-                        .set_partitions(partitions);
+                        .set_partitions_and_schema(&partitions, partitions[0][0].schema());
                 }
                 break;
             }
@@ -231,7 +231,7 @@ mod tests {
         let mut plan: Arc<dyn ExecutionPlan> = serde_json::from_str(&plan)?;
 
         // Feed record batches back to the plan
-        ExecutionContext::feed_one_source(&mut plan, partitions);
+        ExecutionContext::feed_one_source(&mut plan, &partitions);
 
         let batches = collect(plan).await?;
         let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
