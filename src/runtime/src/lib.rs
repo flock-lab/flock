@@ -22,6 +22,7 @@
     clippy::type_complexity,
     clippy::wrong_self_convention
 )]
+#![feature(get_mut_unchecked)]
 
 //! The runtime contains the context information needed by the lambda function,
 //! such as execution plan and the next lambda functions, which instructs the

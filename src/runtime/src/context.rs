@@ -17,7 +17,12 @@
 
 use super::datasource::DataSource;
 use super::encoding::Encoding;
+use arrow::record_batch::RecordBatch;
+use datafusion::physical_plan::memory::MemoryExec;
+use datafusion::physical_plan::ExecutionPlan;
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
+use std::sync::Arc;
 
 type PhysicalPlan = String;
 type CloudFunctionName = String;
@@ -131,6 +136,41 @@ impl ExecutionContext {
             Encoding::None => bincode::deserialize(&env.context[..]).unwrap(),
             _ => unimplemented!(),
         }
+    }
+
+    /// Feed one data source to the execution plan.
+    pub fn feed_one_source(plan: Arc<dyn ExecutionPlan>, partitions: Vec<Vec<RecordBatch>>) {
+        // Breadth-first search
+        let mut queue = VecDeque::new();
+        queue.push_front(plan.clone());
+
+        while !queue.is_empty() {
+            let mut p = &mut queue.pop_front().unwrap();
+            if p.children().is_empty() {
+                unsafe {
+                    Arc::get_mut_unchecked(&mut p)
+                        .as_mut_any()
+                        .downcast_mut::<MemoryExec>()
+                        .unwrap()
+                        .set_partitions(partitions);
+                }
+                break;
+            }
+
+            p.children()
+                .iter()
+                .enumerate()
+                .for_each(|(i, _)| queue.push_back(p.children()[i].clone()));
+        }
+    }
+
+    /// Feed two data sources to the execution plan like join two tables.
+    pub fn feed_two_source(
+        _plan: &mut Arc<dyn ExecutionPlan>,
+        _left: Vec<Vec<RecordBatch>>,
+        _right: Vec<Vec<RecordBatch>>,
+    ) {
+        unimplemented!();
     }
 }
 
