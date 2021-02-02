@@ -139,7 +139,7 @@ impl ExecutionContext {
     }
 
     /// Feed one data source to the execution plan.
-    pub fn feed_one_source(plan: Arc<dyn ExecutionPlan>, partitions: Vec<Vec<RecordBatch>>) {
+    pub fn feed_one_source(plan: &mut Arc<dyn ExecutionPlan>, partitions: Vec<Vec<RecordBatch>>) {
         // Breadth-first search
         let mut queue = VecDeque::new();
         queue.push_front(plan.clone());
@@ -179,6 +179,11 @@ mod tests {
     use super::*;
     use crate::error::Result;
 
+    use crate::datasource::kinesis;
+    use aws_lambda_events::event::kinesis::KinesisEvent;
+    use datafusion::datasource::MemTable;
+    use datafusion::physical_plan::collect;
+
     #[tokio::test]
     async fn lambda_context_marshal() -> Result<()> {
         let plan = r#"{"execution_plan":"coalesce_batches_exec","input":{"execution_plan":"memory_exec","schema":{"fields":[{"name":"c1","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c2","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c3","data_type":"Utf8","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"projection":null},"target_batch_size":16384}"#.to_owned();
@@ -197,6 +202,50 @@ mod tests {
         let json = lambda_context.marshal(Encoding::Snappy);
         let de_json = ExecutionContext::unmarshal(&json);
         assert_eq!(lambda_context, de_json);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn feed_one_source() -> Result<()> {
+        let input = include_str!("../../../examples/lambda/example-kinesis-event.json");
+        let input: KinesisEvent = serde_json::from_str(input).unwrap();
+
+        let (record_batch, schema) = kinesis::to_batch(input);
+        let partitions = vec![vec![record_batch]];
+
+        let mut ctx = datafusion::execution::context::ExecutionContext::new();
+        let provider = MemTable::try_new(schema, partitions.clone())?;
+
+        ctx.register_table("test", Box::new(provider));
+
+        let sql = "SELECT MAX(c1), MIN(c2), c3 FROM test WHERE c2 < 99 GROUP BY c3";
+        let logical_plan = ctx.create_logical_plan(&sql)?;
+        let logical_plan = ctx.optimize(&logical_plan)?;
+        let physical_plan = ctx.create_physical_plan(&logical_plan)?;
+
+        // Serialize the physical plan and skip its record batches
+        let plan = serde_json::to_string(&physical_plan)?;
+
+        // Deserialize the physical plan that doesn't contain record batches
+        let mut plan: Arc<dyn ExecutionPlan> = serde_json::from_str(&plan)?;
+
+        // Feed record batches back to the plan
+        ExecutionContext::feed_one_source(&mut plan, partitions);
+
+        let batches = collect(plan).await?;
+        let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
+        let actual_lines: Vec<&str> = formatted.trim().lines().collect();
+
+        let expected = vec![
+            "+---------+---------+----+",
+            "| MAX(c1) | MIN(c2) | c3 |",
+            "+---------+---------+----+",
+            "| 90      | 92.1    | a  |",
+            "+---------+---------+----+",
+        ];
+
+        assert_eq!(expected, actual_lines);
 
         Ok(())
     }
