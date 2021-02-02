@@ -178,7 +178,7 @@ impl ExecutionContext {
             let mut p = queue.pop_front().unwrap();
             if p.children().is_empty() {
                 // Schema comparsion
-                for partition in vec![&left, &right] {
+                for partition in &[&left, &right] {
                     if p.schema() == partition[0][0].schema() {
                         unsafe {
                             Arc::get_mut_unchecked(&mut p)
@@ -208,6 +208,10 @@ mod tests {
     use aws_lambda_events::event::kinesis::KinesisEvent;
     use datafusion::datasource::MemTable;
     use datafusion::physical_plan::collect;
+
+    use arrow::array::*;
+    use arrow::datatypes::{DataType, Field, Schema};
+    use arrow::record_batch::RecordBatch;
 
     #[tokio::test]
     async fn lambda_context_marshal() -> Result<()> {
@@ -268,6 +272,84 @@ mod tests {
             "+---------+---------+----+",
             "| 90      | 92.1    | a  |",
             "+---------+---------+----+",
+        ];
+
+        assert_eq!(expected, actual_lines);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn feed_two_source() -> Result<()> {
+        let schema1 = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Utf8, false),
+            Field::new("b", DataType::Int32, false),
+        ]));
+        let schema2 = Arc::new(Schema::new(vec![
+            Field::new("c", DataType::Utf8, false),
+            Field::new("d", DataType::Int32, false),
+        ]));
+
+        // define data.
+        let batch1 = RecordBatch::try_new(
+            schema1.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["a", "b", "c", "d"])),
+                Arc::new(Int32Array::from(vec![1, 10, 10, 100])),
+            ],
+        )?;
+        // define data.
+        let batch2 = RecordBatch::try_new(
+            schema2.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["a", "b", "c", "d"])),
+                Arc::new(Int32Array::from(vec![1, 10, 10, 100])),
+            ],
+        )?;
+
+        let partitions1 = vec![vec![batch1]];
+        let partitions2 = vec![vec![batch2]];
+
+        let mut ctx = datafusion::execution::context::ExecutionContext::new();
+
+        let table1 = MemTable::try_new(schema1, partitions1.clone())?;
+        let table2 = MemTable::try_new(schema2, partitions2.clone())?;
+
+        ctx.register_table("t1", Box::new(table1));
+        ctx.register_table("t2", Box::new(table2));
+
+        let sql = concat!(
+            "SELECT a, b, d ",
+            "FROM t1 JOIN t2 ON a = c ",
+            "ORDER BY b ASC ",
+            "LIMIT 3"
+        );
+
+        let logical_plan = ctx.create_logical_plan(&sql)?;
+        let logical_plan = ctx.optimize(&logical_plan)?;
+        let physical_plan = ctx.create_physical_plan(&logical_plan)?;
+
+        // Serialize the physical plan and skip its record batches
+        let plan = serde_json::to_string(&physical_plan)?;
+
+        // Deserialize the physical plan that doesn't contain record batches
+        let mut plan: Arc<dyn ExecutionPlan> = serde_json::from_str(&plan)?;
+
+        // Feed record batches back to the plan
+        ExecutionContext::feed_two_source(&mut plan, &partitions1, &partitions2);
+
+        let batches = collect(plan).await?;
+        let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
+        let actual_lines: Vec<&str> = formatted.trim().lines().collect();
+
+        let expected = vec![
+            "+---+----+----+",
+            "| a | b  | d  |",
+            "+---+----+----+",
+            "| a | 1  | 1  |",
+            "| b | 10 | 10 |",
+            "| c | 10 | 10 |",
+            "+---+----+----+",
         ];
 
         assert_eq!(expected, actual_lines);
