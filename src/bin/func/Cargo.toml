@@ -11,6 +11,8 @@ edition = "2018"
 snmalloc = [ "snmalloc-rs" ]
 
 [dependencies]
+arrow = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq", features = [ "simd" ] }
+
 aws_lambda_events = "0.4"
 daggy = "0.7.0"
 datafusion = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq", features = [ "simd" ] }
@@ -23,3 +25,7 @@ tokio = { version = "0.2", features = [ "macros" ] }
 [[bin]]
 name = "scq_ops"
 path = "src/ops.rs"
+
+[[bin]]
+name = "lambda"
+path = "src/lambda/main.rs"

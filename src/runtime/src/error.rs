@@ -30,6 +30,8 @@ pub type Result<T> = result::Result<T, SquirtleError>;
 /// Squirtle error
 #[derive(Debug)]
 pub enum SquirtleError {
+    /// Error associated to Lambda runtime execution.
+    LambdaError(Box<dyn std::error::Error + Send + Sync>),
     /// Error associated to I/O operations and associated traits.
     IoError(io::Error),
     /// Error returned when SQL is syntatically incorrect.
@@ -91,9 +93,16 @@ impl From<serde_json::Error> for SquirtleError {
     }
 }
 
+impl From<Box<dyn std::error::Error + Send + Sync>> for SquirtleError {
+    fn from(e: Box<dyn std::error::Error + Send + Sync>) -> Self {
+        SquirtleError::LambdaError(e)
+    }
+}
+
 impl Display for SquirtleError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match *self {
+            SquirtleError::LambdaError(ref desc) => write!(f, "Lambda Error: {}", desc),
             SquirtleError::IoError(ref desc) => write!(f, "IO error: {}", desc),
             SquirtleError::SQL(ref desc) => write!(f, "SQL error: {:?}", desc),
             SquirtleError::Arrow(ref desc) => write!(f, "Arrow error: {}", desc),
