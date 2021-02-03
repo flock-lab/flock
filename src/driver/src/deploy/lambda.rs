@@ -15,6 +15,7 @@
 //! Helper functions to create a Lambda function.
 
 use crate::funcgen::dag::*;
+use runtime::config;
 use runtime::context::{CloudFunction, ExecutionContext};
 use runtime::encoding::Encoding;
 use rusoto_core::Region;
@@ -112,7 +113,7 @@ pub fn function_code() -> FunctionCode {
 pub fn environment(ctx: &ExecutionContext) -> Option<Environment> {
     let mut map = HashMap::new();
     map.insert(
-        "execution_context".to_owned(),
+        config::global("context_name").unwrap().to_owned(),
         ctx.marshal(Encoding::Snappy),
     );
     Some(Environment {

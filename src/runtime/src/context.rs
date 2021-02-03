@@ -68,8 +68,14 @@ pub enum CloudFunction {
     None,
 }
 
+impl Default for CloudFunction {
+    fn default() -> Self {
+        CloudFunction::None
+    }
+}
+
 /// Lambda execution context.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct ExecutionContext {
     /// JSON formatted string for a specific physical plan.
     pub plan:       PhysicalPlan,

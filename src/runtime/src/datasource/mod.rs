@@ -54,4 +54,10 @@ pub enum DataSource {
     UnknownEvent,
 }
 
+impl Default for DataSource {
+    fn default() -> Self {
+        DataSource::UnknownEvent
+    }
+}
+
 pub mod kinesis;

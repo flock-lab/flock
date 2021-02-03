@@ -28,6 +28,7 @@
 //! such as execution plan and the next lambda functions, which instructs the
 //! lambda instance to perform the correct operation.
 
+pub mod config;
 pub mod context;
 pub mod datasource;
 pub mod encoding;
@@ -36,4 +37,5 @@ pub mod payload;
 pub mod plan;
 
 pub use datasource::DataSource;
+pub use encoding::Encoding;
 pub use payload::Payload;
