@@ -15,9 +15,7 @@
 //! Helper functions to create a Lambda function.
 
 use crate::funcgen::dag::*;
-use runtime::config;
-use runtime::context::{CloudFunction, ExecutionContext};
-use runtime::encoding::Encoding;
+use runtime::prelude::*;
 use rusoto_core::Region;
 use rusoto_iam::{GetRoleRequest, Iam, IamClient};
 use rusoto_lambda::{Environment, FunctionCode};

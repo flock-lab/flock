@@ -31,7 +31,7 @@
 use super::Query;
 use arrow::datatypes::SchemaRef;
 use datafusion::physical_plan::ExecutionPlan;
-use runtime::datasource::DataSource;
+use runtime::prelude::*;
 use std::any::Any;
 use std::sync::Arc;
 

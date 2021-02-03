@@ -22,15 +22,10 @@ use serde_json::Value;
 
 use std::sync::Once;
 
-use runtime::datasource::kinesis;
-use runtime::plan::*;
-use runtime::Payload;
-use runtime::{exec_plan, init_plan};
-
-type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
+use runtime::prelude::*;
 
 #[tokio::main]
-async fn main() -> Result<(), Error> {
+async fn main() -> Result<()> {
     lambda::run(handler_fn(handler)).await?;
     Ok(())
 }
@@ -41,14 +36,14 @@ static INIT: Once = Once::new();
 /// Empty Plan before initializing the cloud environment.
 static mut PLAN: LambdaPlan = LambdaPlan::None;
 
-async fn handler(event: KinesisEvent, _: Context) -> Result<Value, Error> {
+async fn handler(event: KinesisEvent, _: Context) -> Result<Value> {
     let (schema, plan) = init_plan!(INIT, PLAN);
 
     let (record_batch, _) = kinesis::to_batch(event);
     let result = exec_plan!(plan, vec![vec![record_batch]]);
     pretty::print_batches(&result)?;
 
-    let payload = Payload::from(&result[0], schema);
+    let payload = Payload::from(&result[0], schema, Uuid::default());
     Ok(serde_json::to_value(&payload)?)
 }
 

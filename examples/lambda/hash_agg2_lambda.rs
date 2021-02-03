@@ -20,14 +20,10 @@ use serde_json::Value;
 
 use std::sync::Once;
 
-use runtime::plan::*;
-use runtime::Payload;
-use runtime::{exec_plan, init_plan};
-
-type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
+use runtime::prelude::*;
 
 #[tokio::main]
-async fn main() -> Result<(), Error> {
+async fn main() -> Result<()> {
     lambda::run(handler_fn(handler)).await?;
     Ok(())
 }
@@ -38,14 +34,14 @@ static INIT: Once = Once::new();
 /// Empty Plan before initializing the cloud environment.
 static mut PLAN: LambdaPlan = LambdaPlan::None;
 
-async fn handler(event: Value, _: Context) -> Result<Value, Error> {
+async fn handler(event: Value, _: Context) -> Result<Value> {
     let (schema, plan) = init_plan!(INIT, PLAN);
 
-    let record_batch = Payload::to_batch(event);
+    let (record_batch, uuid) = Payload::to_batch(event);
     let result = exec_plan!(plan, vec![vec![record_batch]]);
     pretty::print_batches(&result)?;
 
-    let payload = Payload::from(&result[0], schema);
+    let payload = Payload::from(&result[0], schema, uuid);
     Ok(serde_json::to_value(&payload)?)
 }
 
@@ -56,7 +52,7 @@ mod tests {
     #[tokio::test]
     async fn agg2_test() {
         let data = r#"
-            {"header":[16,0,0,0,12,0,26,0,24,0,23,0,4,0,8,0,12,0,0,0,32,0,0,0,80,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,3,0,10,0,24,0,12,0,8,0,4,0,10,0,0,0,76,0,0,0,16,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,3,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,0,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,16,0,0,0,0,0,0,0,24,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,32,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,40,0,0,0,0,0,0,0,16,0,0,0,0,0,0,0,56,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,64,0,0,0,0,0,0,0,16,0,0,0,0,0,0,0],"body":[255,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,2,0,0,0,0,0,0,0,97,98,0,0,0,0,0,0,255,0,0,0,0,0,0,0,100,0,0,0,0,0,0,0,101,0,0,0,0,0,0,0,255,0,0,0,0,0,0,0,102,102,102,102,102,6,87,64,154,153,153,153,153,25,88,64],"schema":{"fields":[{"name":"c3","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"MAX(c1)[max]","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"MIN(c2)[min]","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}}}
+            {"header":[16,0,0,0,12,0,26,0,24,0,23,0,4,0,8,0,12,0,0,0,32,0,0,0,80,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,3,0,10,0,24,0,12,0,8,0,4,0,10,0,0,0,76,0,0,0,16,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,3,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,0,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,16,0,0,0,0,0,0,0,24,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,32,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,40,0,0,0,0,0,0,0,16,0,0,0,0,0,0,0,56,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,64,0,0,0,0,0,0,0,16,0,0,0,0,0,0,0],"body":[255,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,2,0,0,0,0,0,0,0,97,98,0,0,0,0,0,0,255,0,0,0,0,0,0,0,100,0,0,0,0,0,0,0,101,0,0,0,0,0,0,0,255,0,0,0,0,0,0,0,102,102,102,102,102,6,87,64,154,153,153,153,153,25,88,64],"schema":{"fields":[{"name":"c3","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"MAX(c1)[max]","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"MIN(c2)[min]","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"uuid":{"tid":"0","seq_num":0,"seq_len":1}}
         "#;
 
         let plan_key = "PLAN_JSON";
