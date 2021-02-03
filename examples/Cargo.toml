@@ -20,7 +20,7 @@ more-asserts = "0.2.1"
 runtime = { path = "../src/runtime" }
 serde = { version = "1.0", features = [ "derive" ] }
 serde_json = "1.0"
-tokio = { version = "0.2", features = [ "macros" ] }
+tokio = { version = "1.1", features = [ "macros" ] }
 
 [dev-dependencies]
 base64 = "0.13"

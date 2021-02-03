@@ -40,7 +40,7 @@ url = { version = "2.0", optional = true }
 
 [dev-dependencies]
 cargo_toml = "0.8.1"
-tokio = { version = "0.2", features = [ "macros" ] }
+tokio = { version = "1.1", features = [ "macros" ] }
 
 [lib]
 name = "driver"
