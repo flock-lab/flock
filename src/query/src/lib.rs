@@ -28,7 +28,7 @@
 
 use arrow::datatypes::SchemaRef;
 use datafusion::physical_plan::ExecutionPlan;
-use runtime::datasource::DataSource;
+use runtime::prelude::*;
 use std::any::Any;
 use std::fmt::Debug;
 use std::sync::Arc;

@@ -19,20 +19,15 @@ use datafusion::physical_plan::{common, ExecutionPlan};
 use lambda::{handler_fn, Context};
 use serde_json::Value;
 
+use runtime::prelude::*;
 use std::sync::Once;
-
-use runtime::plan::*;
-use runtime::Payload;
-use runtime::{exec_plan, init_plan};
-
-type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
 
 #[cfg(feature = "snmalloc")]
 #[global_allocator]
 static ALLOC: snmalloc_rs::SnMalloc = snmalloc_rs::SnMalloc;
 
 #[tokio::main]
-async fn main() -> Result<(), Error> {
+async fn main() -> Result<()> {
     lambda::run(handler_fn(handler)).await?;
     Ok(())
 }
@@ -46,12 +41,12 @@ static INIT: Once = Once::new();
 static mut PLAN: LambdaPlan = LambdaPlan::None;
 
 #[allow(dead_code)]
-async fn handler(event: Value, _: Context) -> Result<Value, Error> {
+async fn handler(event: Value, _: Context) -> Result<Value> {
     let (schema, plan) = init_plan!(INIT, PLAN);
 
-    let record_batch = Payload::to_batch(event);
+    let (record_batch, uuid) = Payload::to_batch(event);
     let result = exec_plan!(plan, vec![vec![record_batch]]);
 
-    let payload = Payload::from(&result[0], schema);
+    let payload = Payload::from(&result[0], schema, uuid);
     Ok(serde_json::to_value(&payload)?)
 }

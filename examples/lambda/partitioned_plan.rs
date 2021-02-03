@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
+use runtime::prelude::*;
 
 #[tokio::main]
-async fn main() -> Result<(), Error> {
+async fn main() -> Result<()> {
     Ok(())
 }
 
@@ -47,7 +47,7 @@ mod tests {
     use std::sync::Arc;
 
     #[tokio::test]
-    async fn simple_query() -> Result<(), Error> {
+    async fn simple_query() -> Result<()> {
         let input = include_str!("example-kinesis-event.json");
         let input: KinesisEvent = serde_json::from_str(input).unwrap();
 
@@ -465,7 +465,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn simple_join() -> Result<(), Error> {
+    async fn simple_join() -> Result<()> {
         let schema1 = Arc::new(Schema::new(vec![
             Field::new("a", DataType::Utf8, false),
             Field::new("b", DataType::Int32, false),

@@ -22,9 +22,7 @@ use daggy::{NodeIndex, Walker};
 use crate::deploy::ExecutionEnvironment;
 use crate::funcgen::dag::*;
 use query::{Query, StreamQuery};
-use runtime::context::{CloudFunction, ExecutionContext};
-use runtime::error::Result;
-use runtime::DataSource;
+use runtime::prelude::*;
 use std::collections::{HashMap, VecDeque};
 
 use blake2::{Blake2b, Digest};

@@ -17,10 +17,8 @@
 
 use crate::funcgen::function::QueryFlow;
 
-use runtime::error::{Result, SquirtleError};
-
+use runtime::prelude::*;
 use rusoto_core::Region;
-
 use rusoto_lambda::{CreateFunctionRequest, Lambda, LambdaClient};
 
 pub mod lambda;

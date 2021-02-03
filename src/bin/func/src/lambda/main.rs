@@ -26,10 +26,7 @@
 )]
 
 use lambda::{handler_fn, Context};
-use runtime::config;
-use runtime::context::ExecutionContext;
-use runtime::error::Result;
-use runtime::DataSource;
+use runtime::prelude::*;
 use serde_json::Value;
 use std::sync::Once;
 
@@ -47,6 +44,32 @@ enum CloudFunctionContext {
 
 /// Lambda execution context.
 static mut EXECUTION_CONTEXT: CloudFunctionContext = CloudFunctionContext::Uninitialized;
+
+/// Performs an initialization routine once and only once.
+macro_rules! init_exec_context {
+    () => {{
+        unsafe {
+            INIT.call_once(|| match config::global("context_name") {
+                Some(name) => match std::env::var(name) {
+                    Ok(s) => {
+                        EXECUTION_CONTEXT =
+                            CloudFunctionContext::Lambda(Box::new(ExecutionContext::unmarshal(&s)));
+                    }
+                    Err(_) => {
+                        panic!("No execution context in the cloud environment.");
+                    }
+                },
+                None => {
+                    panic!("No execution context name!");
+                }
+            });
+            match &mut EXECUTION_CONTEXT {
+                CloudFunctionContext::Lambda(ctx) => ctx,
+                CloudFunctionContext::Uninitialized => panic!("Uninitialized execution context!"),
+            }
+        }
+    }};
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -77,39 +100,9 @@ async fn handler(event: Value, _: Context) -> Result<Value> {
     Ok(event)
 }
 
-/// Performs an initialization routine once and only once.
-#[macro_export]
-macro_rules! init_exec_context {
-    () => {{
-        unsafe {
-            INIT.call_once(|| match config::global("context_name") {
-                Some(name) => match std::env::var(name) {
-                    Ok(s) => {
-                        EXECUTION_CONTEXT =
-                            CloudFunctionContext::Lambda(Box::new(ExecutionContext::unmarshal(&s)));
-                    }
-                    Err(_) => {
-                        panic!("No execution context in the cloud environment.");
-                    }
-                },
-                None => {
-                    panic!("No execution context name!");
-                }
-            });
-            match &mut EXECUTION_CONTEXT {
-                CloudFunctionContext::Lambda(ctx) => ctx,
-                CloudFunctionContext::Uninitialized => panic!("Uninitialized execution context!"),
-            }
-        }
-    }};
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use runtime::context::CloudFunction;
-    use runtime::DataSource;
-    use runtime::Encoding;
     use serde_json::json;
 
     #[tokio::test]
