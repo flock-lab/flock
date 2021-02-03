@@ -29,6 +29,7 @@ use lambda::{handler_fn, Context};
 use runtime::config;
 use runtime::context::ExecutionContext;
 use runtime::error::Result;
+use runtime::DataSource;
 use serde_json::Value;
 use std::sync::Once;
 
@@ -55,7 +56,24 @@ async fn main() -> Result<()> {
 
 async fn handler(event: Value, _: Context) -> Result<Value> {
     // 1. init the execution context.
-    let _ctx = init_exec_context!();
+    let ctx = init_exec_context!();
+
+    // 2. data source
+    match &ctx.datasource {
+        DataSource::Payload => {}
+        DataSource::KinesisEvent(_) => {
+            unimplemented!();
+        }
+        DataSource::KafkaEvent => {
+            unimplemented!();
+        }
+        _ => unimplemented!(),
+    }
+
+    // 3. execution
+
+    // 4. next call
+
     Ok(event)
 }
 
