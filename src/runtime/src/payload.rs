@@ -32,6 +32,9 @@ use std::sync::Arc;
 #[derive(Default, Debug, Deserialize, Serialize)]
 pub struct Uuid {
     /// The identifier of the query triggered at the specific time.
+    ///
+    /// Note: `tid` is also used as a random seed for choosing the next function
+    /// (with concurrency = 1) through consistent hashing.
     pub tid:     String,
     /// The sequence number of the data contained in the payload.
     pub seq_num: i64,
@@ -46,11 +49,15 @@ pub struct Uuid {
 /// each lambda function to seamlessly perform related query operations.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Payload {
+    /// Arrow Flight Data's header.
     #[serde(with = "serde_bytes")]
     header: Vec<u8>,
+    /// Arrow Flight Data's body.
     #[serde(with = "serde_bytes")]
     body:   Vec<u8>,
+    /// The subplan's schema.
     schema: Schema,
+    /// The query's uuid.
     uuid:   Uuid,
 }
 
