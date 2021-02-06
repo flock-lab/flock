@@ -103,16 +103,19 @@ async fn handler(event: Value, _: Context) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use datafusion::physical_plan::ExecutionPlan;
     use serde_json::json;
+    use std::sync::Arc;
 
     #[tokio::test]
     async fn lambda_function() -> Result<()> {
-        let plan = r#"{"execution_plan":"coalesce_batches_exec","input":{"execution_plan":"memory_exec","schema":{"fields":[{"name":"c1","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c2","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c3","data_type":"Utf8","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"projection":null},"target_batch_size":16384}"#.to_owned();
+        let plan = r#"{"execution_plan":"coalesce_batches_exec","input":{"execution_plan":"memory_exec","schema":{"fields":[{"name":"c1","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c2","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c3","data_type":"Utf8","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"projection":null},"target_batch_size":16384}"#;
         let name = "hello".to_owned();
         let next =
             CloudFunction::Solo("SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836Z".to_owned());
         let datasource = DataSource::Payload;
 
+        let plan: Arc<dyn ExecutionPlan> = serde_json::from_str(&plan).unwrap();
         let lambda_context = ExecutionContext {
             plan,
             name,

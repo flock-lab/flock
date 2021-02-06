@@ -51,13 +51,13 @@ mod tests {
         let input = include_str!("example-kinesis-event.json");
         let input: KinesisEvent = serde_json::from_str(input).unwrap();
 
-        let (record_batch, schema) = kinesis::to_batch(input);
+        let record_batch = kinesis::to_batch(input);
 
         let partitions = vec![vec![record_batch]];
 
         let mut ctx = ExecutionContext::new();
 
-        let provider = MemTable::try_new(schema, partitions)?;
+        let provider = MemTable::try_new(partitions[0][0].schema(), partitions)?;
         ctx.register_table("aggregate_test_100", Box::new(provider));
 
         let sql = "SELECT MAX(c1), MIN(c2), c3 FROM aggregate_test_100 WHERE c2 < 99 GROUP BY c3";
@@ -148,43 +148,80 @@ mod tests {
         // Construct a DAG for the physical plan partition
         let mut lambda_dag = QueryDag::new();
 
-        let node = DagNode::from(format!("{}", serde_json::to_value(&hash_agg_2).unwrap()));
+        let node = DagNode::from(hash_agg_2);
         let p = lambda_dag.add_node(node);
 
-        let node = DagNode::from(format!("{}", serde_json::to_value(&hash_agg_1).unwrap()));
+        let node = DagNode::from(hash_agg_1);
         let h = lambda_dag.add_child(p, node);
 
-        let node = DagNode::from(format!("{}", serde_json::to_value(&coalesce).unwrap()));
+        let node = DagNode::from(coalesce);
         let c = lambda_dag.add_child(h, node);
 
-        let node = DagNode::from(format!("{}", serde_json::to_value(&filter).unwrap()));
+        let node = DagNode::from(filter);
         let f = lambda_dag.add_child(c, node);
 
-        let node = DagNode::from(format!("{}", serde_json::to_value(&memory).unwrap()));
+        let node = DagNode::from(memory);
         let m = lambda_dag.add_child(f, node);
 
-        assert!(lambda_dag
-            .get_node(p)
-            .unwrap()
-            .contains("hash_aggregate_exec"));
+        assert!(lambda_dag.get_plan_str(p).contains("hash_aggregate_exec"));
 
         // Forward traversal from root
         let plans = lambda_dag.get_sub_plans(p);
         let mut iter = plans.iter();
 
-        assert!(iter.next().unwrap().0.contains("hash_aggregate_exec"));
-        assert!(iter.next().unwrap().0.contains("coalesce_batches_exec"));
-        assert!(iter.next().unwrap().0.contains("filter_exec"));
-        assert!(iter.next().unwrap().0.contains("memory_exec"));
+        assert!(iter
+            .next()
+            .unwrap()
+            .0
+            .get_plan_str()
+            .contains("hash_aggregate_exec"));
+        assert!(iter
+            .next()
+            .unwrap()
+            .0
+            .get_plan_str()
+            .contains("coalesce_batches_exec"));
+        assert!(iter
+            .next()
+            .unwrap()
+            .0
+            .get_plan_str()
+            .contains("filter_exec"));
+        assert!(iter
+            .next()
+            .unwrap()
+            .0
+            .get_plan_str()
+            .contains("memory_exec"));
 
         // Backward traversal from leaf
         let plans = lambda_dag.get_depended_plans(m);
         let mut iter = plans.iter();
 
-        assert!(iter.next().unwrap().0.contains("filter_exec"));
-        assert!(iter.next().unwrap().0.contains("coalesce_batches_exec"));
-        assert!(iter.next().unwrap().0.contains("hash_aggregate_exec"));
-        assert!(iter.next().unwrap().0.contains("hash_aggregate_exec"));
+        assert!(iter
+            .next()
+            .unwrap()
+            .0
+            .get_plan_str()
+            .contains("filter_exec"));
+        assert!(iter
+            .next()
+            .unwrap()
+            .0
+            .get_plan_str()
+            .contains("coalesce_batches_exec"));
+        assert!(iter
+            .next()
+            .unwrap()
+            .0
+            .get_plan_str()
+            .contains("hash_aggregate_exec"));
+        assert!(iter
+            .next()
+            .unwrap()
+            .0
+            .get_plan_str()
+            .contains("hash_aggregate_exec"));
 
         Ok(())
     }
@@ -201,15 +238,29 @@ mod tests {
 
         let mut iter = dag.node_weights_mut();
         let mut subplan = iter.next().unwrap();
-        assert!(subplan.contains(r#"execution_plan":"projection_exec"#));
-        assert!(subplan.contains(r#"execution_plan":"hash_aggregate_exec","mode":"Final"#));
-        assert!(subplan.contains(r#"execution_plan":"memory_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"projection_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"hash_aggregate_exec","mode":"Final"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"memory_exec"#));
 
         subplan = iter.next().unwrap();
-        assert!(subplan.contains(r#"execution_plan":"hash_aggregate_exec","mode":"Partial"#));
-        assert!(subplan.contains(r#"execution_plan":"coalesce_batches_exec"#));
-        assert!(subplan.contains(r#"execution_plan":"filter_exec"#));
-        assert!(subplan.contains(r#"execution_plan":"memory_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"hash_aggregate_exec","mode":"Partial"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"coalesce_batches_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"filter_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"memory_exec"#));
     }
 
     // Mem -> Proj
@@ -269,12 +320,20 @@ mod tests {
 
         let mut iter = dag.node_weights_mut();
         let mut subplan = iter.next().unwrap();
-        assert!(subplan.contains(r#"execution_plan":"hash_aggregate_exec","mode":"Final"#));
-        assert!(subplan.contains(r#"execution_plan":"memory_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"hash_aggregate_exec","mode":"Final"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"memory_exec"#));
 
         subplan = iter.next().unwrap();
-        assert!(subplan.contains(r#"execution_plan":"hash_aggregate_exec","mode":"Partial"#));
-        assert!(subplan.contains(r#"execution_plan":"memory_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"hash_aggregate_exec","mode":"Partial"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"memory_exec"#));
     }
 
     #[tokio::test]
@@ -299,13 +358,23 @@ mod tests {
 
         let mut iter = dag.node_weights_mut();
         let mut subplan = iter.next().unwrap();
-        assert!(subplan.contains(r#"execution_plan":"projection_exec"#));
-        assert!(subplan.contains(r#"execution_plan":"hash_aggregate_exec","mode":"Final"#));
-        assert!(subplan.contains(r#"execution_plan":"memory_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"projection_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"hash_aggregate_exec","mode":"Final"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"memory_exec"#));
 
         subplan = iter.next().unwrap();
-        assert!(subplan.contains(r#"execution_plan":"hash_aggregate_exec","mode":"Partial"#));
-        assert!(subplan.contains(r#"execution_plan":"memory_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"hash_aggregate_exec","mode":"Partial"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"memory_exec"#));
     }
 
     // Sort
@@ -345,15 +414,29 @@ mod tests {
 
         let mut iter = dag.node_weights_mut();
         let mut subplan = iter.next().unwrap();
-        assert!(subplan.contains(r#"execution_plan":"projection_exec"#));
-        assert!(subplan.contains(r#"execution_plan":"hash_aggregate_exec","mode":"Final"#));
-        assert!(subplan.contains(r#"execution_plan":"memory_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"projection_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"hash_aggregate_exec","mode":"Final"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"memory_exec"#));
 
         subplan = iter.next().unwrap();
-        assert!(subplan.contains(r#"execution_plan":"hash_aggregate_exec","mode":"Partial"#));
-        assert!(subplan.contains(r#"execution_plan":"coalesce_batches_exec"#));
-        assert!(subplan.contains(r#"execution_plan":"filter_exec"#));
-        assert!(subplan.contains(r#"execution_plan":"memory_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"hash_aggregate_exec","mode":"Partial"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"coalesce_batches_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"filter_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"memory_exec"#));
     }
 
     // Mem -> Filter -> Coalesce -> HashAgg -> HashAgg -> Proj
@@ -372,15 +455,29 @@ mod tests {
 
         let mut iter = dag.node_weights_mut();
         let mut subplan = iter.next().unwrap();
-        assert!(subplan.contains(r#"execution_plan":"projection_exec"#));
-        assert!(subplan.contains(r#"execution_plan":"hash_aggregate_exec","mode":"Final"#));
-        assert!(subplan.contains(r#"execution_plan":"memory_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"projection_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"hash_aggregate_exec","mode":"Final"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"memory_exec"#));
 
         subplan = iter.next().unwrap();
-        assert!(subplan.contains(r#"execution_plan":"hash_aggregate_exec","mode":"Partial"#));
-        assert!(subplan.contains(r#"execution_plan":"coalesce_batches_exec"#));
-        assert!(subplan.contains(r#"execution_plan":"filter_exec"#));
-        assert!(subplan.contains(r#"execution_plan":"memory_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"hash_aggregate_exec","mode":"Partial"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"coalesce_batches_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"filter_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"memory_exec"#));
     }
 
     // Mem -> Filter -> Coalesce -> HashAgg -> HashAgg -> Proj -> Sort ->
@@ -402,17 +499,35 @@ mod tests {
 
         let mut iter = dag.node_weights_mut();
         let mut subplan = iter.next().unwrap();
-        assert!(subplan.contains(r#"execution_plan":"global_limit_exec"#));
-        assert!(subplan.contains(r#"execution_plan":"sort_exec"#));
-        assert!(subplan.contains(r#"execution_plan":"projection_exec"#));
-        assert!(subplan.contains(r#"execution_plan":"hash_aggregate_exec","mode":"Final"#));
-        assert!(subplan.contains(r#"execution_plan":"memory_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"global_limit_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"sort_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"projection_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"hash_aggregate_exec","mode":"Final"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"memory_exec"#));
 
         subplan = iter.next().unwrap();
-        assert!(subplan.contains(r#"execution_plan":"hash_aggregate_exec","mode":"Partial"#));
-        assert!(subplan.contains(r#"execution_plan":"coalesce_batches_exec"#));
-        assert!(subplan.contains(r#"execution_plan":"filter_exec"#));
-        assert!(subplan.contains(r#"execution_plan":"memory_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"hash_aggregate_exec","mode":"Partial"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"coalesce_batches_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"filter_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"memory_exec"#));
     }
 
     fn quick_init(sql: &str) -> QueryDag {
@@ -552,29 +667,61 @@ mod tests {
         assert_eq!(1, dag.edge_count());
 
         let subplan = dag.node_weight(NodeIndex::new(0)).unwrap();
-        assert!(subplan.contains(r#"execution_plan":"global_limit_exec"#));
-        assert!(subplan.contains(r#"execution_plan":"sort_exec"#));
-        assert!(subplan.contains(r#"execution_plan":"projection_exec"#));
-        assert!(subplan.contains(r#"execution_plan":"coalesce_batches_exec"#));
-        assert!(subplan.contains(r#"execution_plan":"memory_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"global_limit_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"sort_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"projection_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"coalesce_batches_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"memory_exec"#));
 
         let subplan = dag.node_weight(NodeIndex::new(1)).unwrap();
-        assert!(subplan.contains(r#"execution_plan":"hash_join_exec"#));
-        assert!(subplan.contains(r#"right":{"execution_plan":"memory_exec"#));
-        assert!(subplan.contains(r#"left":{"execution_plan":"memory_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"hash_join_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"right":{"execution_plan":"memory_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"left":{"execution_plan":"memory_exec"#));
 
         let mut iter = dag.node_weights_mut();
         let mut subplan = iter.next().unwrap();
-        assert!(subplan.contains(r#"execution_plan":"global_limit_exec"#));
-        assert!(subplan.contains(r#"execution_plan":"sort_exec"#));
-        assert!(subplan.contains(r#"execution_plan":"projection_exec"#));
-        assert!(subplan.contains(r#"execution_plan":"coalesce_batches_exec"#));
-        assert!(subplan.contains(r#"execution_plan":"memory_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"global_limit_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"sort_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"projection_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"coalesce_batches_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"memory_exec"#));
 
         subplan = iter.next().unwrap();
-        assert!(subplan.contains(r#"execution_plan":"hash_join_exec"#));
-        assert!(subplan.contains(r#"right":{"execution_plan":"memory_exec"#));
-        assert!(subplan.contains(r#"left":{"execution_plan":"memory_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"hash_join_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"right":{"execution_plan":"memory_exec"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"left":{"execution_plan":"memory_exec"#));
 
         let batches = collect(plan).await?;
         let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();

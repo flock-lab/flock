@@ -21,9 +21,11 @@ use daggy::{NodeIndex, Walker};
 
 use crate::deploy::ExecutionEnvironment;
 use crate::funcgen::dag::*;
+use datafusion::physical_plan::ExecutionPlan;
 use query::{Query, StreamQuery};
 use runtime::prelude::*;
 use std::collections::{HashMap, VecDeque};
+use std::sync::Arc;
 
 use blake2::{Blake2b, Digest};
 use chrono::{DateTime, Utc};
@@ -52,10 +54,7 @@ impl QueryFlow {
         let stream = query.as_any().downcast_ref::<StreamQuery>().is_some();
 
         let mut dag = QueryDag::from(&plan);
-        Self::add_source(
-            format!("{}", serde_json::to_value(&plan).unwrap()),
-            &mut dag,
-        );
+        Self::add_source(plan.clone(), &mut dag);
         let ctx = Self::build_context(&*query, &mut dag);
         Self {
             query,
@@ -72,15 +71,12 @@ impl QueryFlow {
 
     /// Adds a data source node into `QueryDag`.
     #[inline]
-    fn add_source<S>(plan: S, dag: &mut QueryDag)
-    where
-        S: Into<String>,
-    {
+    fn add_source(plan: Arc<dyn ExecutionPlan>, dag: &mut QueryDag) {
         let parent = dag.node_count() - 1;
         dag.add_child(
             NodeIndex::new(parent),
             DagNode {
-                plan:        plan.into(),
+                plan:        plan.clone(),
                 concurrency: CONCURRENCY_1,
             },
         );
@@ -197,15 +193,11 @@ mod tests {
             ansi_sql:   json,
             schema:     Some(schema),
             window:     StreamWindow::SessionWindow,
-            cloudwatch: false,
             datasource: DataSource::UnknownEvent,
         });
 
         let mut dag = QueryDag::from(&plan);
-        QueryFlow::add_source(
-            format!("{}", serde_json::to_value(&plan).unwrap()),
-            &mut dag,
-        );
+        QueryFlow::add_source(plan.clone(), &mut dag);
         let ctx = QueryFlow::build_context(&*query, &mut dag);
 
         Ok(QueryFlow {
@@ -254,13 +246,13 @@ mod tests {
 
         let mut iter = dag.node_weights_mut();
         let mut node = iter.next().unwrap();
-        assert!(node.plan.contains(r#"projection_exec"#));
-        assert!(node.plan.contains(r#"memory_exec"#));
+        assert!(node.get_plan_str().contains(r#"projection_exec"#));
+        assert!(node.get_plan_str().contains(r#"memory_exec"#));
         assert_eq!(8, node.concurrency);
 
         node = iter.next().unwrap();
-        assert!(node.plan.contains(r#"projection_exec"#));
-        assert!(node.plan.contains(r#"memory_exec"#));
+        assert!(node.get_plan_str().contains(r#"projection_exec"#));
+        assert!(node.get_plan_str().contains(r#"memory_exec"#));
         assert_eq!(1, node.concurrency);
 
         Ok(())
@@ -295,21 +287,21 @@ mod tests {
 
         let mut iter = dag.node_weights_mut();
         let mut node = iter.next().unwrap();
-        assert!(node.plan.contains(r#"projection_exec"#));
-        assert!(node.plan.contains(r#"hash_aggregate_exec"#));
-        assert!(node.plan.contains(r#"memory_exec"#));
+        assert!(node.get_plan_str().contains(r#"projection_exec"#));
+        assert!(node.get_plan_str().contains(r#"hash_aggregate_exec"#));
+        assert!(node.get_plan_str().contains(r#"memory_exec"#));
         assert_eq!(1, node.concurrency);
 
         node = iter.next().unwrap();
-        assert!(node.plan.contains(r#"hash_aggregate_exec"#));
-        assert!(node.plan.contains(r#"memory_exec"#));
+        assert!(node.get_plan_str().contains(r#"hash_aggregate_exec"#));
+        assert!(node.get_plan_str().contains(r#"memory_exec"#));
         assert_eq!(8, node.concurrency);
 
         node = iter.next().unwrap();
-        assert!(node.plan.contains(r#"projection_exec"#));
-        assert!(node.plan.contains(r#"hash_aggregate_exec"#));
-        assert!(node.plan.contains(r#"hash_aggregate_exec"#));
-        assert!(node.plan.contains(r#"memory_exec"#));
+        assert!(node.get_plan_str().contains(r#"projection_exec"#));
+        assert!(node.get_plan_str().contains(r#"hash_aggregate_exec"#));
+        assert!(node.get_plan_str().contains(r#"hash_aggregate_exec"#));
+        assert!(node.get_plan_str().contains(r#"memory_exec"#));
         assert_eq!(1, node.concurrency);
 
         Ok(())

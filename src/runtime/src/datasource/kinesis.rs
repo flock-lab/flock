@@ -17,10 +17,10 @@
 
 use aws_lambda_events::event::kinesis::KinesisEvent;
 
-use arrow::datatypes::SchemaRef;
 use arrow::json::{self, reader::infer_json_schema};
 use arrow::record_batch::RecordBatch;
 
+use crate::error::Result;
 use rayon::prelude::*;
 
 use serde::{Deserialize, Serialize};
@@ -64,8 +64,15 @@ pub struct Kinesis {
     pub timestamp:                Option<f64>,
 }
 
+impl Kinesis {
+    /// Fetches data records from Kinesis Data Streams.
+    pub fn fetch_data(&self) -> Result<RecordBatch> {
+        unimplemented!();
+    }
+}
+
 /// Converts Kinesis event to record batch in Arrow.
-pub fn to_batch(event: KinesisEvent) -> (RecordBatch, SchemaRef) {
+pub fn to_batch(event: KinesisEvent) -> RecordBatch {
     // infer schema based on the first record
     let record: &[u8] = &event.records[0].kinesis.data.0.clone();
     let mut reader = BufReader::new(record);
@@ -81,6 +88,6 @@ pub fn to_batch(event: KinesisEvent) -> (RecordBatch, SchemaRef) {
 
     // transform data to record batch in Arrow
     reader = BufReader::with_capacity(input.len(), input);
-    let mut json = json::Reader::new(reader, schema.clone(), batch_size, None);
-    (json.next().unwrap().unwrap(), schema)
+    let mut reader = json::Reader::new(reader, schema, batch_size, None);
+    reader.next().unwrap().unwrap()
 }

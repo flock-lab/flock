@@ -24,7 +24,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::sync::Arc;
 
-type PhysicalPlan = String;
 type CloudFunctionName = String;
 type GroupSize = u8;
 
@@ -75,10 +74,10 @@ impl Default for CloudFunction {
 }
 
 /// Lambda execution context.
-#[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ExecutionContext {
-    /// JSON formatted string for a specific physical plan.
-    pub plan:       PhysicalPlan,
+    /// The physical sub-plan.
+    pub plan:       Arc<dyn ExecutionPlan>,
     /// Cloud Function name in the current execution context.
     ///
     /// |      Cloud Function Naming Convention       |
@@ -102,11 +101,21 @@ pub struct ExecutionContext {
     /// at a certain moment.
     ///
     /// SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836Z
-    pub name:       String,
+    pub name:       CloudFunctionName,
     /// Lambda function name(s) for next invocation(s).
     pub next:       CloudFunction,
     /// Data source where data that is being used originates from.
     pub datasource: DataSource,
+}
+
+impl PartialEq for ExecutionContext {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.next == other.next
+            && self.datasource == other.datasource
+            && serde_json::to_string(&self.plan).unwrap()
+                == serde_json::to_string(&other.plan).unwrap()
+    }
 }
 
 impl ExecutionContext {
@@ -114,7 +123,7 @@ impl ExecutionContext {
     pub fn marshal(&self, encoding: Encoding) -> String {
         match encoding {
             Encoding::Snappy => {
-                let encoded: Vec<u8> = bincode::serialize(&self).unwrap();
+                let encoded: Vec<u8> = serde_json::to_vec(&self).unwrap();
                 serde_json::to_string(&CloudEnvironment {
                     context: encoding.encoder(&encoded),
                     encoding,
@@ -122,7 +131,7 @@ impl ExecutionContext {
                 .unwrap()
             }
             Encoding::None => serde_json::to_string(&CloudEnvironment {
-                context: bincode::serialize(&self).unwrap(),
+                context: serde_json::to_vec(&self).unwrap(),
                 encoding,
             })
             .unwrap(),
@@ -137,9 +146,9 @@ impl ExecutionContext {
         match env.encoding {
             Encoding::Snappy => {
                 let encoded = env.encoding.decoder(&env.context);
-                bincode::deserialize(&encoded[..]).unwrap()
+                serde_json::from_slice(&encoded).unwrap()
             }
-            Encoding::None => bincode::deserialize(&env.context[..]).unwrap(),
+            Encoding::None => serde_json::from_slice(&env.context).unwrap(),
             _ => unimplemented!(),
         }
     }
@@ -221,12 +230,13 @@ mod tests {
 
     #[tokio::test]
     async fn lambda_context_marshal() -> Result<()> {
-        let plan = r#"{"execution_plan":"coalesce_batches_exec","input":{"execution_plan":"memory_exec","schema":{"fields":[{"name":"c1","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c2","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c3","data_type":"Utf8","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"projection":null},"target_batch_size":16384}"#.to_owned();
+        let plan = r#"{"execution_plan":"coalesce_batches_exec","input":{"execution_plan":"memory_exec","schema":{"fields":[{"name":"c1","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c2","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c3","data_type":"Utf8","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"projection":null},"target_batch_size":16384}"#;
         let name = "hello".to_owned();
         let next =
             CloudFunction::Solo("SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836Z".to_owned());
         let datasource = DataSource::Payload;
 
+        let plan: Arc<dyn ExecutionPlan> = serde_json::from_str(&plan)?;
         let lambda_context = ExecutionContext {
             plan,
             name,
@@ -246,11 +256,11 @@ mod tests {
         let input = include_str!("../../../examples/lambda/example-kinesis-event.json");
         let input: KinesisEvent = serde_json::from_str(input).unwrap();
 
-        let (record_batch, schema) = kinesis::to_batch(input);
+        let record_batch = kinesis::to_batch(input);
         let partitions = vec![vec![record_batch]];
 
         let mut ctx = datafusion::execution::context::ExecutionContext::new();
-        let provider = MemTable::try_new(schema, partitions.clone())?;
+        let provider = MemTable::try_new(partitions[0][0].schema(), partitions.clone())?;
 
         ctx.register_table("test", Box::new(provider));
 
