@@ -39,7 +39,7 @@ use std::sync::Arc;
 #[rustfmt::skip]
 #[derive(Debug)]
 pub enum Schedule {
-    /// Where Unit can be minute(s), hour(s), or day(s). For a singular value
+    /// Where Unit can be second(s), minute(s), hour(s), or day(s). For a singular value
     /// the unit must be singular (for example,rate(1 day)), otherwise plural
     /// (for example, rate(5 days)).
     ///
@@ -47,16 +47,13 @@ pub enum Schedule {
     ///
     /// | Frequency        | Expression      |
     /// |------------------|-----------------|
+    /// | Every 1 seconds  | rate(1 seconds) |
     /// | Every 5 minutes  | rate(5 minutes) |
     /// | Every hour       | rate(1 hour)    |
     /// | Every seven days | rate(7 days)    |
     ///
     /// Standard rate for frequencies of up to once per minute.
-    LowRate(String),
-    /// CloudWatch Events does not provide second-level precision in schedule
-    /// expressions. When 0 < rate < 60 seconds, cloud functions are
-    /// directly triggered by user.
-    HighRate(u8),
+    Rate(String),
     /// Cron expressions have the following format:
     ///
     /// Cron(`Minutes` `Hours` `Day-of-month` `Month` `Day-of-week` `Year`)
@@ -117,10 +114,15 @@ pub struct StreamQuery {
     pub schema:     Option<SchemaRef>,
     /// The windows group stream elements by time or rows.
     pub window:     StreamWindow,
-    /// Whether the time schedule is triggered by cloud watch or by the user.
-    pub cloudwatch: bool,
     /// A streaming data source.
     pub datasource: DataSource,
+}
+
+impl StreamQuery {
+    /// Returns the time window for a given query.
+    pub fn window(&self) -> &StreamWindow {
+        &self.window
+    }
 }
 
 impl Query for StreamQuery {

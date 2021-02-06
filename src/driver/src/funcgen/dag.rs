@@ -45,22 +45,29 @@ type DagPlan = Dag<DagNode, DagEdge>;
 #[derive(Debug, Clone)]
 pub struct DagNode {
     /// Subplan string.
-    pub plan:        String,
+    pub plan:        Arc<dyn ExecutionPlan>,
     /// Function concurrency in cloud environment.
     pub concurrency: u8,
 }
 
-impl From<String> for DagNode {
-    fn from(s: String) -> DagNode {
+impl DagNode {
+    /// Returns a Json string representation of a sub-plan.
+    pub fn get_plan_str(&self) -> String {
+        serde_json::to_string(&self.plan).unwrap()
+    }
+}
+
+impl From<Arc<dyn ExecutionPlan>> for DagNode {
+    fn from(p: Arc<dyn ExecutionPlan>) -> DagNode {
         DagNode {
-            plan:        s,
+            plan:        p.clone(),
             concurrency: CONCURRENCY_8,
         }
     }
 }
 
 impl Deref for DagNode {
-    type Target = String;
+    type Target = Arc<dyn ExecutionPlan>;
 
     fn deref(&self) -> &Self::Target {
         &self.plan
@@ -140,6 +147,11 @@ impl QueryDag {
         self.dag.node_weight(id)
     }
 
+    /// Returns a Json string representation of a sub-plan.
+    pub fn get_plan_str(&self, id: NodeIndex) -> String {
+        serde_json::to_string(&self.dag.node_weight(id).unwrap().plan).unwrap()
+    }
+
     /// Adds a new child node to the node at the given `NodeIndex`.
     /// Returns the node's `NodeIndex`.
     ///
@@ -187,14 +199,14 @@ impl QueryDag {
     fn insert_dag(dag: &mut QueryDag, leaf: NodeIndex, node: Value, concurrency: u8) -> NodeIndex {
         if leaf == NodeIndex::end() {
             dag.add_node(DagNode {
-                plan: format!("{}", node),
+                plan: serde_json::from_value(node).unwrap(),
                 concurrency,
             })
         } else {
             dag.add_child(
                 leaf,
                 DagNode {
-                    plan: format!("{}", node),
+                    plan: serde_json::from_value(node).unwrap(),
                     concurrency,
                 },
             )
