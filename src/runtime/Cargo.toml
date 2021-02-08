@@ -23,7 +23,7 @@ snap = "1.0.3"
 sqlparser = "0.7.0"
 
 [dev-dependencies]
-tokio = { version = "0.2", features = [ "macros" ] }
+tokio = { version = "1.2", features = [ "macros" ] }
 
 [lib]
 name = "runtime"
