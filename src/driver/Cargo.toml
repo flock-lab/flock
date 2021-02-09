@@ -39,7 +39,7 @@ url = { version = "2.0", optional = true }
 
 [dev-dependencies]
 cargo_toml = "0.8.1"
-tokio = { version = "0.2", features = [ "macros" ] }
+tokio = { version = "1.0", features = [ "macros", "io-util", "sync", "rt-multi-thread" ] }
 
 [lib]
 name = "driver"
