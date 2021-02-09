@@ -21,13 +21,13 @@ use arrow::json::{self, reader::infer_json_schema};
 use arrow::record_batch::RecordBatch;
 
 use crate::error::Result;
+use crate::query::StreamWindow;
 use rayon::prelude::*;
-
 use serde::{Deserialize, Serialize};
 use std::io::BufReader;
 
 /// A struct to manage all Kinesis info in cloud environment.
-#[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct Kinesis {
     /// The shard ID of the Kinesis Data Streams shard to get the iterator for.
     pub shard_id:                 String,
@@ -62,6 +62,8 @@ pub struct Kinesis {
     /// horizon, the iterator returned is for the oldest untrimmed data record
     /// (`TRIM_HORIZON`).
     pub timestamp:                Option<f64>,
+    /// The window type.
+    pub window:                   StreamWindow,
 }
 
 impl Kinesis {

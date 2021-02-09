@@ -103,6 +103,7 @@ pub fn function_code() -> FunctionCode {
         s3_key:            Some(LAMBDA_DEPLOYMENT_PACKAGE.s3_key.to_owned()),
         s3_object_version: Some(LAMBDA_DEPLOYMENT_PACKAGE.s3_object_version.to_owned()),
         zip_file:          None,
+        image_uri:         None,
     }
 }
 
@@ -155,15 +156,15 @@ pub fn function_name(ctx: &ExecutionContext) -> Vec<String> {
 
 /// The identifier of the function's runtime.
 /// <https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html>
-pub fn runtime() -> String {
-    LAMABDA_RUNTIME.to_owned()
+pub fn runtime() -> Option<String> {
+    Some(LAMABDA_RUNTIME.to_owned())
 }
 
 /// The name of the method within your code that Lambda calls to execute your
 /// function. The format includes the file name. It can also include namespaces
 /// and other qualifiers, depending on the runtime.
-pub fn handler() -> String {
-    "doesn't matter".to_owned()
+pub fn handler() -> Option<String> {
+    Some("doesn't matter".to_owned())
 }
 
 /// The amount of memory that your function has access to. Increasing the

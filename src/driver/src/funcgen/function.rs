@@ -22,7 +22,6 @@ use daggy::{NodeIndex, Walker};
 use crate::deploy::ExecutionEnvironment;
 use crate::funcgen::dag::*;
 use datafusion::physical_plan::ExecutionPlan;
-use query::{Query, StreamQuery};
 use runtime::prelude::*;
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
@@ -156,7 +155,7 @@ mod tests {
     use arrow::datatypes::{DataType, Field, Schema};
     use arrow::record_batch::RecordBatch;
 
-    use query::stream::StreamWindow;
+    use runtime::query::StreamWindow;
 
     use datafusion::datasource::MemTable;
     use datafusion::execution::context::ExecutionContext;

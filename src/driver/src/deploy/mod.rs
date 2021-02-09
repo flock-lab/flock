@@ -17,6 +17,7 @@
 
 use crate::funcgen::function::QueryFlow;
 
+use daggy::NodeIndex;
 use runtime::prelude::*;
 use rusoto_core::Region;
 use rusoto_lambda::{CreateFunctionRequest, Lambda, LambdaClient};
@@ -87,6 +88,23 @@ impl ExecutionEnvironment {
                 })
                 .collect();
         }
+
+        // Event source mapping
+        // if query.stream {
+        //     // data source node
+        //     match &query.ctx[&NodeIndex::new(query.dag.node_count() - 1)].datasource
+        // {         DataSource::KinesisEvent(kinesis) => {
+        //             match client.create_event_source_mapping().await {
+        //                 Err(e) => return SquirtleError::LambdaError(format!("")),
+        //                 Ok(_) => return Ok(()),
+        //             }
+
+        //         },
+        //         DataSource::KafkaEvent => unimplemented!(),
+        //         _ => unimplemented!(),
+        //     }
+        // }
+
         Ok(())
     }
 }
