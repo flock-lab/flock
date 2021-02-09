@@ -36,3 +36,4 @@ pub mod error;
 pub mod payload;
 pub mod plan;
 pub mod prelude;
+pub mod query;

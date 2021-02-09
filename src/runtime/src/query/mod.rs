@@ -26,9 +26,9 @@
     clippy::wrong_self_convention
 )]
 
+use crate::datasource::DataSource;
 use arrow::datatypes::SchemaRef;
 use datafusion::physical_plan::ExecutionPlan;
-use runtime::prelude::*;
 use std::any::Any;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -52,4 +52,4 @@ pub mod batch;
 pub mod stream;
 
 pub use batch::BatchQuery;
-pub use stream::StreamQuery;
+pub use stream::{StreamQuery, StreamWindow};

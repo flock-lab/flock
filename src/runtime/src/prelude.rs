@@ -29,4 +29,5 @@ pub use crate::encoding::Encoding;
 pub use crate::error::{Result, SquirtleError};
 pub use crate::payload::{Payload, Uuid};
 pub use crate::plan::*;
+pub use crate::query::{BatchQuery, Query, StreamQuery};
 pub use crate::{exec_plan, init_plan};

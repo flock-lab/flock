@@ -21,9 +21,9 @@
 //! more accurate results.
 
 use super::Query;
+use crate::datasource::DataSource;
 use arrow::datatypes::SchemaRef;
 use datafusion::physical_plan::ExecutionPlan;
-use runtime::prelude::*;
 use std::any::Any;
 use std::sync::Arc;
 

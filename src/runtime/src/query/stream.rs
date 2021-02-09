@@ -29,15 +29,16 @@
 //! <https://docs.microsoft.com/en-us/stream-analytics-query/windowing-azure-stream-analytics>
 
 use super::Query;
+use crate::datasource::DataSource;
 use arrow::datatypes::SchemaRef;
 use datafusion::physical_plan::ExecutionPlan;
-use runtime::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::sync::Arc;
 
 /// You can set up a rule to run an AWS Lambda function on a schedule.
 #[rustfmt::skip]
-#[derive(Debug)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub enum Schedule {
     /// Where Unit can be second(s), minute(s), hour(s), or day(s). For a singular value
     /// the unit must be singular (for example,rate(1 day)), otherwise plural
@@ -76,7 +77,7 @@ pub enum Schedule {
 }
 
 /// A enum `StreamWindow` to define different window types.
-#[derive(Debug)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub enum StreamWindow {
     /// A query that aggregates data using distinct time-based windows that open
     /// and close at regular intervals. In this case, each record on an

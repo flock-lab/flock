@@ -20,7 +20,6 @@ daggy = "0.7.0"
 datafusion = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq", features = [ "simd" ] }
 lambda = { git = "https://github.com/awslabs/aws-lambda-rust-runtime/", branch = "master" }
 lazy_static = "1.4"
-query = { path = "../../src/query" }
 runtime = { path = "../../src/runtime" }
 rusoto_core = "0.45.0"
 rusoto_iam = "0.45.0"
