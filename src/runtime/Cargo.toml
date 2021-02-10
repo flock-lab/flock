@@ -23,7 +23,7 @@ snap = "1.0.3"
 sqlparser = "0.7.0"
 
 [dev-dependencies]
-tokio = { version = "1.0", features = [ "macros", "io-util", "sync", "rt-multi-thread" ] }
+tokio = { version = "1.2", features = [ "macros", "io-util", "sync", "rt-multi-thread" ] }
 
 [lib]
 name = "runtime"

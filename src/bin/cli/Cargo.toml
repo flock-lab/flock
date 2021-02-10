@@ -22,7 +22,7 @@ lazy_static = "1.4.0"
 runtime = { path = "../../runtime" }
 rustyline = { version = "7.0", optional = true }
 sqlparser = { version = "0.7.0", features = [ "json_example" ] }
-tokio = { version = "1.0", features = [ "macros", "io-util", "sync", "rt-multi-thread" ] }
+tokio = { version = "1.2", features = [ "macros", "io-util", "sync", "rt-multi-thread" ] }
 
 [[bin]]
 name = "squirtle-cli"
