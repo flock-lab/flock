@@ -227,7 +227,7 @@ impl QueryDag {
                         let object = (*json["input"].take().as_object().unwrap()).clone();
                         // Add a input for the new subplan
                         let input: Arc<dyn ExecutionPlan> = Arc::new(
-                            MemoryExec::try_new(&vec![], curr.children()[0].schema().clone(), None)
+                            MemoryExec::try_new(&[], curr.children()[0].schema().clone(), None)
                                 .unwrap(),
                         );
                         json["input"] = serde_json::to_value(input).unwrap();
@@ -242,7 +242,7 @@ impl QueryDag {
                 Some("hash_join_exec") => {
                     let object = (*json.take().as_object().unwrap()).clone();
                     let input: Arc<dyn ExecutionPlan> = Arc::new(
-                        MemoryExec::try_new(&vec![], Arc::new(Schema::empty()), None).unwrap(),
+                        MemoryExec::try_new(&[], Arc::new(Schema::empty()), None).unwrap(),
                     );
                     *json = serde_json::to_value(input).unwrap();
                     leaf = Self::insert_dag(dag, leaf, root, CONCURRENCY_1);

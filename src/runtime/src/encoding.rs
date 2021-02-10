@@ -131,13 +131,8 @@ mod tests {
         let en = Encoding::Snappy;
 
         let json = serde_json::to_string(&plan).unwrap();
-        assert_eq!(1773, json.len());
-
         let en_json = en.encoder(&json.as_bytes());
-        assert_eq!(528, en_json.len());
-
         let de_json = en.decoder(&en_json);
-        assert_eq!(1773, de_json.len());
 
         assert_eq!(json, unsafe { std::str::from_utf8_unchecked(&de_json) });
 
