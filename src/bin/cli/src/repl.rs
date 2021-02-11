@@ -13,28 +13,9 @@
 // limitations under the License.
 
 use clap::{crate_version, App, Arg};
-use lazy_static::lazy_static;
 use runtime::error::Result;
 use rustyline::Editor;
 use std::env;
-
-lazy_static! {
-    static ref SERVERLESS_CQ: &'static str = "
-███████╗███████╗██████╗ ██╗   ██╗███████╗██████╗ ██╗     ███████╗███████╗███████╗ ██████╗ ██████╗
-██╔════╝██╔════╝██╔══██╗██║   ██║██╔════╝██╔══██╗██║     ██╔════╝██╔════╝██╔════╝██╔════╝██╔═══██╗
-███████╗█████╗  ██████╔╝██║   ██║█████╗  ██████╔╝██║     █████╗  ███████╗███████╗██║     ██║   ██║
-╚════██║██╔══╝  ██╔══██╗╚██╗ ██╔╝██╔══╝  ██╔══██╗██║     ██╔══╝  ╚════██║╚════██║██║     ██║▄▄ ██║
-███████║███████╗██║  ██║ ╚████╔╝ ███████╗██║  ██║███████╗███████╗███████║███████║╚██████╗╚██████╔╝
-╚══════╝╚══════╝╚═╝  ╚═╝  ╚═══╝  ╚══════╝╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝╚══════╝ ╚═════╝ ╚══▀▀═╝
-
-Squirtle: Continuous Queries on Cloud Function Services (https://github.com/DSLAM-UMD/Squirtle)
-
-Copyright (c) 2020-2021, UMD Database Group. All rights reserved.
-
-This is the standard command line interactive contoller for Squirtle.
-This has all the right tools installed required to execute a query against cloud function services.
-    ";
-}
 
 #[tokio::main]
 pub async fn main() {
@@ -74,7 +55,7 @@ pub async fn main() {
         )
         .get_matches();
 
-    println!("{}", *SERVERLESS_CQ);
+    println!("{}", include_str!("./squirtle.txt"));
     let _config = matches.value_of("config").unwrap_or("default.conf");
 
     let mut rl = Editor::<()>::new();

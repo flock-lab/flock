@@ -1,0 +1,43 @@
+
+                                      ```
+                                `-/shdddddhyo/-`
+                              `/hdmmmmmmmmmmmmdh+.
+                             :ymmmmmmmmmmmmmmmmmmy-
+                            /symmmmmmmmmmds/smmmhys-
+                            +s`mmmmmmmmmmym` :mmyyyo
+                            :  hmmmmmmmmd   .:hmyyy+s/
+                           `+//mmmmmmmmmm+::/sdyyyy+ds+:.
+                           -ydmmhmmdmmmmmmmmmdyhosooNsooo/`
+                        /syyyyosyhhyhhhhhhhhyhdyhmdsdm+/+++-
+              ``....``  :yoymmmmhysyhhhhyyss+ydddmmmdym++oo+:
+          -+yhdmmmmmmhyosyhmmmmmmmyydhhhhhhhhshdhhdmmmsMoooo+.
+       .odmmy+:-.``.-/ohmdsodmmmmmyyhhhysssyhhsoyyyyhhoMN/oo+/
+     `odmh/``:///`      .ommsohddhsNNNNdyNNNNNNdysoooosMh+ooo+
+    `hmy-   .mmmms`       `ymy.`-osmNNNNsNNNNNNNNyhdhomMoooooo   ./osso:.
+    ymo`       +mmo`        sms` -hyhNNNhdNNNNNNydNNNymMooooo/ -ydmmmmmmd+`
+   -ho`        :mmmo`       `mm-  :hhyhhhohhhhhyyNNNNNsmNo+o:o+dmmmmmmmmmms`
+   -+         /mmmmm+`       hm+   -omNNNmsmNNNNmhhmdhy+hmo-:smmmmmhhyydmmm/
+    :.       ommy-ymm/       dm/   .syydNNNydNNNNNhydmmhoym/+hmmmmydmmmommy/
+    -:     `smms` `hmm:.:`  /mh.  -ymmmdyyhhsoyhdyhmmmmmysosyyhmmmodmmmddyo`
+     ::`  `ymm+`   `dmmmmo`:md:   :dmmmmmhoo+oyys/mmmmmmyy+yyyyhdmyoyhhys/`
+      :+-`/++:      .s+:``+mh-    `smmmmmmdyo.--:+mmmmmmyy/://++++//----
+       .oo:``         `-ohh+`      /hmmmmmmms`   :hmmmmhys:
+         `/oso+:::/+oyhho:`        -+yhyso+/-    :hdmmhyys:
+             .-:/++/:-`                          `--+s:---`
+
+
+
+       ███████╗ ██████╗ ██╗   ██╗██╗██████╗ ████████╗██╗     ███████╗
+       ██╔════╝██╔═══██╗██║   ██║██║██╔══██╗╚══██╔══╝██║     ██╔════╝
+       ███████╗██║   ██║██║   ██║██║██████╔╝   ██║   ██║     █████╗
+       ╚════██║██║▄▄ ██║██║   ██║██║██╔══██╗   ██║   ██║     ██╔══╝
+       ███████║╚██████╔╝╚██████╔╝██║██║  ██║   ██║   ███████╗███████╗
+       ╚══════╝ ╚══▀▀═╝  ╚═════╝ ╚═╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚══════╝
+
+
+Squirtle: Serverless SQL Query Engine for Real-Time and Batch Analytics (https://github.com/DSLAM-UMD/Squirtle)
+
+Copyright (c) 2020-2021, UMD Database Group. All rights reserved.
+
+This is the standard command line interactive contoller for Squirtle. This has all the right tools installed
+required to execute a query against local machines or cloud function services.
