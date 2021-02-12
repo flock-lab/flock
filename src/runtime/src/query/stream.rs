@@ -55,6 +55,8 @@ pub enum Schedule {
     ///
     /// Standard rate for frequencies of up to once per minute.
     Rate(String),
+    /// Where Unit can and only can be second(s),
+    Seconds(i64),
     /// Cron expressions have the following format:
     ///
     /// Cron(`Minutes` `Hours` `Day-of-month` `Month` `Day-of-week` `Year`)

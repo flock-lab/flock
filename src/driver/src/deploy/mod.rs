@@ -21,6 +21,8 @@ use daggy::NodeIndex;
 use runtime::prelude::*;
 use rusoto_core::Region;
 use rusoto_lambda::{CreateFunctionRequest, Lambda, LambdaClient};
+use Schedule::Seconds;
+use StreamWindow::TumblingWindow;
 
 pub mod lambda;
 
@@ -90,20 +92,35 @@ impl ExecutionEnvironment {
         }
 
         // Event source mapping
-        // if query.stream {
-        //     // data source node
-        //     match &query.ctx[&NodeIndex::new(query.dag.node_count() - 1)].datasource
-        // {         DataSource::KinesisEvent(kinesis) => {
-        //             match client.create_event_source_mapping().await {
-        //                 Err(e) => return SquirtleError::LambdaError(format!("")),
-        //                 Ok(_) => return Ok(()),
-        //             }
-
-        //         },
-        //         DataSource::KafkaEvent => unimplemented!(),
-        //         _ => unimplemented!(),
-        //     }
-        // }
+        if query.stream {
+            // data source node
+            let ctx = &query.ctx[&NodeIndex::new(query.dag.node_count() - 1)];
+            match &ctx.datasource {
+                DataSource::KinesisEvent(event) => {
+                    let window_in_seconds = match &event.window {
+                        TumblingWindow(Seconds(secs)) => secs,
+                        _ => unimplemented!(),
+                    };
+                    let request = kinesis::create_event_source_mapping_request(
+                        &event.stream_name,
+                        &ctx.name,
+                        *window_in_seconds,
+                    )
+                    .await?;
+                    match client.create_event_source_mapping(request).await {
+                        Err(e) => {
+                            return Err(SquirtleError::FunctionGeneration(format!(
+                                "Kinesis event source mapping failed: {}.",
+                                e
+                            )));
+                        }
+                        Ok(_) => return Ok(()),
+                    }
+                }
+                DataSource::KafkaEvent => unimplemented!(),
+                _ => unimplemented!(),
+            }
+        }
 
         Ok(())
     }
