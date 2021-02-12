@@ -23,54 +23,69 @@ use arrow::record_batch::RecordBatch;
 use crate::error::Result;
 use crate::query::StreamWindow;
 use rayon::prelude::*;
+use rusoto_core::Region;
+use rusoto_kinesis::{DescribeStreamInput, Kinesis, KinesisClient};
+use rusoto_lambda::CreateEventSourceMappingRequest;
 use serde::{Deserialize, Serialize};
 use std::io::BufReader;
 
 /// A struct to manage all Kinesis info in cloud environment.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
-pub struct Kinesis {
-    /// The shard ID of the Kinesis Data Streams shard to get the iterator for.
-    pub shard_id:                 String,
-    /// Determines how the shard iterator is used to start reading data records
-    /// from the shard. The following are the valid Amazon Kinesis shard
-    /// iterator types:
-    /// - `SEQUENCE_NUMBER`: Start reading from the position denoted by a
-    ///   specific sequence number, provided in the value
-    ///   `StartingSequenceNumber`.
-    /// - `AFTER_SEQUENCE_NUMBER`: Start reading right after the position
-    ///   denoted by a specific sequence number, provided in the value
-    ///   `StartingSequenceNumber`.
-    /// - `TIMESTAMP`: Start reading from the position denoted by a specific
-    ///   time stamp, provided in the value `Timestamp`.
-    /// - `TRIM_HORIZON`: Start reading at the last untrimmed record in the
-    ///   shard in the system, which is the oldest data record in the shard.
-    /// - `LATEST`: Start reading just after the most recent record in the
-    ///   shard, so that you always read the most recent data in the shard.
-    pub shard_iterator_type:      String,
-    /// The sequence number of the data record in the shard from which to start
-    /// reading. Used with shard iterator type `AT_SEQUENCE_NUMBER` and
-    /// `AFTER_SEQUENCE_NUMBER`.
-    pub starting_sequence_number: Option<String>,
+pub struct KinesisSource {
     /// The name of the Amazon Kinesis data stream.
-    pub stream_name:              String,
-    /// The time stamp of the data record from which to start reading. Used with
-    /// shard iterator type `AT_TIMESTAMP`. A time stamp is the Unix epoch date
-    /// with precision in milliseconds. For example,
-    /// `2016-04-04T19:58:46.480-00:00` or `1459799926.480`. If a record with
-    /// this exact time stamp does not exist, the iterator returned is for the
-    /// next (later) record. If the time stamp is older than the current trim
-    /// horizon, the iterator returned is for the oldest untrimmed data record
-    /// (`TRIM_HORIZON`).
-    pub timestamp:                Option<f64>,
+    pub stream_name: String,
     /// The window type.
-    pub window:                   StreamWindow,
+    pub window:      StreamWindow,
 }
 
-impl Kinesis {
+impl KinesisSource {
     /// Fetches data records from Kinesis Data Streams.
     pub fn fetch_data(&self) -> Result<RecordBatch> {
         unimplemented!();
     }
+}
+
+/// Creates event source mapping for Kinesis Data Streams.
+pub async fn create_event_source_mapping_request(
+    stream_name: &str,
+    function_name: &str,
+    window_in_seconds: i64,
+) -> Result<CreateEventSourceMappingRequest> {
+    let client = KinesisClient::new(Region::default());
+    let output = client
+        .describe_stream(DescribeStreamInput {
+            stream_name: stream_name.to_string(),
+            ..DescribeStreamInput::default()
+        })
+        .await
+        .unwrap();
+
+    Ok(CreateEventSourceMappingRequest {
+        // The maximum number of items to retrieve in a single batch.
+        // Amazon Kinesis - Default 100. Max 10,000.
+        batch_size: Some(10000),
+        // If true, the event source mapping is active. Set to false to pause polling and
+        // invocation.
+        enabled: Some(true),
+        // The Amazon Resource Name (ARN) of the event source.
+        // Amazon Kinesis - The ARN of the data stream or a stream consumer.
+        event_source_arn: Some(output.stream_description.stream_arn),
+        // The name of the Lambda function.
+        function_name: function_name.to_owned(),
+        // The maximum amount of time to gather records before invoking the function, in seconds.
+        maximum_batching_window_in_seconds: Some(300),
+        // The number of batches to process from each shard concurrently.
+        // The parallelization factor can be scaled up to 10.
+        // <https://aws.amazon.com/blogs/compute/new-aws-lambda-scaling-controls-for-kinesis-and-dynamodb-event-sources>
+        parallelization_factor: Some(4),
+        // The position in a stream from which to start reading. Required for Amazon Kinesis, Amazon
+        // DynamoDB, and Amazon MSK Streams sources.
+        starting_position: Some("LATEST".to_owned()),
+        // The duration of a processing window in seconds. The range is between 1 second up to 15
+        // minutes.
+        tumbling_window_in_seconds: Some(window_in_seconds),
+        ..CreateEventSourceMappingRequest::default()
+    })
 }
 
 /// Converts Kinesis event to record batch in Arrow.

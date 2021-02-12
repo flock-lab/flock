@@ -14,7 +14,7 @@
 
 //! A data source is the location where data that is being used originates from.
 
-use kinesis::Kinesis;
+use kinesis::KinesisSource;
 use serde::{Deserialize, Serialize};
 
 /// A Data Source for either streaming processing or batch processing.
@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 pub enum DataSource {
     /// Amazon Kinesis Data Streams (KDS) is a massively scalable and durable
     /// real-time data streaming service.
-    KinesisEvent(Kinesis),
+    KinesisEvent(KinesisSource),
     /// Apache Kafka is a community distributed event streaming platform capable
     /// of handling trillions of events a day.
     KafkaEvent,

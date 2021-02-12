@@ -143,6 +143,10 @@ pub fn environment(ctx: &ExecutionContext) -> Option<Environment> {
 ///   function's concurrency = 1 and its type is `CloudFunction::Chorus((name,
 ///   group_size))`.
 pub fn function_name(ctx: &ExecutionContext) -> Vec<String> {
+    if ctx.datasource != DataSource::Payload {
+        return vec![ctx.name.to_owned()];
+    }
+
     match &ctx.next {
         CloudFunction::None => (0..CONCURRENCY_8)
             .map(|idx| format!("{}-{}", ctx.name, idx))

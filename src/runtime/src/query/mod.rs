@@ -52,4 +52,4 @@ pub mod batch;
 pub mod stream;
 
 pub use batch::BatchQuery;
-pub use stream::{StreamQuery, StreamWindow};
+pub use stream::{Schedule, StreamQuery, StreamWindow};
