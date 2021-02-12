@@ -17,7 +17,9 @@
 
 use super::datasource::DataSource;
 use super::encoding::Encoding;
+use crate::error::{Result, SquirtleError};
 use arrow::record_batch::RecordBatch;
+use datafusion::physical_plan::collect;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::ExecutionPlan;
 use serde::{Deserialize, Serialize};
@@ -119,6 +121,24 @@ impl PartialEq for ExecutionContext {
 }
 
 impl ExecutionContext {
+    /// Returns `plan` as a mutable reference.
+    pub fn plan(&mut self) -> &mut Arc<dyn ExecutionPlan> {
+        &mut self.plan
+    }
+
+    /// Executes the physical plan.
+    /// `execute` must be called after the execution of `feed_one_source` or
+    /// `feed_two_source`.
+    pub async fn execute(&mut self) -> Result<Vec<RecordBatch>> {
+        match collect(self.plan().clone()).await {
+            Ok(b) => Ok(b),
+            Err(e) => Err(SquirtleError::Plan(format!(
+                "{}. Failed to execute the plan '{:?}'",
+                e, self.plan
+            ))),
+        }
+    }
+
     /// Serializes `ExecutionContext` from client-side.
     pub fn marshal(&self, encoding: Encoding) -> String {
         match encoding {
@@ -154,10 +174,10 @@ impl ExecutionContext {
     }
 
     /// Feed one data source to the execution plan.
-    pub fn feed_one_source(plan: &mut Arc<dyn ExecutionPlan>, partitions: &Vec<Vec<RecordBatch>>) {
+    pub fn feed_one_source(&mut self, partitions: &Vec<Vec<RecordBatch>>) {
         // Breadth-first search
         let mut queue = VecDeque::new();
-        queue.push_front(plan.clone());
+        queue.push_front(self.plan().clone());
 
         while !queue.is_empty() {
             let mut p = queue.pop_front().unwrap();
@@ -180,14 +200,10 @@ impl ExecutionContext {
     }
 
     /// Feed two data sources to the execution plan like join two tables.
-    pub fn feed_two_source(
-        plan: &mut Arc<dyn ExecutionPlan>,
-        left: &Vec<Vec<RecordBatch>>,
-        right: &Vec<Vec<RecordBatch>>,
-    ) {
+    pub fn feed_two_source(&mut self, left: &Vec<Vec<RecordBatch>>, right: &Vec<Vec<RecordBatch>>) {
         // Breadth-first search
         let mut queue = VecDeque::new();
-        queue.push_front(plan.clone());
+        queue.push_front(self.plan().clone());
 
         while !queue.is_empty() {
             let mut p = queue.pop_front().unwrap();
@@ -273,12 +289,18 @@ mod tests {
         let plan = serde_json::to_string(&physical_plan)?;
 
         // Deserialize the physical plan that doesn't contain record batches
-        let mut plan: Arc<dyn ExecutionPlan> = serde_json::from_str(&plan)?;
+        let plan: Arc<dyn ExecutionPlan> = serde_json::from_str(&plan)?;
 
         // Feed record batches back to the plan
-        ExecutionContext::feed_one_source(&mut plan, &partitions);
+        let mut ctx = ExecutionContext {
+            plan,
+            name: "test".to_string(),
+            next: CloudFunction::None,
+            datasource: DataSource::UnknownEvent,
+        };
+        ctx.feed_one_source(&partitions);
 
-        let batches = collect(plan).await?;
+        let batches = collect(ctx.plan.clone()).await?;
         let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
         let actual_lines: Vec<&str> = formatted.trim().lines().collect();
 
@@ -349,12 +371,18 @@ mod tests {
         let plan = serde_json::to_string(&physical_plan)?;
 
         // Deserialize the physical plan that doesn't contain record batches
-        let mut plan: Arc<dyn ExecutionPlan> = serde_json::from_str(&plan)?;
+        let plan: Arc<dyn ExecutionPlan> = serde_json::from_str(&plan)?;
 
         // Feed record batches back to the plan
-        ExecutionContext::feed_two_source(&mut plan, &partitions1, &partitions2);
+        let mut ctx = ExecutionContext {
+            plan,
+            name: "test".to_string(),
+            next: CloudFunction::None,
+            datasource: DataSource::UnknownEvent,
+        };
+        ctx.feed_two_source(&partitions1, &partitions2);
 
-        let batches = collect(plan).await?;
+        let batches = collect(ctx.plan.clone()).await?;
         let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
         let actual_lines: Vec<&str> = formatted.trim().lines().collect();
 

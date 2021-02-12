@@ -25,6 +25,7 @@
     clippy::wrong_self_convention
 )]
 
+use aws_lambda_events::event::kinesis::KinesisEvent;
 use lambda::{handler_fn, Context};
 use runtime::prelude::*;
 use serde_json::Value;
@@ -77,27 +78,41 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn handler(event: Value, _: Context) -> Result<Value> {
-    // 1. init the execution context.
-    let ctx = init_exec_context!();
+async fn kinesis_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Value> {
+    let kinesis_event: KinesisEvent = serde_json::from_value(event).unwrap();
+    let batch = kinesis::to_batch(kinesis_event);
+    let schema = batch.schema();
 
-    // 2. data source
+    ctx.feed_one_source(&vec![vec![batch]]);
+    let batches = ctx.execute().await?;
+
+    let payload = Payload::from(&batches[0], schema, Uuid::default());
+    Ok(serde_json::to_value(&payload)?)
+}
+
+async fn payload_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Value> {
+    let (batch, uuid) = Payload::to_batch(event);
+    let schema = batch.schema();
+
+    ctx.feed_one_source(&vec![vec![batch]]);
+    let batches = ctx.execute().await?;
+
+    let payload = Payload::from(&batches[0], schema, uuid);
+    Ok(serde_json::to_value(&payload)?)
+}
+
+async fn handler(event: Value, _: Context) -> Result<Value> {
+    let mut ctx = init_exec_context!();
+
     match &ctx.datasource {
-        DataSource::Payload => {}
-        DataSource::KinesisEvent(_) => {
-            unimplemented!();
-        }
+        DataSource::Payload => payload_handler(&mut ctx, event).await,
+        DataSource::KinesisEvent(_) => kinesis_handler(&mut ctx, event).await,
+        DataSource::Json => Ok(event),
         DataSource::KafkaEvent => {
             unimplemented!();
         }
         _ => unimplemented!(),
     }
-
-    // 3. execution
-
-    // 4. next call
-
-    Ok(event)
 }
 
 #[cfg(test)]
@@ -108,12 +123,12 @@ mod tests {
     use std::sync::Arc;
 
     #[tokio::test]
-    async fn lambda_function() -> Result<()> {
+    async fn generic_lambda() -> Result<()> {
         let plan = r#"{"execution_plan":"coalesce_batches_exec","input":{"execution_plan":"memory_exec","schema":{"fields":[{"name":"c1","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c2","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c3","data_type":"Utf8","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"projection":null},"target_batch_size":16384}"#;
         let name = "hello".to_owned();
         let next =
             CloudFunction::Solo("SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836Z".to_owned());
-        let datasource = DataSource::Payload;
+        let datasource = DataSource::Json;
 
         let plan: Arc<dyn ExecutionPlan> = serde_json::from_str(&plan).unwrap();
         let lambda_context = ExecutionContext {

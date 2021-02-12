@@ -50,6 +50,8 @@ pub enum DataSource {
     /// - 256 KB (asynchronous)
     /// <https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html>
     Payload,
+    /// Data source for unit tests.
+    Json,
     /// Unknown data source.
     UnknownEvent,
 }
