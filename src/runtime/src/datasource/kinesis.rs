@@ -89,7 +89,7 @@ pub async fn create_event_source_mapping_request(
 }
 
 /// Converts Kinesis event to record batch in Arrow.
-pub fn to_batch(event: KinesisEvent) -> RecordBatch {
+pub fn to_batch(event: KinesisEvent) -> Option<RecordBatch> {
     // infer schema based on the first record
     let record: &[u8] = &event.records[0].kinesis.data.0.clone();
     let mut reader = BufReader::new(record);
@@ -106,5 +106,19 @@ pub fn to_batch(event: KinesisEvent) -> RecordBatch {
     // transform data to record batch in Arrow
     reader = BufReader::with_capacity(input.len(), input);
     let mut reader = json::Reader::new(reader, schema, batch_size, None);
-    reader.next().unwrap().unwrap()
+    reader.next().unwrap()
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn example_kinesis_event() {
+        let data = include_bytes!("json/example-kinesis-event.json");
+        let parsed: KinesisEvent = serde_json::from_slice(data).unwrap();
+        let output: String = serde_json::to_string(&parsed).unwrap();
+        let reparsed: KinesisEvent = serde_json::from_slice(output.as_bytes()).unwrap();
+        assert_eq!(parsed, reparsed);
+    }
 }

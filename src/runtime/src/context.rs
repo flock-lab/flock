@@ -272,7 +272,7 @@ mod tests {
         let input = include_str!("../../../examples/lambda/example-kinesis-event.json");
         let input: KinesisEvent = serde_json::from_str(input).unwrap();
 
-        let record_batch = kinesis::to_batch(input);
+        let record_batch = kinesis::to_batch(input).unwrap();
         let partitions = vec![vec![record_batch]];
 
         let mut ctx = datafusion::execution::context::ExecutionContext::new();

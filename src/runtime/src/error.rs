@@ -40,6 +40,8 @@ pub enum SquirtleError {
     Arrow(ArrowError),
     /// Error returned when DataFusion is unexpectedly executed.
     DataFusion(DataFusionError),
+    /// Error returned when Base64 decoding fails.
+    Base64(base64::DecodeError),
     /// Error returned when serde_json failed to serialize or deserialize data.
     SerdeJson(serde_json::Error),
     /// Error returned on a branch that we know it is possible but to which we
@@ -99,10 +101,17 @@ impl From<Box<dyn std::error::Error + Send + Sync>> for SquirtleError {
     }
 }
 
+impl From<base64::DecodeError> for SquirtleError {
+    fn from(e: base64::DecodeError) -> Self {
+        SquirtleError::Base64(e)
+    }
+}
+
 impl Display for SquirtleError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match *self {
-            SquirtleError::LambdaError(ref desc) => write!(f, "Lambda Error: {}", desc),
+            SquirtleError::Base64(ref desc) => write!(f, "Base64 error: {}", desc),
+            SquirtleError::LambdaError(ref desc) => write!(f, "Lambda error: {}", desc),
             SquirtleError::IoError(ref desc) => write!(f, "IO error: {}", desc),
             SquirtleError::SQL(ref desc) => write!(f, "SQL error: {:?}", desc),
             SquirtleError::Arrow(ref desc) => write!(f, "Arrow error: {}", desc),
