@@ -29,7 +29,6 @@ use aws_lambda_events::event::kafka::KafkaEvent;
 use aws_lambda_events::event::kinesis::KinesisEvent;
 use lambda::{handler_fn, Context};
 use runtime::prelude::*;
-use serde_json::json;
 use serde_json::Value;
 use std::sync::Once;
 
@@ -84,7 +83,7 @@ async fn kinesis_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Val
     let kinesis_event: KinesisEvent = serde_json::from_value(event).unwrap();
     let batch = match kinesis::to_batch(kinesis_event) {
         Some(batch) => batch,
-        None => return Ok(json!("No Kinesis input!")),
+        None => return Err(SquirtleError::Execution("No Kinesis input!".to_owned())),
     };
     let schema = batch.schema();
 
@@ -99,7 +98,7 @@ async fn kafka_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Value
     let kafka_event: KafkaEvent = serde_json::from_value(event).unwrap();
     let batch = match kafka::to_batch(kafka_event) {
         Some(batch) => batch,
-        None => return Ok(json!("No Kafka input!")),
+        None => return Err(SquirtleError::Execution("No Kafka input!".to_owned())),
     };
     let schema = batch.schema();
 
