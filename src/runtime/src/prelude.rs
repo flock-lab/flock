@@ -24,7 +24,7 @@
 
 pub use crate::config;
 pub use crate::context::{CloudFunction, ExecutionContext};
-pub use crate::datasource::{kinesis, DataSource};
+pub use crate::datasource::{kafka, kinesis, DataSource};
 pub use crate::encoding::Encoding;
 pub use crate::error::{Result, SquirtleError};
 pub use crate::payload::{Payload, Uuid};

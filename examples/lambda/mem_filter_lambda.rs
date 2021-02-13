@@ -39,7 +39,7 @@ static mut PLAN: LambdaPlan = LambdaPlan::None;
 async fn handler(event: KinesisEvent, _: Context) -> Result<Value> {
     let (schema, plan) = init_plan!(INIT, PLAN);
 
-    let record_batch = kinesis::to_batch(event);
+    let record_batch = kinesis::to_batch(event).unwrap();
     let result = exec_plan!(plan, vec![vec![record_batch]]);
     pretty::print_batches(&result)?;
 

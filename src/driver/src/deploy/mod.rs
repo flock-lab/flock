@@ -117,7 +117,28 @@ impl ExecutionEnvironment {
                         Ok(_) => return Ok(()),
                     }
                 }
-                DataSource::KafkaEvent => unimplemented!(),
+                DataSource::KafkaEvent(event) => {
+                    let window_in_seconds = match &event.window {
+                        TumblingWindow(Seconds(secs)) => secs,
+                        _ => unimplemented!(),
+                    };
+                    let request = kafka::create_event_source_mapping_request(
+                        &ctx.name,
+                        *window_in_seconds,
+                        &event.cluster_arn,
+                        &event.topics,
+                    )
+                    .await?;
+                    match client.create_event_source_mapping(request).await {
+                        Err(e) => {
+                            return Err(SquirtleError::FunctionGeneration(format!(
+                                "Kafka event source mapping failed: {}.",
+                                e
+                            )));
+                        }
+                        Ok(_) => return Ok(()),
+                    }
+                }
                 _ => unimplemented!(),
             }
         }

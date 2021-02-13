@@ -51,7 +51,7 @@ mod tests {
         let input = include_str!("example-kinesis-event.json");
         let input: KinesisEvent = serde_json::from_str(input).unwrap();
 
-        let record_batch = kinesis::to_batch(input);
+        let record_batch = kinesis::to_batch(input).unwrap();
 
         let partitions = vec![vec![record_batch]];
 

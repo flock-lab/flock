@@ -14,6 +14,7 @@
 
 //! A data source is the location where data that is being used originates from.
 
+use kafka::KafkaSource;
 use kinesis::KinesisSource;
 use serde::{Deserialize, Serialize};
 
@@ -25,7 +26,7 @@ pub enum DataSource {
     KinesisEvent(KinesisSource),
     /// Apache Kafka is a community distributed event streaming platform capable
     /// of handling trillions of events a day.
-    KafkaEvent,
+    KafkaEvent(KafkaSource),
     /// Amazon Simple Queue Service (SQS) is a fully managed message queuing
     /// service that enables you to decouple and scale microservices,
     /// distributed systems, and serverless applications. SQS eliminates the
@@ -62,4 +63,5 @@ impl Default for DataSource {
     }
 }
 
+pub mod kafka;
 pub mod kinesis;

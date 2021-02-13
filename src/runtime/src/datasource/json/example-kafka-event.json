@@ -1,0 +1,17 @@
+{
+  "eventSource": "aws:kafka",
+  "eventSourceArn": "arn:aws:kafka:us-west-2:012345678901:cluster/ExampleMSKCluster/e9f754c6-d29a-4430-a7db-958a19fd2c54-4",
+  "records": {
+    "AWSKafkaTopic-0": [
+      {
+        "key": "OGQ1NTk2YjQtMTgxMy00MjM4LWIyNGItNmRhZDhlM2QxYzBj",
+        "offset": 0,
+        "partition": 0,
+        "timestamp": 1595035749700,
+        "timestampType": "CREATE_TIME",
+        "topic": "AWSKafkaTopic",
+        "value": "eyJjdXN0X2lkIjoxMjMsIm1vbnRoIjo5LCJhbW91bnRfcGFpZCI6NDU2Ljc4fQ=="
+      }
+    ]
+  }
+}

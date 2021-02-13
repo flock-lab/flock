@@ -25,6 +25,7 @@
     clippy::wrong_self_convention
 )]
 
+use aws_lambda_events::event::kafka::KafkaEvent;
 use aws_lambda_events::event::kinesis::KinesisEvent;
 use lambda::{handler_fn, Context};
 use runtime::prelude::*;
@@ -80,7 +81,25 @@ async fn main() -> Result<()> {
 
 async fn kinesis_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Value> {
     let kinesis_event: KinesisEvent = serde_json::from_value(event).unwrap();
-    let batch = kinesis::to_batch(kinesis_event);
+    let batch = match kinesis::to_batch(kinesis_event) {
+        Some(batch) => batch,
+        None => return Err(SquirtleError::Execution("No Kinesis input!".to_owned())),
+    };
+    let schema = batch.schema();
+
+    ctx.feed_one_source(&vec![vec![batch]]);
+    let batches = ctx.execute().await?;
+
+    let payload = Payload::from(&batches[0], schema, Uuid::default());
+    Ok(serde_json::to_value(&payload)?)
+}
+
+async fn kafka_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Value> {
+    let kafka_event: KafkaEvent = serde_json::from_value(event).unwrap();
+    let batch = match kafka::to_batch(kafka_event) {
+        Some(batch) => batch,
+        None => return Err(SquirtleError::Execution("No Kafka input!".to_owned())),
+    };
     let schema = batch.schema();
 
     ctx.feed_one_source(&vec![vec![batch]]);
@@ -108,9 +127,7 @@ async fn handler(event: Value, _: Context) -> Result<Value> {
         DataSource::Payload => payload_handler(&mut ctx, event).await,
         DataSource::KinesisEvent(_) => kinesis_handler(&mut ctx, event).await,
         DataSource::Json => Ok(event),
-        DataSource::KafkaEvent => {
-            unimplemented!();
-        }
+        DataSource::KafkaEvent(_) => kafka_handler(&mut ctx, event).await,
         _ => unimplemented!(),
     }
 }
