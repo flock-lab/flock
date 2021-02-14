@@ -20,7 +20,8 @@
     clippy::new_without_default,
     clippy::ptr_arg,
     clippy::type_complexity,
-    clippy::wrong_self_convention
+    clippy::wrong_self_convention,
+    clippy::should_implement_trait
 )]
 #![feature(get_mut_unchecked)]
 
