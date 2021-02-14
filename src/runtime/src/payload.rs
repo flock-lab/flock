@@ -53,6 +53,8 @@ impl UuidBuilder {
 
     /// Returns the next Uuid for the next payload.
     pub fn next(&mut self) -> Uuid {
+        assert!(self.pos < self.len);
+
         let tid = self.tid.to_owned();
         let seq_num = self.pos;
         let seq_len = self.len;
