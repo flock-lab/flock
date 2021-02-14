@@ -27,7 +27,7 @@ pub use crate::context::{CloudFunction, ExecutionContext};
 pub use crate::datasource::{kafka, kinesis, DataSource};
 pub use crate::encoding::Encoding;
 pub use crate::error::{Result, SquirtleError};
-pub use crate::payload::{Payload, Uuid};
+pub use crate::payload::{Payload, Uuid, UuidBuilder};
 pub use crate::plan::*;
 pub use crate::query::{BatchQuery, Query, Schedule, StreamQuery, StreamWindow};
 pub use crate::{exec_plan, init_plan};
