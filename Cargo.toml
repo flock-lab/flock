@@ -2,8 +2,8 @@
 members = [
     "examples",
     "src/bin/cli",
-    "src/bin/func",
     "src/driver",
+    "src/function",
     "src/runtime",
 ]
 exclude = [
