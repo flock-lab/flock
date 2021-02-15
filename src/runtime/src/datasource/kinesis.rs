@@ -95,7 +95,7 @@ pub fn to_batch(event: KinesisEvent) -> Option<RecordBatch> {
     let mut reader = BufReader::new(record);
     let schema = infer_json_schema(&mut reader, Some(1)).unwrap();
 
-    // get all data from Kinesis event
+    // `batch_size` guarantees that only one `RecordBatch` will be generated
     let batch_size = event.records.len();
     let input: &[u8] = &event
         .records
@@ -120,5 +120,39 @@ mod test {
         let output: String = serde_json::to_string(&parsed).unwrap();
         let reparsed: KinesisEvent = serde_json::from_slice(output.as_bytes()).unwrap();
         assert_eq!(parsed, reparsed);
+    }
+
+    #[test]
+    fn example_reader() {
+        let records: &[u8] = include_str!("json/mixed_arrays.txt").as_bytes();
+        let mut reader = BufReader::new(records);
+        let schema = infer_json_schema(&mut reader, Some(1)).unwrap();
+
+        let batch_size = 1024;
+        let mut reader =
+            json::Reader::new(BufReader::new(records), schema.clone(), batch_size, None);
+        let batch = reader.next().unwrap().unwrap();
+        assert_eq!(4, batch.num_rows());
+        assert_eq!(4, batch.num_columns());
+
+        let batch_size = 4;
+        let mut reader =
+            json::Reader::new(BufReader::new(records), schema.clone(), batch_size, None);
+        let batch = reader.next().unwrap().unwrap();
+        assert_eq!(4, batch.num_rows());
+        assert_eq!(4, batch.num_columns());
+
+        let batch_size = 2;
+        let mut reader =
+            json::Reader::new(BufReader::new(records), schema.clone(), batch_size, None);
+        let batch = reader.next().unwrap().unwrap();
+        assert_eq!(2, batch.num_rows());
+        assert_eq!(4, batch.num_columns());
+
+        let batch_size = 1;
+        let mut reader = json::Reader::new(BufReader::new(records), schema, batch_size, None);
+        let batch = reader.next().unwrap().unwrap();
+        assert_eq!(1, batch.num_rows());
+        assert_eq!(4, batch.num_columns());
     }
 }

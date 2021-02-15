@@ -45,12 +45,12 @@ pub enum ExecutionEnvironment {
 }
 
 impl ExecutionEnvironment {
-    /// Returns a new `ExecutionEnvironment` that executes query locally.
+    /// Return a new `ExecutionEnvironment` that executes query locally.
     pub fn new() -> Self {
         Self::Local
     }
 
-    /// Deploys a query to cloud function services on a public cloud.
+    /// Deploy a query to cloud function services on a public cloud.
     pub async fn deploy(&self, query: &QueryFlow) -> Result<()> {
         match &self {
             ExecutionEnvironment::Local => Err(SquirtleError::FunctionGeneration(
@@ -61,7 +61,7 @@ impl ExecutionEnvironment {
         }
     }
 
-    /// Deploys a query to lambda function services.
+    /// Deploy a query to lambda function services.
     /// To create a function, you need a [deployment package](https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-package.html) and an execution role.
     ///
     /// - The deployment package contains lambda function code.

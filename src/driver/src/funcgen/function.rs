@@ -47,7 +47,7 @@ pub struct QueryFlow {
 }
 
 impl QueryFlow {
-    /// Creates a new `QueryFlow` from a given query.
+    /// Create a new `QueryFlow` from a given query.
     pub fn from(query: Box<dyn Query>) -> Self {
         let plan = query.plan();
         let stream = query.as_any().downcast_ref::<StreamQuery>().is_some();
@@ -63,12 +63,12 @@ impl QueryFlow {
         }
     }
 
-    /// Deploys the lambda functions for a given query to the cloud.
+    /// Deploy the lambda functions for a given query to the cloud.
     pub async fn deploy(&self, environment: ExecutionEnvironment) -> Result<()> {
         environment.deploy(&self).await
     }
 
-    /// Adds a data source node into `QueryDag`.
+    /// Add a data source node into `QueryDag`.
     #[inline]
     fn add_source(plan: Arc<dyn ExecutionPlan>, dag: &mut QueryDag) {
         let parent = dag.node_count() - 1;
@@ -81,13 +81,14 @@ impl QueryFlow {
         );
     }
 
+    /// Return a unique function name.
     #[inline]
     fn function_name(query_code: &String, node: &NodeIndex, timestamp: &DateTime<Utc>) -> String {
         let plan_index = format!("{:0>2}", node.index());
         format!("{}-{}-{:?}", query_code, plan_index, timestamp)
     }
 
-    /// Creates the environmental execution context for all lambda functions.
+    /// Create the environmental execution context for all lambda functions.
     fn build_context(
         query: &dyn Query,
         dag: &mut QueryDag,

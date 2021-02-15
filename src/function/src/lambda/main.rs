@@ -14,17 +14,6 @@
 
 //! The generic lambda function for sub-plan execution on AWS Lambda.
 
-#![warn(missing_docs)]
-// Clippy lints, some should be disabled incrementally
-#![allow(
-    clippy::float_cmp,
-    clippy::module_inception,
-    clippy::new_without_default,
-    clippy::ptr_arg,
-    clippy::type_complexity,
-    clippy::wrong_self_convention
-)]
-
 use aws_lambda_events::event::kafka::KafkaEvent;
 use aws_lambda_events::event::kinesis::KinesisEvent;
 use lambda::{handler_fn, Context};
