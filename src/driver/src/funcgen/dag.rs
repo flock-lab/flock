@@ -51,7 +51,7 @@ pub struct DagNode {
 }
 
 impl DagNode {
-    /// Returns a Json string representation of a sub-plan.
+    /// Return a Json string representation of a sub-plan.
     pub fn get_plan_str(&self) -> String {
         serde_json::to_string(&self.plan).unwrap()
     }
@@ -98,7 +98,7 @@ impl DerefMut for QueryDag {
 }
 
 impl QueryDag {
-    /// Creates a new `QueryDag`.
+    /// Create a new `QueryDag`.
     pub fn new() -> Self {
         QueryDag {
             dag: DagPlan::new(),
@@ -110,12 +110,12 @@ impl QueryDag {
         self.dag.node_count()
     }
 
-    /// Builds a Dag representation of a given plan.
+    /// Build a Dag representation of a given plan.
     pub fn from(plan: &Arc<dyn ExecutionPlan>) -> Self {
         Self::build_dag(plan)
     }
 
-    /// Returns the depth for the given node in the dag.
+    /// Return the depth for the given node in the dag.
     pub fn depth(&self, node: NodeIndex) -> usize {
         self.dag
             .recursive_walk(node, |g, n| g.parents(n).walk_next(g))
@@ -123,7 +123,7 @@ impl QueryDag {
             .count()
     }
 
-    /// Adds a new node to the `QueryDag`.
+    /// Add a new node to the `QueryDag`.
     ///
     /// Computes in **O(1)** time.
     ///
@@ -132,7 +132,7 @@ impl QueryDag {
         self.dag.add_node(node)
     }
 
-    /// Adds a root node to the `QueryDag`.
+    /// Add a root node to the `QueryDag`.
     ///
     /// Computes in **O(1)** time.
     ///
@@ -142,28 +142,28 @@ impl QueryDag {
         n
     }
 
-    /// Returns a node for a given id.
+    /// Return a node for a given id.
     pub fn get_node(&self, id: NodeIndex) -> Option<&DagNode> {
         self.dag.node_weight(id)
     }
 
-    /// Returns a Json string representation of a sub-plan.
+    /// Return a Json string representation of a sub-plan.
     pub fn get_plan_str(&self, id: NodeIndex) -> String {
         serde_json::to_string(&self.dag.node_weight(id).unwrap().plan).unwrap()
     }
 
-    /// Adds a new child node to the node at the given `NodeIndex`.
-    /// Returns the node's `NodeIndex`.
+    /// Add a new child node to the node at the given `NodeIndex`.
+    /// Return the node's `NodeIndex`.
     ///
     /// child -> edge -> node
     ///
-    /// Computes in **O(1)** time.
+    /// Compute in **O(1)** time.
     pub fn add_child(&mut self, parent: NodeIndex, node: DagNode) -> NodeIndex {
         let (_, n) = self.dag.add_child(parent, (), node);
         n
     }
 
-    /// Returns a **Vec** with all depended subplans for the given node.
+    /// Return a **Vec** with all depended subplans for the given node.
     pub fn get_depended_plans(&self, node: NodeIndex) -> Vec<(DagNode, NodeIndex)> {
         self.dag
             .recursive_walk(node, |g, n| g.parents(n).walk_next(g))
@@ -172,7 +172,7 @@ impl QueryDag {
             .collect()
     }
 
-    /// Returns a **Vec** with all children for the given node.
+    /// Return a **Vec** with all children for the given node.
     pub fn get_sub_plans(&self, node: NodeIndex) -> Vec<(DagNode, NodeIndex)> {
         let mut children = Vec::new();
         for (_, n) in self.dag.children(node).iter(&self.dag) {
@@ -182,12 +182,12 @@ impl QueryDag {
         children
     }
 
-    /// Returns the internal daggy.
+    /// Return the internal daggy.
     pub fn context(&mut self) -> &mut DagPlan {
         &mut self.dag
     }
 
-    /// Builds a new daggy from a physical plan.
+    /// Build a new daggy from a physical plan.
     fn build_dag(plan: &Arc<dyn ExecutionPlan>) -> Self {
         let mut dag = QueryDag::new();
         Self::fission(&mut dag, &plan);
@@ -195,7 +195,7 @@ impl QueryDag {
         dag
     }
 
-    /// Adds a new node to the `QueryDag`.
+    /// Add a new node to the `QueryDag`.
     fn insert_dag(dag: &mut QueryDag, leaf: NodeIndex, node: Value, concurrency: u8) -> NodeIndex {
         if leaf == NodeIndex::end() {
             dag.add_node(DagNode {
@@ -213,7 +213,7 @@ impl QueryDag {
         }
     }
 
-    /// Transforms a physical plan for cloud environment execution.
+    /// Transform a physical plan for cloud environment execution.
     fn fission(dag: &mut QueryDag, plan: &Arc<dyn ExecutionPlan>) {
         let mut root = serde_json::to_value(&plan).unwrap();
         let mut json = &mut root;
