@@ -45,7 +45,7 @@ pub enum Encoding {
 
 impl Default for Encoding {
     fn default() -> Encoding {
-        Encoding::Zstd
+        Encoding::Lz4
     }
 }
 
