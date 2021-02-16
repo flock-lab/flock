@@ -58,7 +58,7 @@ impl Encoding {
                 encoder.compress_vec(&s).unwrap()
             }
             Encoding::Lz4 => lz4::block::compress(&s, None, true).unwrap(),
-            Encoding::Zstd => zstd::block::compress(&s, 0).unwrap(),
+            Encoding::Zstd => zstd::block::compress(&s, 3).unwrap(),
             _ => {
                 unimplemented!();
             }
