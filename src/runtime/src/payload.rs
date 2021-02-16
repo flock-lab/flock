@@ -242,6 +242,7 @@ mod tests {
             writer.write_batches(&[batch.clone()]).unwrap();
         }
         assert_eq!(9436023, buf.len());
+        println!("Arrow RecordBatch data (Json writer): {}", buf.len());
 
         // Option: Arrow Struct Array
         let struct_array: StructArray = batch.clone().into();
@@ -252,10 +253,13 @@ mod tests {
             assert_eq!(4659712, struct_array.get_buffer_memory_size());
             // return the total number of bytes of memory occupied physically by this array.
             assert_eq!(4661048, struct_array.get_array_memory_size());
-            println!("arrow array data: {}", struct_array.get_array_memory_size());
+            println!(
+                "Arrow Struct Array data: {}",
+                struct_array.get_array_memory_size()
+            );
         }
 
-        // Option: Flight Data
+        // Option: Arrow Flight Data
         let options = arrow::ipc::writer::IpcWriteOptions::default();
         let (_, flight_data) = flight_data_from_arrow_batch(&batch, &options);
 
@@ -263,22 +267,22 @@ mod tests {
             let flight_data_size = flight_data.data_header.len() + flight_data.data_body.len();
             assert_eq!(3453248, flight_data_size);
             println!(
-                "raw flight data: {}, encoding ratio: {:.3}",
+                "Raw Arrow Flight data: {}, encoding ratio: {:.3}",
                 flight_data_size,
-                struct_array.get_array_memory_size() as f32 / flight_data_size as f32
+                buf.len() as f32 / flight_data_size as f32
             );
         }
 
-        // Option: Compress flight data
+        // Option: Compress Arrow Flight data
         {
             let en = Encoding::Snappy;
             let en_flight_data_size = en.encoder(&flight_data.data_header).len()
                 + en.encoder(&flight_data.data_body).len();
             assert_eq!(1532739, en_flight_data_size);
             println!(
-                "compressed flight data: {}, compression ratio: {:.3}",
+                "Compressed Arrow Flight data: {}, compression ratio: {:.3}",
                 en_flight_data_size,
-                struct_array.get_array_memory_size() as f32 / en_flight_data_size as f32
+                buf.len() as f32 / en_flight_data_size as f32
             );
         }
     }
