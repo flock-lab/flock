@@ -146,7 +146,7 @@ mod tests {
             datasource,
         };
 
-        let encoded = lambda_context.marshal(Encoding::Snappy);
+        let encoded = lambda_context.marshal(Encoding::default());
 
         // Configures the cloud environment
         std::env::set_var(config::global("context_name").unwrap(), encoded);

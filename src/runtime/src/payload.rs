@@ -160,6 +160,7 @@ mod tests {
     use arrow::datatypes::{DataType, Field, Schema};
     use arrow::json;
     use std::sync::Arc;
+    use std::time::Instant;
 
     #[test]
     fn uuid_builder() {
@@ -275,15 +276,31 @@ mod tests {
 
         // Option: Compress Arrow Flight data
         {
+            let now = Instant::now();
             let en = Encoding::Snappy;
-            let en_flight_data_size = en.encoder(&flight_data.data_header).len()
-                + en.encoder(&flight_data.data_body).len();
+            let en_flight_data_size = en.compress(&flight_data.data_header).len()
+                + en.compress(&flight_data.data_body).len();
             assert_eq!(1532739, en_flight_data_size);
             println!(
                 "Compressed Arrow Flight data: {}, compression ratio: {:.3}",
                 en_flight_data_size,
                 buf.len() as f32 / en_flight_data_size as f32
             );
+            println!("Compression time: {} ms", now.elapsed().as_millis());
+        }
+
+        {
+            let now = Instant::now();
+            let en = Encoding::Lz4;
+            let en_flight_data_size = en.compress(&flight_data.data_header).len()
+                + en.compress(&flight_data.data_body).len();
+            assert_eq!(1552275, en_flight_data_size);
+            println!(
+                "Compressed Arrow Flight data: {}, compression ratio: {:.3}",
+                en_flight_data_size,
+                buf.len() as f32 / en_flight_data_size as f32
+            );
+            println!("Compression time: {} ms", now.elapsed().as_millis());
         }
     }
 }

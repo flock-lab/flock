@@ -36,18 +36,28 @@ pub enum Encoding {
     /// A streaming compression/decompression library DEFLATE-based streams.
     /// <https://github.com/rust-lang/flate2-rs>
     Zlib,
+    /// A fast lossless compression algorithm, targeting real-time compression
+    /// scenarios at zlib-level and better compression ratios. <https://github.com/facebook/zstd>
+    Zstd,
     /// No compression/decompression applied to the context.
     None,
 }
 
+impl Default for Encoding {
+    fn default() -> Encoding {
+        Encoding::Lz4
+    }
+}
+
 impl Encoding {
     /// Compress data
-    pub fn encoder(&self, s: &[u8]) -> Vec<u8> {
+    pub fn compress(&self, s: &[u8]) -> Vec<u8> {
         match *self {
             Encoding::Snappy => {
                 let mut encoder = snap::raw::Encoder::new();
                 encoder.compress_vec(&s).unwrap()
             }
+            Encoding::Lz4 => lz4::block::compress(&s, None, true).unwrap(),
             _ => {
                 unimplemented!();
             }
@@ -55,12 +65,13 @@ impl Encoding {
     }
 
     /// Decompress data
-    pub fn decoder(&self, s: &[u8]) -> Vec<u8> {
+    pub fn decompress(&self, s: &[u8]) -> Vec<u8> {
         match *self {
             Encoding::Snappy => {
                 let mut decoder = snap::raw::Decoder::new();
                 decoder.decompress_vec(&s).unwrap()
             }
+            Encoding::Lz4 => lz4::block::decompress(&s, None).unwrap(),
             _ => {
                 unimplemented!();
             }
@@ -128,13 +139,13 @@ mod tests {
         let plan = ctx.optimize(&plan)?;
         let plan = ctx.create_physical_plan(&plan)?;
 
-        let en = Encoding::Snappy;
+        for en in [Encoding::Snappy, Encoding::Lz4].iter() {
+            let json = serde_json::to_string(&plan).unwrap();
+            let en_json = en.compress(&json.as_bytes());
+            let de_json = en.decompress(&en_json);
 
-        let json = serde_json::to_string(&plan).unwrap();
-        let en_json = en.encoder(&json.as_bytes());
-        let de_json = en.decoder(&en_json);
-
-        assert_eq!(json, unsafe { std::str::from_utf8_unchecked(&de_json) });
+            assert_eq!(json, unsafe { std::str::from_utf8_unchecked(&de_json) });
+        }
 
         Ok(())
     }
