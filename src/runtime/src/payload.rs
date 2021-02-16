@@ -277,30 +277,28 @@ mod tests {
         // Option: Compress Arrow Flight data
         {
             let now = Instant::now();
-            let en = Encoding::Snappy;
-            let en_flight_data_size = en.compress(&flight_data.data_header).len()
-                + en.compress(&flight_data.data_body).len();
-            assert_eq!(1532739, en_flight_data_size);
-            println!(
-                "Compressed Arrow Flight data: {}, compression ratio: {:.3}",
-                en_flight_data_size,
-                buf.len() as f32 / en_flight_data_size as f32
-            );
-            println!("Compression time: {} ms", now.elapsed().as_millis());
-        }
+            for en in [Encoding::Snappy, Encoding::Lz4].iter() {
+                let (en_header, en_body) = (
+                    en.compress(&flight_data.data_header),
+                    en.compress(&flight_data.data_body),
+                );
+                let en_flight_data_size = en_header.len() + en_body.len();
+                println!("Compression time: {} ms", now.elapsed().as_millis());
 
-        {
-            let now = Instant::now();
-            let en = Encoding::Lz4;
-            let en_flight_data_size = en.compress(&flight_data.data_header).len()
-                + en.compress(&flight_data.data_body).len();
-            assert_eq!(1552275, en_flight_data_size);
-            println!(
-                "Compressed Arrow Flight data: {}, compression ratio: {:.3}",
-                en_flight_data_size,
-                buf.len() as f32 / en_flight_data_size as f32
-            );
-            println!("Compression time: {} ms", now.elapsed().as_millis());
+                println!(
+                    "Compressed Arrow Flight data: {}, type: {:?}, compression ratio: {:.3}",
+                    en_flight_data_size,
+                    en,
+                    buf.len() as f32 / en_flight_data_size as f32
+                );
+
+                let now = Instant::now();
+                let (de_header, de_body) = (en.decompress(&en_header), en.decompress(&en_body));
+                println!("Decompression time: {} ms", now.elapsed().as_millis());
+
+                assert_eq!(flight_data.data_header, de_header);
+                assert_eq!(flight_data.data_body, de_body);
+            }
         }
     }
 }
