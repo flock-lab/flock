@@ -17,7 +17,6 @@
 
 use arrow::datatypes::{Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
-
 use arrow_flight::utils::{flight_data_from_arrow_batch, flight_data_to_arrow_batch};
 use arrow_flight::FlightData;
 use serde::{Deserialize, Serialize};
@@ -139,6 +138,7 @@ impl Payload {
     }
 
     /// Converts record batch to payload for network transmission.
+    /// TODO: compression option
     pub fn from(batch: &RecordBatch, schema: SchemaRef, uuid: Uuid) -> Self {
         let options = arrow::ipc::writer::IpcWriteOptions::default();
         let (_, flight_data) = flight_data_from_arrow_batch(batch, &options);
@@ -154,8 +154,15 @@ impl Payload {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::encoding::Encoding;
+    use arrow::array::{Array, StructArray};
+    use arrow::csv;
+    use arrow::datatypes::{DataType, Field, Schema};
+    use arrow::json;
+    use std::sync::Arc;
+
     #[test]
-    fn example_uuid_builder() {
+    fn uuid_builder() {
         let function_name = "SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836";
         let payload_num = 10;
 
@@ -173,6 +180,109 @@ mod tests {
                     seq_num: i,
                     seq_len: payload_num,
                 }
+            );
+        }
+    }
+
+    #[test]
+    fn flight_data_compression_ratio_1() {
+        let schema = Schema::new(vec![
+            Field::new("city", DataType::Utf8, false),
+            Field::new("lat", DataType::Float64, false),
+            Field::new("lng", DataType::Float64, false),
+        ]);
+
+        let records: &[u8] = include_str!("datasource/data/uk_cities_with_headers.csv").as_bytes();
+        let mut reader = csv::Reader::new(records, Arc::new(schema), true, None, 1024, None, None);
+        let batch = reader.next().unwrap().unwrap();
+        let struct_array: StructArray = batch.clone().into();
+
+        assert_eq!(37, struct_array.len());
+        // return the total number of bytes of memory occupied by the buffers owned by
+        // this array.
+        assert_eq!(2432, struct_array.get_buffer_memory_size());
+        // return the total number of bytes of memory occupied physically by this array.
+        assert_eq!(2768, struct_array.get_array_memory_size());
+
+        let options = arrow::ipc::writer::IpcWriteOptions::default();
+        let (_, flight_data) = flight_data_from_arrow_batch(&batch, &options);
+        let flight_data_size = flight_data.data_header.len() + flight_data.data_body.len();
+        assert_eq!(1856, flight_data_size);
+    }
+
+    #[test]
+    fn flight_data_compression_ratio_2() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("tripduration", DataType::Utf8, false),
+            Field::new("starttime", DataType::Utf8, false),
+            Field::new("stoptime", DataType::Utf8, false),
+            Field::new("start station id", DataType::Int32, false),
+            Field::new("start station name", DataType::Utf8, false),
+            Field::new("start station latitude", DataType::Float64, false),
+            Field::new("start station longitude", DataType::Float64, false),
+            Field::new("end station id", DataType::Int32, false),
+            Field::new("end station name", DataType::Utf8, false),
+            Field::new("end station latitude", DataType::Float64, false),
+            Field::new("end station longitude", DataType::Float64, false),
+            Field::new("bikeid", DataType::Int32, false),
+            Field::new("usertype", DataType::Utf8, false),
+            Field::new("birth year", DataType::Int32, false),
+            Field::new("gender", DataType::Int8, false),
+        ]));
+
+        let records: &[u8] =
+            include_str!("datasource/data/JC-202011-citibike-tripdata.csv").as_bytes();
+        let mut reader = csv::Reader::new(records, schema, true, None, 21275, None, None);
+        let batch = reader.next().unwrap().unwrap();
+
+        // Option: Arrow RecordBatch
+        let mut buf = Vec::new();
+        {
+            let mut writer = json::Writer::new(&mut buf);
+            writer.write_batches(&[batch.clone()]).unwrap();
+        }
+        assert_eq!(9436023, buf.len());
+        println!("Arrow RecordBatch data (Json writer): {}", buf.len());
+
+        // Option: Arrow Struct Array
+        let struct_array: StructArray = batch.clone().into();
+        {
+            assert_eq!(21275, struct_array.len());
+            // return the total number of bytes of memory occupied by the buffers owned by
+            // this array.
+            assert_eq!(4659712, struct_array.get_buffer_memory_size());
+            // return the total number of bytes of memory occupied physically by this array.
+            assert_eq!(4661048, struct_array.get_array_memory_size());
+            println!(
+                "Arrow Struct Array data: {}",
+                struct_array.get_array_memory_size()
+            );
+        }
+
+        // Option: Arrow Flight Data
+        let options = arrow::ipc::writer::IpcWriteOptions::default();
+        let (_, flight_data) = flight_data_from_arrow_batch(&batch, &options);
+
+        {
+            let flight_data_size = flight_data.data_header.len() + flight_data.data_body.len();
+            assert_eq!(3453248, flight_data_size);
+            println!(
+                "Raw Arrow Flight data: {}, encoding ratio: {:.3}",
+                flight_data_size,
+                buf.len() as f32 / flight_data_size as f32
+            );
+        }
+
+        // Option: Compress Arrow Flight data
+        {
+            let en = Encoding::Snappy;
+            let en_flight_data_size = en.encoder(&flight_data.data_header).len()
+                + en.encoder(&flight_data.data_body).len();
+            assert_eq!(1532739, en_flight_data_size);
+            println!(
+                "Compressed Arrow Flight data: {}, compression ratio: {:.3}",
+                en_flight_data_size,
+                buf.len() as f32 / en_flight_data_size as f32
             );
         }
     }

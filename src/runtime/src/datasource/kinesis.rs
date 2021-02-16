@@ -115,7 +115,7 @@ mod test {
 
     #[test]
     fn example_kinesis_event() {
-        let data = include_bytes!("json/example-kinesis-event.json");
+        let data = include_bytes!("data/example-kinesis-event.json");
         let parsed: KinesisEvent = serde_json::from_slice(data).unwrap();
         let output: String = serde_json::to_string(&parsed).unwrap();
         let reparsed: KinesisEvent = serde_json::from_slice(output.as_bytes()).unwrap();
@@ -124,7 +124,7 @@ mod test {
 
     #[test]
     fn example_reader() {
-        let records: &[u8] = include_str!("json/mixed_arrays.txt").as_bytes();
+        let records: &[u8] = include_str!("data/mixed_arrays.txt").as_bytes();
         let mut reader = BufReader::new(records);
         let schema = infer_json_schema(&mut reader, Some(1)).unwrap();
 
