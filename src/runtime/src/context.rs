@@ -142,10 +142,10 @@ impl ExecutionContext {
     /// Serializes `ExecutionContext` from client-side.
     pub fn marshal(&self, encoding: Encoding) -> String {
         match encoding {
-            Encoding::Snappy => {
+            Encoding::Snappy | Encoding::Lz4 => {
                 let encoded: Vec<u8> = serde_json::to_vec(&self).unwrap();
                 serde_json::to_string(&CloudEnvironment {
-                    context: encoding.encoder(&encoded),
+                    context: encoding.compress(&encoded),
                     encoding,
                 })
                 .unwrap()
@@ -164,8 +164,8 @@ impl ExecutionContext {
         let env: CloudEnvironment = serde_json::from_str(&s).unwrap();
 
         match env.encoding {
-            Encoding::Snappy => {
-                let encoded = env.encoding.decoder(&env.context);
+            Encoding::Snappy | Encoding::Lz4 => {
+                let encoded = env.encoding.decompress(&env.context);
                 serde_json::from_slice(&encoded).unwrap()
             }
             Encoding::None => serde_json::from_slice(&env.context).unwrap(),
@@ -260,7 +260,7 @@ mod tests {
             datasource,
         };
 
-        let json = lambda_context.marshal(Encoding::Snappy);
+        let json = lambda_context.marshal(Encoding::default());
         let de_json = ExecutionContext::unmarshal(&json);
         assert_eq!(lambda_context, de_json);
 

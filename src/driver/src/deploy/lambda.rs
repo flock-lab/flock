@@ -113,7 +113,7 @@ pub fn environment(ctx: &ExecutionContext) -> Option<Environment> {
     let mut map = HashMap::new();
     map.insert(
         config::global("context_name").unwrap().to_owned(),
-        ctx.marshal(Encoding::Snappy),
+        ctx.marshal(Encoding::default()),
     );
     Some(Environment {
         variables: Some(map),
