@@ -132,7 +132,7 @@ mod test {
 
     #[test]
     fn example_kafka_event() -> Result<()> {
-        let data = include_bytes!("json/example-kafka-event.json");
+        let data = include_bytes!("data/example-kafka-event.json");
         let parsed: KafkaEvent = serde_json::from_slice(data)?;
         let output: String = serde_json::to_string(&parsed)?;
         let reparsed: KafkaEvent = serde_json::from_slice(output.as_bytes())?;
