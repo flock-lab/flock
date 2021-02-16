@@ -58,6 +58,7 @@ impl Encoding {
                 encoder.compress_vec(&s).unwrap()
             }
             Encoding::Lz4 => lz4::block::compress(&s, None, true).unwrap(),
+            Encoding::Zstd => zstd::block::compress(&s, 3).unwrap(),
             _ => {
                 unimplemented!();
             }
@@ -72,6 +73,10 @@ impl Encoding {
                 decoder.decompress_vec(&s).unwrap()
             }
             Encoding::Lz4 => lz4::block::decompress(&s, None).unwrap(),
+            Encoding::Zstd => zstd::block::decompress(
+                &s, 10485760, // The decompressed data should be less than 10 MB
+            )
+            .unwrap(),
             _ => {
                 unimplemented!();
             }
@@ -139,7 +144,7 @@ mod tests {
         let plan = ctx.optimize(&plan)?;
         let plan = ctx.create_physical_plan(&plan)?;
 
-        for en in [Encoding::Snappy, Encoding::Lz4].iter() {
+        for en in [Encoding::Snappy, Encoding::Lz4, Encoding::Zstd].iter() {
             let json = serde_json::to_string(&plan).unwrap();
             let en_json = en.compress(&json.as_bytes());
             let de_json = en.decompress(&en_json);

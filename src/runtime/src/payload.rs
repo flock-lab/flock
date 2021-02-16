@@ -276,7 +276,7 @@ mod tests {
 
         // Option: Compress Arrow Flight data
         {
-            for en in [Encoding::Snappy, Encoding::Lz4].iter() {
+            for en in [Encoding::Snappy, Encoding::Lz4, Encoding::Zstd].iter() {
                 let now = Instant::now();
                 let (en_header, en_body) = (
                     en.compress(&flight_data.data_header),
