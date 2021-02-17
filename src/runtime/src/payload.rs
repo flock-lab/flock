@@ -282,7 +282,16 @@ mod tests {
         let mut reader = csv::Reader::new(records, schema, true, None, 21275, None, None);
         let batch = reader.next().unwrap().unwrap();
 
-        // Option: Arrow RecordBatch
+        // Arrow RecordBatch (in-memory)
+        let size: usize = batch
+            .columns()
+            .iter()
+            .map(|a| a.get_array_memory_size())
+            .sum();
+        assert_eq!(4661248, size);
+        println!("Arrow RecordBatch data (in-memory): {}", size);
+
+        // Option: Arrow RecordBatch (Json writer)
         let mut buf = Vec::new();
         {
             let mut writer = json::Writer::new(&mut buf);
@@ -316,7 +325,7 @@ mod tests {
             println!(
                 "Raw Arrow Flight data: {}, encoding ratio: {:.3}",
                 flight_data_size,
-                buf.len() as f32 / flight_data_size as f32
+                size as f32 / flight_data_size as f32
             );
         }
 
@@ -335,7 +344,7 @@ mod tests {
                     "Compressed Arrow Flight data: {}, type: {:?}, compression ratio: {:.3}",
                     en_flight_data_size,
                     en,
-                    buf.len() as f32 / en_flight_data_size as f32
+                    size as f32 / en_flight_data_size as f32
                 );
 
                 let now = Instant::now();
