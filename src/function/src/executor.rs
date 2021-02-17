@@ -12,12 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! The execution strategy dynamically adjusts the execution plan of the cloud
-//! function at runtime to achieve the optimal performance and cost.
-//! Furthermore, it achieves adaptive query optimization. For example, most
-//! queries do not require distributed dataflow processing. Squirtle can
-//! intelligently make optimization strategies at runtime and choose to complete
-//! the entire query processing in a single cloud function.
+//! By default, Squirtle supports two types of interactive execution modes:
+//! central and distributed. During the planning phase in the client-side, the
+//! optimizer analyzes the query and generate both central and distributed
+//! modes. In central mode, Squirtle executes the query plan immediately using a
+//! single cloud function. In contrast, in distributed mode, the first cloud
+//! function acts as the query coordinator. It schedules work on other cloud
+//! functions that then together execute the query in a distributed dataflow
+//! model. The execution strategy dynamically adjusts execution modes at runtime
+//! to achieve the optimal performance and cost, which achieves
+//! adaptive query optimization.
+//!
+//! For example, small queries begin executing on the immediate cloud function
+//! that receives the requests. Squirtle schedules larger queries for
+//! distributed execution by dynamically provisioning execution funtions in
+//! asynchonrous dataflow fashion.
 
 use arrow::record_batch::RecordBatch;
 use datafusion::physical_plan::ExecutionPlan;
@@ -25,11 +34,13 @@ use std::sync::Arc;
 
 /// The execution strategy of the first cloud function.
 pub enum ExecutionStrategy {
-    /// The current query is executed by a single cloud function.
-    MonolithExec,
-    /// The current query is split into multiple cloud functions (DAG) for
-    /// execution.
-    MacroExec,
+    /// In centralized execution, the system analyzes, plans, and executes the
+    /// query immediately at the first cloud function that receives it.
+    Centralized,
+    /// In distributed mode, the first cloud function to receive the query acts
+    /// only as the query coordinator. That function schedules work on separate
+    /// functions (DAG) that then together execute the query.
+    Distributed,
     /// Unknown error.
     UnknownExec,
 }
@@ -42,8 +53,13 @@ impl Executor {
     /// attributes of the query.
     pub fn choose_strategy(
         _plan: Arc<dyn ExecutionPlan>,
-        _batch: &RecordBatch,
+        batch: &RecordBatch,
     ) -> ExecutionStrategy {
+        let _: usize = batch
+            .columns()
+            .iter()
+            .map(|a| a.get_array_memory_size())
+            .sum();
         ExecutionStrategy::UnknownExec
     }
 }
