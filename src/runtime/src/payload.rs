@@ -15,6 +15,7 @@
 //! Payload API for building and executing query plans in cloud function
 //! services.
 
+use crate::encoding::Encoding;
 use arrow::datatypes::{Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
 use arrow_flight::utils::{flight_data_from_arrow_batch, flight_data_to_arrow_batch};
@@ -88,12 +89,9 @@ pub struct Uuid {
     pub seq_len: i64,
 }
 
-/// `Payload` is the raw structure of the function's payload passed between
-/// lambda functions. In AWS Lambda, it supports payload sizes up to 256KB for
-/// async invocation. you can pass payloads in your query workflows, allowing
-/// each lambda function to seamlessly perform related query operations.
+/// Arrow Flight Data format
 #[derive(Debug, Deserialize, Serialize)]
-pub struct Payload {
+pub struct DataFrame {
     /// Arrow Flight Data's header.
     #[serde(with = "serde_bytes")]
     header: Vec<u8>,
@@ -102,59 +100,107 @@ pub struct Payload {
     body:   Vec<u8>,
     /// The subplan's schema.
     schema: Schema,
-    /// The query's uuid.
-    uuid:   Uuid,
 }
 
-impl Default for Payload {
-    fn default() -> Payload {
+impl Default for DataFrame {
+    fn default() -> DataFrame {
         Self {
             header: vec![],
             body:   vec![],
             schema: Schema::empty(),
-            uuid:   Uuid::default(),
+        }
+    }
+}
+
+/// `Payload` is the raw structure of the function's payload passed between
+/// lambda functions. In AWS Lambda, it supports payload sizes up to 256KB for
+/// async invocation. You can pass payloads in your query workflows, allowing
+/// each lambda function to seamlessly perform related query operations.
+#[derive(Default, Debug, Deserialize, Serialize)]
+pub struct Payload {
+    /// The data batches in the payload.
+    #[serde(with = "serde_bytes")]
+    pub data:     Vec<u8>,
+    /// The query's uuid.
+    pub uuid:     Uuid,
+    /// Compress `DataFrame` to guarantee the total size
+    /// of payload doesn't exceed 256 KB.
+    pub encoding: Encoding,
+}
+
+impl DataFrame {
+    /// Serialize `Payload` in cloud functions.
+    pub fn marshal(&self, uuid: Uuid, encoding: Encoding) -> Value {
+        match encoding {
+            Encoding::Snappy | Encoding::Lz4 | Encoding::Zstd => {
+                let encoded: Vec<u8> = serde_json::to_vec(&self).unwrap();
+                serde_json::to_value(&Payload {
+                    data: encoding.compress(&encoded),
+                    uuid,
+                    encoding,
+                })
+                .unwrap()
+            }
+            Encoding::None => serde_json::to_value(&Payload {
+                data: serde_json::to_vec(&self).unwrap(),
+                uuid,
+                encoding,
+            })
+            .unwrap(),
+            _ => unimplemented!(),
+        }
+    }
+
+    /// Deserialize `DataFrame` from cloud functions.
+    pub fn unmarshal(payload: &Payload) -> DataFrame {
+        match payload.encoding {
+            Encoding::Snappy | Encoding::Lz4 | Encoding::Zstd => {
+                let encoded = payload.encoding.decompress(&payload.data);
+                serde_json::from_slice(&encoded).unwrap()
+            }
+            Encoding::None => serde_json::from_slice(&payload.data).unwrap(),
+            _ => unimplemented!(),
         }
     }
 }
 
 impl Payload {
-    /// Converts incoming payload to record batch in Arrow.
+    /// Convert incoming payload to record batch in Arrow.
     pub fn to_batch(event: Value) -> (RecordBatch, Uuid) {
-        let input: Payload = serde_json::from_value(event).unwrap();
+        let payload: Payload = serde_json::from_value(event).unwrap();
+        let data = DataFrame::unmarshal(&payload);
         (
             flight_data_to_arrow_batch(
                 &FlightData {
-                    data_body:         input.body,
-                    data_header:       input.header,
+                    data_body:         data.body,
+                    data_header:       data.header,
                     app_metadata:      vec![],
                     flight_descriptor: None,
                 },
-                Arc::new(input.schema),
+                Arc::new(data.schema),
                 &[],
             )
             .unwrap(),
-            input.uuid,
+            payload.uuid,
         )
     }
 
-    /// Converts record batch to payload for network transmission.
-    /// TODO: compression option
-    pub fn from(batch: &RecordBatch, schema: SchemaRef, uuid: Uuid) -> Self {
+    /// Convert record batch to payload for network transmission.
+    pub fn from(batch: &RecordBatch, schema: SchemaRef, uuid: Uuid) -> Value {
         let options = arrow::ipc::writer::IpcWriteOptions::default();
         let (_, flight_data) = flight_data_from_arrow_batch(batch, &options);
-        Self {
-            body: flight_data.data_body,
+        let dataframe = DataFrame {
             header: flight_data.data_header,
+            body:   flight_data.data_body,
             schema: (*schema).clone(),
-            uuid,
-        }
+        };
+        dataframe.marshal(uuid, Encoding::default())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::encoding::Encoding;
     use arrow::array::{Array, StructArray};
     use arrow::csv;
     use arrow::datatypes::{DataType, Field, Schema};

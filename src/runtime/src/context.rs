@@ -269,7 +269,7 @@ mod tests {
 
     #[tokio::test]
     async fn feed_one_source() -> Result<()> {
-        let input = include_str!("../../../examples/lambda/example-kinesis-event.json");
+        let input = include_str!("datasource/data/example-kinesis-event-1.json");
         let input: KinesisEvent = serde_json::from_str(input).unwrap();
 
         let record_batch = kinesis::to_batch(input).unwrap();
