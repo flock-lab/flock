@@ -14,14 +14,15 @@
 
 //! By default, Squirtle supports two types of interactive execution modes:
 //! central and distributed. During the planning phase in the client-side, the
-//! optimizer analyzes the query and generate both central and distributed
-//! modes. In central mode, Squirtle executes the query plan immediately using a
-//! single cloud function. In contrast, in distributed mode, the first cloud
-//! function acts as the query coordinator. It schedules work on other cloud
-//! functions that then together execute the query in a distributed dataflow
-//! model. The execution strategy dynamically adjusts execution modes at runtime
-//! to achieve the optimal performance and cost, which achieves
-//! adaptive query optimization.
+//! optimizer analyzes the query and generate the physical plan, which is
+//! compressed and serialized to the environment context of cloud functios. The
+//! execution strategy dynamically adjusts central and distributed execution
+//! modes at runtime to achieve the optimal performance and cost, that is,
+//! adaptive query optimization. In central mode, Squirtle executes the query
+//! plan immediately using a single cloud function. In contrast, in distributed
+//! mode, the first cloud function acts as the query coordinator. It schedules
+//! work on other cloud functions that then together execute the query in a
+//! distributed dataflow model.
 //!
 //! For example, small queries begin executing on the immediate cloud function
 //! that receives the requests. Squirtle schedules larger queries for
@@ -33,6 +34,10 @@ use datafusion::physical_plan::ExecutionPlan;
 use std::sync::Arc;
 
 /// The execution strategy of the first cloud function.
+///
+/// Small queries begin executing on the immediate cloud function that
+/// receives the requests; Larger queries beigin executing on dynamically
+/// provisioning cloud funtions in asynchonrous fashion.
 pub enum ExecutionStrategy {
     /// In centralized execution, the system analyzes, plans, and executes the
     /// query immediately at the first cloud function that receives it.
