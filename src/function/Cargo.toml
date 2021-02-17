@@ -23,9 +23,5 @@ snmalloc-rs = { version = "0.2", optional = true, features = [ "cache-friendly" 
 tokio = { version = "1.2", features = [ "macros", "io-util", "sync", "rt-multi-thread" ] }
 
 [[bin]]
-name = "scq_ops"
-path = "src/ops.rs"
-
-[[bin]]
 name = "lambda"
 path = "src/lambda/main.rs"
