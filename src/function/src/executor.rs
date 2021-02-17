@@ -23,11 +23,6 @@
 //! mode, the first cloud function acts as the query coordinator. It schedules
 //! work on other cloud functions that then together execute the query in a
 //! distributed dataflow model.
-//!
-//! For example, small queries begin executing on the immediate cloud function
-//! that receives the requests. Squirtle schedules larger queries for
-//! distributed execution by dynamically provisioning execution funtions in
-//! asynchonrous dataflow fashion.
 
 use arrow::record_batch::RecordBatch;
 use datafusion::physical_plan::ExecutionPlan;
