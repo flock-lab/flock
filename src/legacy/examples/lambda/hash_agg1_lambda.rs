@@ -41,8 +41,7 @@ async fn handler(event: Value, _: Context) -> Result<Value> {
     let result = exec_plan!(plan, vec![vec![record_batch]]);
     pretty::print_batches(&result)?;
 
-    let payload = Payload::from(&result[0], schema, uuid);
-    Ok(serde_json::to_value(&payload)?)
+    Ok(Payload::from(&result[0], schema, uuid))
 }
 
 #[cfg(test)]
@@ -50,16 +49,16 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn agg2_test() {
+    async fn agg1_test() {
         let data = r#"
-            {"header":[16,0,0,0,12,0,26,0,24,0,23,0,4,0,8,0,12,0,0,0,32,0,0,0,80,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,3,0,10,0,24,0,12,0,8,0,4,0,10,0,0,0,76,0,0,0,16,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,3,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,0,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,16,0,0,0,0,0,0,0,24,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,32,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,40,0,0,0,0,0,0,0,16,0,0,0,0,0,0,0,56,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,64,0,0,0,0,0,0,0,16,0,0,0,0,0,0,0],"body":[255,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,2,0,0,0,0,0,0,0,97,98,0,0,0,0,0,0,255,0,0,0,0,0,0,0,100,0,0,0,0,0,0,0,101,0,0,0,0,0,0,0,255,0,0,0,0,0,0,0,102,102,102,102,102,6,87,64,154,153,153,153,153,25,88,64],"schema":{"fields":[{"name":"c3","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"MAX(c1)[max]","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"MIN(c2)[min]","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"uuid":{"tid":"0","seq_num":0,"seq_len":1}}
+            {"header":[16,0,0,0,12,0,26,0,24,0,23,0,4,0,8,0,12,0,0,0,32,0,0,0,136,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,3,0,10,0,24,0,12,0,8,0,4,0,10,0,0,0,76,0,0,0,16,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,3,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,7,0,0,0,0,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,40,0,0,0,0,0,0,0,48,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,56,0,0,0,0,0,0,0,40,0,0,0,0,0,0,0,96,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,104,0,0,0,0,0,0,0,24,0,0,0,0,0,0,0,128,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0],"body":[255,0,0,0,0,0,0,0,90,0,0,0,0,0,0,0,100,0,0,0,0,0,0,0,91,0,0,0,0,0,0,0,101,0,0,0,0,0,0,0,92,0,0,0,0,0,0,0,255,0,0,0,0,0,0,0,102,102,102,102,102,6,87,64,205,204,204,204,204,76,87,64,51,51,51,51,51,211,87,64,154,153,153,153,153,25,88,64,0,0,0,0,0,160,88,64,255,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,2,0,0,0,3,0,0,0,4,0,0,0,5,0,0,0,97,97,97,98,98,0,0,0],"schema":{"fields":[{"name":"c1","data_type":"Int64","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"c2","data_type":"Float64","nullable":false,"dict_id":0,"dict_is_ordered":false},{"name":"c3","data_type":"Utf8","nullable":false,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"uuid":{"tid":"0","seq_num":0,"seq_len":1}}
         "#;
 
         let plan_key = "PLAN_JSON";
         let plan_val = r#"
         {
             "execution_plan":"hash_aggregate_exec",
-            "mode":"Final",
+            "mode":"Partial",
             "group_expr":[
                [
                   {
@@ -103,14 +102,14 @@ mod tests {
                         "dict_is_ordered":false
                      },
                      {
-                        "name":"MAX(c1)",
+                        "name":"MAX(c1)[max]",
                         "data_type":"Int64",
                         "nullable":true,
                         "dict_id":0,
                         "dict_is_ordered":false
                      },
                      {
-                        "name":"MIN(c2)",
+                        "name":"MIN(c2)[min]",
                         "data_type":"Float64",
                         "nullable":true,
                         "dict_id":0,
@@ -133,14 +132,14 @@ mod tests {
                      "dict_is_ordered":false
                   },
                   {
-                     "name":"MAX(c1)",
+                     "name":"MAX(c1)[max]",
                      "data_type":"Int64",
                      "nullable":true,
                      "dict_id":0,
                      "dict_is_ordered":false
                   },
                   {
-                     "name":"MIN(c2)",
+                     "name":"MIN(c2)[min]",
                      "data_type":"Float64",
                      "nullable":true,
                      "dict_id":0,

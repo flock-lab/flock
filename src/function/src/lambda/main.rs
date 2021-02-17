@@ -80,8 +80,7 @@ async fn kinesis_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Val
     let batches = ctx.execute().await?;
 
     let mut uuid_builder = UuidBuilder::new(&ctx.name, 1 /* one payload */);
-    let payload = Payload::from(&batches[0], schema, uuid_builder.next());
-    Ok(serde_json::to_value(&payload)?)
+    Ok(Payload::from(&batches[0], schema, uuid_builder.next()))
 }
 
 async fn kafka_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Value> {
@@ -96,8 +95,7 @@ async fn kafka_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Value
     let batches = ctx.execute().await?;
 
     let mut uuid_builder = UuidBuilder::new(&ctx.name, 1 /* one payload */);
-    let payload = Payload::from(&batches[0], schema, uuid_builder.next());
-    Ok(serde_json::to_value(&payload)?)
+    Ok(Payload::from(&batches[0], schema, uuid_builder.next()))
 }
 
 async fn payload_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Value> {
@@ -107,8 +105,7 @@ async fn payload_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Val
     ctx.feed_one_source(&vec![vec![batch]]);
     let batches = ctx.execute().await?;
 
-    let payload = Payload::from(&batches[0], schema, uuid);
-    Ok(serde_json::to_value(&payload)?)
+    Ok(Payload::from(&batches[0], schema, uuid))
 }
 
 async fn handler(event: Value, _: Context) -> Result<Value> {

@@ -47,6 +47,5 @@ async fn handler(event: Value, _: Context) -> Result<Value> {
     let (record_batch, uuid) = Payload::to_batch(event);
     let result = exec_plan!(plan, vec![vec![record_batch]]);
 
-    let payload = Payload::from(&result[0], schema, uuid);
-    Ok(serde_json::to_value(&payload)?)
+    Ok(Payload::from(&result[0], schema, uuid))
 }

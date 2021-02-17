@@ -43,8 +43,7 @@ async fn handler(event: KinesisEvent, _: Context) -> Result<Value> {
     let result = exec_plan!(plan, vec![vec![record_batch]]);
     pretty::print_batches(&result)?;
 
-    let payload = Payload::from(&result[0], schema, Uuid::default());
-    Ok(serde_json::to_value(&payload)?)
+    Ok(Payload::from(&result[0], schema, Uuid::default()))
 }
 
 #[cfg(test)]
