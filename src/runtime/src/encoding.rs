@@ -96,6 +96,7 @@ mod tests {
     use datafusion::datasource::MemTable;
     use datafusion::execution::context::ExecutionContext;
     use std::sync::Arc;
+    use std::time::Instant;
 
     #[tokio::test]
     async fn encode_plan() -> Result<()> {
@@ -146,8 +147,26 @@ mod tests {
 
         for en in [Encoding::Snappy, Encoding::Lz4, Encoding::Zstd].iter() {
             let json = serde_json::to_string(&plan).unwrap();
+
+            let now = Instant::now();
             let en_json = en.compress(&json.as_bytes());
+            println!("Compression time: {} μs", now.elapsed().as_micros());
+
+            let now = Instant::now();
             let de_json = en.decompress(&en_json);
+            println!("Decompression time: {} μs", now.elapsed().as_micros());
+
+            println!(
+                concat!(
+                    "Plan: before compression: {} bytes, ",
+                    "after compression: {} bytes, ",
+                    "type: {:?}, ratio: {:.3}"
+                ),
+                json.len(),
+                en_json.len(),
+                en,
+                json.len() as f64 / en_json.len() as f64
+            );
 
             assert_eq!(json, unsafe { std::str::from_utf8_unchecked(&de_json) });
         }
