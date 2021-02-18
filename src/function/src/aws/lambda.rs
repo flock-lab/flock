@@ -63,34 +63,40 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn kinesis_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Value> {
-    let kinesis_event: KinesisEvent = serde_json::from_value(event).unwrap();
-    let batch = match kinesis::to_batch(kinesis_event) {
-        Some(batch) => batch,
-        None => return Err(SquirtleError::Execution("No Kinesis input!".to_owned())),
+async fn source_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Value> {
+    let (batch, schema) = match &ctx.datasource {
+        DataSource::KinesisEvent(_) => {
+            let kinesis_event: KinesisEvent = serde_json::from_value(event).unwrap();
+            let batch = match kinesis::to_batch(kinesis_event) {
+                Some(batch) => batch,
+                None => return Err(SquirtleError::Execution("No Kinesis input!".to_owned())),
+            };
+            let schema = batch.schema();
+            (batch, schema)
+        }
+        DataSource::KafkaEvent(_) => {
+            let kafka_event: KafkaEvent = serde_json::from_value(event).unwrap();
+            let batch = match kafka::to_batch(kafka_event) {
+                Some(batch) => batch,
+                None => return Err(SquirtleError::Execution("No Kafka input!".to_owned())),
+            };
+            let schema = batch.schema();
+            (batch, schema)
+        }
+        _ => unimplemented!(),
     };
-    let schema = batch.schema();
 
-    ctx.feed_one_source(&vec![vec![batch]]);
-    let batches = ctx.execute().await?;
-
-    let mut uuid_builder = UuidBuilder::new(&ctx.name, 1 /* one payload */);
-    Ok(Payload::from(&batches[0], schema, uuid_builder.next()))
-}
-
-async fn kafka_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Value> {
-    let kafka_event: KafkaEvent = serde_json::from_value(event).unwrap();
-    let batch = match kafka::to_batch(kafka_event) {
-        Some(batch) => batch,
-        None => return Err(SquirtleError::Execution("No Kafka input!".to_owned())),
-    };
-    let schema = batch.schema();
-
-    ctx.feed_one_source(&vec![vec![batch]]);
-    let batches = ctx.execute().await?;
-
-    let mut uuid_builder = UuidBuilder::new(&ctx.name, 1 /* one payload */);
-    Ok(Payload::from(&batches[0], schema, uuid_builder.next()))
+    match LambdaExecutor::choose_strategy(&ctx, &batch) {
+        ExecutionStrategy::Centralized => {
+            ctx.feed_one_source(&vec![vec![batch]]);
+            let batches = ctx.execute().await?;
+            let mut uuid_builder = UuidBuilder::new(&ctx.name, 1 /* one payload */);
+            Ok(Payload::from(&batches[0], schema, uuid_builder.next()))
+        }
+        ExecutionStrategy::Distributed => {
+            unimplemented!();
+        }
+    }
 }
 
 async fn payload_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Value> {
@@ -108,8 +114,9 @@ async fn handler(event: Value, _: Context) -> Result<Value> {
 
     match &ctx.datasource {
         DataSource::Payload => payload_handler(&mut ctx, event).await,
-        DataSource::KinesisEvent(_) => kinesis_handler(&mut ctx, event).await,
-        DataSource::KafkaEvent(_) => kafka_handler(&mut ctx, event).await,
+        DataSource::KinesisEvent(_) | DataSource::KafkaEvent(_) => {
+            source_handler(&mut ctx, event).await
+        }
         DataSource::Json => Ok(event),
         _ => unimplemented!(),
     }
