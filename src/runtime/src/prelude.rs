@@ -30,4 +30,3 @@ pub use crate::error::{Result, SquirtleError};
 pub use crate::payload::{Payload, Uuid, UuidBuilder};
 pub use crate::plan::*;
 pub use crate::query::{BatchQuery, Query, Schedule, StreamQuery, StreamWindow};
-pub use crate::{exec_plan, init_plan};

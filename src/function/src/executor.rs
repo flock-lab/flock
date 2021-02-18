@@ -26,6 +26,7 @@
 
 use arrow::record_batch::RecordBatch;
 use datafusion::physical_plan::ExecutionPlan;
+use runtime::prelude::*;
 use std::sync::Arc;
 
 /// The execution strategy of the first cloud function.
@@ -48,18 +49,37 @@ pub enum ExecutionStrategy {
 /// The query executor in cloud function.
 pub struct Executor;
 
+const FIVE_MB: usize = 5 * 1024 * 1024;
+const TEN_MB: usize = 10 * 1024 * 1024;
+const TWENTY_MB: usize = 20 * 1024 * 1024;
+
 impl Executor {
     /// Choose an optimal strategy according to the size of the batch and the
     /// attributes of the query.
-    pub fn choose_strategy(
-        _plan: Arc<dyn ExecutionPlan>,
-        batch: &RecordBatch,
-    ) -> ExecutionStrategy {
-        let _: usize = batch
+    pub fn choose_strategy(plan: Arc<dyn ExecutionPlan>, batch: &RecordBatch) -> ExecutionStrategy {
+        let size: usize = batch
             .columns()
             .iter()
             .map(|a| a.get_array_memory_size())
             .sum();
-        ExecutionStrategy::UnknownExec
+        if contain_join(&plan) {
+            if size < FIVE_MB {
+                ExecutionStrategy::Centralized
+            } else {
+                ExecutionStrategy::Distributed
+            }
+        } else if contain_aggregate(&plan) {
+            if size < TEN_MB {
+                ExecutionStrategy::Centralized
+            } else {
+                ExecutionStrategy::Distributed
+            }
+        } else {
+            if size < TWENTY_MB {
+                ExecutionStrategy::Centralized
+            } else {
+                ExecutionStrategy::Distributed
+            }
+        }
     }
 }
