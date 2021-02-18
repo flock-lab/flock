@@ -25,7 +25,10 @@
 //! distributed dataflow model.
 
 use arrow::record_batch::RecordBatch;
+use datafusion::physical_plan::coalesce_batches::CoalesceBatchesExec;
+use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::ExecutionPlan;
+use futures::stream::StreamExt;
 use runtime::prelude::*;
 use std::sync::Arc;
 
@@ -56,30 +59,58 @@ const TWENTY_MB: usize = 20 * 1024 * 1024;
 impl Executor {
     /// Choose an optimal strategy according to the size of the batch and the
     /// attributes of the query.
-    pub fn choose_strategy(plan: Arc<dyn ExecutionPlan>, batch: &RecordBatch) -> ExecutionStrategy {
+    pub fn choose_strategy(ctx: &ExecutionContext, batch: &RecordBatch) -> ExecutionStrategy {
         let size: usize = batch
             .columns()
             .iter()
             .map(|a| a.get_array_memory_size())
             .sum();
-        if contain_join(&plan) {
+        if contain_join(&ctx.plan) {
             if size < FIVE_MB {
                 ExecutionStrategy::Centralized
             } else {
                 ExecutionStrategy::Distributed
             }
-        } else if contain_aggregate(&plan) {
+        } else if contain_aggregate(&ctx.plan) {
             if size < TEN_MB {
                 ExecutionStrategy::Centralized
             } else {
                 ExecutionStrategy::Distributed
             }
+        } else if size < TWENTY_MB {
+            ExecutionStrategy::Centralized
         } else {
-            if size < TWENTY_MB {
-                ExecutionStrategy::Centralized
-            } else {
-                ExecutionStrategy::Distributed
-            }
+            ExecutionStrategy::Distributed
         }
+    }
+
+    /// Combines small batches into larger batches for more efficient use of
+    /// vectorized processing by upstream operators
+    pub async fn coalesce_batches(
+        input_partitions: Vec<Vec<RecordBatch>>,
+        target_batch_size: usize,
+    ) -> Result<Vec<Vec<RecordBatch>>> {
+        // create physical plan
+        let exec = MemoryExec::try_new(
+            &input_partitions,
+            input_partitions[0][0].schema().clone(),
+            None,
+        )?;
+        let exec: Arc<dyn ExecutionPlan> =
+            Arc::new(CoalesceBatchesExec::new(Arc::new(exec), target_batch_size));
+
+        // execute and collect results
+        let output_partition_count = exec.output_partitioning().partition_count();
+        let mut output_partitions = Vec::with_capacity(output_partition_count);
+        for i in 0..output_partition_count {
+            // execute this *output* partition and collect all batches
+            let mut stream = exec.execute(i).await?;
+            let mut batches = vec![];
+            while let Some(result) = stream.next().await {
+                batches.push(result?);
+            }
+            output_partitions.push(batches);
+        }
+        Ok(output_partitions)
     }
 }
