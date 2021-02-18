@@ -112,7 +112,7 @@ pub fn function_code() -> FunctionCode {
 pub fn environment(ctx: &ExecutionContext) -> Option<Environment> {
     let mut map = HashMap::new();
     map.insert(
-        config::global("context_name").unwrap().to_owned(),
+        (&globals["context"]["name"]).to_owned(),
         ctx.marshal(Encoding::Zstd),
     );
     Some(Environment {

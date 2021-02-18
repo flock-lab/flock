@@ -14,25 +14,12 @@
 
 //! Configuration settings that affect all crates in current system.
 
+use ini::Ini;
 use lazy_static::lazy_static;
-use serde_json::Value;
 
 lazy_static! {
-    /// Global constants across crates.
-    pub static ref GLOBALS: Value = serde_json::from_str(include_str!("global.json")).unwrap();
-}
-
-/// Display the current configuration settings.
-pub fn show() {
-    println!(" * Settings :: \n\x1b[31m{:#?}\x1b[0m", GLOBALS.to_string());
-}
-
-/// A wrapper function to get the global information.
-pub fn global<S>(s: S) -> Option<&'static str>
-where
-    S: Into<String>,
-{
-    GLOBALS[s.into()].as_str()
+    /// Global settings.
+    pub static ref GLOBALS: Ini = Ini::load_from_str(include_str!("config/squirtle.toml")).unwrap();
 }
 
 #[cfg(test)]
@@ -42,7 +29,32 @@ mod tests {
 
     #[tokio::test]
     async fn setting_shows() -> Result<()> {
-        show();
+        let conf = Ini::load_from_str(include_str!("config/squirtle.toml")).unwrap();
+
+        for (sec, prop) in &conf {
+            println!("Section: {:?}", sec);
+            for (key, value) in prop.iter() {
+                println!("{:?}:{:?}", key, value);
+            }
+        }
+
+        assert_eq!(
+            5242880,
+            (&conf["context"]["join_threshold"]).parse::<i32>().unwrap()
+        );
+        assert_eq!(
+            10485760,
+            (&conf["context"]["aggregate_threshold"])
+                .parse::<i32>()
+                .unwrap()
+        );
+        assert_eq!(
+            20971520,
+            (&conf["context"]["regular_threshold"])
+                .parse::<i32>()
+                .unwrap()
+        );
+
         Ok(())
     }
 }

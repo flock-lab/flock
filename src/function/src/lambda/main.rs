@@ -40,18 +40,13 @@ static mut EXECUTION_CONTEXT: CloudFunctionContext = CloudFunctionContext::Unini
 macro_rules! init_exec_context {
     () => {{
         unsafe {
-            INIT.call_once(|| match config::global("context_name") {
-                Some(name) => match std::env::var(name) {
-                    Ok(s) => {
-                        EXECUTION_CONTEXT =
-                            CloudFunctionContext::Lambda(Box::new(ExecutionContext::unmarshal(&s)));
-                    }
-                    Err(_) => {
-                        panic!("No execution context in the cloud environment.");
-                    }
-                },
-                None => {
-                    panic!("No execution context name!");
+            INIT.call_once(|| match std::env::var(&globals["context"]["name"]) {
+                Ok(s) => {
+                    EXECUTION_CONTEXT =
+                        CloudFunctionContext::Lambda(Box::new(ExecutionContext::unmarshal(&s)));
+                }
+                Err(_) => {
+                    panic!("No execution context in the cloud environment.");
                 }
             });
             match &mut EXECUTION_CONTEXT {
@@ -146,7 +141,7 @@ mod tests {
         let encoded = lambda_context.marshal(Encoding::default());
 
         // Configures the cloud environment
-        std::env::set_var(config::global("context_name").unwrap(), encoded);
+        std::env::set_var(&globals["context"]["name"], encoded);
 
         // First lambda call
         let event = json!({

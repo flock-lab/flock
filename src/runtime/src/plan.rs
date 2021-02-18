@@ -12,77 +12,62 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! The helper of lambda function to initialize the physical plan from the cloud
-//! environment.
+//! The helper crate for cloud function to extract information from a physical
+//! plan.
+//!
+//! A generic execution plan which includes:
+//! - `CoalesceBatchesExec`: Combines small batches into larger batches for more
+//!   efficient use of vectorized processing by upstream operators.
+//! - `CsvExec`: Execution plan for scanning a CSV file.
+//! - `DummyExec`: Dummy execution plan.
+//! - `EmptyExec`: Execution plan for empty relation (produces no rows).
+//! - `ExplainExec`: Explain execution plan operator. This operator contains the
+//!   string values of the various plans it has when it is created, and passes
+//!   them to its output.
+//! - `FilterExec`: Evaluates a boolean predicate against all input batches to
+//!   determine which rows to include in its output batches.
+//! - `HashAggregateExec`: Hash aggregate execution plan.
+//! - `HashJoinExec`: Join execution plan executes partitions in parallel and
+//!   combines them into a set of partitions.
+//! - `GlobalLimitExec`: Limit execution plan.
+//! - `LocalLimitExec`: Applies a limit to a single partition.
+//! - `MemoryExec`: Execution plan for reading in-memory batches of data.
+//! - `Merge`: Execution plan executes partitions in parallel and combines them
+//!   into a single partition. No guarantees are made about the order of the
+//!   resulting partition.
+//! - `ParquetExec`: Execution plan for scanning one or more `Parquet`
+//!   partitions.
+//! - `ProjectionExec`: Execution plan for a projection.
+//! - `RepartitionExec`: The repartition operator maps N input partitions to M
+//!   output partitions based on a partitioning scheme. No guarantees are made
+//!   about the order of the resulting partitions.
+//! - `Sort`: The sort execution plan.
 
+use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
+use datafusion::physical_plan::hash_join::HashJoinExec;
+use datafusion::physical_plan::sort::SortExec;
 use datafusion::physical_plan::ExecutionPlan;
+use std::sync::Arc;
 
-/// Environment key for the JSON-formatted physical sub-plan.
-pub const PLAN_JSON: &str = "PLAN_JSON";
-
-/// The lazy-loaded singleton of lambda function supports dynamic dispatch
-/// through `LambdaPlan`.
-pub enum LambdaPlan {
-    /// A generic execution plan which includes:
-    /// - `CoalesceBatchesExec`: Combines small batches into larger batches for
-    ///   more efficient use of vectorized processing by upstream operators.
-    /// - `CsvExec`: Execution plan for scanning a CSV file.
-    /// - `DummyExec`: Dummy execution plan.
-    /// - `EmptyExec`: Execution plan for empty relation (produces no rows).
-    /// - `ExplainExec`: Explain execution plan operator. This operator contains
-    ///   the string values of the various plans it has when it is created, and
-    ///   passes them to its output.
-    /// - `FilterExec`: Evaluates a boolean predicate against all input batches
-    ///   to determine which rows to include in its output batches.
-    /// - `HashAggregateExec`: Hash aggregate execution plan.
-    /// - `HashJoinExec`: Join execution plan executes partitions in parallel
-    ///   and combines them into a set of partitions.
-    /// - `GlobalLimitExec`: Limit execution plan.
-    /// - `LocalLimitExec`: Applies a limit to a single partition.
-    /// - `MemoryExec`: Execution plan for reading in-memory batches of data.
-    /// - `Merge`: Execution plan executes partitions in parallel and combines
-    ///   them into a single partition. No guarantees are made about the order
-    ///   of the resulting partition.
-    /// - `ParquetExec`: Execution plan for scanning one or more `Parquet`
-    ///   partitions.
-    /// - `ProjectionExec`: Execution plan for a projection.
-    /// - `RepartitionExec`: The repartition operator maps N input partitions to
-    ///   M output partitions based on a partitioning scheme. No guarantees are
-    ///   made about the order of the resulting partitions.
-    /// - `Sort`: The sort execution plan.
-    OpsExec(Box<dyn ExecutionPlan>),
-    /// No execution plan for initialization.
-    None,
-}
-
-/// Performs an initialization routine once and only once.
-#[macro_export]
-macro_rules! init_plan {
-    ($init:ident, $plan:ident) => {{
-        unsafe {
-            $init.call_once(|| match std::env::var(PLAN_JSON) {
-                Ok(json) => {
-                    $plan = LambdaPlan::OpsExec(
-                        serde_json::from_str::<Box<dyn ExecutionPlan>>(&json).unwrap(),
-                    );
+macro_rules! query_has_op_function {
+    ($OPERATOR:ident, $FUNC:ident) => {
+        /// Returns true if the current execution plan contains a given operator.
+        pub fn $FUNC(plan: &Arc<dyn ExecutionPlan>) -> bool {
+            let mut curr = plan.clone();
+            loop {
+                if curr.as_any().downcast_ref::<$OPERATOR>().is_some() {
+                    return true;
                 }
-                Err(e) => panic!("Didn't configure the environment {}, {}", PLAN_JSON, e),
-            });
-            match &mut $plan {
-                LambdaPlan::OpsExec(plan) => (plan.schema(), plan),
-                LambdaPlan::None => panic!("Unexpected plan!"),
-                _ => unimplemented!(),
+                if curr.children().is_empty() {
+                    break;
+                }
+                curr = curr.children()[0].clone();
             }
+            false
         }
-    }};
+    };
 }
 
-/// Executes the physical plan.
-#[macro_export]
-macro_rules! exec_plan {
-    ($plan:ident, $batch:expr) => {{
-        $plan.feed_batches($batch);
-        let it = $plan.execute(0).await?;
-        common::collect(it).await?
-    }};
-}
+query_has_op_function!(SortExec, contain_sort);
+query_has_op_function!(HashJoinExec, contain_join);
+query_has_op_function!(HashAggregateExec, contain_aggregate);
