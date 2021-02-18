@@ -91,11 +91,7 @@ impl Executor {
         target_batch_size: usize,
     ) -> Result<Vec<Vec<RecordBatch>>> {
         // create physical plan
-        let exec = MemoryExec::try_new(
-            &input_partitions,
-            input_partitions[0][0].schema().clone(),
-            None,
-        )?;
+        let exec = MemoryExec::try_new(&input_partitions, input_partitions[0][0].schema(), None)?;
         let exec: Arc<dyn ExecutionPlan> =
             Arc::new(CoalesceBatchesExec::new(Arc::new(exec), target_batch_size));
 
@@ -112,5 +108,54 @@ impl Executor {
             output_partitions.push(batches);
         }
         Ok(output_partitions)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use arrow::array::UInt32Array;
+    use arrow::datatypes::{DataType, Field, Schema};
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_concat_batches() -> Result<()> {
+        let schema = test_schema();
+        let partition = create_vec_batches(&schema, 10)?;
+        let partitions = vec![partition];
+
+        let output_partitions = Executor::coalesce_batches(partitions, 20).await?;
+        assert_eq!(1, output_partitions.len());
+
+        // input is 10 batches x 8 rows (80 rows)
+        // expected output is batches of at least 20 rows (except for the final batch)
+        let batches = &output_partitions[0];
+        assert_eq!(4, batches.len());
+        assert_eq!(24, batches[0].num_rows());
+        assert_eq!(24, batches[1].num_rows());
+        assert_eq!(24, batches[2].num_rows());
+        assert_eq!(8, batches[3].num_rows());
+
+        Ok(())
+    }
+
+    fn test_schema() -> Arc<Schema> {
+        Arc::new(Schema::new(vec![Field::new("c0", DataType::UInt32, false)]))
+    }
+
+    fn create_vec_batches(schema: &Arc<Schema>, num_batches: usize) -> Result<Vec<RecordBatch>> {
+        let batch = create_batch(schema);
+        let mut vec = Vec::with_capacity(num_batches);
+        for _ in 0..num_batches {
+            vec.push(batch.clone());
+        }
+        Ok(vec)
+    }
+
+    fn create_batch(schema: &Arc<Schema>) -> RecordBatch {
+        RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(UInt32Array::from(vec![1, 2, 3, 4, 5, 6, 7, 8]))],
+        )
+        .unwrap()
     }
 }
