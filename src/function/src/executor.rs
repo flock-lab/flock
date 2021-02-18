@@ -27,7 +27,8 @@
 use arrow::record_batch::RecordBatch;
 use datafusion::physical_plan::coalesce_batches::CoalesceBatchesExec;
 use datafusion::physical_plan::memory::MemoryExec;
-use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::repartition::RepartitionExec;
+use datafusion::physical_plan::{ExecutionPlan, Partitioning};
 use futures::stream::StreamExt;
 use runtime::prelude::*;
 use std::sync::Arc;
@@ -109,6 +110,31 @@ impl Executor {
         }
         Ok(output_partitions)
     }
+
+    /// Maps N input partitions to M output partitions based on a
+    /// partitioning scheme. No guarantees are made about the order of the
+    /// resulting partitions.
+    pub async fn repartition(
+        input_partitions: Vec<Vec<RecordBatch>>,
+        partitioning: Partitioning,
+    ) -> Result<Vec<Vec<RecordBatch>>> {
+        // create physical plan
+        let exec = MemoryExec::try_new(&input_partitions, input_partitions[0][0].schema(), None)?;
+        let exec = RepartitionExec::try_new(Arc::new(exec), partitioning)?;
+
+        // execute and collect results
+        let mut output_partitions = vec![];
+        for i in 0..exec.partitioning().partition_count() {
+            // execute this *output* partition and collect all batches
+            let mut stream = exec.execute(i).await?;
+            let mut batches = vec![];
+            while let Some(result) = stream.next().await {
+                batches.push(result?);
+            }
+            output_partitions.push(batches);
+        }
+        Ok(output_partitions)
+    }
 }
 
 #[cfg(test)]
@@ -134,6 +160,64 @@ mod tests {
         assert_eq!(24, batches[1].num_rows());
         assert_eq!(24, batches[2].num_rows());
         assert_eq!(8, batches[3].num_rows());
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn one_to_many_round_robin() -> Result<()> {
+        // define input partitions
+        let schema = test_schema();
+        let partition = create_vec_batches(&schema, 50)?;
+        let partitions = vec![partition];
+
+        // repartition from 1 input to 4 output
+        let output_partitions =
+            Executor::repartition(partitions, Partitioning::RoundRobinBatch(4)).await?;
+
+        assert_eq!(4, output_partitions.len());
+        assert_eq!(13, output_partitions[0].len());
+        assert_eq!(13, output_partitions[1].len());
+        assert_eq!(12, output_partitions[2].len());
+        assert_eq!(12, output_partitions[3].len());
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn many_to_one_round_robin() -> Result<()> {
+        // define input partitions
+        let schema = test_schema();
+        let partition = create_vec_batches(&schema, 50)?;
+        let partitions = vec![partition.clone(), partition.clone(), partition.clone()];
+
+        // repartition from 3 input to 1 output
+        let output_partitions =
+            Executor::repartition(partitions, Partitioning::RoundRobinBatch(1)).await?;
+
+        assert_eq!(1, output_partitions.len());
+        assert_eq!(150, output_partitions[0].len());
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn many_to_many_round_robin() -> Result<()> {
+        // define input partitions
+        let schema = test_schema();
+        let partition = create_vec_batches(&schema, 50)?;
+        let partitions = vec![partition.clone(), partition.clone(), partition.clone()];
+
+        // repartition from 3 input to 5 output
+        let output_partitions =
+            Executor::repartition(partitions, Partitioning::RoundRobinBatch(5)).await?;
+
+        assert_eq!(5, output_partitions.len());
+        assert_eq!(30, output_partitions[0].len());
+        assert_eq!(30, output_partitions[1].len());
+        assert_eq!(30, output_partitions[2].len());
+        assert_eq!(30, output_partitions[3].len());
+        assert_eq!(30, output_partitions[4].len());
 
         Ok(())
     }
