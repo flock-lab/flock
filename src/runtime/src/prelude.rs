@@ -23,6 +23,7 @@
 //! ```
 
 pub use crate::config;
+pub use crate::config::GLOBALS as globals;
 pub use crate::context::{CloudFunction, ExecutionContext};
 pub use crate::datasource::{kafka, kinesis, DataSource};
 pub use crate::encoding::Encoding;

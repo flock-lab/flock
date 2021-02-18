@@ -15,7 +15,7 @@
 //! By default, Squirtle supports two types of interactive execution modes:
 //! central and distributed. During the planning phase in the client-side, the
 //! optimizer analyzes the query and generate the physical plan, which is
-//! compressed and serialized to the environment context of cloud functios. The
+//! compressed and serialized to the environment context of cloud functions. The
 //! execution strategy dynamically adjusts central and distributed execution
 //! modes at runtime to achieve the optimal performance and cost, that is,
 //! adaptive query optimization. In central mode, Squirtle executes the query
@@ -53,10 +53,6 @@ pub enum ExecutionStrategy {
 /// The query executor in cloud function.
 pub struct Executor;
 
-const FIVE_MB: usize = 5 * 1024 * 1024;
-const TEN_MB: usize = 10 * 1024 * 1024;
-const TWENTY_MB: usize = 20 * 1024 * 1024;
-
 impl Executor {
     /// Choose an optimal strategy according to the size of the batch and the
     /// attributes of the query.
@@ -67,18 +63,30 @@ impl Executor {
             .map(|a| a.get_array_memory_size())
             .sum();
         if contain_join(&ctx.plan) {
-            if size < FIVE_MB {
+            if size
+                < globals["context"]["join_threshold"]
+                    .parse::<usize>()
+                    .unwrap()
+            {
                 ExecutionStrategy::Centralized
             } else {
                 ExecutionStrategy::Distributed
             }
         } else if contain_aggregate(&ctx.plan) {
-            if size < TEN_MB {
+            if size
+                < globals["context"]["aggregate_threshold"]
+                    .parse::<usize>()
+                    .unwrap()
+            {
                 ExecutionStrategy::Centralized
             } else {
                 ExecutionStrategy::Distributed
             }
-        } else if size < TWENTY_MB {
+        } else if size
+            < globals["context"]["regular_threshold"]
+                .parse::<usize>()
+                .unwrap()
+        {
             ExecutionStrategy::Centralized
         } else {
             ExecutionStrategy::Distributed
@@ -146,7 +154,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_concat_batches() -> Result<()> {
         let schema = test_schema();
-        let partition = create_vec_batches(&schema, 10)?;
+        let partition = create_vec_batches(&schema, 10);
         let partitions = vec![partition];
 
         let output_partitions = Executor::coalesce_batches(partitions, 20).await?;
@@ -168,7 +176,7 @@ mod tests {
     async fn one_to_many_round_robin() -> Result<()> {
         // define input partitions
         let schema = test_schema();
-        let partition = create_vec_batches(&schema, 50)?;
+        let partition = create_vec_batches(&schema, 50);
         let partitions = vec![partition];
 
         // repartition from 1 input to 4 output
@@ -188,7 +196,7 @@ mod tests {
     async fn many_to_one_round_robin() -> Result<()> {
         // define input partitions
         let schema = test_schema();
-        let partition = create_vec_batches(&schema, 50)?;
+        let partition = create_vec_batches(&schema, 50);
         let partitions = vec![partition.clone(), partition.clone(), partition.clone()];
 
         // repartition from 3 input to 1 output
@@ -205,7 +213,7 @@ mod tests {
     async fn many_to_many_round_robin() -> Result<()> {
         // define input partitions
         let schema = test_schema();
-        let partition = create_vec_batches(&schema, 50)?;
+        let partition = create_vec_batches(&schema, 50);
         let partitions = vec![partition.clone(), partition.clone(), partition.clone()];
 
         // repartition from 3 input to 5 output
@@ -226,13 +234,13 @@ mod tests {
         Arc::new(Schema::new(vec![Field::new("c0", DataType::UInt32, false)]))
     }
 
-    fn create_vec_batches(schema: &Arc<Schema>, num_batches: usize) -> Result<Vec<RecordBatch>> {
+    fn create_vec_batches(schema: &Arc<Schema>, num_batches: usize) -> Vec<RecordBatch> {
         let batch = create_batch(schema);
         let mut vec = Vec::with_capacity(num_batches);
         for _ in 0..num_batches {
             vec.push(batch.clone());
         }
-        Ok(vec)
+        vec
     }
 
     fn create_batch(schema: &Arc<Schema>) -> RecordBatch {
