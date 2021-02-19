@@ -43,6 +43,8 @@
 //!   about the order of the resulting partitions.
 //! - `Sort`: The sort execution plan.
 
+use crate::error::Result;
+use datafusion::execution::context::ExecutionContext;
 use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
 use datafusion::physical_plan::hash_join::HashJoinExec;
 use datafusion::physical_plan::sort::SortExec;
@@ -71,3 +73,10 @@ macro_rules! query_has_op_function {
 query_has_op_function!(SortExec, contain_sort);
 query_has_op_function!(HashJoinExec, contain_join);
 query_has_op_function!(HashAggregateExec, contain_aggregate);
+
+/// Planning phase and return the execution plan.
+pub fn physical_plan(ctx: &mut ExecutionContext, sql: &str) -> Result<Arc<dyn ExecutionPlan>> {
+    let logical_plan = ctx.create_logical_plan(sql)?;
+    let logical_plan = ctx.optimize(&logical_plan)?;
+    Ok(ctx.create_physical_plan(&logical_plan)?)
+}

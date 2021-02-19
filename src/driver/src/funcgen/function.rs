@@ -34,33 +34,25 @@ use chrono::{DateTime, Utc};
 #[derive(Debug)]
 pub struct QueryFlow {
     /// A query information received from the client-side.
-    pub query:  Box<dyn Query>,
+    pub query: Box<dyn Query>,
     /// A DAG structure representing the partitioned subplans from a given
     /// query.
-    pub dag:    QueryDag,
+    pub dag:   QueryDag,
     /// A Lambda context representing a unique execution environment for the
     /// lambda function. The node in `dag` obtains the corresponding execution
     /// context from `ctx` through NodeIndex.
-    pub ctx:    HashMap<NodeIndex, ExecutionContext>,
-    /// Query continuous data stream or offline batches.
-    pub stream: bool,
+    pub ctx:   HashMap<NodeIndex, ExecutionContext>,
 }
 
 impl QueryFlow {
     /// Create a new `QueryFlow` from a given query.
     pub fn from(query: Box<dyn Query>) -> Self {
         let plan = query.plan();
-        let stream = query.as_any().downcast_ref::<StreamQuery>().is_some();
 
         let mut dag = QueryDag::from(&plan);
         Self::add_source(plan.clone(), &mut dag);
         let ctx = Self::build_context(&*query, &mut dag);
-        Self {
-            query,
-            dag,
-            ctx,
-            stream,
-        }
+        Self { query, dag, ctx }
     }
 
     /// Deploy the lambda functions for a given query to the cloud.
@@ -156,8 +148,6 @@ mod tests {
     use arrow::datatypes::{DataType, Field, Schema};
     use arrow::record_batch::RecordBatch;
 
-    use runtime::query::StreamWindow;
-
     use datafusion::datasource::MemTable;
     use datafusion::execution::context::ExecutionContext;
 
@@ -184,28 +174,19 @@ mod tests {
 
         ctx.register_table("t", Box::new(table));
 
-        let plan = ctx.create_logical_plan(&sql)?;
-        let plan = ctx.optimize(&plan)?;
-        let plan = ctx.create_physical_plan(&plan)?;
-
-        let json = serde_json::to_string(&plan).unwrap();
+        let plan = physical_plan(&mut ctx, &sql)?;
         let query: Box<dyn Query> = Box::new(StreamQuery {
-            ansi_sql:   json,
-            schema:     Some(schema),
-            window:     StreamWindow::SessionWindow,
+            ansi_sql: sql.to_string(),
+            schema,
             datasource: DataSource::UnknownEvent,
+            plan,
         });
 
-        let mut dag = QueryDag::from(&plan);
-        QueryFlow::add_source(plan.clone(), &mut dag);
+        let mut dag = QueryDag::from(&query.plan());
+        QueryFlow::add_source(query.plan().clone(), &mut dag);
         let ctx = QueryFlow::build_context(&*query, &mut dag);
 
-        Ok(QueryFlow {
-            query,
-            dag,
-            ctx,
-            stream: true,
-        })
+        Ok(QueryFlow { query, dag, ctx })
     }
 
     fn datasource(func: &QueryFlow, idx: usize) -> String {

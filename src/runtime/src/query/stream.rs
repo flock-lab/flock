@@ -103,6 +103,24 @@ pub enum StreamWindow {
     StaggerWinodw,
 }
 
+impl Default for StreamWindow {
+    fn default() -> StreamWindow {
+        StreamWindow::TumblingWindow(Schedule::Seconds(10))
+    }
+}
+
+impl StreamWindow {
+    /// Returns a new tumbling window.
+    pub fn tumbling_window(sec: i64) -> StreamWindow {
+        StreamWindow::TumblingWindow(Schedule::Seconds(sec))
+    }
+
+    /// Returns a new sliding window.
+    pub fn sliding_window(sec: i64) -> StreamWindow {
+        StreamWindow::SlidingWindow(Schedule::Seconds(sec))
+    }
+}
+
 /// SQL queries in your application code execute continuously over
 /// in-application streams.
 #[derive(Debug)]
@@ -114,18 +132,11 @@ pub struct StreamQuery {
     pub ansi_sql:   String,
     /// A schema that is the skeleton structure that represents the logical view
     /// of streaming data.
-    pub schema:     Option<SchemaRef>,
-    /// The windows group stream elements by time or rows.
-    pub window:     StreamWindow,
+    pub schema:     SchemaRef,
     /// A streaming data source.
     pub datasource: DataSource,
-}
-
-impl StreamQuery {
-    /// Returns the time window for a given query.
-    pub fn window(&self) -> &StreamWindow {
-        &self.window
-    }
+    /// The execution plan.
+    pub plan:       Arc<dyn ExecutionPlan>,
 }
 
 impl Query for StreamQuery {
@@ -140,13 +151,13 @@ impl Query for StreamQuery {
     }
 
     /// Returns the data schema for a given query.
-    fn schema(&self) -> &Option<SchemaRef> {
+    fn schema(&self) -> &SchemaRef {
         &self.schema
     }
 
     /// Returns the entire physical plan for a given query.
-    fn plan(&self) -> Arc<dyn ExecutionPlan> {
-        unimplemented!();
+    fn plan(&self) -> &Arc<dyn ExecutionPlan> {
+        &self.plan
     }
 
     /// Returns the data source for a given query.

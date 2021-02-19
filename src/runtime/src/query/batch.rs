@@ -37,9 +37,11 @@ pub struct BatchQuery {
     pub ansi_sql:   String,
     /// A schema that is the skeleton structure that represents the logical view
     /// of streaming data.
-    pub schema:     Option<SchemaRef>,
+    pub schema:     SchemaRef,
     /// A streaming data source.
     pub datasource: DataSource,
+    /// The execution plan.
+    pub plan:       Arc<dyn ExecutionPlan>,
 }
 
 impl Query for BatchQuery {
@@ -54,13 +56,13 @@ impl Query for BatchQuery {
     }
 
     /// Returns the data schema for a given query.
-    fn schema(&self) -> &Option<SchemaRef> {
+    fn schema(&self) -> &SchemaRef {
         &self.schema
     }
 
     /// Returns the entire physical plan for a given query.
-    fn plan(&self) -> Arc<dyn ExecutionPlan> {
-        unimplemented!();
+    fn plan(&self) -> &Arc<dyn ExecutionPlan> {
+        &self.plan
     }
 
     /// Returns the data source for a given query.
