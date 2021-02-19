@@ -239,7 +239,7 @@ mod tests {
             Field::new("lng", DataType::Float64, false),
         ]);
 
-        let records: &[u8] = include_str!("datasource/data/uk_cities_with_headers.csv").as_bytes();
+        let records: &[u8] = include_str!("../../data/uk_cities_with_headers.csv").as_bytes();
         let mut reader = csv::Reader::new(records, Arc::new(schema), true, None, 1024, None, None);
         let batch = reader.next().unwrap().unwrap();
         let struct_array: StructArray = batch.clone().into();
@@ -277,8 +277,7 @@ mod tests {
             Field::new("gender", DataType::Int8, false),
         ]));
 
-        let records: &[u8] =
-            include_str!("datasource/data/JC-202011-citibike-tripdata.csv").as_bytes();
+        let records: &[u8] = include_str!("../../data/JC-202011-citibike-tripdata.csv").as_bytes();
         let mut reader = csv::Reader::new(records, schema, true, None, 21275, None, None);
         let batch = reader.next().unwrap().unwrap();
 
