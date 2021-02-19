@@ -33,7 +33,7 @@ use std::io::BufReader;
 use std::sync::Arc;
 
 /// A struct to manage all KafKa info in cloud environment.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct KafkaSource {
     /// The window type.
     pub window:       StreamWindow,

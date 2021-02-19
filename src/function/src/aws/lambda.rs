@@ -125,13 +125,25 @@ async fn handler(event: Value, _: Context) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use arrow::datatypes::{DataType, Field, Schema};
+    use arrow::record_batch::RecordBatch;
+    use datafusion::datasource::MemTable;
     use datafusion::physical_plan::ExecutionPlan;
+    use driver::QueryFlow;
     use serde_json::json;
     use std::sync::Arc;
+    extern crate daggy;
+    use daggy::NodeIndex;
 
     #[tokio::test]
+    #[ignore]
     async fn generic_lambda() -> Result<()> {
-        let plan = r#"{"execution_plan":"coalesce_batches_exec","input":{"execution_plan":"memory_exec","schema":{"fields":[{"name":"c1","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c2","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c3","data_type":"Utf8","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"projection":null},"target_batch_size":16384}"#;
+        let plan = r#"{"execution_plan":"coalesce_batches_exec","input":{"execution_plan":"
+            memory_exec","schema":{"fields":[{"name":"c1","data_type":"Int64","nullable":
+            true,"dict_id":0,"dict_is_ordered":false},{"name":"c2","data_type":"Float64",
+            "nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c3","data_type"
+            :"Utf8","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},
+            "projection":null},"target_batch_size":16384}"#;
         let name = "hello".to_owned();
         let next =
             CloudFunction::Solo("SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836Z".to_owned());
@@ -171,6 +183,72 @@ mod tests {
                 .expect("expected Ok(_) value"),
             event
         );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn centralized_execution() -> Result<()> {
+        let event: Value =
+            serde_json::from_str(include_str!("../../../data/example-kinesis-event-1.json"))?;
+
+        let datasource = DataSource::default();
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("c1", DataType::Int64, false),
+            Field::new("c2", DataType::Float64, false),
+            Field::new("c3", DataType::Utf8, false),
+        ]));
+
+        let ansi_sql =
+            String::from("SELECT MAX(c1), MIN(c2), c3 FROM t1 WHERE c2 < 99 GROUP BY c3");
+
+        // register table
+        let mut ctx = datafusion::execution::context::ExecutionContext::new();
+        {
+            // create empty batch to generate the execution plan
+            let batch = RecordBatch::new_empty(schema.clone());
+            let table = MemTable::try_new(schema.clone(), vec![vec![batch]]).unwrap();
+            ctx.register_table("t1", Box::new(table));
+        }
+
+        let plan = physical_plan(&mut ctx, &ansi_sql)?;
+
+        let query = Box::new(StreamQuery {
+            ansi_sql,
+            schema,
+            datasource,
+            plan,
+        });
+
+        // directed acyclic graph of the physical plan
+        let query_flow = QueryFlow::from(query);
+        assert_eq!(3, query_flow.dag.node_count());
+
+        // environment context
+        let ctx = &query_flow.ctx[&NodeIndex::new(query_flow.dag.node_count() - 1)];
+        std::env::set_var(&globals["context"]["name"], ctx.marshal(Encoding::Zstd));
+
+        // lambda function execution
+        let res = handler(event, Context::default()).await?;
+        let (batch, uuid) = Payload::to_batch(res);
+
+        assert!(uuid.tid.contains("8qJkskaF5yXaZ3XM"));
+        assert_eq!(0, uuid.seq_num);
+        assert_eq!(1, uuid.seq_len);
+
+        let formatted = arrow::util::pretty::pretty_format_batches(&[batch]).unwrap();
+        let actual_lines: Vec<&str> = formatted.trim().lines().collect();
+
+        let expected = vec![
+            "+-----+------+----+",
+            "| c1  | c2   | c3 |",
+            "+-----+------+----+",
+            "| 100 | 92.1 | a  |",
+            "+-----+------+----+",
+        ];
+
+        assert_eq!(expected, actual_lines);
 
         Ok(())
     }

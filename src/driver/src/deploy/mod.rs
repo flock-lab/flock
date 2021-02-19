@@ -69,9 +69,9 @@ impl ExecutionEnvironment {
     /// - The execution role grants the function permission to use AWS services,
     /// such as Amazon CloudWatch Logs for log streaming and AWS X-Ray for
     /// request tracing.
-    async fn lambda_deployment(query: &QueryFlow) -> Result<()> {
+    async fn lambda_deployment(flow: &QueryFlow) -> Result<()> {
         let client = &LambdaClient::new(Region::default());
-        for (_, ctx) in query.ctx.iter() {
+        for (_, ctx) in flow.ctx.iter() {
             let _: Vec<_> = lambda::function_name(&ctx)
                 .iter()
                 .map(move |name| async move {
@@ -92,9 +92,9 @@ impl ExecutionEnvironment {
         }
 
         // Event source mapping
-        if query.stream {
+        if flow.query.as_any().downcast_ref::<StreamQuery>().is_some() {
             // data source node
-            let ctx = &query.ctx[&NodeIndex::new(query.dag.node_count() - 1)];
+            let ctx = &flow.ctx[&NodeIndex::new(flow.dag.node_count() - 1)];
             match &ctx.datasource {
                 DataSource::KinesisEvent(event) => {
                     let window_in_seconds = match &event.window {

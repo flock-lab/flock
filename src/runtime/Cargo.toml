@@ -11,9 +11,9 @@ edition = "2018"
 arrow = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq", features = [ "simd" ] }
 arrow-flight = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq" }
 async-trait = "0.1.42"
-
 aws_lambda_events = "0.4"
 base64 = "0.13.0"
+blake2 = "0.9"
 datafusion = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq", features = [ "simd" ] }
 futures = "0.3.12"
 json = "0.12.4"

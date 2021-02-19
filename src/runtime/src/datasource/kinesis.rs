@@ -30,11 +30,11 @@ use serde::{Deserialize, Serialize};
 use std::io::BufReader;
 
 /// A struct to manage all Kinesis info in cloud environment.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct KinesisSource {
     /// The name of the Amazon Kinesis data stream.
     pub stream_name: String,
-    /// The window type.
+    /// The windows group stream elements by time or rows.
     pub window:      StreamWindow,
 }
 
@@ -97,6 +97,7 @@ pub fn to_batch(event: KinesisEvent) -> Option<RecordBatch> {
 
     // `batch_size` guarantees that only one `RecordBatch` will be generated
     let batch_size = event.records.len();
+    println!("## {}", batch_size);
     let input: &[u8] = &event
         .records
         .into_par_iter()

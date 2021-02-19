@@ -41,9 +41,9 @@ pub trait Query: Debug + Send + Sync {
     /// Returns a SQL query.
     fn sql(&self) -> &String;
     /// Returns the data schema for a given query.
-    fn schema(&self) -> &Option<SchemaRef>;
+    fn schema(&self) -> &SchemaRef;
     /// Returns the entire physical plan for a given query.
-    fn plan(&self) -> Arc<dyn ExecutionPlan>;
+    fn plan(&self) -> &Arc<dyn ExecutionPlan>;
     /// Returns the data source for a given query.
     fn datasource(&self) -> &DataSource;
 }
