@@ -237,9 +237,6 @@ mod tests {
         assert_eq!(0, uuid.seq_num);
         assert_eq!(1, uuid.seq_len);
 
-        let formatted = arrow::util::pretty::pretty_format_batches(&[batch]).unwrap();
-        let actual_lines: Vec<&str> = formatted.trim().lines().collect();
-
         let expected = vec![
             "+-----+------+----+",
             "| c1  | c2   | c3 |",
@@ -248,7 +245,7 @@ mod tests {
             "+-----+------+----+",
         ];
 
-        assert_eq!(expected, actual_lines);
+        test_utils::assert_batches_eq!(&expected, &[batch]);
 
         Ok(())
     }

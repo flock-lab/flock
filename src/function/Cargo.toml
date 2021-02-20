@@ -23,6 +23,7 @@ tokio = { version = "1.2", features = [ "macros", "io-util", "sync", "rt-multi-t
 
 [dev-dependencies]
 driver = { path = "../driver" }
+test_utils = { path = "../test" }
 
 [[bin]]
 name = "aws"

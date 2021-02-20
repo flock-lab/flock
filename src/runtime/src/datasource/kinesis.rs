@@ -97,7 +97,6 @@ pub fn to_batch(event: KinesisEvent) -> Option<RecordBatch> {
 
     // `batch_size` guarantees that only one `RecordBatch` will be generated
     let batch_size = event.records.len();
-    println!("## {}", batch_size);
     let input: &[u8] = &event
         .records
         .into_par_iter()
