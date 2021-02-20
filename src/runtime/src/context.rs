@@ -301,8 +301,6 @@ mod tests {
         ctx.feed_one_source(&partitions);
 
         let batches = collect(ctx.plan.clone()).await?;
-        let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
-        let actual_lines: Vec<&str> = formatted.trim().lines().collect();
 
         let expected = vec![
             "+---------+---------+----+",
@@ -312,7 +310,7 @@ mod tests {
             "+---------+---------+----+",
         ];
 
-        assert_eq!(expected, actual_lines);
+        test_utils::assert_batches_eq!(&expected, &batches);
 
         Ok(())
     }
@@ -383,8 +381,6 @@ mod tests {
         ctx.feed_two_source(&partitions1, &partitions2);
 
         let batches = collect(ctx.plan.clone()).await?;
-        let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
-        let actual_lines: Vec<&str> = formatted.trim().lines().collect();
 
         let expected = vec![
             "+---+----+----+",
@@ -396,7 +392,7 @@ mod tests {
             "+---+----+----+",
         ];
 
-        assert_eq!(expected, actual_lines);
+        test_utils::assert_batches_eq!(&expected, &batches);
 
         Ok(())
     }

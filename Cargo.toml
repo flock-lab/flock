@@ -4,6 +4,7 @@ members = [
     "src/driver",
     "src/function",
     "src/runtime",
+    "src/test",
 ]
 exclude = [
     "target/scq",

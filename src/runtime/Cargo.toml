@@ -34,6 +34,7 @@ text_io = "0.1.8"
 zstd = "0.6.0"
 
 [dev-dependencies]
+test_utils = { path = "../test" }
 tokio = { version = "1.2", features = [ "macros", "io-util", "sync", "rt-multi-thread" ] }
 
 [lib]

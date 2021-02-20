@@ -964,8 +964,6 @@ mod tests {
             .contains(r#"left":{"execution_plan":"memory_exec"#));
 
         let batches = collect(plan).await?;
-        let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
-        let actual_lines: Vec<&str> = formatted.trim().lines().collect();
 
         let expected = vec![
             "+---+----+----+",
@@ -977,7 +975,7 @@ mod tests {
             "+---+----+----+",
         ];
 
-        assert_eq!(expected, actual_lines);
+        test_utils::assert_batches_eq!(&expected, &batches);
 
         Ok(())
     }
