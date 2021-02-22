@@ -229,7 +229,12 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::assert_batches_eq;
+    use arrow::datatypes::{DataType, Field, Schema};
+    use arrow::json;
     use runtime::prelude::*;
+    use std::io::BufReader;
+    use std::sync::Arc;
 
     #[tokio::test]
     async fn fake_data() -> Result<()> {
@@ -240,6 +245,43 @@ mod tests {
             records: fake::vec![KinesisEventRecord; 4],
         };
         assert_eq!(event.records.len(), 4);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn arrow_json_reader() -> Result<()> {
+        let schema = Schema::new(vec![
+            Field::new("a", DataType::Float64, false),
+            Field::new("b", DataType::Float64, false),
+            Field::new("c", DataType::Boolean, false),
+            Field::new("d", DataType::Utf8, false),
+        ]);
+
+        let records: &[u8] = include_str!("../data/basic.txt").as_bytes();
+        let mut json = json::Reader::new(BufReader::new(records), Arc::new(schema), 1024, None);
+        let batch = json.next().unwrap().unwrap();
+
+        let expected = vec![
+            "+-----------------+------+-------+------+",
+            "| a               | b    | c     | d    |",
+            "+-----------------+------+-------+------+",
+            "| 1               | 2    | false | 4    |",
+            "| -10             | -3.5 | true  | 4    |",
+            "| 2               | 0.6  | false | text |",
+            "| 1               | 2    | false | 4    |",
+            "| 7               | -3.5 | true  | 4    |",
+            "| 1               | 0.6  | false | text |",
+            "| 1               | 2    | false | 4    |",
+            "| 5               | -3.5 | true  | 4    |",
+            "| 1               | 0.6  | false | text |",
+            "| 1               | 2    | false | 4    |",
+            "| 1               | -3.5 | true  | 4    |",
+            "| 100000000000000 | 0.6  | false | text |",
+            "+-----------------+------+-------+------+",
+        ];
+
+        assert_batches_eq!(&expected, &[batch]);
 
         Ok(())
     }

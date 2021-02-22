@@ -96,16 +96,23 @@ pub fn to_batch(event: KinesisEvent) -> Option<RecordBatch> {
     let schema = infer_json_schema(&mut reader, Some(1)).unwrap();
 
     // `batch_size` guarantees that only one `RecordBatch` will be generated
-    let batch_size = event.records.len();
+    let batch_size = event.records.len() * 1024;
     let input: &[u8] = &event
         .records
         .into_par_iter()
-        .flat_map(|r| r.kinesis.data.0)
-        .collect::<Vec<u8>>();
+        .flat_map(|r| {
+            r.kinesis
+                .data
+                .0
+                .into_iter()
+                .chain(vec![10].into_iter())
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
 
     // transform data to record batch in Arrow
     reader = BufReader::with_capacity(input.len(), input);
-    let mut reader = json::Reader::new(reader, schema, batch_size, None);
+    let mut reader = json::Reader::from_buf_reader(reader, schema, batch_size, None);
     reader.next().unwrap()
 }
 
@@ -115,7 +122,7 @@ mod test {
 
     #[test]
     fn example_kinesis_event() {
-        let data = include_bytes!("../../../data/example-kinesis-event.json");
+        let data = include_bytes!("../../../test/data/example-kinesis-event.json");
         let parsed: KinesisEvent = serde_json::from_slice(data).unwrap();
         let output: String = serde_json::to_string(&parsed).unwrap();
         let reparsed: KinesisEvent = serde_json::from_slice(output.as_bytes()).unwrap();
@@ -124,7 +131,7 @@ mod test {
 
     #[test]
     fn example_reader() {
-        let records: &[u8] = include_str!("../../../data/mixed_arrays.txt").as_bytes();
+        let records: &[u8] = include_str!("../../../test/data/mixed_arrays.txt").as_bytes();
         let mut reader = BufReader::new(records);
         let schema = infer_json_schema(&mut reader, Some(1)).unwrap();
 
