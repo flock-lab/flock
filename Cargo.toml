@@ -6,9 +6,6 @@ members = [
     "src/runtime",
     "src/test",
 ]
-exclude = [
-    "target/scq",
-]
 
 [profile.release]
 # Cargo defaults its optimization level to 3 for release builds, which optimizes the binary for speed.
