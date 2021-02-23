@@ -125,15 +125,10 @@ async fn handler(event: Value, _: Context) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arrow::datatypes::{DataType, Field, Schema};
-    use arrow::record_batch::RecordBatch;
-    use datafusion::datasource::MemTable;
     use datafusion::physical_plan::ExecutionPlan;
     use driver::QueryFlow;
     use serde_json::json;
     use std::sync::Arc;
-    extern crate daggy;
-    use daggy::NodeIndex;
 
     #[tokio::test]
     #[ignore]
@@ -189,49 +184,31 @@ mod tests {
 
     #[tokio::test]
     async fn centralized_execution() -> Result<()> {
-        let event = test_utils::random_kinesis_event(100)?;
+        // 1. sql statement
+        let sql = concat!(
+            "SELECT MAX(c1), MIN(c2), c3 ",
+            "FROM t1 ",
+            "WHERE c2 < 99 GROUP BY c3"
+        );
+        // 2. data source
+        let datasource = DataSource::kinesis();
+        // 3. data schema
+        let (event, schema) = test_utils::random_event(&datasource, 100)?;
+        // 4. physical plan
+        let plan = test_utils::physical_plan(&schema, &sql, "t1");
 
-        let datasource = DataSource::default();
+        // create query flow
+        let qflow = QueryFlow::new(sql, schema, datasource, plan);
+        assert_eq!(3, qflow.dag.node_count());
 
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("c1", DataType::Int64, false),
-            Field::new("c2", DataType::Int64, false),
-            Field::new("c3", DataType::Utf8, false),
-        ]));
+        // set environment context for the first cloud function
+        test_utils::set_env_context(&qflow, qflow.dag.node_count() - 1);
 
-        let ansi_sql =
-            String::from("SELECT MAX(c1), MIN(c2), c3 FROM t1 WHERE c2 < 99 GROUP BY c3");
-
-        // register table
-        let mut ctx = datafusion::execution::context::ExecutionContext::new();
-        {
-            // create empty batch to generate the execution plan
-            let batch = RecordBatch::new_empty(schema.clone());
-            let table = MemTable::try_new(schema.clone(), vec![vec![batch]]).unwrap();
-            ctx.register_table("t1", Box::new(table));
-        }
-
-        let plan = physical_plan(&mut ctx, &ansi_sql)?;
-
-        let query = Box::new(StreamQuery {
-            ansi_sql,
-            schema,
-            datasource,
-            plan,
-        });
-
-        // directed acyclic graph of the physical plan
-        let query_flow = QueryFlow::from(query);
-        assert_eq!(3, query_flow.dag.node_count());
-
-        // environment context
-        let ctx = &query_flow.ctx[&NodeIndex::new(query_flow.dag.node_count() - 1)];
-        std::env::set_var(&globals["context"]["name"], ctx.marshal(Encoding::Zstd));
-
-        // lambda function execution
+        // cloud function execution
         let res = handler(event, Context::default()).await?;
-        let (batch, uuid) = Payload::to_batch(res);
 
+        // check the result of function execution
+        let (batch, uuid) = Payload::to_batch(res);
         assert!(uuid.tid.contains("8qJkskaF5yXaZ3XM"));
         assert_eq!(0, uuid.seq_num);
         assert_eq!(1, uuid.seq_len);

@@ -21,6 +21,7 @@ use daggy::{NodeIndex, Walker};
 
 use crate::deploy::ExecutionEnvironment;
 use crate::funcgen::dag::*;
+use arrow::datatypes::SchemaRef;
 use datafusion::physical_plan::ExecutionPlan;
 use runtime::prelude::*;
 use std::collections::{HashMap, VecDeque};
@@ -45,6 +46,22 @@ pub struct QueryFlow {
 }
 
 impl QueryFlow {
+    /// Create a new `QueryFlow`.
+    pub fn new(
+        sql: &str,
+        schema: SchemaRef,
+        datasource: DataSource,
+        plan: Arc<dyn ExecutionPlan>,
+    ) -> Self {
+        let query = Box::new(StreamQuery {
+            ansi_sql: sql.to_owned(),
+            schema,
+            datasource,
+            plan,
+        });
+        QueryFlow::from(query)
+    }
+
     /// Create a new `QueryFlow` from a given query.
     pub fn from(query: Box<dyn Query>) -> Self {
         let plan = query.plan();

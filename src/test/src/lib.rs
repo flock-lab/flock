@@ -28,10 +28,20 @@
 )]
 #![feature(get_mut_unchecked)]
 
+use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
+use arrow::record_batch::RecordBatch;
+use datafusion::datasource::MemTable;
+use datafusion::execution::context::ExecutionContext;
+use datafusion::physical_plan::ExecutionPlan;
+use driver::QueryFlow;
 use fake::{Dummy, Fake};
-use runtime::prelude::Result;
+use runtime::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::sync::Arc;
+
+extern crate daggy;
+use daggy::NodeIndex;
 
 mod kinesis;
 
@@ -43,6 +53,17 @@ pub(crate) struct DataRecord {
     #[dummy(faker = "1..100")]
     pub c2: i64,
     pub c3: String,
+}
+
+impl DataRecord {
+    /// Return the schema of the data record.
+    pub fn schema() -> SchemaRef {
+        Arc::new(Schema::new(vec![
+            Field::new("c1", DataType::Int64, false),
+            Field::new("c2", DataType::Int64, false),
+            Field::new("c3", DataType::Utf8, false),
+        ]))
+    }
 }
 
 /// Compares formatted output of a record batch with an expected
@@ -124,11 +145,12 @@ macro_rules! assert_batches_sorted_eq {
 ///
 /// # Arguments
 ///
-/// * `size`: the number of records in the event.
+/// * `num`: the number of records in the event.
 ///
 /// # Return
 ///
-/// A valid JSON [value](serde_json::Value) representing the Kinesis event.
+/// A valid JSON [value](serde_json::Value) representing the Kinesis event, and
+/// the schema of the data records.
 ///
 /// # Example
 ///
@@ -172,10 +194,71 @@ macro_rules! assert_batches_sorted_eq {
 ///     ]
 /// }
 /// ```
-pub fn random_kinesis_event(size: usize) -> Result<Value> {
-    Ok(serde_json::to_value(kinesis::KinesisEvent {
-        records: fake::vec![kinesis::KinesisEventRecord; size],
-    })?)
+pub fn random_kinesis_event(num: usize) -> Result<(Value, SchemaRef)> {
+    Ok((
+        serde_json::to_value(kinesis::KinesisEvent {
+            records: fake::vec![kinesis::KinesisEventRecord; num],
+        })?,
+        DataRecord::schema(),
+    ))
+}
+
+/// Generate a random event for a given data source.
+///
+/// # Arguments
+///
+/// * `datasource`: A [data source](DataSource) type.
+/// * `num`: the number of records in the event.
+///
+/// # Return
+///
+/// A valid JSON [value](serde_json::Value) representing the event, and
+/// the schema of the data records in the event.
+pub fn random_event(datasource: &DataSource, num: usize) -> Result<(Value, SchemaRef)> {
+    match &datasource {
+        DataSource::KinesisEvent(_) => random_kinesis_event(num),
+        DataSource::KafkaEvent(_) => unimplemented!(),
+        _ => unimplemented!(),
+    }
+}
+
+/// Register a table
+pub fn register_table(schema: &SchemaRef, table_name: &str) -> ExecutionContext {
+    let mut ctx = ExecutionContext::new();
+
+    // create empty batch to generate the execution plan
+    let batch = RecordBatch::new_empty(schema.clone());
+    let table = MemTable::try_new(schema.clone(), vec![vec![batch]]).unwrap();
+    ctx.register_table(table_name, Box::new(table));
+
+    ctx
+}
+
+/// Generate a physical plan of a given query.
+///
+/// # Arguments
+///
+/// * `schema`: the data schema.
+/// * `sql`: ANSI SQL statement.
+/// * `table_name`: the table name the query works on.
+///
+/// # Return
+///
+/// `Arc<dyn ExecutionPlan>`: A physical execution plan.
+pub fn physical_plan(schema: &SchemaRef, sql: &str, table_name: &str) -> Arc<dyn ExecutionPlan> {
+    let mut ctx = register_table(&schema, table_name);
+    runtime::executor::plan::physical_plan(&mut ctx, &sql).unwrap()
+}
+
+/// Set the cloud environment context to a specific cloud function in the query.
+///
+/// # Parameters
+///
+/// * `qflow`: A struct `QueryFlow` contains all revelent query information.
+/// * `idx`: the node index of DAG in the `qflow`.
+pub fn set_env_context(qflow: &QueryFlow, idx: usize) {
+    let ctx = &qflow.ctx[&NodeIndex::new(idx)];
+    std::env::set_var(&globals["context"]["name"], ctx.marshal(Encoding::Zstd));
 }
 
 #[cfg(test)]
@@ -185,7 +268,7 @@ mod tests {
     #[tokio::test]
     async fn random_kinesis_data() -> Result<()> {
         for i in 1..5 {
-            let value = random_kinesis_event(i)?;
+            let (value, _) = random_kinesis_event(i)?;
             let event: aws_lambda_events::event::kinesis::KinesisEvent =
                 serde_json::from_value(value)?;
             assert_eq!(event.records.len(), i);
