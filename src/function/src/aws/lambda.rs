@@ -91,7 +91,7 @@ async fn source_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Valu
         ExecutionStrategy::Centralized => {
             if batch.len() > 8 {
                 ctx.feed_one_source(
-                    &LambdaExecutor::repartition(vec![batch], Partitioning::RoundRobinBatch(4))
+                    &LambdaExecutor::repartition(vec![batch], Partitioning::RoundRobinBatch(8))
                         .await?,
                 );
             } else {
