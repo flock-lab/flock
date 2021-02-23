@@ -194,13 +194,14 @@ macro_rules! assert_batches_sorted_eq {
 ///     ]
 /// }
 /// ```
-pub fn random_kinesis_event(num: usize) -> Result<(Value, SchemaRef)> {
-    Ok((
+pub fn random_kinesis_event(num: usize) -> (Value, SchemaRef) {
+    (
         serde_json::to_value(kinesis::KinesisEvent {
             records: fake::vec![kinesis::KinesisEventRecord; num],
-        })?,
+        })
+        .unwrap(),
         DataRecord::schema(),
-    ))
+    )
 }
 
 /// Generate a random event for a given data source.
@@ -214,7 +215,7 @@ pub fn random_kinesis_event(num: usize) -> Result<(Value, SchemaRef)> {
 ///
 /// A valid JSON [value](serde_json::Value) representing the event, and
 /// the schema of the data records in the event.
-pub fn random_event(datasource: &DataSource, num: usize) -> Result<(Value, SchemaRef)> {
+pub fn random_event(datasource: &DataSource, num: usize) -> (Value, SchemaRef) {
     match &datasource {
         DataSource::KinesisEvent(_) => random_kinesis_event(num),
         DataSource::KafkaEvent(_) => unimplemented!(),
@@ -268,7 +269,7 @@ mod tests {
     #[tokio::test]
     async fn random_kinesis_data() -> Result<()> {
         for i in 1..5 {
-            let (value, _) = random_kinesis_event(i)?;
+            let (value, _) = random_kinesis_event(i);
             let event: aws_lambda_events::event::kinesis::KinesisEvent =
                 serde_json::from_value(value)?;
             assert_eq!(event.records.len(), i);

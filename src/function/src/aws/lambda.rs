@@ -16,6 +16,7 @@
 
 use aws_lambda_events::event::kafka::KafkaEvent;
 use aws_lambda_events::event::kinesis::KinesisEvent;
+use datafusion::physical_plan::Partitioning;
 use lambda::{handler_fn, Context};
 use runtime::prelude::*;
 use serde_json::Value;
@@ -67,20 +68,20 @@ async fn source_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Valu
     let (batch, schema) = match &ctx.datasource {
         DataSource::KinesisEvent(_) => {
             let kinesis_event: KinesisEvent = serde_json::from_value(event).unwrap();
-            let batch = match kinesis::to_batch(kinesis_event) {
-                Some(batch) => batch,
-                None => return Err(SquirtleError::Execution("No Kinesis input!".to_owned())),
-            };
-            let schema = batch.schema();
+            let batch = kinesis::to_batch(kinesis_event);
+            if batch.is_empty() {
+                return Err(SquirtleError::Execution("No Kinesis input!".to_owned()));
+            }
+            let schema = batch[0].schema();
             (batch, schema)
         }
         DataSource::KafkaEvent(_) => {
             let kafka_event: KafkaEvent = serde_json::from_value(event).unwrap();
-            let batch = match kafka::to_batch(kafka_event) {
-                Some(batch) => batch,
-                None => return Err(SquirtleError::Execution("No Kafka input!".to_owned())),
-            };
-            let schema = batch.schema();
+            let batch = kafka::to_batch(kafka_event);
+            if batch.is_empty() {
+                return Err(SquirtleError::Execution("No Kafka input!".to_owned()));
+            }
+            let schema = batch[0].schema();
             (batch, schema)
         }
         _ => unimplemented!(),
@@ -88,7 +89,14 @@ async fn source_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Valu
 
     match LambdaExecutor::choose_strategy(&ctx, &batch) {
         ExecutionStrategy::Centralized => {
-            ctx.feed_one_source(&vec![vec![batch]]);
+            if batch.len() > 8 {
+                ctx.feed_one_source(
+                    &LambdaExecutor::repartition(vec![batch], Partitioning::RoundRobinBatch(4))
+                        .await?,
+                );
+            } else {
+                ctx.feed_one_source(&vec![batch]);
+            }
             let batches = ctx.execute().await?;
             let mut uuid_builder = UuidBuilder::new(&ctx.name, 1 /* one payload */);
             Ok(Payload::from(&batches[0], schema, uuid_builder.next()))
@@ -182,27 +190,34 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn centralized_execution() -> Result<()> {
-        // 1. sql statement
+    fn init_lambda_exec(num: usize) -> Value {
         let sql = concat!(
             "SELECT MAX(c1), MIN(c2), c3 ",
             "FROM t1 ",
             "WHERE c2 < 99 GROUP BY c3"
         );
-        // 2. data source
+        let table_name = "t1";
+
+        // 1. data source
         let datasource = DataSource::kinesis();
-        // 3. data schema
-        let (event, schema) = test_utils::random_event(&datasource, 100)?;
-        // 4. physical plan
-        let plan = test_utils::physical_plan(&schema, &sql, "t1");
+        // 2. data schema
+        let (event, schema) = test_utils::random_event(&datasource, num);
+        // 3. physical plan
+        let plan = test_utils::physical_plan(&schema, &sql, &table_name);
 
         // create query flow
         let qflow = QueryFlow::new(sql, schema, datasource, plan);
-        assert_eq!(3, qflow.dag.node_count());
 
         // set environment context for the first cloud function
         test_utils::set_env_context(&qflow, qflow.dag.node_count() - 1);
+
+        event
+    }
+
+    #[tokio::test]
+    async fn centralized_execution() -> Result<()> {
+        let record_num = 100;
+        let event = init_lambda_exec(record_num);
 
         // cloud function execution
         let res = handler(event, Context::default()).await?;

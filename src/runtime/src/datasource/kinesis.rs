@@ -89,14 +89,15 @@ pub async fn create_event_source_mapping_request(
 }
 
 /// Converts Kinesis event to record batch in Arrow.
-pub fn to_batch(event: KinesisEvent) -> Option<RecordBatch> {
+pub fn to_batch(event: KinesisEvent) -> Vec<RecordBatch> {
     // infer schema based on the first record
     let record: &[u8] = &event.records[0].kinesis.data.0.clone();
     let mut reader = BufReader::new(record);
     let schema = infer_json_schema(&mut reader, Some(1)).unwrap();
 
-    // `batch_size` guarantees that only one `RecordBatch` will be generated
-    let batch_size = event.records.len() * 1024;
+    // The default batch size when using the
+    // [`ReaderBuilder`](json::Reader::ReaderBuilder) is 1024 records
+    let batch_size = 1024;
     let input: &[u8] = &event
         .records
         .into_par_iter()
@@ -113,7 +114,12 @@ pub fn to_batch(event: KinesisEvent) -> Option<RecordBatch> {
     // transform data to record batch in Arrow
     reader = BufReader::with_capacity(input.len(), input);
     let mut reader = json::Reader::from_buf_reader(reader, schema, batch_size, None);
-    reader.next().unwrap()
+
+    let mut batches = vec![];
+    while let Some(batch) = reader.next().unwrap() {
+        batches.push(batch);
+    }
+    batches
 }
 
 #[cfg(test)]
@@ -157,7 +163,17 @@ mod test {
         assert_eq!(4, batch.num_columns());
 
         let batch_size = 1;
+        let mut reader =
+            json::Reader::new(BufReader::new(records), schema.clone(), batch_size, None);
+        let batch = reader.next().unwrap().unwrap();
+        assert_eq!(1, batch.num_rows());
+        assert_eq!(4, batch.num_columns());
+
+        let batch_size = 3;
         let mut reader = json::Reader::new(BufReader::new(records), schema, batch_size, None);
+        let batch = reader.next().unwrap().unwrap();
+        assert_eq!(3, batch.num_rows());
+        assert_eq!(4, batch.num_columns());
         let batch = reader.next().unwrap().unwrap();
         assert_eq!(1, batch.num_rows());
         assert_eq!(4, batch.num_columns());

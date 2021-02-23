@@ -90,14 +90,14 @@ pub async fn create_event_source_mapping_request(
 }
 
 /// Converts KafKa event to record batch in Arrow.
-pub fn to_batch(event: KafkaEvent) -> Option<RecordBatch> {
+pub fn to_batch(event: KafkaEvent) -> Vec<RecordBatch> {
     let mut input = vec![];
-    let mut batch_size = 0;
+    let mut i = 0;
     let mut schema = Arc::new(Schema::empty());
 
     // get all data from KafKa event
-    for records in event.records.values() {
-        if batch_size == 0 {
+    for (i, records) in event.records.values().enumerate() {
+        if i == 0 {
             assert!(!records.is_empty());
             // infer schema based on the first record
             let record = base64::decode(records[0].value.as_ref().unwrap()).unwrap();
@@ -105,24 +105,34 @@ pub fn to_batch(event: KafkaEvent) -> Option<RecordBatch> {
             schema = infer_json_schema(&mut BufReader::new(&record[..]), Some(1)).unwrap();
         }
 
-        batch_size += records.len();
-
         input.append(
             &mut records
                 .into_par_iter()
-                .flat_map(|r| base64::decode(r.value.as_ref().unwrap()).unwrap())
-                .collect::<Vec<u8>>(),
+                .flat_map(|r| {
+                    base64::decode(r.value.as_ref().unwrap())
+                        .unwrap()
+                        .into_iter()
+                        .chain(vec![10].into_iter())
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>(),
         );
     }
 
     // transform data to record batch in Arrow
+    let batch_size = 1024;
     let mut reader = json::Reader::new(
         BufReader::with_capacity(input.len(), &input[..]),
         schema,
         batch_size,
         None,
     );
-    reader.next().unwrap()
+
+    let mut batches = vec![];
+    while let Some(batch) = reader.next().unwrap() {
+        batches.push(batch);
+    }
+    batches
 }
 
 #[cfg(test)]
@@ -151,7 +161,7 @@ mod test {
             std::str::from_utf8(&batches).unwrap()
         );
 
-        pretty::print_batches(&[to_batch(parsed).unwrap()])?;
+        pretty::print_batches(&to_batch(parsed))?;
 
         Ok(())
     }
