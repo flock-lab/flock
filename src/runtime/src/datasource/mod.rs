@@ -63,5 +63,12 @@ impl Default for DataSource {
     }
 }
 
+impl DataSource {
+    /// Return Kinesis type with default settings.
+    pub fn kinesis() -> Self {
+        DataSource::default()
+    }
+}
+
 pub mod kafka;
 pub mod kinesis;
