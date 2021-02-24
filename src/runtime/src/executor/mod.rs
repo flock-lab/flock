@@ -27,6 +27,7 @@
 use crate::config::GLOBALS as globals;
 use crate::context::ExecutionContext;
 use crate::error::Result;
+use crate::payload::{Payload, Uuid};
 use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
 use datafusion::physical_plan::coalesce_batches::CoalesceBatchesExec;
@@ -36,6 +37,7 @@ use datafusion::physical_plan::{ExecutionPlan, Partitioning};
 use futures::stream::StreamExt;
 use plan::*;
 use rayon::prelude::*;
+use serde_json::Value;
 use std::sync::Arc;
 
 /// The execution strategy of the first cloud function.
@@ -105,6 +107,25 @@ pub trait Executor {
             output_partitions.push(batches);
         }
         Ok(output_partitions)
+    }
+
+    /// Event sink or data sink is a function designed to send the events from
+    /// the function to the customers.
+    async fn event_sink(batches: Vec<Vec<RecordBatch>>) -> Result<Value> {
+        // coalesce batches to one and only one batch
+        let batches = Self::repartition(batches, Partitioning::RoundRobinBatch(1)).await?;
+        assert_eq!(1, batches.len());
+
+        let batch_size = batches[0].par_iter().map(|r| r.num_rows()).sum();
+        let output_partitions = LambdaExecutor::coalesce_batches(batches, batch_size).await?;
+        assert_eq!(1, output_partitions.len());
+        assert_eq!(1, output_partitions[0].len());
+
+        Ok(Payload::from(
+            &output_partitions[0][0],
+            output_partitions[0][0].schema(),
+            Uuid::default(),
+        ))
     }
 }
 

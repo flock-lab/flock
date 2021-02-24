@@ -15,6 +15,8 @@ arrow = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq", features =
 aws_lambda_events = "0.4"
 datafusion = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq", features = [ "simd" ] }
 lambda = { git = "https://github.com/awslabs/aws-lambda-rust-runtime/", branch = "master" }
+rayon = "1.5"
+
 runtime = { path = "../runtime" }
 serde_json = "1.0"
 snmalloc-rs = { version = "0.2", optional = true, features = [ "cache-friendly" ] }
