@@ -214,24 +214,58 @@ mod tests {
         event
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn centralized_execution() -> Result<()> {
-        let record_num = 100;
+        for (i, num) in [100, 1024, 10240].iter().enumerate() {
+            let event = init_lambda_exec(*num);
+
+            // cloud function execution
+            let res = handler(event, Context::default()).await?;
+
+            // check the result of function execution
+            let (batch, uuid) = Payload::to_batch(res);
+            assert!(uuid.tid.contains("8qJkskaF5yXaZ3XM"));
+            assert_eq!(0, uuid.seq_num);
+            assert_eq!(1, uuid.seq_len);
+
+            if i == 0 {
+                println!(
+                    "{}",
+                    arrow::util::pretty::pretty_format_batches(&[batch]).unwrap(),
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn repartition_execution() -> Result<()> {
+        let record_num = 10240;
         let event = init_lambda_exec(record_num);
 
-        // cloud function execution
-        let res = handler(event, Context::default()).await?;
+        let kinesis_event: KinesisEvent = serde_json::from_value(event).unwrap();
+        let batch = kinesis::to_batch(kinesis_event);
 
-        // check the result of function execution
-        let (batch, uuid) = Payload::to_batch(res);
-        assert!(uuid.tid.contains("8qJkskaF5yXaZ3XM"));
-        assert_eq!(0, uuid.seq_num);
-        assert_eq!(1, uuid.seq_len);
+        assert_eq!(10, batch.len());
 
-        println!(
-            "{}",
-            arrow::util::pretty::pretty_format_batches(&[batch]).unwrap(),
-        );
+        (0..10).for_each(|i| assert_eq!(1024, batch[i].num_rows()));
+
+        let new_batch =
+            LambdaExecutor::repartition(vec![batch], Partitioning::RoundRobinBatch(8)).await?;
+
+        assert_eq!(8, new_batch.len());
+
+        (0..2).for_each(|i| {
+            assert_eq!(2, new_batch[i].len());
+            assert_eq!(1024, new_batch[i][0].num_rows());
+            assert_eq!(1024, new_batch[i][1].num_rows());
+        });
+
+        (2..8).for_each(|i| {
+            assert_eq!(1, new_batch[i].len());
+            assert_eq!(1024, new_batch[i][0].num_rows());
+        });
 
         Ok(())
     }
