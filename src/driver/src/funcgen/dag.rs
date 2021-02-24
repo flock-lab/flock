@@ -291,9 +291,7 @@ mod tests {
         let input = include_str!("../../../test/data/example-kinesis-event-1.json");
         let input: KinesisEvent = serde_json::from_str(input).unwrap();
 
-        let record_batch = kinesis::to_batch(input).unwrap();
-
-        let partitions = vec![vec![record_batch]];
+        let partitions = vec![kinesis::to_batch(input)];
 
         let mut ctx = ExecutionContext::new();
 

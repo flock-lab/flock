@@ -35,6 +35,7 @@ use datafusion::physical_plan::repartition::RepartitionExec;
 use datafusion::physical_plan::{ExecutionPlan, Partitioning};
 use futures::stream::StreamExt;
 use plan::*;
+use rayon::prelude::*;
 use std::sync::Arc;
 
 /// The execution strategy of the first cloud function.
@@ -116,11 +117,15 @@ impl Executor for LambdaExecutor {}
 impl LambdaExecutor {
     /// Choose an optimal strategy according to the size of the batch and the
     /// attributes of the query.
-    pub fn choose_strategy(ctx: &ExecutionContext, batch: &RecordBatch) -> ExecutionStrategy {
+    pub fn choose_strategy(ctx: &ExecutionContext, batch: &[RecordBatch]) -> ExecutionStrategy {
         let size: usize = batch
-            .columns()
-            .iter()
-            .map(|a| a.get_array_memory_size())
+            .par_iter()
+            .map(|r| {
+                r.columns()
+                    .par_iter()
+                    .map(|a| a.get_array_memory_size())
+                    .sum::<usize>()
+            })
             .sum();
         if contain_join(&ctx.plan) {
             if size

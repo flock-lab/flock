@@ -64,13 +64,13 @@ macro_rules! init_plan {
 
 async fn handler(event: KinesisEvent, _: Context) -> Result<Value, Error> {
     let schema = init_plan!();
-    let (record_batch, _) = kinesis::to_batch(event);
+    let record_batch = kinesis::to_batch(event);
 
     unsafe {
         match &mut PLAN {
             Some(plan) => {
                 // Plan Execution
-                plan.feed_batches(vec![vec![record_batch]]);
+                plan.feed_batches(vec![record_batch]);
                 let it = plan.execute(0).await?;
                 let result = common::collect(it).await?;
 

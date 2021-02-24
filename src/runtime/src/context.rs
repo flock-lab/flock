@@ -271,9 +271,7 @@ mod tests {
     async fn feed_one_source() -> Result<()> {
         let input = include_str!("../../test/data/example-kinesis-event-1.json");
         let input: KinesisEvent = serde_json::from_str(input).unwrap();
-
-        let record_batch = kinesis::to_batch(input).unwrap();
-        let partitions = vec![vec![record_batch]];
+        let partitions = vec![kinesis::to_batch(input)];
 
         let mut ctx = datafusion::execution::context::ExecutionContext::new();
         let provider = MemTable::try_new(partitions[0][0].schema(), partitions.clone())?;
