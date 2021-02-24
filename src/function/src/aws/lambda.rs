@@ -65,15 +65,14 @@ async fn main() -> Result<()> {
 }
 
 async fn source_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Value> {
-    let (batch, schema) = match &ctx.datasource {
+    let batch = match &ctx.datasource {
         DataSource::KinesisEvent(_) => {
             let kinesis_event: KinesisEvent = serde_json::from_value(event).unwrap();
             let batch = kinesis::to_batch(kinesis_event);
             if batch.is_empty() {
                 return Err(SquirtleError::Execution("No Kinesis input!".to_owned()));
             }
-            let schema = batch[0].schema();
-            (batch, schema)
+            batch
         }
         DataSource::KafkaEvent(_) => {
             let kafka_event: KafkaEvent = serde_json::from_value(event).unwrap();
@@ -81,14 +80,14 @@ async fn source_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Valu
             if batch.is_empty() {
                 return Err(SquirtleError::Execution("No Kafka input!".to_owned()));
             }
-            let schema = batch[0].schema();
-            (batch, schema)
+            batch
         }
         _ => unimplemented!(),
     };
 
     match LambdaExecutor::choose_strategy(&ctx, &batch) {
         ExecutionStrategy::Centralized => {
+            // feed data into the physical plan
             if batch.len() > 8 {
                 ctx.feed_one_source(
                     &LambdaExecutor::repartition(vec![batch], Partitioning::RoundRobinBatch(8))
@@ -97,9 +96,12 @@ async fn source_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Valu
             } else {
                 ctx.feed_one_source(&vec![batch]);
             }
+
+            // query execution
             let batches = ctx.execute().await?;
-            let mut uuid_builder = UuidBuilder::new(&ctx.name, 1 /* one payload */);
-            Ok(Payload::from(&batches[0], schema, uuid_builder.next()))
+
+            // send the results back to the client-side
+            LambdaExecutor::event_sink(vec![batches]).await
         }
         ExecutionStrategy::Distributed => {
             unimplemented!();
@@ -223,10 +225,7 @@ mod tests {
             let res = handler(event, Context::default()).await?;
 
             // check the result of function execution
-            let (batch, uuid) = Payload::to_batch(res);
-            assert!(uuid.tid.contains("8qJkskaF5yXaZ3XM"));
-            assert_eq!(0, uuid.seq_num);
-            assert_eq!(1, uuid.seq_len);
+            let (batch, _) = Payload::to_batch(res);
 
             if i == 0 {
                 println!(
