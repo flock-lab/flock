@@ -28,6 +28,7 @@ use rusoto_kinesis::{DescribeStreamInput, Kinesis, KinesisClient};
 use rusoto_lambda::CreateEventSourceMappingRequest;
 use serde::{Deserialize, Serialize};
 use std::io::BufReader;
+use std::sync::Arc;
 
 /// A struct to manage all Kinesis info in cloud environment.
 #[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq)]
@@ -93,7 +94,7 @@ pub fn to_batch(event: KinesisEvent) -> Vec<RecordBatch> {
     // infer schema based on the first record
     let record: &[u8] = &event.records[0].kinesis.data.0.clone();
     let mut reader = BufReader::new(record);
-    let schema = infer_json_schema(&mut reader, Some(1)).unwrap();
+    let schema = Arc::new(infer_json_schema(&mut reader, Some(1)).unwrap());
 
     // The default batch size when using the
     // [`ReaderBuilder`](json::Reader::ReaderBuilder) is 1024 records
@@ -139,7 +140,7 @@ mod test {
     fn example_reader() {
         let records: &[u8] = include_str!("../../../test/data/mixed_arrays.txt").as_bytes();
         let mut reader = BufReader::new(records);
-        let schema = infer_json_schema(&mut reader, Some(1)).unwrap();
+        let schema = Arc::new(infer_json_schema(&mut reader, Some(1)).unwrap());
 
         let batch_size = 1024;
         let mut reader =

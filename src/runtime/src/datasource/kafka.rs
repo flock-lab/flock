@@ -92,7 +92,7 @@ pub async fn create_event_source_mapping_request(
 /// Converts KafKa event to record batch in Arrow.
 pub fn to_batch(event: KafkaEvent) -> Vec<RecordBatch> {
     let mut input = vec![];
-    let mut schema = Arc::new(Schema::empty());
+    let mut schema = Schema::empty();
 
     // get all data from KafKa event
     for (i, records) in event.records.values().enumerate() {
@@ -122,7 +122,7 @@ pub fn to_batch(event: KafkaEvent) -> Vec<RecordBatch> {
     let batch_size = 1024;
     let mut reader = json::Reader::new(
         BufReader::with_capacity(input.len(), &input[..]),
-        schema,
+        Arc::new(schema),
         batch_size,
         None,
     );

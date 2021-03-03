@@ -291,12 +291,12 @@ mod tests {
         assert_eq!(4661248, size);
         println!("Arrow RecordBatch data (in-memory): {}", size);
 
-        // Option: Arrow RecordBatch (Json writer)
-        let mut buf = Vec::new();
-        {
-            let mut writer = json::Writer::new(&mut buf);
-            writer.write_batches(&[batch.clone()]).unwrap();
-        }
+        // Option: Write the record batch out as JSON
+        let buf = Vec::new();
+        let mut writer = json::LineDelimitedWriter::new(buf);
+        writer.write_batches(&[batch.clone()]).unwrap();
+        writer.finish().unwrap();
+        let buf = writer.into_inner();
         assert_eq!(9436023, buf.len());
         println!("Arrow RecordBatch data (Json writer): {}", buf.len());
 
