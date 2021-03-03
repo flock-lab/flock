@@ -230,7 +230,7 @@ pub fn register_table(schema: &SchemaRef, table_name: &str) -> ExecutionContext 
     // create empty batch to generate the execution plan
     let batch = RecordBatch::new_empty(schema.clone());
     let table = MemTable::try_new(schema.clone(), vec![vec![batch]]).unwrap();
-    ctx.register_table(table_name, Box::new(table));
+    ctx.register_table(table_name, Arc::new(table));
 
     ctx
 }
