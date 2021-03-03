@@ -37,11 +37,36 @@ jobs:
       - name: build and tests
         run: |
           cargo build -j8
+          cargo test
+
+  coverage:
+    name: Coverage
+    if: github.ref != 'refs/heads/master'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Cache Cargo
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          # this key is not equal because coverage uses different compilation flags.
+          key: ${{ runner.os }}-cargo-target-coverage-cache
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+          components: rustfmt, clippy
+      - name: update umd-arrow
+        run: |
+          cargo update --package arrow
       - name: Run cargo-tarpaulin
         uses: actions-rs/tarpaulin@v0.1
         with:
           version: '0.15.0'
-          args: '-- --test-threads 1'
+          args: '-- --test-threads 4'
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v1.0.2
         with:
