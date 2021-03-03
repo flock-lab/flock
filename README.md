@@ -3,6 +3,7 @@
 ## Squirtle: Serverless SQL Query Engine for Real-Time and Batch Analytics
 
 [![CI](https://github.com/DSLAM-UMD/Squirtle/workflows/CI/badge.svg?branch=code&event=pull_request)](https://github.com/DSLAM-UMD/Squirtle/actions)
+[![codecov](https://codecov.io/gh/DSLAM-UMD/Squirtle/branch/code/graph/badge.svg?token=1FOM4DJUZJ)](https://codecov.io/gh/DSLAM-UMD/Squirtle)
 [![License](https://img.shields.io/badge/license-Apache%202-blue.svg)](LICENSE)
 
 ## Architecture
