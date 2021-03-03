@@ -11,4 +11,5 @@ codecov:
 
 ignore:
   - "src/legacy"
+  - "src/driver/src/build"
   - "**/*.md"
