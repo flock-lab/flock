@@ -1,7 +1,15 @@
+# For more configuration details:
+# https://docs.codecov.io/docs/codecov-yaml
+
+# Check if this file is valid by running in bash:
+# curl -X POST --data-binary @.codecov.yml https://codecov.io/validate
+
+# Coverage configuration
+# ----------------------
 codecov:
-  notify:
-    require_ci_to_pass: no
+  require_ci_to_pass: yes
 
 ignore:
   - "src/legacy"
+  - "src/driver/src/build"
   - "**/*.md"
