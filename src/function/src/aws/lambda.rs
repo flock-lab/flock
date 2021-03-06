@@ -155,7 +155,7 @@ mod tests {
     #[tokio::test]
     async fn generic_lambda() -> Result<()> {
         IS_TESTING.with(|t| t.set(true));
-        let plan = include_str!("../../../test/data/simple_select.json");
+        let plan = include_str!("../../../test/data/plan/simple_select.json");
         let name = "hello".to_owned();
         let next =
             CloudFunction::Solo("SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836Z".to_owned());
