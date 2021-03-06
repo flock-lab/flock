@@ -20,6 +20,7 @@ use datafusion::physical_plan::Partitioning;
 use lambda::{handler_fn, Context};
 use runtime::prelude::*;
 use serde_json::Value;
+use std::cell::Cell;
 use std::sync::Once;
 
 #[cfg(feature = "snmalloc")]
@@ -28,6 +29,11 @@ static ALLOC: snmalloc_rs::SnMalloc = snmalloc_rs::SnMalloc;
 
 /// Initializes the lambda function once and only once.
 static INIT: Once = Once::new();
+
+thread_local! {
+    /// Is in the testing environment.
+    static IS_TESTING: Cell<bool> = Cell::new(false);
+}
 
 enum CloudFunctionContext {
     Lambda(Box<ExecutionContext>),
@@ -41,7 +47,8 @@ static mut EXECUTION_CONTEXT: CloudFunctionContext = CloudFunctionContext::Unini
 macro_rules! init_exec_context {
     () => {{
         unsafe {
-            INIT.call_once(|| match std::env::var(&globals["context"]["name"]) {
+            // Init query executor from the cloud evironment.
+            let init_context = || match std::env::var(&globals["context"]["name"]) {
                 Ok(s) => {
                     EXECUTION_CONTEXT =
                         CloudFunctionContext::Lambda(Box::new(ExecutionContext::unmarshal(&s)));
@@ -49,7 +56,12 @@ macro_rules! init_exec_context {
                 Err(_) => {
                     panic!("No execution context in the cloud environment.");
                 }
-            });
+            };
+            if IS_TESTING.with(|t| t.get()) {
+                init_context();
+            } else {
+                INIT.call_once(init_context);
+            }
             match &mut EXECUTION_CONTEXT {
                 CloudFunctionContext::Lambda(ctx) => ctx,
                 CloudFunctionContext::Uninitialized => panic!("Uninitialized execution context!"),
@@ -141,14 +153,9 @@ mod tests {
     use std::sync::Arc;
 
     #[tokio::test]
-    #[ignore]
     async fn generic_lambda() -> Result<()> {
-        let plan = r#"{"execution_plan":"coalesce_batches_exec","input":{"execution_plan":"
-            memory_exec","schema":{"fields":[{"name":"c1","data_type":"Int64","nullable":
-            true,"dict_id":0,"dict_is_ordered":false},{"name":"c2","data_type":"Float64",
-            "nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c3","data_type"
-            :"Utf8","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},
-            "projection":null},"target_batch_size":16384}"#;
+        IS_TESTING.with(|t| t.set(true));
+        let plan = include_str!("../../../test/data/simple_select.json");
         let name = "hello".to_owned();
         let next =
             CloudFunction::Solo("SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836Z".to_owned());
@@ -218,6 +225,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn centralized_execution() -> Result<()> {
+        IS_TESTING.with(|t| t.set(true));
         for (i, num) in [100, 1024, 10240].iter().enumerate() {
             let event = init_lambda_exec(*num);
 
@@ -240,6 +248,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn repartition_execution() -> Result<()> {
+        IS_TESTING.with(|t| t.set(true));
         let record_num = 10240;
         let event = init_lambda_exec(record_num);
 
@@ -265,6 +274,18 @@ mod tests {
             assert_eq!(1, new_batch[i].len());
             assert_eq!(1024, new_batch[i][0].num_rows());
         });
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn distributed_execution() -> Result<()> {
+        IS_TESTING.with(|t| t.set(true));
+        let event = init_lambda_exec(300000);
+
+        // cloud function execution
+        let _ = handler(event, Context::default()).await?;
 
         Ok(())
     }
