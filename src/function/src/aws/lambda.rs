@@ -223,7 +223,7 @@ mod tests {
         event
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn centralized_execution() -> Result<()> {
         IS_TESTING.with(|t| t.set(true));
         for (i, num) in [100, 1024, 10240].iter().enumerate() {
@@ -246,7 +246,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn repartition_execution() -> Result<()> {
         IS_TESTING.with(|t| t.set(true));
         let record_num = 10240;
@@ -278,7 +278,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     #[ignore]
     async fn distributed_execution() -> Result<()> {
         IS_TESTING.with(|t| t.set(true));

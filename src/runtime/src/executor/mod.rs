@@ -189,7 +189,7 @@ mod tests {
     use datafusion::physical_plan::expressions::Column;
     use tokio::task::JoinHandle;
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_concat_batches() -> Result<()> {
         let schema = test_schema();
         let partition = create_vec_batches(&schema, 10);
@@ -210,7 +210,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn one_to_many_round_robin() -> Result<()> {
         // define input partitions
         let schema = test_schema();
@@ -230,7 +230,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn many_to_one_round_robin() -> Result<()> {
         // define input partitions
         let schema = test_schema();
@@ -247,7 +247,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn many_to_many_round_robin() -> Result<()> {
         // define input partitions
         let schema = test_schema();
@@ -268,7 +268,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn many_to_many_hash_partition() -> Result<()> {
         // define input partitions
         let schema = test_schema();
