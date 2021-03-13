@@ -100,7 +100,6 @@ pub fn to_batch(event: KafkaEvent) -> Vec<RecordBatch> {
             assert!(!records.is_empty());
             // infer schema based on the first record
             let record = base64::decode(records[0].value.as_ref().unwrap()).unwrap();
-            println!("{}", std::str::from_utf8(&record).unwrap());
             schema = infer_json_schema(&mut BufReader::new(&record[..]), Some(1)).unwrap();
         }
 

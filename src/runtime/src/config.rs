@@ -40,17 +40,17 @@ mod tests {
 
         assert_eq!(
             5242880,
-            (&conf["context"]["join_threshold"]).parse::<i32>().unwrap()
+            (&conf["lambda"]["join_threshold"]).parse::<i32>().unwrap()
         );
         assert_eq!(
             10485760,
-            (&conf["context"]["aggregate_threshold"])
+            (&conf["lambda"]["aggregate_threshold"])
                 .parse::<i32>()
                 .unwrap()
         );
         assert_eq!(
             20971520,
-            (&conf["context"]["regular_threshold"])
+            (&conf["lambda"]["regular_threshold"])
                 .parse::<i32>()
                 .unwrap()
         );

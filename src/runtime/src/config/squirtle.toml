@@ -3,11 +3,18 @@
 name = "squirtle"
 discription = "Squirtle: Serverless SQL Query Engine for Real-Time and Batch Analytics"
 license = "Copyright (c) 2020-2021, UMD Database Group. All rights reserved. The library, examples, and all source code are released under Apache 2.0"
+production = false
 
-[context]
+[lambda]
 
 name = "execution_context"
-production = false
+
+# default target batch size
+target_batch_size = 16384
+
+# multi-thread parallelism inside the cloud function
+parallelism = 8
+
 join_threshold = 5242880
 aggregate_threshold = 10485760
 regular_threshold = 20971520

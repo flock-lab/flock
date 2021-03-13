@@ -18,7 +18,6 @@ blake2 = "0.9"
 chrono = "0.4.19"
 daggy = "0.7.0"
 datafusion = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq", features = [ "simd" ] }
-lambda = { git = "https://github.com/awslabs/aws-lambda-rust-runtime/", branch = "master" }
 lazy_static = "1.4"
 runtime = { path = "../../src/runtime" }
 rusoto_core = "0.46.0"
