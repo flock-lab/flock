@@ -100,9 +100,17 @@ async fn source_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Valu
     match LambdaExecutor::choose_strategy(&ctx, &batch) {
         ExecutionStrategy::Centralized => {
             // feed data into the physical plan
-            let output_partitions = LambdaExecutor::coalesce_batches(vec![batch], 16384).await?;
+            let output_partitions = LambdaExecutor::coalesce_batches(
+                vec![batch],
+                globals["lambda"]["target_batch_size"]
+                    .parse::<usize>()
+                    .unwrap(),
+            )
+            .await?;
+
             let num_batches = output_partitions[0].len();
             let parallelism = globals["lambda"]["parallelism"].parse::<usize>().unwrap();
+
             if num_batches > parallelism {
                 ctx.feed_one_source(
                     &LambdaExecutor::repartition(

@@ -9,6 +9,9 @@ production = false
 
 name = "execution_context"
 
+# default target batch size
+target_batch_size = 16384
+
 # multi-thread parallelism inside the cloud function
 parallelism = 8
 
