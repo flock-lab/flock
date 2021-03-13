@@ -150,7 +150,7 @@ impl LambdaExecutor {
             .sum();
         if contain_join(&ctx.plan) {
             if size
-                < globals["context"]["join_threshold"]
+                < globals["lambda"]["join_threshold"]
                     .parse::<usize>()
                     .unwrap()
             {
@@ -160,7 +160,7 @@ impl LambdaExecutor {
             }
         } else if contain_aggregate(&ctx.plan) {
             if size
-                < globals["context"]["aggregate_threshold"]
+                < globals["lambda"]["aggregate_threshold"]
                     .parse::<usize>()
                     .unwrap()
             {
@@ -169,7 +169,7 @@ impl LambdaExecutor {
                 ExecutionStrategy::Distributed
             }
         } else if size
-            < globals["context"]["regular_threshold"]
+            < globals["lambda"]["regular_threshold"]
                 .parse::<usize>()
                 .unwrap()
         {

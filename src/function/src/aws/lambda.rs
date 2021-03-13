@@ -48,7 +48,7 @@ macro_rules! init_exec_context {
     () => {{
         unsafe {
             // Init query executor from the cloud evironment.
-            let init_context = || match std::env::var(&globals["context"]["name"]) {
+            let init_context = || match std::env::var(&globals["lambda"]["name"]) {
                 Ok(s) => {
                     EXECUTION_CONTEXT =
                         CloudFunctionContext::Lambda(Box::new(ExecutionContext::unmarshal(&s)));
@@ -100,13 +100,29 @@ async fn source_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Valu
     match LambdaExecutor::choose_strategy(&ctx, &batch) {
         ExecutionStrategy::Centralized => {
             // feed data into the physical plan
-            if batch.len() > 8 {
+            let output_partitions = LambdaExecutor::coalesce_batches(vec![batch], 16384).await?;
+            let num_batches = output_partitions[0].len();
+            let parallelism = globals["lambda"]["parallelism"].parse::<usize>().unwrap();
+            if num_batches > parallelism {
                 ctx.feed_one_source(
-                    &LambdaExecutor::repartition(vec![batch], Partitioning::RoundRobinBatch(8))
-                        .await?,
+                    &LambdaExecutor::repartition(
+                        output_partitions,
+                        Partitioning::RoundRobinBatch(parallelism),
+                    )
+                    .await?,
+                );
+            } else if num_batches > 1 {
+                ctx.feed_one_source(
+                    &LambdaExecutor::repartition(
+                        output_partitions,
+                        Partitioning::RoundRobinBatch(num_batches),
+                    )
+                    .await?,
                 );
             } else {
-                ctx.feed_one_source(&vec![batch]);
+                // only one batch exists
+                assert!(num_batches == 1);
+                ctx.feed_one_source(&output_partitions);
             }
 
             // query execution
@@ -172,7 +188,7 @@ mod tests {
         let encoded = lambda_context.marshal(Encoding::default());
 
         // Configures the cloud environment
-        std::env::set_var(&globals["context"]["name"], encoded);
+        std::env::set_var(&globals["lambda"]["name"], encoded);
 
         // First lambda call
         let event = json!({
