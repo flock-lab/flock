@@ -17,7 +17,7 @@
 use aws_lambda_events::event::kafka::KafkaEvent;
 use aws_lambda_events::event::kinesis::KinesisEvent;
 use datafusion::physical_plan::Partitioning;
-use lambda::{handler_fn, Context};
+use lambda_runtime::{handler_fn, Context};
 use runtime::prelude::*;
 use serde_json::Value;
 use std::cell::Cell;
@@ -72,7 +72,7 @@ macro_rules! init_exec_context {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    lambda::run(handler_fn(handler)).await?;
+    lambda_runtime::run(handler_fn(handler)).await?;
     Ok(())
 }
 

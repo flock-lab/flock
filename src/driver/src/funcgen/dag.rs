@@ -304,7 +304,6 @@ mod tests {
         let physical_plan = ctx.create_physical_plan(&logical_plan)?;
 
         let serialized = serde_json::to_string(&physical_plan).unwrap();
-        println!("{}", serialized);
 
         let physical_plan: Arc<dyn ExecutionPlan> = serde_json::from_str(&serialized).unwrap();
 
