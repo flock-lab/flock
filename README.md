@@ -14,5 +14,5 @@ The following diagram highlights some of the integrations that will be possible 
 
 ## License
 
-Copyright (c) 2020-2021, UMD Database Group. All rights reserved.
+Copyright (c) 2020-2021 Gang Liao. All rights reserved.
 The library, examples, and all source code are released under Apache 2.0.
