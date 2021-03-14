@@ -28,6 +28,7 @@
 )]
 #![feature(get_mut_unchecked)]
 
+use arrow::array::{Int64Array, StringArray};
 use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
 use datafusion::datasource::MemTable;
@@ -223,6 +224,44 @@ pub fn random_event(datasource: &DataSource, num: usize) -> (Value, SchemaRef) {
     }
 }
 
+/// Generate a random payload for unit tests.
+///
+/// # Arguments
+///
+/// * `rows`: the number of rows in each record batch (RecordBatch).
+/// * `batch_nums`: the number of batches in each partition (vec![RecordBatch]).
+/// * `partition_nums`: the number of partitions in each payload
+///   (vec![vec![RecordBatch]).
+///
+/// # Return
+///
+/// A record batches that is formatted in vec![vec![RecordBatch]].
+pub fn random_batches(
+    rows: usize,
+    batch_nums: usize,
+    partition_nums: usize,
+) -> Vec<Vec<RecordBatch>> {
+    (0..partition_nums)
+        .map(|_| {
+            (0..batch_nums)
+                .map(|_| {
+                    RecordBatch::try_new(
+                        DataRecord::schema(),
+                        vec![
+                            Arc::new(Int64Array::from(fake::vec![i64; rows])),
+                            Arc::new(Int64Array::from(fake::vec![i64; rows])),
+                            Arc::new(StringArray::from_iter_values(
+                                fake::vec![String; rows].iter(),
+                            )),
+                        ],
+                    )
+                    .unwrap()
+                })
+                .collect()
+        })
+        .collect()
+}
+
 /// Register a table
 pub fn register_table(schema: &SchemaRef, table_name: &str) -> ExecutionContext {
     let mut ctx = ExecutionContext::new();
@@ -274,6 +313,26 @@ mod tests {
                 serde_json::from_value(value)?;
             assert_eq!(event.records.len(), i);
         }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn random_batches_data() -> Result<()> {
+        let rows = 16;
+        let batch_nums = 16;
+        let partition_nums = 16;
+
+        let batches = random_batches(rows, batch_nums, partition_nums);
+
+        assert_eq!(partition_nums, batches.len());
+
+        (0..partition_nums).for_each(|i| {
+            assert_eq!(batches[i].len(), batch_nums);
+            (0..batch_nums).for_each(|j| {
+                assert_eq!(batches[i][j].num_rows(), rows);
+            });
+        });
+
         Ok(())
     }
 }
