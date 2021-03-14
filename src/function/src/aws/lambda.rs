@@ -35,6 +35,8 @@ thread_local! {
     static IS_TESTING: Cell<bool> = Cell::new(false);
 }
 
+/// A wrapper to allow the declaration of the execution context of the lambda
+/// function.
 enum CloudFunctionContext {
     Lambda(Box<ExecutionContext>),
     Uninitialized,
