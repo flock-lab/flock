@@ -21,7 +21,6 @@ json = "0.12.4"
 lazy_static = "1.4"
 lz4 = "1.23.1"
 rand = "0.8.3"
-
 rayon = "1.5"
 rusoto_core = "0.46.0"
 rusoto_kafka = "0.46.0"

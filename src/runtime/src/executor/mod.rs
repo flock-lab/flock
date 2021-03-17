@@ -28,21 +28,17 @@ use crate::config::GLOBALS as globals;
 use crate::context::CloudFunction;
 use crate::context::ExecutionContext;
 use crate::error::{Result, SquirtleError};
-use crate::payload::{Payload, Uuid, UuidBuilder};
+use crate::payload::{Payload, Uuid};
 use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
 use datafusion::physical_plan::coalesce_batches::CoalesceBatchesExec;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::repartition::RepartitionExec;
 use datafusion::physical_plan::{ExecutionPlan, Partitioning};
-use futures::executor::block_on;
 use futures::stream::StreamExt;
 use plan::*;
 use rand::Rng;
 use rayon::prelude::*;
-use rusoto_core::Region;
-use rusoto_lambda::InvokeAsyncRequest;
-use rusoto_lambda::{Lambda, LambdaClient};
 use serde_json::Value;
 use std::sync::Arc;
 
@@ -182,7 +178,7 @@ impl LambdaExecutor {
     }
 
     /// Returns the next cloud function names for invocation.
-    fn next_function(ctx: &ExecutionContext) -> Result<String> {
+    pub fn next_function(ctx: &ExecutionContext) -> Result<String> {
         let mut lambdas = match &ctx.next {
             CloudFunction::None => vec![],
             CloudFunction::Chorus((name, num)) => {
@@ -206,51 +202,17 @@ impl LambdaExecutor {
 
         Ok(function_name)
     }
-
-    /// Invoke functions in the next stage of the data flow.
-    pub fn invoke_async_functions(
-        ctx: &ExecutionContext,
-        batches: &mut Vec<RecordBatch>,
-    ) -> Result<()> {
-        // retrieve the next lambda function names
-        let next_func = LambdaExecutor::next_function(&ctx)?;
-
-        // create uuid builder to assign id to each payload
-        let mut uuid_builder = UuidBuilder::new(&ctx.name, batches.len());
-
-        let client = &LambdaClient::new(Region::default());
-        let nums = batches.len();
-        (0..nums).for_each(|_| {
-            let uuid = uuid_builder.next();
-            // call the lambda function asynchronously until it succeeds.
-            loop {
-                let request = InvokeAsyncRequest {
-                    function_name: next_func.clone(),
-                    invoke_args:   Payload::to_bytes(&[batches.pop().unwrap()], uuid.clone()),
-                };
-
-                if let Ok(reponse) = block_on(client.invoke_async(request)) {
-                    if let Some(code) = reponse.status {
-                        // A success response (202 Accepted) indicates that the request
-                        // is queued for invocation.
-                        if code == 202 {
-                            break;
-                        }
-                    }
-                }
-            }
-        });
-
-        Ok(())
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::datasource::{kinesis, DataSource};
     use crate::error::SquirtleError;
     use arrow::array::UInt32Array;
     use arrow::datatypes::{DataType, Field, Schema};
+    use aws_lambda_events::event::kinesis::KinesisEvent;
+    use datafusion::datasource::MemTable;
     use datafusion::physical_plan::expressions::Column;
     use tokio::task::JoinHandle;
 
@@ -399,6 +361,62 @@ mod tests {
             vec![Arc::new(UInt32Array::from(vec![1, 2, 3, 4, 5, 6, 7, 8]))],
         )
         .unwrap()
+    }
+
+    #[tokio::test]
+    async fn next_function() -> Result<()> {
+        let input = include_str!("../../../test/data/example-kinesis-event-1.json");
+        let input: KinesisEvent = serde_json::from_str(input).unwrap();
+        let partitions = vec![kinesis::to_batch(input)];
+
+        let mut ctx = datafusion::execution::context::ExecutionContext::new();
+        let provider = MemTable::try_new(partitions[0][0].schema(), partitions.clone())?;
+
+        ctx.register_table("test", Arc::new(provider));
+
+        let sql = "SELECT MAX(c1), MIN(c2), c3 FROM test WHERE c2 < 99 GROUP BY c3";
+        let logical_plan = ctx.create_logical_plan(&sql)?;
+        let logical_plan = ctx.optimize(&logical_plan)?;
+        let physical_plan = ctx.create_physical_plan(&logical_plan)?;
+
+        // Serialize the physical plan and skip its record batches
+        let plan = serde_json::to_string(&physical_plan)?;
+
+        // Deserialize the physical plan that doesn't contain record batches
+        let plan: Arc<dyn ExecutionPlan> = serde_json::from_str(&plan)?;
+
+        // Feed record batches back to the plan
+        let mut ctx = ExecutionContext {
+            plan:       plan.clone(),
+            name:       "test".to_string(),
+            next:       CloudFunction::None,
+            datasource: DataSource::UnknownEvent,
+        };
+        LambdaExecutor::next_function(&ctx).expect_err("No distributed execution plan");
+
+        ctx = ExecutionContext {
+            plan:       plan.clone(),
+            name:       "test".to_string(),
+            next:       CloudFunction::Solo("solo".to_string()),
+            datasource: DataSource::UnknownEvent,
+        };
+        assert_eq!("solo", LambdaExecutor::next_function(&ctx)?);
+
+        ctx = ExecutionContext {
+            plan:       plan.clone(),
+            name:       "test".to_string(),
+            next:       CloudFunction::Chorus(("chorus".to_string(), 24)),
+            datasource: DataSource::UnknownEvent,
+        };
+
+        let lambdas: Vec<String> = (0..100)
+            .map(|_| LambdaExecutor::next_function(&ctx).unwrap())
+            .collect();
+
+        assert_eq!(100, lambdas.len());
+        assert_ne!(lambdas.iter().min(), lambdas.iter().max());
+
+        Ok(())
     }
 }
 
