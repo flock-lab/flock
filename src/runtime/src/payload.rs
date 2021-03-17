@@ -104,7 +104,7 @@ pub struct DataFrame {
 /// lambda functions. In AWS Lambda, it supports payload sizes up to 256KB for
 /// async invocation. You can pass payloads in your query workflows, allowing
 /// each lambda function to seamlessly perform related query operations.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub struct Payload {
     /// The data batches in the payload.
     #[serde(with = "serde_bytes")]
@@ -277,6 +277,7 @@ pub fn unmarshal(payload: &Payload) -> Vec<DataFrame> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::Result;
     use arrow::array::{Array, StructArray};
     use arrow::csv;
     use arrow::datatypes::{DataType, Field, Schema};
@@ -431,5 +432,53 @@ mod tests {
                 assert_eq!(flight_data.data_body, de_body);
             }
         }
+    }
+
+    #[tokio::test]
+    async fn serde_payload() -> Result<()> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("tripduration", DataType::Utf8, false),
+            Field::new("starttime", DataType::Utf8, false),
+            Field::new("stoptime", DataType::Utf8, false),
+            Field::new("start station id", DataType::Int32, false),
+            Field::new("start station name", DataType::Utf8, false),
+            Field::new("start station latitude", DataType::Float64, false),
+            Field::new("start station longitude", DataType::Float64, false),
+            Field::new("end station id", DataType::Int32, false),
+            Field::new("end station name", DataType::Utf8, false),
+            Field::new("end station latitude", DataType::Float64, false),
+            Field::new("end station longitude", DataType::Float64, false),
+            Field::new("bikeid", DataType::Int32, false),
+            Field::new("usertype", DataType::Utf8, false),
+            Field::new("birth year", DataType::Int32, false),
+            Field::new("gender", DataType::Int8, false),
+        ]));
+
+        let records: &[u8] =
+            include_str!("../../test/data/JC-202011-citibike-tripdata.csv").as_bytes();
+        let mut reader = csv::Reader::new(records, schema, true, None, 21275, None, None);
+
+        let batches = vec![reader.next().unwrap().unwrap()];
+        let mut uuid_builder =
+            UuidBuilder::new("SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836", 10);
+        let uuid = uuid_builder.next();
+
+        let value = Payload::to_value(&batches, uuid.clone());
+        let payload1: Payload = serde_json::from_value(value.clone())?;
+        let (de_batches, de_uuid) = Payload::to_batch(value);
+        {
+            assert_eq!(batches.len(), de_batches.len());
+            assert_eq!(batches[0].schema(), de_batches[0].schema());
+            assert_eq!(batches[0].num_columns(), de_batches[0].num_columns());
+            assert_eq!(batches[0].num_rows(), de_batches[0].num_rows());
+            assert_eq!(batches[0].columns(), de_batches[0].columns());
+            assert_eq!(uuid, de_uuid);
+        }
+
+        let bytes = Payload::to_bytes(&batches, uuid);
+        let payload2: Payload = serde_json::from_slice(&bytes)?;
+        assert_eq!(payload1, payload2);
+
+        Ok(())
     }
 }
