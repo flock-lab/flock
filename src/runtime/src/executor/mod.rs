@@ -25,18 +25,24 @@
 //! distributed dataflow model.
 
 use crate::config::GLOBALS as globals;
+use crate::context::CloudFunction;
 use crate::context::ExecutionContext;
-use crate::error::Result;
-use crate::payload::{Payload, Uuid};
+use crate::error::{Result, SquirtleError};
+use crate::payload::{Payload, Uuid, UuidBuilder};
 use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
 use datafusion::physical_plan::coalesce_batches::CoalesceBatchesExec;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::repartition::RepartitionExec;
 use datafusion::physical_plan::{ExecutionPlan, Partitioning};
+use futures::executor::block_on;
 use futures::stream::StreamExt;
 use plan::*;
+use rand::Rng;
 use rayon::prelude::*;
+use rusoto_core::Region;
+use rusoto_lambda::InvokeAsyncRequest;
+use rusoto_lambda::{Lambda, LambdaClient};
 use serde_json::Value;
 use std::sync::Arc;
 
@@ -121,11 +127,7 @@ pub trait Executor {
         assert_eq!(1, output_partitions.len());
         assert_eq!(1, output_partitions[0].len());
 
-        Ok(Payload::from(
-            &output_partitions[0][0],
-            output_partitions[0][0].schema(),
-            Uuid::default(),
-        ))
+        Ok(Payload::to_value(&output_partitions[0], Uuid::default()))
     }
 }
 
@@ -177,6 +179,69 @@ impl LambdaExecutor {
         } else {
             ExecutionStrategy::Distributed
         }
+    }
+
+    /// Returns the next cloud function names for invocation.
+    fn next_function(ctx: &ExecutionContext) -> Result<String> {
+        let mut lambdas = match &ctx.next {
+            CloudFunction::None => vec![],
+            CloudFunction::Chorus((name, num)) => {
+                (0..*num).map(|i| format!("{}-{}", name, i)).collect()
+            }
+            CloudFunction::Solo(name) => vec![name.to_owned()],
+        };
+
+        if lambdas.is_empty() {
+            return Err(SquirtleError::Internal(
+                "No distributed execution plan".to_owned(),
+            ));
+        }
+
+        let mut function_name = lambdas[0].clone();
+        if lambdas.len() > 1 {
+            // mapping to the same lambda function name through hashing technology.
+            let mut rng = rand::thread_rng();
+            function_name = lambdas.remove(rng.gen_range(0..lambdas.len()));
+        }
+
+        Ok(function_name)
+    }
+
+    /// Invoke functions in the next stage of the data flow.
+    pub fn invoke_async_functions(
+        ctx: &ExecutionContext,
+        batches: &mut Vec<RecordBatch>,
+    ) -> Result<()> {
+        // retrieve the next lambda function names
+        let next_func = LambdaExecutor::next_function(&ctx)?;
+
+        // create uuid builder to assign id to each payload
+        let mut uuid_builder = UuidBuilder::new(&ctx.name, batches.len());
+
+        let client = &LambdaClient::new(Region::default());
+        let nums = batches.len();
+        (0..nums).for_each(|_| {
+            let uuid = uuid_builder.next();
+            // call the lambda function asynchronously until it succeeds.
+            loop {
+                let request = InvokeAsyncRequest {
+                    function_name: next_func.clone(),
+                    invoke_args:   Payload::to_bytes(&[batches.pop().unwrap()], uuid.clone()),
+                };
+
+                if let Ok(reponse) = block_on(client.invoke_async(request)) {
+                    if let Some(code) = reponse.status {
+                        // A success response (202 Accepted) indicates that the request
+                        // is queued for invocation.
+                        if code == 202 {
+                            break;
+                        }
+                    }
+                }
+            }
+        });
+
+        Ok(())
     }
 }
 

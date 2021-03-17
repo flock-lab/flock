@@ -9,8 +9,11 @@ production = false
 
 name = "execution_context"
 
-# default target batch size
+# default target batch size (16 KB)
 target_batch_size = 16384
+
+# default raw record batch size in the payload (512 KB)
+payload_batch_size = 524288
 
 # multi-thread parallelism inside the cloud function
 parallelism = 8

@@ -16,7 +16,7 @@
 //! services.
 
 use crate::encoding::Encoding;
-use arrow::datatypes::{Schema, SchemaRef};
+use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
 use arrow_flight::utils::{flight_data_from_arrow_batch, flight_data_to_arrow_batch};
 use arrow_flight::FlightData;
@@ -31,15 +31,15 @@ pub struct UuidBuilder {
     /// The identifier of the query triggered at the specific time.
     pub tid: String,
     /// The sequence number which builder has assigned to the latest payload.
-    pub pos: i64,
+    pub pos: usize,
     /// The total sequence numbers after the data is fragmented to different
     /// payloads.
-    pub len: i64,
+    pub len: usize,
 }
 
 impl UuidBuilder {
     /// Returns a new UuidBuilder.
-    pub fn new(function_name: &str, len: i64) -> Self {
+    pub fn new(function_name: &str, len: usize) -> Self {
         let query_code: String;
         let plan_inedx: String;
         let timestamp: String;
@@ -73,7 +73,7 @@ impl UuidBuilder {
 /// identifier to distinguish each other, so that the lambda function can
 /// correctly separate and aggregate the results for distributed dataflow
 /// computation.
-#[derive(Default, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct Uuid {
     /// The identifier of the query triggered at the specific time.
     ///
@@ -83,14 +83,14 @@ pub struct Uuid {
     /// (with concurrency = 1) through consistent hashing.
     pub tid:     String,
     /// The sequence number of the data contained in the payload.
-    pub seq_num: i64,
+    pub seq_num: usize,
     /// The total sequence numbers after the data is fragmented to different
     /// payloads.
-    pub seq_len: i64,
+    pub seq_len: usize,
 }
 
 /// Arrow Flight Data format
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Default, Debug, Deserialize, Serialize)]
 pub struct DataFrame {
     /// Arrow Flight Data's header.
     #[serde(with = "serde_bytes")]
@@ -98,29 +98,19 @@ pub struct DataFrame {
     /// Arrow Flight Data's body.
     #[serde(with = "serde_bytes")]
     body:   Vec<u8>,
-    /// The subplan's schema.
-    schema: Schema,
-}
-
-impl Default for DataFrame {
-    fn default() -> DataFrame {
-        Self {
-            header: vec![],
-            body:   vec![],
-            schema: Schema::empty(),
-        }
-    }
 }
 
 /// `Payload` is the raw structure of the function's payload passed between
 /// lambda functions. In AWS Lambda, it supports payload sizes up to 256KB for
 /// async invocation. You can pass payloads in your query workflows, allowing
 /// each lambda function to seamlessly perform related query operations.
-#[derive(Default, Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Payload {
     /// The data batches in the payload.
     #[serde(with = "serde_bytes")]
     pub data:     Vec<u8>,
+    /// The subplan's schema.
+    schema:       Schema,
     /// The query's uuid.
     pub uuid:     Uuid,
     /// Compress `DataFrame` to guarantee the total size
@@ -128,73 +118,159 @@ pub struct Payload {
     pub encoding: Encoding,
 }
 
-impl DataFrame {
-    /// Serialize `Payload` in cloud functions.
-    pub fn marshal(&self, uuid: Uuid, encoding: Encoding) -> Value {
-        match encoding {
-            Encoding::Snappy | Encoding::Lz4 | Encoding::Zstd => {
-                let encoded: Vec<u8> = serde_json::to_vec(&self).unwrap();
-                serde_json::to_value(&Payload {
-                    data: encoding.compress(&encoded),
-                    uuid,
-                    encoding,
-                })
-                .unwrap()
-            }
-            Encoding::None => serde_json::to_value(&Payload {
-                data: serde_json::to_vec(&self).unwrap(),
-                uuid,
-                encoding,
-            })
-            .unwrap(),
-            _ => unimplemented!(),
-        }
-    }
-
-    /// Deserialize `DataFrame` from cloud functions.
-    pub fn unmarshal(payload: &Payload) -> DataFrame {
-        match payload.encoding {
-            Encoding::Snappy | Encoding::Lz4 | Encoding::Zstd => {
-                let encoded = payload.encoding.decompress(&payload.data);
-                serde_json::from_slice(&encoded).unwrap()
-            }
-            Encoding::None => serde_json::from_slice(&payload.data).unwrap(),
-            _ => unimplemented!(),
+impl Default for Payload {
+    fn default() -> Payload {
+        Self {
+            data:     vec![],
+            schema:   Schema::empty(),
+            uuid:     Uuid::default(),
+            encoding: Encoding::default(),
         }
     }
 }
 
 impl Payload {
     /// Convert incoming payload to record batch in Arrow.
-    pub fn to_batch(event: Value) -> (RecordBatch, Uuid) {
+    pub fn to_batch(event: Value) -> (Vec<RecordBatch>, Uuid) {
         let payload: Payload = serde_json::from_value(event).unwrap();
-        let data = DataFrame::unmarshal(&payload);
+        let uuid = payload.uuid.clone();
+        let mut data_frames = unmarshal(&payload);
+        let nums = data_frames.len();
         (
-            flight_data_to_arrow_batch(
-                &FlightData {
-                    data_body:         data.body,
-                    data_header:       data.header,
-                    app_metadata:      vec![],
-                    flight_descriptor: None,
-                },
-                Arc::new(data.schema),
-                &[],
-            )
-            .unwrap(),
-            payload.uuid,
+            (0..nums)
+                .map(|_| {
+                    let data = data_frames.pop().unwrap();
+                    flight_data_to_arrow_batch(
+                        &FlightData {
+                            data_body:         data.body,
+                            data_header:       data.header,
+                            app_metadata:      vec![],
+                            flight_descriptor: None,
+                        },
+                        Arc::new(payload.schema.clone()),
+                        &[],
+                    )
+                    .unwrap()
+                })
+                .collect(),
+            uuid,
         )
     }
 
     /// Convert record batch to payload for network transmission.
-    pub fn from(batch: &RecordBatch, schema: SchemaRef, uuid: Uuid) -> Value {
+    pub fn to_value(batches: &[RecordBatch], uuid: Uuid) -> Value {
         let options = arrow::ipc::writer::IpcWriteOptions::default();
-        let (_, flight_data) = flight_data_from_arrow_batch(batch, &options);
-        let dataframe = DataFrame {
-            header: flight_data.data_header,
-            body:   flight_data.data_body,
-            schema: (*schema).clone(),
-        };
-        dataframe.marshal(uuid, Encoding::default())
+
+        let data_frames = (0..batches.len())
+            .map(|i| {
+                let (_, flight_data) = flight_data_from_arrow_batch(&batches[i], &options);
+                DataFrame {
+                    header: flight_data.data_header,
+                    body:   flight_data.data_body,
+                }
+            })
+            .collect();
+
+        marshal2value(
+            &data_frames,
+            (*batches[0].schema()).clone(),
+            uuid,
+            Encoding::default(),
+        )
+    }
+
+    /// Convert record batch to payload for network transmission.
+    pub fn to_bytes(batches: &[RecordBatch], uuid: Uuid) -> bytes::Bytes {
+        let options = arrow::ipc::writer::IpcWriteOptions::default();
+
+        let data_frames = (0..batches.len())
+            .map(|i| {
+                let (_, flight_data) = flight_data_from_arrow_batch(&batches[i], &options);
+                DataFrame {
+                    header: flight_data.data_header,
+                    body:   flight_data.data_body,
+                }
+            })
+            .collect();
+
+        marshal2bytes(
+            &data_frames,
+            (*batches[0].schema()).clone(),
+            uuid,
+            Encoding::default(),
+        )
+    }
+}
+
+/// Serialize `Payload` in cloud functions.
+pub fn marshal2value(
+    data: &Vec<DataFrame>,
+    schema: Schema,
+    uuid: Uuid,
+    encoding: Encoding,
+) -> Value {
+    match encoding {
+        Encoding::Snappy | Encoding::Lz4 | Encoding::Zstd => {
+            let encoded: Vec<u8> = serde_json::to_vec(&data).unwrap();
+            serde_json::to_value(&Payload {
+                data: encoding.compress(&encoded),
+                schema,
+                uuid,
+                encoding,
+            })
+            .unwrap()
+        }
+        Encoding::None => serde_json::to_value(&Payload {
+            data: serde_json::to_vec(&data).unwrap(),
+            schema,
+            uuid,
+            encoding,
+        })
+        .unwrap(),
+        _ => unimplemented!(),
+    }
+}
+
+/// Serialize `Payload` in cloud functions.
+pub fn marshal2bytes(
+    data: &Vec<DataFrame>,
+    schema: Schema,
+    uuid: Uuid,
+    encoding: Encoding,
+) -> bytes::Bytes {
+    match encoding {
+        Encoding::Snappy | Encoding::Lz4 | Encoding::Zstd => {
+            let encoded: Vec<u8> = serde_json::to_vec(&data).unwrap();
+            serde_json::to_vec(&Payload {
+                data: encoding.compress(&encoded),
+                schema,
+                uuid,
+                encoding,
+            })
+            .unwrap()
+            .into()
+        }
+        Encoding::None => serde_json::to_vec(&Payload {
+            data: serde_json::to_vec(&data).unwrap(),
+            schema,
+            uuid,
+            encoding,
+        })
+        .unwrap()
+        .into(),
+        _ => unimplemented!(),
+    }
+}
+
+/// Deserialize `DataFrame` from cloud functions.
+pub fn unmarshal(payload: &Payload) -> Vec<DataFrame> {
+    match payload.encoding {
+        Encoding::Snappy | Encoding::Lz4 | Encoding::Zstd => {
+            let encoded = payload.encoding.decompress(&payload.data);
+            serde_json::from_slice(&encoded).unwrap()
+        }
+        Encoding::None => serde_json::from_slice(&payload.data).unwrap(),
+        _ => unimplemented!(),
     }
 }
 

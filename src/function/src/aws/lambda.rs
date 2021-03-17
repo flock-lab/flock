@@ -142,19 +142,28 @@ async fn source_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Valu
             LambdaExecutor::event_sink(vec![batches]).await
         }
         ExecutionStrategy::Distributed => {
-            unimplemented!();
+            let mut batches = LambdaExecutor::coalesce_batches(
+                vec![batch],
+                globals["lambda"]["payload_batch_size"]
+                    .parse::<usize>()
+                    .unwrap(),
+            )
+            .await?;
+            assert_eq!(1, batches.len());
+
+            LambdaExecutor::invoke_async_functions(&ctx, &mut batches[0])?;
+            Ok(serde_json::to_value(&ctx.name)?)
         }
     }
 }
 
 async fn payload_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Value> {
-    let (batch, uuid) = Payload::to_batch(event);
-    let schema = batch.schema();
+    let (batches, uuid) = Payload::to_batch(event);
 
-    ctx.feed_one_source(&vec![vec![batch]]);
+    ctx.feed_one_source(&vec![batches]);
     let batches = ctx.execute().await?;
 
-    Ok(Payload::from(&batches[0], schema, uuid))
+    Ok(Payload::to_value(&batches, uuid))
 }
 
 async fn handler(event: Value, _: Context) -> Result<Value> {
@@ -259,12 +268,12 @@ mod tests {
             let res = handler(event, Context::default()).await?;
 
             // check the result of function execution
-            let (batch, _) = Payload::to_batch(res);
+            let (batches, _) = Payload::to_batch(res);
 
             if i == 0 {
                 println!(
                     "{}",
-                    arrow::util::pretty::pretty_format_batches(&[batch]).unwrap(),
+                    arrow::util::pretty::pretty_format_batches(&batches).unwrap(),
                 );
             }
         }
