@@ -74,7 +74,7 @@ impl ExecutionEnvironment {
         for (_, ctx) in flow.ctx.iter() {
             let _: Vec<_> = lambda::function_name(&ctx)
                 .iter()
-                .map(move |name| async move {
+                .map(|name| async move {
                     client
                         .create_function(CreateFunctionRequest {
                             code: lambda::function_code(),

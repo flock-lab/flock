@@ -25,8 +25,9 @@
 //! distributed dataflow model.
 
 use crate::config::GLOBALS as globals;
+use crate::context::CloudFunction;
 use crate::context::ExecutionContext;
-use crate::error::Result;
+use crate::error::{Result, SquirtleError};
 use crate::payload::{Payload, Uuid};
 use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
@@ -36,6 +37,7 @@ use datafusion::physical_plan::repartition::RepartitionExec;
 use datafusion::physical_plan::{ExecutionPlan, Partitioning};
 use futures::stream::StreamExt;
 use plan::*;
+use rand::Rng;
 use rayon::prelude::*;
 use serde_json::Value;
 use std::sync::Arc;
@@ -121,11 +123,7 @@ pub trait Executor {
         assert_eq!(1, output_partitions.len());
         assert_eq!(1, output_partitions[0].len());
 
-        Ok(Payload::from(
-            &output_partitions[0][0],
-            output_partitions[0][0].schema(),
-            Uuid::default(),
-        ))
+        Ok(Payload::to_value(&output_partitions[0], Uuid::default()))
     }
 }
 
@@ -178,14 +176,43 @@ impl LambdaExecutor {
             ExecutionStrategy::Distributed
         }
     }
+
+    /// Returns the next cloud function names for invocation.
+    pub fn next_function(ctx: &ExecutionContext) -> Result<String> {
+        let mut lambdas = match &ctx.next {
+            CloudFunction::None => vec![],
+            CloudFunction::Chorus((name, num)) => {
+                (0..*num).map(|i| format!("{}-{}", name, i)).collect()
+            }
+            CloudFunction::Solo(name) => vec![name.to_owned()],
+        };
+
+        if lambdas.is_empty() {
+            return Err(SquirtleError::Internal(
+                "No distributed execution plan".to_owned(),
+            ));
+        }
+
+        let mut function_name = lambdas[0].clone();
+        if lambdas.len() > 1 {
+            // mapping to the same lambda function name through hashing technology.
+            let mut rng = rand::thread_rng();
+            function_name = lambdas.remove(rng.gen_range(0..lambdas.len()));
+        }
+
+        Ok(function_name)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::datasource::{kinesis, DataSource};
     use crate::error::SquirtleError;
     use arrow::array::UInt32Array;
     use arrow::datatypes::{DataType, Field, Schema};
+    use aws_lambda_events::event::kinesis::KinesisEvent;
+    use datafusion::datasource::MemTable;
     use datafusion::physical_plan::expressions::Column;
     use tokio::task::JoinHandle;
 
@@ -334,6 +361,62 @@ mod tests {
             vec![Arc::new(UInt32Array::from(vec![1, 2, 3, 4, 5, 6, 7, 8]))],
         )
         .unwrap()
+    }
+
+    #[tokio::test]
+    async fn next_function() -> Result<()> {
+        let input = include_str!("../../../test/data/example-kinesis-event-1.json");
+        let input: KinesisEvent = serde_json::from_str(input).unwrap();
+        let partitions = vec![kinesis::to_batch(input)];
+
+        let mut ctx = datafusion::execution::context::ExecutionContext::new();
+        let provider = MemTable::try_new(partitions[0][0].schema(), partitions.clone())?;
+
+        ctx.register_table("test", Arc::new(provider));
+
+        let sql = "SELECT MAX(c1), MIN(c2), c3 FROM test WHERE c2 < 99 GROUP BY c3";
+        let logical_plan = ctx.create_logical_plan(&sql)?;
+        let logical_plan = ctx.optimize(&logical_plan)?;
+        let physical_plan = ctx.create_physical_plan(&logical_plan)?;
+
+        // Serialize the physical plan and skip its record batches
+        let plan = serde_json::to_string(&physical_plan)?;
+
+        // Deserialize the physical plan that doesn't contain record batches
+        let plan: Arc<dyn ExecutionPlan> = serde_json::from_str(&plan)?;
+
+        // Feed record batches back to the plan
+        let mut ctx = ExecutionContext {
+            plan:       plan.clone(),
+            name:       "test".to_string(),
+            next:       CloudFunction::None,
+            datasource: DataSource::UnknownEvent,
+        };
+        LambdaExecutor::next_function(&ctx).expect_err("No distributed execution plan");
+
+        ctx = ExecutionContext {
+            plan:       plan.clone(),
+            name:       "test".to_string(),
+            next:       CloudFunction::Solo("solo".to_string()),
+            datasource: DataSource::UnknownEvent,
+        };
+        assert_eq!("solo", LambdaExecutor::next_function(&ctx)?);
+
+        ctx = ExecutionContext {
+            plan:       plan.clone(),
+            name:       "test".to_string(),
+            next:       CloudFunction::Chorus(("chorus".to_string(), 24)),
+            datasource: DataSource::UnknownEvent,
+        };
+
+        let lambdas: Vec<String> = (0..100)
+            .map(|_| LambdaExecutor::next_function(&ctx).unwrap())
+            .collect();
+
+        assert_eq!(100, lambdas.len());
+        assert_ne!(lambdas.iter().min(), lambdas.iter().max());
+
+        Ok(())
     }
 }
 
