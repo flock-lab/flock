@@ -499,33 +499,36 @@ mod tests {
         let my_struct = &body[0];
 
         unsafe {
+            assert_eq!(data_frames[0].header.len(), (*my_struct).header.len());
             assert_eq!(data_frames[0].header, (*my_struct).header);
+            assert_eq!(data_frames[0].body.len(), (*my_struct).body.len());
             assert_eq!(data_frames[0].body, (*my_struct).body);
         }
 
         let encoding = Encoding::Zstd;
         // compress
         let now = Instant::now();
-        let event = serde_json::to_value(&Payload {
+        let event: bytes::Bytes = serde_json::to_vec(&Payload {
             data: encoding.compress(&d),
             uuid: uuid.clone(),
             encoding: encoding.clone(),
             schema,
         })
-        .unwrap();
+        .unwrap()
+        .into();
         println!(
             "transmute data - compression time: {} us",
             now.elapsed().as_micros()
         );
         println!(
             "transmute data - compressed data: {}, type: {:?}",
-            serde_json::to_vec(&event).unwrap().len(),
+            event.len(),
             encoding
         );
 
         // decompress
         let now = Instant::now();
-        let payload: Payload = serde_json::from_value(event).unwrap();
+        let payload: Payload = serde_json::from_slice(&event).unwrap();
         let de_uuid = payload.uuid.clone();
         let encoded = payload.encoding.decompress(&payload.data);
 
@@ -539,7 +542,9 @@ mod tests {
         assert!(head.is_empty(), "Data was not aligned");
 
         unsafe {
+            assert_eq!(data_frames[0].header.len(), (*de_struct).header.len());
             assert_eq!(data_frames[0].header, (*de_struct).header);
+            assert_eq!(data_frames[0].body.len(), (*de_struct).body.len());
             assert_eq!(data_frames[0].body, (*de_struct).body);
             assert_eq!(uuid, de_uuid);
             println!(
