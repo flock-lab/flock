@@ -16,7 +16,7 @@
 //! services.
 
 use crate::encoding::Encoding;
-use arrow::datatypes::Schema;
+use arrow::datatypes::{Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
 use arrow_flight::utils::{flight_data_from_arrow_batch, flight_data_to_arrow_batch};
 use arrow_flight::FlightData;
@@ -110,7 +110,7 @@ pub struct Payload {
     #[serde(with = "serde_bytes")]
     pub data:     Vec<u8>,
     /// The subplan's schema.
-    schema:       Schema,
+    schema:       SchemaRef,
     /// The query's uuid.
     pub uuid:     Uuid,
     /// Compress `DataFrame` to guarantee the total size
@@ -122,7 +122,7 @@ impl Default for Payload {
     fn default() -> Payload {
         Self {
             data:     vec![],
-            schema:   Schema::empty(),
+            schema:   Arc::new(Schema::empty()),
             uuid:     Uuid::default(),
             encoding: Encoding::default(),
         }
@@ -147,7 +147,7 @@ impl Payload {
                             app_metadata:      vec![],
                             flight_descriptor: None,
                         },
-                        Arc::new(payload.schema.clone()),
+                        payload.schema.clone(),
                         &[],
                     )
                     .unwrap()
@@ -171,12 +171,7 @@ impl Payload {
             })
             .collect();
 
-        marshal2value(
-            &data_frames,
-            (*batches[0].schema()).clone(),
-            uuid,
-            Encoding::default(),
-        )
+        marshal2value(&data_frames, batches[0].schema(), uuid, Encoding::default())
     }
 
     /// Convert record batch to payload for network transmission.
@@ -193,19 +188,14 @@ impl Payload {
             })
             .collect();
 
-        marshal2bytes(
-            &data_frames,
-            (*batches[0].schema()).clone(),
-            uuid,
-            Encoding::default(),
-        )
+        marshal2bytes(&data_frames, batches[0].schema(), uuid, Encoding::default())
     }
 }
 
 /// Serialize `Payload` in cloud functions.
 pub fn marshal2value(
     data: &Vec<DataFrame>,
-    schema: Schema,
+    schema: SchemaRef,
     uuid: Uuid,
     encoding: Encoding,
 ) -> Value {
@@ -234,7 +224,7 @@ pub fn marshal2value(
 /// Serialize `Payload` in cloud functions.
 pub fn marshal2bytes(
     data: &Vec<DataFrame>,
-    schema: Schema,
+    schema: SchemaRef,
     uuid: Uuid,
     encoding: Encoding,
 ) -> bytes::Bytes {
@@ -282,6 +272,8 @@ mod tests {
     use arrow::csv;
     use arrow::datatypes::{DataType, Field, Schema};
     use arrow::json;
+    use std::mem;
+    use std::slice;
     use std::sync::Arc;
     use std::time::Instant;
 
@@ -334,8 +326,7 @@ mod tests {
         assert_eq!(1856, flight_data_size);
     }
 
-    #[test]
-    fn flight_data_compression_ratio_2() {
+    fn init_batches() -> RecordBatch {
         let schema = Arc::new(Schema::new(vec![
             Field::new("tripduration", DataType::Utf8, false),
             Field::new("starttime", DataType::Utf8, false),
@@ -357,7 +348,12 @@ mod tests {
         let records: &[u8] =
             include_str!("../../test/data/JC-202011-citibike-tripdata.csv").as_bytes();
         let mut reader = csv::Reader::new(records, schema, true, None, 21275, None, None);
-        let batch = reader.next().unwrap().unwrap();
+        reader.next().unwrap().unwrap()
+    }
+
+    #[test]
+    fn flight_data_compression_ratio_2() {
+        let batch = init_batches();
 
         // Arrow RecordBatch (in-memory)
         let size: usize = batch
@@ -436,29 +432,7 @@ mod tests {
 
     #[tokio::test]
     async fn serde_payload() -> Result<()> {
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("tripduration", DataType::Utf8, false),
-            Field::new("starttime", DataType::Utf8, false),
-            Field::new("stoptime", DataType::Utf8, false),
-            Field::new("start station id", DataType::Int32, false),
-            Field::new("start station name", DataType::Utf8, false),
-            Field::new("start station latitude", DataType::Float64, false),
-            Field::new("start station longitude", DataType::Float64, false),
-            Field::new("end station id", DataType::Int32, false),
-            Field::new("end station name", DataType::Utf8, false),
-            Field::new("end station latitude", DataType::Float64, false),
-            Field::new("end station longitude", DataType::Float64, false),
-            Field::new("bikeid", DataType::Int32, false),
-            Field::new("usertype", DataType::Utf8, false),
-            Field::new("birth year", DataType::Int32, false),
-            Field::new("gender", DataType::Int8, false),
-        ]));
-
-        let records: &[u8] =
-            include_str!("../../test/data/JC-202011-citibike-tripdata.csv").as_bytes();
-        let mut reader = csv::Reader::new(records, schema, true, None, 21275, None, None);
-
-        let batches = vec![reader.next().unwrap().unwrap()];
+        let batches = vec![init_batches()];
         let mut uuid_builder =
             UuidBuilder::new("SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836", 10);
         let uuid = uuid_builder.next();
@@ -478,6 +452,101 @@ mod tests {
         let bytes = Payload::to_bytes(&batches, uuid);
         let payload2: Payload = serde_json::from_slice(&bytes)?;
         assert_eq!(payload1, payload2);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn transmute_data_frames() -> Result<()> {
+        #[repr(packed)]
+        pub struct DataFrameStruct {
+            /// Arrow Flight Data's header.
+            header: Vec<u8>,
+            /// Arrow Flight Data's body.
+            body:   Vec<u8>,
+        }
+
+        let batch = init_batches();
+        let schema = batch.schema();
+        let batches = vec![batch.clone(), batch.clone(), batch];
+        let mut uuid_builder =
+            UuidBuilder::new("SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836", 10);
+        let uuid = uuid_builder.next();
+
+        let options = arrow::ipc::writer::IpcWriteOptions::default();
+        let data_frames = (0..batches.len())
+            .map(|i| {
+                let (_, flight_data) = flight_data_from_arrow_batch(&batches[i], &options);
+                DataFrameStruct {
+                    header: flight_data.data_header,
+                    body:   flight_data.data_body,
+                }
+            })
+            .collect::<Vec<DataFrameStruct>>();
+        unsafe {
+            println!(
+                "transmute data - raw data: {}",
+                data_frames[0].header.len() + data_frames[0].body.len(),
+            );
+        }
+
+        let p: *const DataFrameStruct = &data_frames[0];
+        let p: *const u8 = p as *const u8;
+        let d: &[u8] = unsafe { slice::from_raw_parts(p, mem::size_of::<DataFrameStruct>()) };
+
+        let (head, body, _tail) = unsafe { d.align_to::<DataFrameStruct>() };
+        assert!(head.is_empty(), "Data was not aligned");
+        let my_struct = &body[0];
+
+        unsafe {
+            assert_eq!(data_frames[0].header, (*my_struct).header);
+            assert_eq!(data_frames[0].body, (*my_struct).body);
+        }
+
+        let encoding = Encoding::Zstd;
+        // compress
+        let now = Instant::now();
+        let event = serde_json::to_value(&Payload {
+            data: encoding.compress(&d),
+            uuid: uuid.clone(),
+            encoding: encoding.clone(),
+            schema,
+        })
+        .unwrap();
+        println!(
+            "transmute data - compression time: {} us",
+            now.elapsed().as_micros()
+        );
+        println!(
+            "transmute data - compressed data: {}, type: {:?}",
+            serde_json::to_vec(&event).unwrap().len(),
+            encoding
+        );
+
+        // decompress
+        let now = Instant::now();
+        let payload: Payload = serde_json::from_value(event).unwrap();
+        let de_uuid = payload.uuid.clone();
+        let encoded = payload.encoding.decompress(&payload.data);
+
+        let (head, body, _tail) = unsafe { encoded.align_to::<DataFrameStruct>() };
+        println!(
+            "transmute data - decompression time: {} us",
+            now.elapsed().as_micros()
+        );
+
+        let de_struct = &body[0];
+        assert!(head.is_empty(), "Data was not aligned");
+
+        unsafe {
+            assert_eq!(data_frames[0].header, (*de_struct).header);
+            assert_eq!(data_frames[0].body, (*de_struct).body);
+            assert_eq!(uuid, de_uuid);
+            println!(
+                "transmute data - decompress raw data: {}",
+                (*de_struct).header.len() + (*de_struct).body.len(),
+            );
+        }
 
         Ok(())
     }
