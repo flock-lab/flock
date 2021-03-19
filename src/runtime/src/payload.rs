@@ -158,16 +158,15 @@ impl Payload {
     }
 
     /// Convert record batch to payload for network transmission.
-    pub fn to_value(batches: &[RecordBatch], uuid: Uuid) -> Value {
+    pub fn to_value(batches: &[RecordBatch], uuid: Uuid, encoding: Encoding) -> Value {
         let options = arrow::ipc::writer::IpcWriteOptions::default();
-        let encoding = Encoding::Lz4;
         let data_frames = batches
             .par_iter()
             .map(|b| {
                 let (_, flight_data) = flight_data_from_arrow_batch(&b, &options);
                 DataFrame {
-                    header: encoding.compress(&flight_data.data_header),
-                    body:   encoding.compress(&flight_data.data_body),
+                    header: encoding.compress(flight_data.data_header),
+                    body:   encoding.compress(flight_data.data_body),
                 }
             })
             .collect();
@@ -182,16 +181,15 @@ impl Payload {
     }
 
     /// Convert record batch to payload for network transmission.
-    pub fn to_bytes(batches: &[RecordBatch], uuid: Uuid) -> bytes::Bytes {
+    pub fn to_vec(batches: &[RecordBatch], uuid: Uuid, encoding: Encoding) -> Vec<u8> {
         let options = arrow::ipc::writer::IpcWriteOptions::default();
-        let encoding = Encoding::Lz4;
         let data_frames = batches
             .par_iter()
             .map(|b| {
                 let (_, flight_data) = flight_data_from_arrow_batch(&b, &options);
                 DataFrame {
-                    header: encoding.compress(&flight_data.data_header),
-                    body:   encoding.compress(&flight_data.data_body),
+                    header: encoding.compress(flight_data.data_header),
+                    body:   encoding.compress(flight_data.data_body),
                 }
             })
             .collect();
@@ -203,7 +201,6 @@ impl Payload {
             encoding,
         })
         .unwrap()
-        .into()
     }
 }
 
@@ -303,7 +300,7 @@ mod tests {
             Field::new("gender", DataType::Int8, false),
         ]));
 
-        let batch_size = 1024;
+        let batch_size = 21275;
         let records: &[u8] =
             include_str!("../../test/data/JC-202011-citibike-tripdata.csv").as_bytes();
         let mut reader = csv::Reader::new(records, schema, true, None, batch_size, None, None);
@@ -330,7 +327,7 @@ mod tests {
                     .sum::<usize>()
             })
             .sum();
-        assert_eq!(4130944, size);
+        assert_eq!(4661248, size);
         println!("Arrow RecordBatch data (in-memory): {}", size);
 
         let batches = LambdaExecutor::coalesce_batches(vec![batches], size).await?;
@@ -354,9 +351,9 @@ mod tests {
             assert_eq!(21275, struct_array.len());
             // return the total number of bytes of memory occupied by the buffers owned by
             // this array.
-            assert_eq!(4025664, struct_array.get_buffer_memory_size());
+            assert_eq!(3412864, struct_array.get_buffer_memory_size());
             // return the total number of bytes of memory occupied physically by this array.
-            assert_eq!(4026760, struct_array.get_array_memory_size());
+            assert_eq!(3413960, struct_array.get_array_memory_size());
             println!(
                 "Arrow Struct Array data: {}",
                 struct_array.get_array_memory_size()
@@ -380,11 +377,12 @@ mod tests {
         // Option: Compress Arrow Flight data
         {
             for en in [Encoding::Snappy, Encoding::Lz4, Encoding::Zstd].iter() {
-                let now = Instant::now();
-                let (en_header, en_body) = (
-                    en.compress(&flight_data.data_header),
-                    en.compress(&flight_data.data_body),
+                let (h, b) = (
+                    flight_data.data_header.clone(),
+                    flight_data.data_body.clone(),
                 );
+                let now = Instant::now();
+                let (en_header, en_body) = (en.compress(h), en.compress(b));
                 let en_flight_data_size = en_header.len() + en_body.len();
                 println!("Compression time: {} ms", now.elapsed().as_millis());
 
@@ -415,7 +413,7 @@ mod tests {
         let uuid = uuid_builder.next();
 
         let now = Instant::now();
-        let value = Payload::to_value(&batches, uuid.clone());
+        let value = Payload::to_value(&batches, uuid.clone(), Encoding::default());
         println!(
             "serde payload to value (with compression) - time: {} ms",
             now.elapsed().as_millis()
@@ -439,14 +437,23 @@ mod tests {
         }
 
         let now = Instant::now();
-        let bytes = Payload::to_bytes(&batches, uuid);
+        let bytes = Payload::to_vec(&batches, uuid, Encoding::default());
         println!(
-            "serde payload to bytes (with compression) - time: {} ms",
-            now.elapsed().as_millis()
+            "serde payload to bytes (with compression) - time: {} ms, size: {} bytes",
+            now.elapsed().as_millis(),
+            bytes.len()
         );
 
         let payload2: Payload = serde_json::from_slice(&bytes)?;
         assert_eq!(payload1, payload2);
+
+        let now = Instant::now();
+        let bytes = Encoding::Zstd.compress(bytes);
+        println!(
+            "serde Json bytes - time: {} ms, size: {} bytes",
+            now.elapsed().as_millis(),
+            bytes.len()
+        );
 
         Ok(())
     }

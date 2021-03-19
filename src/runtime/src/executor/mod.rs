@@ -27,6 +27,7 @@
 use crate::config::GLOBALS as globals;
 use crate::context::CloudFunction;
 use crate::context::ExecutionContext;
+use crate::encoding::Encoding;
 use crate::error::{Result, SquirtleError};
 use crate::payload::{Payload, Uuid};
 use arrow::record_batch::RecordBatch;
@@ -123,7 +124,11 @@ pub trait Executor {
         assert_eq!(1, output_partitions.len());
         assert_eq!(1, output_partitions[0].len());
 
-        Ok(Payload::to_value(&output_partitions[0], Uuid::default()))
+        Ok(Payload::to_value(
+            &output_partitions[0],
+            Uuid::default(),
+            Encoding::default(),
+        ))
     }
 }
 
