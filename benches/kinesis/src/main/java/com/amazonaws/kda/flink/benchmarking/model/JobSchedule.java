@@ -1,4 +1,4 @@
-// Copyright (c) 2020-2021 Gang Liao. All rights reserved.
+// Copyright 2020 UMD Database Group. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.

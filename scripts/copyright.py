@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright (c) 2020-2021 Gang Liao. All rights reserved.
+# Copyright 2020 UMD Database Group. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import subprocess
 import platform
 
 COPYRIGHT = '''
-Copyright (c) 2020-2021 Gang Liao. All rights reserved.
+Copyright 2020 UMD Database Group. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -43,7 +43,7 @@ COPYRIGHT_HEADER = None
 
 NEW_LINE_MARK = '\n'
 COPYRIGHT_HEADER = COPYRIGHT.split(NEW_LINE_MARK)[1]
-p = re.search('(-\d{4})', COPYRIGHT_HEADER).group(1)[1:]
+p = re.search('(\d{4})', COPYRIGHT_HEADER).group(0)
 process = subprocess.Popen(["date", "+%Y"], stdout=subprocess.PIPE)
 date, err = process.communicate()
 date = date.decode("utf-8").rstrip("\n")

@@ -9,5 +9,5 @@
 
 ## License
 
-Copyright (c) 2020-2021 Gang Liao. All rights reserved.
-The library, examples, and all source code are released under Apache 2.0.
+Copyright 2020 UMD Database Group. All Rights Reserved.
+The library, examples, and all source code are released under [Apache License 2.0](LICENSE).
