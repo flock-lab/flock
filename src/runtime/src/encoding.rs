@@ -51,7 +51,7 @@ impl Default for Encoding {
 
 impl Encoding {
     /// Compress data
-    pub fn compress(&self, s: &[u8]) -> Vec<u8> {
+    pub fn compress(&self, s: Vec<u8>) -> Vec<u8> {
         match *self {
             Encoding::Snappy => {
                 let mut encoder = snap::raw::Encoder::new();
@@ -59,9 +59,8 @@ impl Encoding {
             }
             Encoding::Lz4 => lz4::block::compress(&s, None, true).unwrap(),
             Encoding::Zstd => zstd::block::compress(&s, 3).unwrap(),
-            _ => {
-                unimplemented!();
-            }
+            Encoding::None => s,
+            _ => unimplemented!(),
         }
     }
 
@@ -149,7 +148,7 @@ mod tests {
             let json = serde_json::to_string(&plan).unwrap();
 
             let now = Instant::now();
-            let en_json = en.compress(&json.as_bytes());
+            let en_json = en.compress(json.as_bytes().to_vec());
             println!("Compression time: {} μs", now.elapsed().as_micros());
 
             let now = Instant::now();

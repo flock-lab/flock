@@ -99,7 +99,12 @@ fn invoke_async_functions(ctx: &ExecutionContext, batches: &mut Vec<RecordBatch>
         loop {
             let request = InvokeAsyncRequest {
                 function_name: next_func.clone(),
-                invoke_args:   Payload::to_bytes(&[batches.pop().unwrap()], uuid.clone()),
+                invoke_args:   Payload::to_vec(
+                    &[batches.pop().unwrap()],
+                    uuid.clone(),
+                    Encoding::default(),
+                )
+                .into(),
             };
 
             if let Ok(reponse) = block_on(client.invoke_async(request)) {
@@ -204,7 +209,7 @@ async fn payload_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Val
     ctx.feed_one_source(&vec![batches]);
     let batches = ctx.execute().await?;
 
-    Ok(Payload::to_value(&batches, uuid))
+    Ok(Payload::to_value(&batches, uuid, Encoding::default()))
 }
 
 async fn handler(event: Value, _: Context) -> Result<Value> {

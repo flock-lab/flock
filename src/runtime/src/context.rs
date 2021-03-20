@@ -145,7 +145,7 @@ impl ExecutionContext {
             Encoding::Snappy | Encoding::Lz4 | Encoding::Zstd => {
                 let encoded: Vec<u8> = serde_json::to_vec(&self).unwrap();
                 serde_json::to_string(&CloudEnvironment {
-                    context: encoding.compress(&encoded),
+                    context: encoding.compress(encoded),
                     encoding,
                 })
                 .unwrap()
