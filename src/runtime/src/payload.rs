@@ -78,7 +78,7 @@ impl UuidBuilder {
 /// identifier to distinguish each other, so that the lambda function can
 /// correctly separate and aggregate the results for distributed dataflow
 /// computation.
-#[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Abomonation, Deserialize, Serialize, PartialEq, Eq)]
 pub struct Uuid {
     /// The identifier of the query triggered at the specific time.
     ///
@@ -95,7 +95,7 @@ pub struct Uuid {
 }
 
 /// Arrow Flight Data format
-#[derive(Default, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Abomonation, Deserialize, Serialize, PartialEq, Eq)]
 pub struct DataFrame {
     /// Arrow Flight Data's header.
     #[serde(with = "serde_bytes")]
@@ -109,7 +109,7 @@ pub struct DataFrame {
 /// lambda functions. In AWS Lambda, it supports payload sizes up to 256KB for
 /// async invocation. You can pass payloads in your query workflows, allowing
 /// each lambda function to seamlessly perform related query operations.
-#[derive(Default, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Default, Debug, Abomonation, Deserialize, Serialize, PartialEq)]
 pub struct Payload {
     /// The data batches in the payload.
     pub data:     Vec<DataFrame>,
@@ -482,39 +482,42 @@ mod tests {
 
     #[tokio::test]
     async fn abomonation_data_frames() -> Result<()> {
-        #[derive(Abomonation, Eq, PartialEq)]
-        pub struct DataFrameStruct {
-            /// Arrow Flight Data's header.
-            header: Vec<u8>,
-            /// Arrow Flight Data's body.
-            body:   Vec<u8>,
-        }
-
         let batches = init_batches();
+        let schema = batches[0].schema().clone();
 
         // compress
         let now = Instant::now();
         let options = arrow::ipc::writer::IpcWriteOptions::default();
-        let data_frames = (0..batches.len())
-            .map(|i| {
-                let (_, flight_data) = flight_data_from_arrow_batch(&batches[i], &options);
-                DataFrameStruct {
+        let data_frames = batches
+            .into_par_iter()
+            .map(|batch| {
+                let (_, flight_data) = flight_data_from_arrow_batch(&batch, &options);
+                DataFrame {
                     header: flight_data.data_header,
                     body:   flight_data.data_body,
                 }
             })
-            .collect::<Vec<DataFrameStruct>>();
+            .collect::<Vec<DataFrame>>();
 
         println!(
             "abomonation data - raw data: {}",
             data_frames[0].header.len() + data_frames[0].body.len(),
         );
 
+        // compress
         let encoding = Encoding::Zstd;
+        let uuid = UuidBuilder::new("SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836", 10).next();
+
+        let payload = Payload {
+            data: data_frames,
+            schema: Payload::schema_to_bytes(schema.clone()),
+            uuid,
+            encoding: encoding.clone(),
+        };
 
         let mut bytes = Vec::new();
         unsafe {
-            encode(&data_frames[0], &mut bytes)?;
+            encode(&payload, &mut bytes)?;
         }
         let event: bytes::Bytes = encoding.compress(&bytes).into();
         println!(
@@ -530,15 +533,15 @@ mod tests {
         // decompress
         let now = Instant::now();
         let mut encoded = encoding.decompress(&event);
-        if let Some((result, remaining)) = unsafe { decode::<DataFrameStruct>(&mut encoded) } {
-            assert!(remaining.is_empty());
+        if let Some((result, remaining)) = unsafe { decode::<Payload>(&mut encoded) } {
             println!(
                 "abomonation data - decompression time: {} ms",
                 now.elapsed().as_millis()
             );
+            assert!(remaining.is_empty());
             println!(
                 "abomonation data - decompressed data: {}",
-                result.header.len() + result.body.len(),
+                result.data[0].header.len() + result.data[0].body.len(),
             );
         }
 

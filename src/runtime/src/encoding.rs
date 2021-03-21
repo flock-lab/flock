@@ -19,7 +19,7 @@ use abomonation::{decode, encode};
 use serde::{Deserialize, Serialize};
 
 /// A compressor/decompressor type.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Abomonation, Deserialize, Serialize, PartialEq)]
 pub enum Encoding {
     /// Snappy is a LZ77-type compressor with a fixed, byte-oriented encoding.
     /// It does not aim for maximum compression, or compatibility with any other
