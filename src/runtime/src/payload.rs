@@ -244,8 +244,6 @@ mod tests {
     use arrow::csv;
     use arrow::datatypes::{DataType, Field, Schema};
     use arrow::json;
-    // use bytes::BytesMut;
-    // use prost::Message;
     use std::sync::Arc;
     use std::time::Instant;
 
