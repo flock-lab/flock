@@ -29,6 +29,10 @@
 //! such as execution plan and the next lambda functions, which instructs the
 //! lambda instance to perform the correct operation.
 
+#![allow(unused_imports)]
+#[macro_use]
+extern crate abomonation_derive;
+
 pub mod config;
 pub mod context;
 pub mod datasource;
