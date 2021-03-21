@@ -15,10 +15,11 @@
 //! `Encoding` is a compression/decompression module to reduce the total size of
 //! all environment variables so that they doesn't exceed 4 KB.
 
+use abomonation::{decode, encode};
 use serde::{Deserialize, Serialize};
 
 /// A compressor/decompressor type.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Abomonation, Deserialize, Serialize, PartialEq)]
 pub enum Encoding {
     /// Snappy is a LZ77-type compressor with a fixed, byte-oriented encoding.
     /// It does not aim for maximum compression, or compatibility with any other
@@ -51,7 +52,7 @@ impl Default for Encoding {
 
 impl Encoding {
     /// Compress data
-    pub fn compress(&self, s: Vec<u8>) -> Vec<u8> {
+    pub fn compress(&self, s: &[u8]) -> Vec<u8> {
         match *self {
             Encoding::Snappy => {
                 let mut encoder = snap::raw::Encoder::new();
@@ -59,7 +60,6 @@ impl Encoding {
             }
             Encoding::Lz4 => lz4::block::compress(&s, None, true).unwrap(),
             Encoding::Zstd => zstd::block::compress(&s, 3).unwrap(),
-            Encoding::None => s,
             _ => unimplemented!(),
         }
     }
@@ -148,7 +148,7 @@ mod tests {
             let json = serde_json::to_string(&plan).unwrap();
 
             let now = Instant::now();
-            let en_json = en.compress(json.as_bytes().to_vec());
+            let en_json = en.compress(json.as_bytes());
             println!("Compression time: {} μs", now.elapsed().as_micros());
 
             let now = Instant::now();

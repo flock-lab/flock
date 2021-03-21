@@ -8,6 +8,8 @@ keywords = [ "AWS", "sql", "physical-plan", "dataflow" ]
 edition = "2018"
 
 [dependencies]
+abomonation = { git = "https://github.com/TimelyDataflow/abomonation", branch = "master" }
+abomonation_derive = "0.5.0"
 arrow = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq", features = [ "simd" ] }
 arrow-flight = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq" }
 async-trait = "0.1.42"
@@ -36,6 +38,9 @@ text_io = "0.1.8"
 zstd = "0.6.0"
 
 [dev-dependencies]
+prost = "0.7"
+prost-derive = "0.7"
+
 test_utils = { path = "../test" }
 tokio = { version = "1.2", features = [ "macros", "io-util", "sync", "rt-multi-thread" ] }
 
