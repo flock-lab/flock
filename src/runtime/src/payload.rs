@@ -543,6 +543,10 @@ mod tests {
                 "abomonation data - decompressed data: {}",
                 result.data[0].header.len() + result.data[0].body.len(),
             );
+
+            assert_eq!(payload.schema, result.schema);
+            assert_eq!(payload.data, result.data);
+            assert_eq!(payload.uuid, result.uuid);
         }
 
         Ok(())
