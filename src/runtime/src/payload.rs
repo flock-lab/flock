@@ -16,10 +16,13 @@
 //! services.
 
 use crate::encoding::Encoding;
+use crate::error::{Result, SquirtleError};
 use abomonation::{decode, encode};
 use arrow::datatypes::{Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
-use arrow_flight::utils::{flight_data_from_arrow_batch, flight_data_to_arrow_batch};
+use arrow_flight::utils::{
+    flight_data_from_arrow_batch, flight_data_from_arrow_schema, flight_data_to_arrow_batch,
+};
 use arrow_flight::FlightData;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -106,12 +109,13 @@ pub struct DataFrame {
 /// lambda functions. In AWS Lambda, it supports payload sizes up to 256KB for
 /// async invocation. You can pass payloads in your query workflows, allowing
 /// each lambda function to seamlessly perform related query operations.
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Default, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Payload {
     /// The data batches in the payload.
     pub data:     Vec<DataFrame>,
     /// The subplan's schema.
-    pub schema:   SchemaRef,
+    #[serde(with = "serde_bytes")]
+    pub schema:   Vec<u8>,
     /// The query's uuid.
     pub uuid:     Uuid,
     /// Compress `DataFrame` to guarantee the total size
@@ -119,18 +123,21 @@ pub struct Payload {
     pub encoding: Encoding,
 }
 
-impl Default for Payload {
-    fn default() -> Payload {
-        Self {
-            data:     vec![],
-            schema:   Arc::new(Schema::empty()),
-            uuid:     Uuid::default(),
-            encoding: Encoding::default(),
-        }
-    }
-}
-
 impl Payload {
+    /// Serialize the schema
+    pub fn schema_to_bytes(schema: SchemaRef) -> Vec<u8> {
+        let options = arrow::ipc::writer::IpcWriteOptions::default();
+        let flight_data = flight_data_from_arrow_schema(&schema, &options);
+        flight_data.data_header
+    }
+
+    /// Deserialize the schema
+    pub fn schema_from_bytes(bytes: &[u8]) -> Result<Arc<Schema>> {
+        let schema = arrow::ipc::convert::schema_from_bytes(&bytes)
+            .map_err(|err| SquirtleError::Arrow(err))?;
+        Ok(Arc::new(schema))
+    }
+
     /// Convert incoming payload to record batch in Arrow.
     pub fn to_batch(event: Value) -> (Vec<RecordBatch>, Uuid) {
         let payload: Payload = serde_json::from_value(event).unwrap();
@@ -148,7 +155,7 @@ impl Payload {
                             app_metadata:      vec![],
                             flight_descriptor: None,
                         },
-                        schema.clone(),
+                        Self::schema_from_bytes(&schema).unwrap(),
                         &[],
                     )
                     .unwrap()
@@ -181,7 +188,7 @@ impl Payload {
 
         serde_json::to_value(&Payload {
             data: data_frames,
-            schema: batches[0].schema(),
+            schema: Self::schema_to_bytes(batches[0].schema().clone()),
             uuid,
             encoding,
         })
@@ -211,7 +218,7 @@ impl Payload {
 
         serde_json::to_vec(&Payload {
             data: data_frames,
-            schema: batches[0].schema(),
+            schema: Self::schema_to_bytes(batches[0].schema().clone()),
             uuid,
             encoding,
         })
@@ -238,7 +245,6 @@ pub fn unmarshal(payload: Payload) -> Vec<DataFrame> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::error::Result;
     use crate::executor::{Executor, LambdaExecutor};
     use arrow::array::{Array, StructArray};
     use arrow::csv;
@@ -584,6 +590,22 @@ mod tests {
         );
 
         assert_eq!(de_flights_data, data_frames[0]);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn schema_ipc() -> Result<()> {
+        let batches = init_batches();
+        let schema1 = batches[0].schema();
+
+        // serilization
+        let bytes = Payload::schema_to_bytes(schema1.clone());
+
+        // deserialization
+        let schema2 = Payload::schema_from_bytes(&bytes)?;
+
+        assert_eq!(schema1, schema2);
 
         Ok(())
     }
