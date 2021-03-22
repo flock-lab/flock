@@ -188,7 +188,7 @@ impl Payload {
 
         serde_json::to_value(&Payload {
             data: data_frames,
-            schema: Self::schema_to_bytes(batches[0].schema().clone()),
+            schema: Self::schema_to_bytes(batches[0].schema()),
             uuid,
             encoding,
         })
@@ -218,7 +218,7 @@ impl Payload {
 
         serde_json::to_vec(&Payload {
             data: data_frames,
-            schema: Self::schema_to_bytes(batches[0].schema().clone()),
+            schema: Self::schema_to_bytes(batches[0].schema()),
             uuid,
             encoding,
         })
@@ -482,71 +482,83 @@ mod tests {
 
     #[tokio::test]
     async fn abomonation_data_frames() -> Result<()> {
-        let batches = init_batches();
-        let schema = batches[0].schema().clone();
-
-        // compress
-        let now = Instant::now();
         let options = arrow::ipc::writer::IpcWriteOptions::default();
-        let data_frames = batches
-            .into_par_iter()
-            .map(|batch| {
-                let (_, flight_data) = flight_data_from_arrow_batch(&batch, &options);
-                DataFrame {
-                    header: flight_data.data_header,
-                    body:   flight_data.data_body,
-                }
-            })
-            .collect::<Vec<DataFrame>>();
 
-        println!(
-            "abomonation data - raw data: {}",
-            data_frames[0].header.len() + data_frames[0].body.len(),
-        );
+        for encoding in [
+            Encoding::Snappy,
+            Encoding::Lz4,
+            Encoding::Zstd,
+            Encoding::None,
+        ]
+        .iter()
+        {
+            println!("-----------------{:?}-----------------", encoding);
+            let batches = init_batches();
+            let schema = batches[0].schema().clone();
 
-        // compress
-        let encoding = Encoding::Zstd;
-        let uuid = UuidBuilder::new("SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836", 10).next();
+            let now = Instant::now();
 
-        let payload = Payload {
-            data: data_frames,
-            schema: Payload::schema_to_bytes(schema.clone()),
-            uuid,
-            encoding: encoding.clone(),
-        };
+            // compress
+            let data_frames = batches
+                .into_par_iter()
+                .map(|batch| {
+                    let (_, flight_data) = flight_data_from_arrow_batch(&batch, &options);
+                    DataFrame {
+                        header: flight_data.data_header,
+                        body:   flight_data.data_body,
+                    }
+                })
+                .collect::<Vec<DataFrame>>();
 
-        let mut bytes = Vec::new();
-        unsafe {
-            encode(&payload, &mut bytes)?;
-        }
-        let event: bytes::Bytes = encoding.compress(&bytes).into();
-        println!(
-            "abomonation data - compression time: {} ms",
-            now.elapsed().as_millis()
-        );
-        println!(
-            "abomonation data - compressed data: {}, type: {:?}",
-            event.len(),
-            encoding
-        );
-
-        // decompress
-        let now = Instant::now();
-        let mut encoded = encoding.decompress(&event);
-        if let Some((result, remaining)) = unsafe { decode::<Payload>(&mut encoded) } {
             println!(
-                "abomonation data - decompression time: {} ms",
+                "abomonation data - raw data: {}",
+                data_frames[0].header.len() + data_frames[0].body.len(),
+            );
+
+            let uuid =
+                UuidBuilder::new("SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836", 10).next();
+
+            let payload = Payload {
+                data: data_frames,
+                schema: Payload::schema_to_bytes(schema.clone()),
+                uuid,
+                encoding: encoding.clone(),
+            };
+
+            let mut bytes = Vec::new();
+            unsafe {
+                encode(&payload, &mut bytes)?;
+            }
+            let event: bytes::Bytes = encoding.compress(&bytes).into();
+            println!(
+                "abomonation data - compression time: {} ms",
                 now.elapsed().as_millis()
             );
-            assert!(remaining.is_empty());
             println!(
-                "abomonation data - decompressed data: {}",
-                result.data[0].header.len() + result.data[0].body.len(),
+                "abomonation data - compressed data: {}, type: {:?}",
+                event.len(),
+                encoding
             );
 
-            assert_eq!(payload.schema, result.schema);
-            assert_eq!(payload.data, result.data);
-            assert_eq!(payload.uuid, result.uuid);
+            // decompress
+            let now = Instant::now();
+            let mut encoded = encoding.decompress(&event);
+            if let Some((result, remaining)) = unsafe { decode::<Payload>(&mut encoded) } {
+                println!(
+                    "abomonation data - decompression time: {} ms",
+                    now.elapsed().as_millis()
+                );
+                assert!(remaining.is_empty());
+                println!(
+                    "abomonation data - decompressed data: {}",
+                    result.data[0].header.len() + result.data[0].body.len(),
+                );
+
+                assert_eq!(payload.schema, result.schema);
+                assert_eq!(payload.data, result.data);
+                assert_eq!(payload.uuid, result.uuid);
+            }
+            println!("--------------------------------------");
         }
 
         Ok(())

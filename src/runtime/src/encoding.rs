@@ -60,6 +60,7 @@ impl Encoding {
             }
             Encoding::Lz4 => lz4::block::compress(&s, None, true).unwrap(),
             Encoding::Zstd => zstd::block::compress(&s, 3).unwrap(),
+            Encoding::None => s.into(),
             _ => unimplemented!(),
         }
     }
@@ -76,6 +77,7 @@ impl Encoding {
                 &s, 10485760, // The decompressed data should be less than 10 MB
             )
             .unwrap(),
+            Encoding::None => s.into(),
             _ => {
                 unimplemented!();
             }
