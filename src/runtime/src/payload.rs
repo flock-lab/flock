@@ -673,4 +673,21 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn uuid() -> Result<()> {
+        let mut uuid_builder =
+            UuidBuilder::new("SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836", 10);
+        (0..10).for_each(|i| assert_eq!(uuid_builder.get(i).seq_num, i));
+
+        let batches = init_batches();
+        let bytes = Payload::to_bytes(&batches[0], uuid_builder.next(), Encoding::default());
+        let value: Value = serde_json::from_slice(&bytes)?;
+        let (de_batches, _) = Payload::to_batch(value);
+
+        assert_eq!(batches[0].schema(), de_batches[0].schema());
+        assert_eq!(batches[0].columns(), de_batches[0].columns());
+
+        Ok(())
+    }
 }
