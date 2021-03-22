@@ -72,6 +72,21 @@ impl UuidBuilder {
             seq_len,
         }
     }
+
+    /// Returns the Uuid with a specific index.
+    pub fn get(&self, i: usize) -> Uuid {
+        assert!(i < self.len);
+
+        let tid = self.tid.to_owned();
+        let seq_num = i;
+        let seq_len = self.len;
+
+        Uuid {
+            tid,
+            seq_num,
+            seq_len,
+        }
+    }
 }
 
 /// Whether it is streaming or batch processing, each query has a unique
@@ -133,8 +148,8 @@ impl Payload {
 
     /// Deserialize the schema
     pub fn schema_from_bytes(bytes: &[u8]) -> Result<Arc<Schema>> {
-        let schema = arrow::ipc::convert::schema_from_bytes(&bytes)
-            .map_err(|err| SquirtleError::Arrow(err))?;
+        let schema =
+            arrow::ipc::convert::schema_from_bytes(&bytes).map_err(SquirtleError::Arrow)?;
         Ok(Arc::new(schema))
     }
 
@@ -223,6 +238,36 @@ impl Payload {
             encoding,
         })
         .unwrap()
+    }
+
+    /// Convert record batch to bytes for network transmission.
+    pub fn to_bytes(batch: &RecordBatch, uuid: Uuid, encoding: Encoding) -> bytes::Bytes {
+        let options = arrow::ipc::writer::IpcWriteOptions::default();
+        let schema = Self::schema_to_bytes(batch.schema());
+        let (_, flight_data) = flight_data_from_arrow_batch(&batch, &options);
+
+        let data_frames = {
+            if encoding != Encoding::None {
+                DataFrame {
+                    header: encoding.compress(&flight_data.data_header),
+                    body:   encoding.compress(&flight_data.data_body),
+                }
+            } else {
+                DataFrame {
+                    header: flight_data.data_header,
+                    body:   flight_data.data_body,
+                }
+            }
+        };
+
+        serde_json::to_vec(&Payload {
+            data: vec![data_frames],
+            schema,
+            uuid,
+            encoding,
+        })
+        .unwrap()
+        .into()
     }
 }
 
@@ -625,6 +670,23 @@ mod tests {
         let schema2 = Payload::schema_from_bytes(&bytes)?;
 
         assert_eq!(schema1, schema2);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn uuid() -> Result<()> {
+        let mut uuid_builder =
+            UuidBuilder::new("SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836", 10);
+        (0..10).for_each(|i| assert_eq!(uuid_builder.get(i).seq_num, i));
+
+        let batches = init_batches();
+        let bytes = Payload::to_bytes(&batches[0], uuid_builder.next(), Encoding::default());
+        let value: Value = serde_json::from_slice(&bytes)?;
+        let (de_batches, _) = Payload::to_batch(value);
+
+        assert_eq!(batches[0].schema(), de_batches[0].schema());
+        assert_eq!(batches[0].columns(), de_batches[0].columns());
 
         Ok(())
     }

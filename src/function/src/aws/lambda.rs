@@ -21,6 +21,7 @@ use datafusion::physical_plan::Partitioning;
 use futures::executor::block_on;
 use lambda_runtime::{handler_fn, Context};
 use log::warn;
+use rayon::prelude::*;
 use runtime::prelude::*;
 use rusoto_core::Region;
 use rusoto_lambda::{InvokeAsyncRequest, Lambda, LambdaClient};
@@ -84,27 +85,21 @@ async fn main() -> Result<()> {
 }
 
 /// Invoke functions in the next stage of the data flow.
-fn invoke_async_functions(ctx: &ExecutionContext, batches: &mut Vec<RecordBatch>) -> Result<()> {
+fn invoke_next_functions(ctx: &ExecutionContext, batches: &mut Vec<RecordBatch>) -> Result<()> {
     // retrieve the next lambda function names
     let next_func = LambdaExecutor::next_function(&ctx)?;
 
     // create uuid builder to assign id to each payload
-    let mut uuid_builder = UuidBuilder::new(&ctx.name, batches.len());
+    let uuid_builder = UuidBuilder::new(&ctx.name, batches.len());
 
     let client = &LambdaClient::new(Region::default());
-    let nums = batches.len();
-    (0..nums).for_each(|_| {
-        let uuid = uuid_builder.next();
+    batches.into_par_iter().enumerate().for_each(|(i, batch)| {
         // call the lambda function asynchronously until it succeeds.
         loop {
+            let uuid = uuid_builder.get(i);
             let request = InvokeAsyncRequest {
                 function_name: next_func.clone(),
-                invoke_args:   Payload::to_vec(
-                    &[batches.pop().unwrap()],
-                    uuid.clone(),
-                    Encoding::default(),
-                )
-                .into(),
+                invoke_args:   Payload::to_bytes(&batch, uuid, Encoding::default()),
             };
 
             if let Ok(reponse) = block_on(client.invoke_async(request)) {
@@ -197,7 +192,7 @@ async fn source_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Valu
             .await?;
             assert_eq!(1, batches.len());
 
-            invoke_async_functions(&ctx, &mut batches[0])?;
+            invoke_next_functions(&ctx, &mut batches[0])?;
             Ok(serde_json::to_value(&ctx.name)?)
         }
     }
