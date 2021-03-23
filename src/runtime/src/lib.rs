@@ -33,6 +33,7 @@
 #[macro_use]
 extern crate abomonation_derive;
 
+pub mod arena;
 pub mod config;
 pub mod context;
 pub mod datasource;
