@@ -45,11 +45,13 @@ pub struct CloudEnvironment {
 /// Next lambda function call.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub enum CloudFunction {
+    /// Function type: parititioned computation
     /// The next function name with concurrency > 1.
     ///
     /// If the next call type is `Solo`, then the name it contains is the lambda
     /// function.
     Solo(CloudFunctionName),
+    /// Function type: aggregate computation
     /// The next function name with concurrency = 1. To cope with the speed
     /// and volume of data processed, the system creates a function group that
     /// contains multiple functions (names) with the same function code. When
@@ -65,7 +67,7 @@ pub enum CloudFunction {
     /// next call is `CloudFunctionName`-`i`.
     Chorus((CloudFunctionName, GroupSize)),
     /// There is no subsequent call to the cloud function at the end.
-    /// TODO: This function must include data sink operation.
+    /// TODO(gangliao): This function must include data sink operation.
     None,
 }
 
@@ -111,7 +113,7 @@ pub struct ExecutionContext {
 }
 
 impl PartialEq for ExecutionContext {
-    fn eq(&self, other: &Self) -> bool {
+    fn eq(&self, other: &ExecutionContext) -> bool {
         self.name == other.name
             && self.next == other.next
             && self.datasource == other.datasource
