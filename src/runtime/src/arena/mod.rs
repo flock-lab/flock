@@ -60,10 +60,19 @@ impl Arena {
         Arena(DashMap::<String, WindowSession>::new())
     }
 
+    /// Return record batches for the current window.
+    pub fn batches(&mut self, tid: String) -> Vec<Vec<RecordBatch>> {
+        if let Some((_, v)) = (*self).remove(&tid) {
+            v.batches
+        } else {
+            vec![]
+        }
+    }
+
     /// Ressemble the payload to a specific window session.
     ///
     /// Return true, if the window data collection is complete,
-    pub fn reassemble(&mut self, event: Value) -> bool {
+    pub fn reassemble(&mut self, event: Value) -> (bool, Uuid) {
         let mut ready = false;
         let (fragment, uuid) = Payload::to_batch(event);
         match &mut (*self).get_mut(&uuid.tid) {
@@ -84,10 +93,10 @@ impl Arena {
 
                 ready = window.size == 1;
                 window.bitmap.set(uuid.seq_num);
-                (*self).insert(uuid.tid, window);
+                (*self).insert(uuid.tid.clone(), window);
             }
         }
-        ready
+        (ready, uuid)
     }
 }
 
@@ -152,10 +161,11 @@ mod tests {
         let mut arena = Arena::new();
         batches.into_iter().enumerate().for_each(|(i, batch)| {
             let value = Payload::to_value(&[batch], uuids.get(i), Encoding::default());
+            let (ready, _) = arena.reassemble(value);
             if i < 7 {
-                assert_eq!(false, arena.reassemble(value));
+                assert_eq!(false, ready);
             } else {
-                assert_eq!(true, arena.reassemble(value));
+                assert_eq!(true, ready);
             }
         });
 
@@ -167,6 +177,9 @@ mod tests {
             assert_eq!(8, window.batches.len());
             (0..8).for_each(|i| assert_eq!(true, window.bitmap.is_set(i)));
         }
+
+        assert_eq!(8, arena.batches(tid).len());
+        assert_eq!(0, arena.batches("no exists".to_string()).len());
 
         Ok(())
     }

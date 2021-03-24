@@ -44,7 +44,7 @@ thread_local! {
 /// A wrapper to allow the declaration of the execution context of the lambda
 /// function.
 enum CloudFunctionContext {
-    Lambda(Box<ExecutionContext>),
+    Lambda((Box<ExecutionContext>, Arena)),
     Uninitialized,
 }
 
@@ -58,8 +58,10 @@ macro_rules! init_exec_context {
             // Init query executor from the cloud evironment.
             let init_context = || match std::env::var(&globals["lambda"]["name"]) {
                 Ok(s) => {
-                    EXECUTION_CONTEXT =
-                        CloudFunctionContext::Lambda(Box::new(ExecutionContext::unmarshal(&s)));
+                    EXECUTION_CONTEXT = CloudFunctionContext::Lambda((
+                        Box::new(ExecutionContext::unmarshal(&s)),
+                        Arena::new(),
+                    ));
                 }
                 Err(_) => {
                     panic!("No execution context in the cloud environment.");
@@ -71,7 +73,7 @@ macro_rules! init_exec_context {
                 INIT.call_once(init_context);
             }
             match &mut EXECUTION_CONTEXT {
-                CloudFunctionContext::Lambda(ctx) => ctx,
+                CloudFunctionContext::Lambda((ctx, arena)) => (ctx, arena),
                 CloudFunctionContext::Uninitialized => panic!("Uninitialized execution context!"),
             }
         }
@@ -198,20 +200,41 @@ async fn source_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Valu
     }
 }
 
-async fn payload_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Value> {
-    let (batches, uuid) = Payload::to_batch(event);
+async fn payload_handler(
+    ctx: &mut ExecutionContext,
+    arena: &mut Arena,
+    event: Value,
+) -> Result<Value> {
+    let (ready, uuid) = arena.reassemble(event);
+    if ready {
+        // TODO(gangliao): repartition input batches to speedup the operations
+        let input_partitions = arena.batches(uuid.tid);
+        if input_partitions.is_empty() {
+            return Ok(serde_json::to_value(&ctx.name)?);
+        }
 
-    ctx.feed_one_source(&vec![batches]);
-    let batches = ctx.execute().await?;
+        ctx.feed_one_source(&input_partitions);
+        let output_partitions = ctx.execute().await?;
 
-    Ok(Payload::to_value(&batches, uuid, Encoding::default()))
+        let mut batches = LambdaExecutor::coalesce_batches(
+            vec![output_partitions],
+            globals["lambda"]["payload_batch_size"]
+                .parse::<usize>()
+                .unwrap(),
+        )
+        .await?;
+        assert_eq!(1, batches.len());
+
+        invoke_next_functions(&ctx, &mut batches[0])?;
+    }
+    Ok(serde_json::to_value(&ctx.name)?)
 }
 
 async fn handler(event: Value, _: Context) -> Result<Value> {
-    let mut ctx = init_exec_context!();
+    let (mut ctx, mut arena) = init_exec_context!();
 
     match &ctx.datasource {
-        DataSource::Payload => payload_handler(&mut ctx, event).await,
+        DataSource::Payload => payload_handler(&mut ctx, &mut arena, event).await,
         DataSource::KinesisEvent(_) | DataSource::KafkaEvent(_) => {
             source_handler(&mut ctx, event).await
         }

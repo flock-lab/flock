@@ -22,6 +22,7 @@
 //! use runtime::prelude::*;
 //! ```
 
+pub use crate::arena::{Arena, WindowSession};
 pub use crate::config;
 pub use crate::config::GLOBALS as globals;
 pub use crate::context::{CloudFunction, ExecutionContext};
