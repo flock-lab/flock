@@ -207,7 +207,7 @@ async fn payload_handler(
 ) -> Result<Value> {
     let (ready, uuid) = arena.reassemble(event);
     if ready {
-        // TODO(gangliao): repartition input batches to speedup the opearations
+        // TODO(gangliao): repartition input batches to speedup the operations
         let input_partitions = arena.batches(uuid.tid);
         if input_partitions.is_empty() {
             return Ok(serde_json::to_value(&ctx.name)?);
