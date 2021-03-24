@@ -205,17 +205,38 @@ async fn payload_handler(
     arena: &mut Arena,
     event: Value,
 ) -> Result<Value> {
-    let (ready, uuid) = arena.reassemble(event);
-    if ready {
-        // TODO(gangliao): repartition input batches to speedup the operations
-        let input_partitions = arena.batches(uuid.tid);
-        if input_partitions.is_empty() {
-            return Ok(serde_json::to_value(&ctx.name)?);
+    let input_partitions = {
+        if match &ctx.next {
+            CloudFunction::None | CloudFunction::Solo(..) => true,
+            CloudFunction::Chorus(..) => false,
+        } {
+            // ressemble lambda n to 1
+            let (ready, uuid) = arena.reassemble(event);
+            if ready {
+                arena.batches(uuid.tid)
+            } else {
+                return Err(SquirtleError::Execution(
+                    "window data collection has not been completed.".to_string(),
+                ));
+            }
+        } else {
+            // partition lambda 1 to n
+            let (batch, _) = Payload::to_batch(event);
+            vec![batch]
         }
+    };
 
-        ctx.feed_one_source(&input_partitions);
-        let output_partitions = ctx.execute().await?;
+    if input_partitions.is_empty() || input_partitions[0].is_empty() {
+        return Err(SquirtleError::Execution(
+            "payload data is empty.".to_string(),
+        ));
+    }
 
+    // TODO(gangliao): repartition input batches to speedup the operations.
+    ctx.feed_one_source(&input_partitions);
+    let output_partitions = ctx.execute().await?;
+
+    if ctx.next != CloudFunction::None {
         let mut batches = LambdaExecutor::coalesce_batches(
             vec![output_partitions],
             globals["lambda"]["payload_batch_size"]
@@ -224,9 +245,11 @@ async fn payload_handler(
         )
         .await?;
         assert_eq!(1, batches.len());
-
+        // call the next stage of the dataflow graph.
         invoke_next_functions(&ctx, &mut batches[0])?;
     }
+
+    // TODO(gangliao): sink results to other cloud services.
     Ok(serde_json::to_value(&ctx.name)?)
 }
 
