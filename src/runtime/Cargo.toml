@@ -30,7 +30,7 @@ rusoto_core = "0.46.0"
 rusoto_kafka = "0.46.0"
 rusoto_kinesis = "0.46.0"
 rusoto_lambda = "0.46.0"
-rust-ini = "0.16"
+rust-ini = "0.17"
 serde = { version = "1.0", features = [ "derive" ] }
 serde_bytes = "0.11"
 serde_json = "1.0"
