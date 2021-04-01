@@ -374,7 +374,7 @@ mod tests {
     }
 
     #[test]
-    fn test_nexmark_config() -> () {
+    fn test_nexmark_config() {
         let mut config = Config::new();
 
         config.insert("active_people", "1024".to_string());
@@ -397,7 +397,5 @@ mod tests {
         nexmark_cfg = NEXMarkConfig::new(&config);
         nexmark_cfg.event_timestamp_ns(2048);
         nexmark_cfg.next_adjusted_event(100000);
-
-        ()
     }
 }

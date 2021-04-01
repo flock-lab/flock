@@ -21,14 +21,31 @@ use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::cmp::{max, min};
 
+const MIN_STRING_LENGTH: usize = 3;
+
 trait NEXMarkRng {
-    fn gen_string(&mut self, _max: usize) -> String;
+    fn gen_string(&mut self, max: usize) -> String;
     fn gen_price(&mut self) -> usize;
 }
 
 impl NEXMarkRng for SmallRng {
-    fn gen_string(&mut self, _max: usize) -> String {
-        String::default()
+    fn gen_string(&mut self, max: usize) -> String {
+        let len = self.gen_range(MIN_STRING_LENGTH..max);
+        String::from(
+            (0..len)
+                .map(|_| {
+                    if self.gen_range(0..13) == 0 {
+                        String::from(" ")
+                    } else {
+                        ::std::char::from_u32('a' as u32 + self.gen_range(0..26))
+                            .unwrap()
+                            .to_string()
+                    }
+                })
+                .collect::<Vec<String>>()
+                .join("")
+                .trim(),
+        )
     }
 
     fn gen_price(&mut self) -> usize {
@@ -155,9 +172,16 @@ impl Person {
     fn new(id: usize, time: Date, rng: &mut SmallRng, nex: &NEXMarkConfig) -> Self {
         Person {
             id:            Self::last_id(id, nex) + nex.first_person_id,
-            name:          String::new(),
-            email_address: String::new(),
-            credit_card:   String::new(),
+            name:          format!(
+                "{} {}",
+                nex.first_names.choose(rng).unwrap(),
+                nex.last_names.choose(rng).unwrap(),
+            ),
+            email_address: format!("{}@{}.com", rng.gen_string(7), rng.gen_string(5)),
+            credit_card:   (0..4)
+                .map(|_| format!("{:04}", rng.gen_range(0..10000)))
+                .collect::<Vec<String>>()
+                .join(" "),
             city:          nex.us_cities.choose(rng).unwrap().clone(),
             state:         nex.us_states.choose(rng).unwrap().clone(),
             date_time:     time,
@@ -321,5 +345,33 @@ impl Bid {
             price:     rng.gen_price(),
             date_time: time,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_nexmark_rng() {
+        let mut rng = SmallRng::seed_from_u64(1u64);
+        let prices_1 = (0..100).map(|_| rng.gen_price()).collect::<Vec<_>>();
+        let prices_2 = (0..100).map(|_| rng.gen_price()).collect::<Vec<_>>();
+        assert_ne!(prices_1, prices_2);
+
+        let strings_1 = (0..100).map(|_| rng.gen_string(10)).collect::<Vec<_>>();
+        let strings_2 = (0..100).map(|_| rng.gen_string(10)).collect::<Vec<_>>();
+        assert_ne!(strings_1, strings_2);
+    }
+
+    #[test]
+    fn test_date_time() {
+        let date_1 = Date::new(1);
+        let date_2 = Date::new(2);
+
+        assert_eq!(*date_1, 1);
+        assert_eq!(*date_2, 2);
+        assert_eq!(*(date_1 + date_2), 3);
+        assert_eq!(*(date_2 - date_1), 1);
     }
 }
