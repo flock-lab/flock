@@ -90,7 +90,7 @@ impl Config {
 
 use std::f64::consts::PI;
 
-const BASE_TIME: usize = 0; // 1436918400_000;
+const BASE_TIME: usize = 1436918400_000;
 
 fn split_string_arg(string: String) -> Vec<String> {
     string.split(',').map(String::from).collect::<Vec<String>>()
@@ -129,8 +129,8 @@ pub struct NEXMarkConfig {
     /// Generators running in parallel time may share the same event number, and
     /// the event number is used to determine the event timestamp.
     pub first_event_number:      usize,
-    /// Time for first event (ns since epoch).
-    pub base_time_ns:            usize,
+    /// Time for first event (ms since epoch).
+    pub base_time:               usize,
     /// Delay before changing the current inter-event delay.
     pub step_length:             usize,
     /// Number of events per epoch.
@@ -139,11 +139,11 @@ pub struct NEXMarkConfig {
     pub events_per_epoch:        usize,
     /// True period of epoch in milliseconds. Derived from above. (Ie time to
     /// run through cycle for all interEventDelayUs entries).
-    pub epoch_period:            f64,
+    pub epoch_period:            f32,
     /// Delay between events, in microseconds.
     /// If the array has more than one entry then the rate is changed every
     /// step_length, and wraps around.
-    pub inter_event_delays_ns:   Vec<f64>,
+    pub inter_event_delays:      Vec<f32>,
     // Originally constants
     /// Auction categories.
     pub num_categories:          usize,
@@ -211,8 +211,8 @@ impl NEXMarkConfig {
         let first_category_id = config.get_as_or("first-category-id", 10);
         let person_id_lead = config.get_as_or("person-id-lead", 10);
         let sine_approx_steps = config.get_as_or("sine-approx-steps", 10);
-        let base_time_ns = config.get_as_or("base-time", BASE_TIME);
-        let us_states = split_string_arg(config.get_or("us-states", "AZ,CA,ID,OR,WA,WY"));
+        let base_time = config.get_as_or("base-time", BASE_TIME);
+        let us_states = split_string_arg(config.get_or("us-states", "az,ca,id,or,wa,wy"));
         let us_cities = split_string_arg(config.get_or(
             "us-cities",
             "phoenix,los angeles,san francisco,boise,portland,bend,redmond,seattle,kent,cheyenne",
@@ -233,21 +233,21 @@ impl NEXMarkConfig {
         let rate_period = config.get_as_or("rate-period", 600);
         let first_rate = config.get_as_or(
             "first-event-rate",
-            config.get_as_or("events-per-second", 1_000),
+            config.get_as_or("events-per-second", 10_000),
         );
         let next_rate = config.get_as_or("next-event-rate", first_rate);
-        let ns_per_unit = config.get_as_or("us-per-unit", 1_000_000_000); // Rate is in μs
-        let generators = config.get_as_or("threads", 1) as f64;
+        let us_per_unit = config.get_as_or("us-per-unit", 1_000_000); // Rate is in μs
+        let generators = config.get_as_or("threads", 1) as f32;
         // Calculate inter event delays array.
-        let mut inter_event_delays_ns = Vec::new();
-        let rate_to_period = |r| (ns_per_unit) as f64 / r as f64;
+        let mut inter_event_delays = Vec::new();
+        let rate_to_period = |r| (us_per_unit) as f32 / r as f32;
         if first_rate == next_rate {
-            inter_event_delays_ns.push(rate_to_period(first_rate) * generators);
+            inter_event_delays.push(rate_to_period(first_rate) * generators);
         } else {
             match rate_shape {
                 RateShape::Square => {
-                    inter_event_delays_ns.push(rate_to_period(first_rate) * generators);
-                    inter_event_delays_ns.push(rate_to_period(next_rate) * generators);
+                    inter_event_delays.push(rate_to_period(first_rate) * generators);
+                    inter_event_delays.push(rate_to_period(next_rate) * generators);
                 }
                 RateShape::Sine => {
                     let mid = (first_rate + next_rate) as f64 / 2.0;
@@ -255,8 +255,7 @@ impl NEXMarkConfig {
                     for i in 0..sine_approx_steps {
                         let r = (2.0 * PI * i as f64) / sine_approx_steps as f64;
                         let rate = mid + amp * r.cos();
-                        inter_event_delays_ns
-                            .push(rate_to_period(rate.round() as usize) * generators);
+                        inter_event_delays.push(rate_to_period(rate.round() as usize) * generators);
                     }
                 }
             }
@@ -270,10 +269,10 @@ impl NEXMarkConfig {
         let step_length = (rate_period + n - 1) / n;
         let mut events_per_epoch = 0;
         let mut epoch_period = 0.0;
-        if inter_event_delays_ns.len() > 1 {
-            for inter_event_delay in &inter_event_delays_ns {
+        if inter_event_delays.len() > 1 {
+            for inter_event_delay in &inter_event_delays {
                 let num_events_for_this_cycle =
-                    (step_length * 1_000_000) as f64 / inter_event_delay;
+                    (step_length * 1_000_000) as f32 / inter_event_delay;
                 events_per_epoch += num_events_for_this_cycle.round() as usize;
                 epoch_period += (num_events_for_this_cycle * inter_event_delay) / 1000.0;
             }
@@ -287,11 +286,11 @@ impl NEXMarkConfig {
             hot_bidder_ratio,
             first_event_id,
             first_event_number,
-            base_time_ns,
+            base_time,
             step_length,
             events_per_epoch,
             epoch_period,
-            inter_event_delays_ns,
+            inter_event_delays,
             // Originally constants
             num_categories,
             auction_id_lead,
@@ -315,30 +314,30 @@ impl NEXMarkConfig {
     }
 
     /// Returns a new event timestamp.
-    pub fn event_timestamp_ns(&self, event_number: usize) -> usize {
-        if self.inter_event_delays_ns.len() == 1 {
-            return self.base_time_ns
-                + ((event_number as f64 * self.inter_event_delays_ns[0]) as usize);
+    pub fn event_timestamp(&self, event_number: usize) -> usize {
+        if self.inter_event_delays.len() == 1 {
+            return self.base_time
+                + ((event_number as f32 * self.inter_event_delays[0]) / 1000.0).round() as usize;
         }
 
         let epoch = event_number / self.events_per_epoch;
         let mut event_i = event_number % self.events_per_epoch;
-        let mut offset_in_epoch = 0.0_f64;
-        for inter_event_delay_ns in &self.inter_event_delays_ns {
+        let mut offset_in_epoch = 0.0;
+        for inter_event_delay in &self.inter_event_delays {
             let num_events_for_this_cycle =
-                (self.step_length * 1_000_000) as f64 / inter_event_delay_ns;
+                (self.step_length * 1_000_000) as f32 / inter_event_delay;
             if self.out_of_order_group_size < num_events_for_this_cycle.round() as usize {
-                let offset_in_cycle = event_i as f64 * inter_event_delay_ns;
-                return self.base_time_ns
-                    + (epoch as f64 * self.epoch_period as f64
+                let offset_in_cycle = event_i as f32 * inter_event_delay;
+                return self.base_time
+                    + (epoch as f32 * self.epoch_period
                         + offset_in_epoch
                         + offset_in_cycle / 1000.0)
                         .round() as usize;
             }
             event_i -= num_events_for_this_cycle.round() as usize;
-            offset_in_epoch += (num_events_for_this_cycle * inter_event_delay_ns) / 1000.0;
+            offset_in_epoch += (num_events_for_this_cycle * inter_event_delay) / 1000.0;
         }
-        0
+        return 0;
     }
 
     /// Returns the next adjusted event.
@@ -379,23 +378,23 @@ mod tests {
 
         config.insert("active_people", "1024".to_string());
         let mut nexmark_cfg = NEXMarkConfig::new(&config);
-        nexmark_cfg.event_timestamp_ns(2048);
+        nexmark_cfg.event_timestamp(2048);
         nexmark_cfg.next_adjusted_event(100000);
 
         config.insert("rate-shape", "sine".to_string());
         config.insert("next-event-rate", "512".to_string());
         nexmark_cfg = NEXMarkConfig::new(&config);
-        nexmark_cfg.event_timestamp_ns(2048);
+        nexmark_cfg.event_timestamp(2048);
         nexmark_cfg.next_adjusted_event(100000);
 
         config.insert("rate-shape", "square".to_string());
         nexmark_cfg = NEXMarkConfig::new(&config);
-        nexmark_cfg.event_timestamp_ns(2048);
+        nexmark_cfg.event_timestamp(2048);
         nexmark_cfg.next_adjusted_event(100000);
 
         config.insert("threads", "8".to_string());
         nexmark_cfg = NEXMarkConfig::new(&config);
-        nexmark_cfg.event_timestamp_ns(2048);
+        nexmark_cfg.event_timestamp(2048);
         nexmark_cfg.next_adjusted_event(100000);
     }
 }

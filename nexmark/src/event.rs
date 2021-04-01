@@ -102,10 +102,13 @@ impl ::std::ops::Sub for Date {
     }
 }
 
+/// The NexMark event with the date time.
 #[derive(Serialize, Deserialize, Abomonation, Debug)]
-struct EventCarrier {
-    time:  Date,
-    event: Event,
+pub struct EventCarrier {
+    /// The date time.
+    pub time:  Date,
+    /// The NexMark event.
+    pub event: Event,
 }
 
 /// The NexMark Event, including `Person`, `Auction`, and `Bid`.
@@ -124,7 +127,7 @@ impl Event {
     /// Creates a new event randomly.
     pub fn new(events_so_far: usize, nex: &mut NEXMarkConfig) -> Self {
         let rem = nex.next_adjusted_event(events_so_far) % nex.proportion_denominator;
-        let timestamp = Date(nex.event_timestamp_ns(nex.next_adjusted_event(events_so_far)));
+        let timestamp = Date(nex.event_timestamp(nex.next_adjusted_event(events_so_far)));
         let id = nex.first_event_id + nex.next_adjusted_event(events_so_far);
         let mut rng = SmallRng::seed_from_u64(id as u64);
         if rem < nex.person_proportion {
@@ -297,7 +300,7 @@ impl Auction {
         let current_event = nex.next_adjusted_event(events_so_far);
         let events_for_auctions =
             (nex.in_flight_auctions * nex.proportion_denominator) / nex.auction_proportion;
-        let future_auction = nex.event_timestamp_ns(current_event + events_for_auctions);
+        let future_auction = nex.event_timestamp(current_event + events_for_auctions);
 
         let horizon = future_auction - time.0;
         Date(1 + rng.gen_range(0..max(horizon * 2, 1)))
@@ -384,6 +387,8 @@ mod tests {
         config.insert("bid-proportion", "40".to_string());
 
         let mut nex = NEXMarkConfig::new(&config);
-        (0..100).for_each(|i| println!("{:?}", Event::new(i, &mut nex)));
+        (0..100).for_each(|i| {
+            Event::new(i, &mut nex);
+        });
     }
 }
