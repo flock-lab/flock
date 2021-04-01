@@ -351,6 +351,7 @@ impl Bid {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::Config;
 
     #[test]
     fn test_nexmark_rng() {
@@ -373,5 +374,16 @@ mod tests {
         assert_eq!(*date_2, 2);
         assert_eq!(*(date_1 + date_2), 3);
         assert_eq!(*(date_2 - date_1), 1);
+    }
+
+    #[test]
+    fn test_events() {
+        let mut config = Config::new();
+        config.insert("person-proportion", "30".to_string());
+        config.insert("auction-proportion", "30".to_string());
+        config.insert("bid-proportion", "40".to_string());
+
+        let mut nex = NEXMarkConfig::new(&config);
+        (0..20).for_each(|i| println!("{:?}", Event::new(i, &mut nex)));
     }
 }
