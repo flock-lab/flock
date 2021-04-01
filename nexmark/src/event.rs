@@ -384,6 +384,6 @@ mod tests {
         config.insert("bid-proportion", "40".to_string());
 
         let mut nex = NEXMarkConfig::new(&config);
-        (0..20).for_each(|i| println!("{:?}", Event::new(i, &mut nex)));
+        (0..100).for_each(|i| println!("{:?}", Event::new(i, &mut nex)));
     }
 }
