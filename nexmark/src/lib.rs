@@ -63,8 +63,8 @@
 //!
 //! # Reference
 //!
-//! Pete Tucker et al. NEXMark–A Benchmark for Queries over Data Streams
-//! (DRAFT). Tech. rep. Technical report, Septembers, 2008.
+//! Pete Tucker, Kristin Tufte, Vassilis Papadimos, David Maier.
+//! NEXMark – A Benchmark for Queries over Data Streams. June 2010.
 //! <http://datalab.cs.pdx.edu/niagara/pstream/nexmark.pdf>.
 
 #![warn(missing_docs)]

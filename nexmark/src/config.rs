@@ -19,7 +19,7 @@ use std::io::{Error, ErrorKind, Result};
 use std::str::FromStr;
 
 /// This is a simple command line options parser.
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct Config {
     args: HashMap<String, String>,
 }
@@ -346,5 +346,58 @@ impl NEXMarkConfig {
         let n = self.out_of_order_group_size;
         let event_number = self.first_event_number + events_so_far;
         (event_number / n) * n + (event_number * 953) % n
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_config() -> Result<()> {
+        let config1 = Config::new();
+        assert_eq!(config1.get("hello"), None);
+
+        let mut config2 = Config::from(
+            vec!["--hello", "world", "--db", "424", "layoff"]
+                .iter()
+                .map(ToString::to_string),
+        )?;
+        config2.insert("net", "417".to_string());
+
+        assert_eq!(config2.get_or("0", "-1"), "layoff");
+        assert_eq!(config2.get_or("hello", "-1"), "world");
+        assert_eq!(config2.get_as_or("db", 424), 424);
+        assert_eq!(config2.get_as_or("net", 417), 417);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_nexmark_config() -> () {
+        let mut config = Config::new();
+
+        config.insert("active_people", "1024".to_string());
+        let mut nexmark_cfg = NEXMarkConfig::new(&config);
+        nexmark_cfg.event_timestamp_ns(2048);
+        nexmark_cfg.next_adjusted_event(100000);
+
+        config.insert("rate-shape", "sine".to_string());
+        config.insert("next-event-rate", "512".to_string());
+        nexmark_cfg = NEXMarkConfig::new(&config);
+        nexmark_cfg.event_timestamp_ns(2048);
+        nexmark_cfg.next_adjusted_event(100000);
+
+        config.insert("rate-shape", "square".to_string());
+        nexmark_cfg = NEXMarkConfig::new(&config);
+        nexmark_cfg.event_timestamp_ns(2048);
+        nexmark_cfg.next_adjusted_event(100000);
+
+        config.insert("threads", "8".to_string());
+        nexmark_cfg = NEXMarkConfig::new(&config);
+        nexmark_cfg.event_timestamp_ns(2048);
+        nexmark_cfg.next_adjusted_event(100000);
+
+        ()
     }
 }
