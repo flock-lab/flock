@@ -27,6 +27,11 @@ pub enum DataSource {
     /// Apache Kafka is a community distributed event streaming platform capable
     /// of handling trillions of events a day.
     KafkaEvent(KafkaSource),
+    /// Nexmark is a suite of pipelines inspired by the continuous data stream
+    /// queries, which includes multiple queries over a three entities model
+    /// representing on online auction system.
+    /// We use Nexmark benchmark to measure the performance of our system.
+    NexMarkEvent,
     /// Amazon Simple Queue Service (SQS) is a fully managed message queuing
     /// service that enables you to decouple and scale microservices,
     /// distributed systems, and serverless applications. SQS eliminates the

@@ -253,6 +253,11 @@ async fn payload_handler(
     Ok(serde_json::to_value(&ctx.name)?)
 }
 
+async fn nexmark_bench_handler(ctx: &mut ExecutionContext, _event: Value) -> Result<Value> {
+    // TODO: data generation.
+    Ok(serde_json::to_value(&ctx.name)?)
+}
+
 async fn handler(event: Value, _: Context) -> Result<Value> {
     let (mut ctx, mut arena) = init_exec_context!();
 
@@ -261,6 +266,7 @@ async fn handler(event: Value, _: Context) -> Result<Value> {
         DataSource::KinesisEvent(_) | DataSource::KafkaEvent(_) => {
             source_handler(&mut ctx, event).await
         }
+        DataSource::NexMarkEvent => nexmark_bench_handler(&mut ctx, event).await,
         DataSource::Json => Ok(event),
         _ => unimplemented!(),
     }
