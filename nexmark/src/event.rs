@@ -125,10 +125,12 @@ pub enum Event {
 
 impl Event {
     /// Creates a new event randomly.
-    pub fn new(events_so_far: usize, nex: &mut NEXMarkConfig) -> Self {
+    pub fn new(events_so_far: usize, sub_idx: usize, nex: &mut NEXMarkConfig) -> Self {
         let rem = nex.next_adjusted_event(events_so_far) % nex.proportion_denominator;
         let timestamp = Date(nex.event_timestamp(nex.next_adjusted_event(events_so_far)));
-        let id = nex.first_event_id + nex.next_adjusted_event(events_so_far);
+        let id = nex.first_event_id
+            + nex.next_adjusted_event(events_so_far)
+            + (100_000 / nex.num_event_generators) * sub_idx;
         let mut rng = SmallRng::seed_from_u64(id as u64);
         if rem < nex.person_proportion {
             Event::Person(Person::new(id, timestamp, &mut rng, nex))
@@ -388,7 +390,7 @@ mod tests {
 
         let mut nex = NEXMarkConfig::new(&config);
         (0..100).for_each(|i| {
-            Event::new(i, &mut nex);
+            Event::new(i, 0, &mut nex);
         });
     }
 }

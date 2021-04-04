@@ -16,6 +16,7 @@
 
 use kafka::KafkaSource;
 use kinesis::KinesisSource;
+use nexmark::NexMarkSource;
 use serde::{Deserialize, Serialize};
 
 /// A Data Source for either stream processing or batch processing.
@@ -31,7 +32,7 @@ pub enum DataSource {
     /// queries, which includes multiple queries over a three entities model
     /// representing on online auction system.
     /// We use Nexmark benchmark to measure the performance of our system.
-    NexMarkEvent,
+    NexMarkEvent(NexMarkSource),
     /// Amazon Simple Queue Service (SQS) is a fully managed message queuing
     /// service that enables you to decouple and scale microservices,
     /// distributed systems, and serverless applications. SQS eliminates the
@@ -77,3 +78,4 @@ impl DataSource {
 
 pub mod kafka;
 pub mod kinesis;
+pub mod nexmark;
