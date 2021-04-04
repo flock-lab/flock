@@ -85,7 +85,7 @@ mod tests {
     fn generate_events_in_json_file() -> Result<()> {
         let mut config = Config::new();
         config.insert("threads", "100".to_string());
-        // config.insert("seconds", "10".to_string());
+        config.insert("seconds", "1".to_string());
 
         let data_dir = format!("{}/nexmark", config.get_or("data-dir", "data"));
         fs::create_dir_all(&data_dir)?;
