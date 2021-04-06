@@ -67,23 +67,11 @@
 //! NEXMark – A Benchmark for Queries over Data Streams. June 2010.
 //! <http://datalab.cs.pdx.edu/niagara/pstream/nexmark.pdf>.
 
-#![warn(missing_docs)]
-// Clippy lints, some should be disabled incrementally
-#![allow(
-    clippy::float_cmp,
-    clippy::module_inception,
-    clippy::new_without_default,
-    clippy::ptr_arg,
-    clippy::type_complexity,
-    clippy::wrong_self_convention,
-    clippy::should_implement_trait
-)]
-#![feature(get_mut_unchecked)]
-
-extern crate abomonation;
-#[macro_use]
-extern crate abomonation_derive;
-
 pub mod config;
 pub mod event;
 pub mod generator;
+pub mod nexmark;
+
+mod queries;
+
+pub use nexmark::{NexMarkEvents, NexMarkSource};
