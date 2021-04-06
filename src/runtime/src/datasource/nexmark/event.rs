@@ -14,7 +14,7 @@
 
 //! The NexMark events: `Person`, `Auction`, and `Bid`.
 
-use crate::config::NEXMarkConfig;
+use crate::datasource::nexmark::config::NEXMarkConfig;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
@@ -356,7 +356,7 @@ impl Bid {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::Config;
+    use crate::datasource::nexmark::config::Config;
 
     #[test]
     fn test_nexmark_rng() {

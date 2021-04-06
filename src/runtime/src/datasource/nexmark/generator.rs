@@ -15,8 +15,8 @@
 //! The NexMark data generator is based on the data generator by Nicolas Hafner,
 //! original available on https://github.com/Shinmera/bsc-thesis/blob/master/benchmarks/src/nexmark.rs
 
-use crate::config::{Config, NEXMarkConfig};
-use crate::event::{Auction, Bid, Date, Event, Person};
+use crate::datasource::nexmark::config::{Config, NEXMarkConfig};
+use crate::datasource::nexmark::event::{Auction, Bid, Date, Event, Person};
 use std::io::{Error, ErrorKind, Result};
 
 /// The NexMark event generator.
@@ -112,7 +112,7 @@ impl NEXMarkGenerator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::EventCarrier;
+    use crate::datasource::nexmark::event::EventCarrier;
     use std::fs;
     use std::fs::File;
     use std::io::{Result, Write};

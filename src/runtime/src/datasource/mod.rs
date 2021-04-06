@@ -14,9 +14,9 @@
 
 //! A data source is the location where data that is being used originates from.
 
-use self::nexmark::NexMarkSource;
 use kafka::KafkaSource;
 use kinesis::KinesisSource;
+use nexmark::NexMarkSource;
 use serde::{Deserialize, Serialize};
 
 /// A Data Source for either stream processing or batch processing.

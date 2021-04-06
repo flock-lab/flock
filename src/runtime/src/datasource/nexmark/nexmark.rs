@@ -17,18 +17,16 @@
 use arrow::json::{self, reader::infer_json_schema};
 use arrow::record_batch::RecordBatch;
 use log::info;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 
-use crate::error::{Result, SquirtleError};
+use crate::datasource::nexmark::config::{Config, NEXMarkConfig};
+use crate::datasource::nexmark::event::{Auction, Bid, Date, Person};
+use crate::datasource::nexmark::generator::NEXMarkGenerator;
+use crate::error::Result;
 use crate::query::StreamWindow;
-use nexmark::config::{Config, NEXMarkConfig};
-use nexmark::event::{Auction, Bid, Date, Person};
-use nexmark::generator::NEXMarkGenerator;
-use rayon::prelude::*;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::io::BufReader;
 
 type Epoch = Date;
 type SourceId = usize;
@@ -104,7 +102,7 @@ impl NexMarkSource {
         persons: Vec<Person>,
         auctions: Vec<Auction>,
         bids: Vec<Bid>,
-    ) -> Result<()> {
+    ) {
         match events.persons.get_mut(&t) {
             Some(pm) => {
                 (*pm).insert(p, persons);
@@ -137,7 +135,6 @@ impl NexMarkSource {
                 events.bids.insert(t, bm);
             }
         }
-        Ok(())
     }
 
     /// Generates data events for Nexmark benchmark.
@@ -163,7 +160,7 @@ impl NexMarkSource {
                 let (t, d) = generator.next_epoch(p).unwrap();
                 if !(d.0.is_empty() && d.1.is_empty() && d.2.is_empty()) {
                     let mut events = events_handle.lock().unwrap();
-                    NexMarkSource::assgin_events(&mut events, t, p, d.0, d.1, d.2).unwrap();
+                    NexMarkSource::assgin_events(&mut events, t, p, d.0, d.1, d.2);
                 } else {
                     break;
                 }
@@ -216,10 +213,12 @@ mod test {
 
     #[test]
     fn test_gen_data() -> Result<()> {
-        let mut nex = NexMarkSource::default();
-        nex.seconds = 1;
-        nex.threads = 10;
-        nex.events_per_second = 10_000;
+        let nex = NexMarkSource {
+            seconds: 1,
+            threads: 10,
+            events_per_second: 10_000,
+            ..Default::default()
+        };
         let events = nex.generate_data()?;
         assert_eq!(events.persons.len(), 1);
         assert_eq!(events.auctions.len(), 1);
