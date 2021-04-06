@@ -16,7 +16,7 @@
 //! original available on https://github.com/Shinmera/bsc-thesis/blob/master/benchmarks/src/nexmark.rs
 
 use crate::config::{Config, NEXMarkConfig};
-use crate::event::{Date, Event};
+use crate::event::{Auction, Bid, Date, Event, Person};
 use std::io::{Error, ErrorKind, Result};
 
 /// The NexMark event generator.
@@ -40,8 +40,45 @@ impl NEXMarkGenerator {
         }
     }
 
-    /// Produces the events in the next epoch.
-    pub fn next(&mut self) -> Result<(Date, Vec<Event>)> {
+    /// Produces the next epoch and classifies the events.
+    pub fn next_epoch(
+        &mut self,
+        p: usize,
+    ) -> Result<(Date, (Vec<Person>, Vec<Auction>, Vec<Bid>))> {
+        let mut persons = Vec::with_capacity((1000.0 / self.config.inter_event_delays[0]) as usize);
+        let mut auctions =
+            Vec::with_capacity((1000.0 / self.config.inter_event_delays[0]) as usize);
+        let mut bids = Vec::with_capacity((1000.0 / self.config.inter_event_delays[0]) as usize);
+        let epoch = (self
+            .config
+            .event_timestamp(self.events + self.config.first_event_id)
+            - self.config.base_time)
+            / 1000;
+
+        loop {
+            let time = self
+                .config
+                .event_timestamp(self.events + self.config.first_event_id);
+            let next_epoch = (time - self.config.base_time) / 1000;
+            let event = Event::new(self.events, p, &mut self.config);
+
+            if next_epoch < self.seconds && next_epoch == epoch {
+                self.events += 1;
+                match event {
+                    Event::Person(person) => persons.push(person),
+                    Event::Auction(auction) => auctions.push(auction),
+                    Event::Bid(bid) => bids.push(bid),
+                }
+            } else {
+                break;
+            }
+        }
+
+        Ok((Date::new(epoch), (persons, auctions, bids)))
+    }
+
+    /// Produces the events in the next epoch (for testing).
+    pub fn next(&mut self, p: usize) -> Result<(Date, Vec<Event>)> {
         let mut data = Vec::with_capacity((1000.0 / self.config.inter_event_delays[0]) as usize);
         let epoch = (self
             .config
@@ -54,7 +91,7 @@ impl NEXMarkGenerator {
                 .config
                 .event_timestamp(self.events + self.config.first_event_id);
             let next_epoch = (time - self.config.base_time) / 1000;
-            let event = Event::new(self.events, &mut self.config);
+            let event = Event::new(self.events, p, &mut self.config);
 
             if next_epoch < self.seconds && next_epoch == epoch {
                 self.events += 1;
@@ -84,17 +121,15 @@ mod tests {
     #[test]
     fn generate_events_in_json_file() -> Result<()> {
         let mut config = Config::new();
-        config.insert("person-proportion", "30".to_string());
-        config.insert("auction-proportion", "30".to_string());
-        config.insert("bid-proportion", "40".to_string());
-        config.insert("threads", "8".to_string());
-        config.insert("seconds", "5".to_string());
+        config.insert("threads", "100".to_string());
+        config.insert("seconds", "1".to_string());
+        config.insert("events-per-second", "1000".to_string());
 
         let data_dir = format!("{}/nexmark", config.get_or("data-dir", "data"));
         fs::create_dir_all(&data_dir)?;
+
         let seconds = config.get_as_or("seconds", 5);
         let partitions = config.get_as_or("threads", 8);
-
         println!(
             "Generating events for {}s over {} partitions.",
             seconds, partitions
@@ -107,10 +142,10 @@ mod tests {
             let mut file = File::create(format!("{}/events-{}.txt", &data_dir, p))?;
             let mut generator = generator.clone();
             threads.push(thread::spawn(move || loop {
-                let (t, d) = generator.next()?;
+                let (t, d) = generator.next(p)?;
                 for e in d {
                     serde_json::to_writer(&file, &EventCarrier { time: t, event: e })?;
-                    file.write(b"\n")?;
+                    file.write_all(b"\n")?;
                 }
             }));
         }

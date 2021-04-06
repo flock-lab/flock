@@ -90,7 +90,7 @@ impl Config {
 
 use std::f64::consts::PI;
 
-const BASE_TIME: usize = 1436918400_000;
+const BASE_TIME: usize = 1_436_918_400_000;
 
 fn split_string_arg(string: String) -> Vec<String> {
     string.split(',').map(String::from).collect::<Vec<String>>()
@@ -184,6 +184,9 @@ pub struct NEXMarkConfig {
     pub first_names:             Vec<String>,
     /// The collection of last names.
     pub last_names:              Vec<String>,
+    /// Number of event generators to use. Each generates events in its own
+    /// timeline.
+    pub num_event_generators:    usize,
 }
 
 impl NEXMarkConfig {
@@ -310,6 +313,7 @@ impl NEXMarkConfig {
             us_cities,
             first_names,
             last_names,
+            num_event_generators: generators as usize,
         }
     }
 
@@ -337,7 +341,7 @@ impl NEXMarkConfig {
             event_i -= num_events_for_this_cycle.round() as usize;
             offset_in_epoch += (num_events_for_this_cycle * inter_event_delay) / 1000.0;
         }
-        return 0;
+        0
     }
 
     /// Returns the next adjusted event.
