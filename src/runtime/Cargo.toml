@@ -18,12 +18,14 @@ base64 = "0.13.0"
 blake2 = "0.9"
 bytes = "1.0.1"
 dashmap = "4.0.2"
-
 datafusion = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq", features = [ "simd" ] }
 futures = "0.3.12"
 json = "0.12.4"
 lazy_static = "1.4"
+log = "0.4.14"
+
 lz4 = "1.23.1"
+nexmark = { path = "../../nexmark" }
 rand = "0.8.3"
 rayon = "1.5"
 rusoto_core = "0.46.0"

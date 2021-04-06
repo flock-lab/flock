@@ -36,6 +36,8 @@ use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::sync::Arc;
 
+type Slide = i64; // seconds
+
 /// You can set up a rule to run an AWS Lambda function on a schedule.
 #[rustfmt::skip]
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
@@ -88,7 +90,7 @@ pub enum StreamWindow {
     TumblingWindow(Schedule),
     /// A query that aggregates data continuously, using a fixed time or
     /// rowcount interval.
-    SlidingWindow(Schedule),
+    SlidingWindow((Schedule, Slide)),
     /// Session windows group events that arrive at similar times, filtering out
     /// periods of time where there is no data. Session window function has
     /// three main parameters: timeout, maximum duration, and partitioning key
@@ -101,11 +103,13 @@ pub enum StreamWindow {
     /// falling into the same time-restricted window, such as when tumbling
     /// windows were used.
     StaggerWinodw,
+    /// Element-wise stream processing at epoch level.
+    None,
 }
 
 impl Default for StreamWindow {
     fn default() -> StreamWindow {
-        StreamWindow::TumblingWindow(Schedule::Seconds(10))
+        StreamWindow::None
     }
 }
 
@@ -116,8 +120,8 @@ impl StreamWindow {
     }
 
     /// Returns a new sliding window.
-    pub fn sliding_window(sec: i64) -> StreamWindow {
-        StreamWindow::SlidingWindow(Schedule::Seconds(sec))
+    pub fn sliding_window(sec: i64, slide: i64) -> StreamWindow {
+        StreamWindow::SlidingWindow((Schedule::Seconds(sec), slide))
     }
 }
 

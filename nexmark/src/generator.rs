@@ -16,7 +16,7 @@
 //! original available on https://github.com/Shinmera/bsc-thesis/blob/master/benchmarks/src/nexmark.rs
 
 use crate::config::{Config, NEXMarkConfig};
-use crate::event::{Date, Event};
+use crate::event::{Auction, Bid, Date, Event, Person};
 use std::io::{Error, ErrorKind, Result};
 
 /// The NexMark event generator.
@@ -40,7 +40,44 @@ impl NEXMarkGenerator {
         }
     }
 
-    /// Produces the events in the next epoch.
+    /// Produces the next epoch and classifies the events.
+    pub fn next_epoch(
+        &mut self,
+        p: usize,
+    ) -> Result<(Date, (Vec<Person>, Vec<Auction>, Vec<Bid>))> {
+        let mut persons = Vec::with_capacity((1000.0 / self.config.inter_event_delays[0]) as usize);
+        let mut auctions =
+            Vec::with_capacity((1000.0 / self.config.inter_event_delays[0]) as usize);
+        let mut bids = Vec::with_capacity((1000.0 / self.config.inter_event_delays[0]) as usize);
+        let epoch = (self
+            .config
+            .event_timestamp(self.events + self.config.first_event_id)
+            - self.config.base_time)
+            / 1000;
+
+        loop {
+            let time = self
+                .config
+                .event_timestamp(self.events + self.config.first_event_id);
+            let next_epoch = (time - self.config.base_time) / 1000;
+            let event = Event::new(self.events, p, &mut self.config);
+
+            if next_epoch < self.seconds && next_epoch == epoch {
+                self.events += 1;
+                match event {
+                    Event::Person(person) => persons.push(person),
+                    Event::Auction(auction) => auctions.push(auction),
+                    Event::Bid(bid) => bids.push(bid),
+                }
+            } else {
+                break;
+            }
+        }
+
+        Ok((Date::new(epoch), (persons, auctions, bids)))
+    }
+
+    /// Produces the events in the next epoch (for testing).
     pub fn next(&mut self, p: usize) -> Result<(Date, Vec<Event>)> {
         let mut data = Vec::with_capacity((1000.0 / self.config.inter_event_delays[0]) as usize);
         let epoch = (self
@@ -86,6 +123,7 @@ mod tests {
         let mut config = Config::new();
         config.insert("threads", "100".to_string());
         config.insert("seconds", "1".to_string());
+        config.insert("events-per-second", "1000".to_string());
 
         let data_dir = format!("{}/nexmark", config.get_or("data-dir", "data"));
         fs::create_dir_all(&data_dir)?;
