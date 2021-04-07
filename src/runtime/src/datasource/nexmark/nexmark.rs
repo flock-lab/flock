@@ -180,8 +180,7 @@ impl NexMarkSource {
     /// Converts NexMark events to record batches in Arrow.
     pub fn to_batch(events: &[u8], schema: SchemaRef) -> Vec<RecordBatch> {
         let batch_size = 1024;
-        let mut reader =
-            json::Reader::new(BufReader::new(events), schema.clone(), batch_size, None);
+        let mut reader = json::Reader::new(BufReader::new(events), schema, batch_size, None);
 
         let mut batches = vec![];
         while let Some(batch) = reader.next().unwrap() {
