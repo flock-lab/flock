@@ -31,14 +31,15 @@ mod tests {
     use std::sync::Arc;
 
     #[tokio::test]
-    async fn local_query_0() -> Result<()> {
+    async fn local_query_2() -> Result<()> {
         // benchmark configuration
         let nex = NexMarkSource::new(3, 1, 200, StreamWindow::None);
 
         // data source generation
         let events = nex.generate_data()?;
 
-        let sql = "SELECT * FROM bid;";
+        let sql = "SELECT auction, price FROM bid WHERE auction % 123 = 0;";
+
         let schema = Arc::new(Bid::schema());
 
         // sequential processing
