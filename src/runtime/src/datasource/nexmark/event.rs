@@ -15,6 +15,7 @@
 //! The NexMark events: `Person`, `Auction`, and `Bid`.
 
 use crate::datasource::nexmark::config::NEXMarkConfig;
+use arrow::datatypes::{DataType, Field, Schema};
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
@@ -173,6 +174,19 @@ impl Person {
         }
     }
 
+    /// Returns `Person`'s schema.
+    pub fn schema() -> Schema {
+        Schema::new(vec![
+            Field::new("id", DataType::Int32, false),
+            Field::new("name", DataType::Utf8, false),
+            Field::new("email_address", DataType::Utf8, false),
+            Field::new("credit_card", DataType::Utf8, false),
+            Field::new("city", DataType::Utf8, false),
+            Field::new("state", DataType::Utf8, false),
+            Field::new("date_time", DataType::Date64, false),
+        ])
+    }
+
     /// Creates a new `Person` event.
     fn new(id: usize, time: Date, rng: &mut SmallRng, nex: &NEXMarkConfig) -> Self {
         Person {
@@ -241,6 +255,21 @@ impl Auction {
             Event::Auction(p) => Some(p),
             _ => None,
         }
+    }
+
+    /// Returns `Auction`'s schema.
+    pub fn schema() -> Schema {
+        Schema::new(vec![
+            Field::new("id", DataType::Int32, false),
+            Field::new("item_name", DataType::Utf8, false),
+            Field::new("description", DataType::Utf8, false),
+            Field::new("initial_bid", DataType::Int32, false),
+            Field::new("reserve", DataType::Int32, false),
+            Field::new("date_time", DataType::Date64, false),
+            Field::new("expires", DataType::Date64, false),
+            Field::new("seller", DataType::Int32, false),
+            Field::new("category", DataType::Int32, false),
+        ])
     }
 
     fn new(
@@ -333,6 +362,16 @@ impl Bid {
         }
     }
 
+    /// Returns `Auction`'s schema.
+    pub fn schema() -> Schema {
+        Schema::new(vec![
+            Field::new("auction", DataType::Int32, false),
+            Field::new("bidder", DataType::Int32, false),
+            Field::new("price", DataType::Int32, false),
+            Field::new("date_time", DataType::Date64, false),
+        ])
+    }
+
     fn new(id: usize, time: Date, rng: &mut SmallRng, nex: &NEXMarkConfig) -> Self {
         let auction = if 0 < rng.gen_range(0..nex.hot_auction_ratio) {
             (Auction::last_id(id, nex) / nex.hot_auction_ratio_2) * nex.hot_auction_ratio_2
@@ -392,5 +431,12 @@ mod tests {
         (0..100).for_each(|i| {
             Event::new(i, 0, &mut nex);
         });
+    }
+
+    #[test]
+    fn test_nexmark_schema() {
+        println!("{:?}", Person::schema());
+        println!("{:?}", Auction::schema());
+        println!("{:?}", Bid::schema());
     }
 }
