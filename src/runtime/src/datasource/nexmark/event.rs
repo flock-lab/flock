@@ -368,7 +368,7 @@ impl Bid {
             Field::new("auction", DataType::Int32, false),
             Field::new("bidder", DataType::Int32, false),
             Field::new("price", DataType::Int32, false),
-            Field::new("date_time", DataType::Date64, false),
+            Field::new("b_date_time", DataType::Date64, false),
         ])
     }
 

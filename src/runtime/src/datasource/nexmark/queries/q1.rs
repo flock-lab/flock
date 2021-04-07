@@ -38,7 +38,7 @@ mod tests {
         // data source generation
         let events = nex.generate_data()?;
 
-        let sql = "SELECT auction, bidder, 0.908 * price as price, date_time FROM bid";
+        let sql = "SELECT auction, bidder, 0.908 * price as price, b_date_time FROM bid";
 
         let schema = Arc::new(Bid::schema());
 
