@@ -14,11 +14,13 @@
 
 //! Nexmark benchmark suite
 
+use arrow::datatypes::{Schema, SchemaRef};
 use arrow::json::{self, reader::infer_json_schema};
 use arrow::record_batch::RecordBatch;
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::io::BufReader;
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 
@@ -31,16 +33,17 @@ use crate::query::StreamWindow;
 type Epoch = Date;
 type SourceId = usize;
 type Partition = usize;
+type NumEvents = usize;
 
 /// A struct to classify three types of events.
 #[derive(Debug, Default)]
 pub struct NexMarkEvents {
     /// The Person events in different epochs and partitions.
-    pub persons:  HashMap<Epoch, HashMap<SourceId, Vec<Person>>>,
+    pub persons:  HashMap<Epoch, HashMap<SourceId, (Vec<u8>, NumEvents)>>,
     /// The Auction events in different epochs and partitions.
-    pub auctions: HashMap<Epoch, HashMap<SourceId, Vec<Auction>>>,
+    pub auctions: HashMap<Epoch, HashMap<SourceId, (Vec<u8>, NumEvents)>>,
     /// The Bid events in different epochs and partitions.
-    pub bids:     HashMap<Epoch, HashMap<SourceId, Vec<Bid>>>,
+    pub bids:     HashMap<Epoch, HashMap<SourceId, (Vec<u8>, NumEvents)>>,
 }
 
 impl NexMarkEvents {
@@ -99,9 +102,9 @@ impl NexMarkSource {
         events: &mut NexMarkEvents,
         t: Epoch,
         p: Partition,
-        persons: Vec<Person>,
-        auctions: Vec<Auction>,
-        bids: Vec<Bid>,
+        persons: (Vec<u8>, usize),
+        auctions: (Vec<u8>, usize),
+        bids: (Vec<u8>, usize),
     ) {
         match events.persons.get_mut(&t) {
             Some(pm) => {
@@ -158,7 +161,7 @@ impl NexMarkSource {
             let events_handle = Arc::clone(&events_handle);
             threads.push(thread::spawn(move || loop {
                 let (t, d) = generator.next_epoch(p).unwrap();
-                if !(d.0.is_empty() && d.1.is_empty() && d.2.is_empty()) {
+                if !((d.0).0.is_empty() && (d.1).0.is_empty() && (d.2).0.is_empty()) {
                     let mut events = events_handle.lock().unwrap();
                     NexMarkSource::assgin_events(&mut events, t, p, d.0, d.1, d.2);
                 } else {
@@ -173,16 +176,25 @@ impl NexMarkSource {
         let mut events = events_handle.lock().unwrap();
         Ok(std::mem::take(&mut events))
     }
-}
 
-#[cfg(test)]
-mod test {
-    use super::*;
+    /// Converts NexMark events to record batches in Arrow.
+    pub fn to_batch(events: &[u8], schema: SchemaRef) -> Vec<RecordBatch> {
+        let batch_size = 1024;
+        let mut reader =
+            json::Reader::new(BufReader::new(events), schema.clone(), batch_size, None);
 
-    fn count_events(partitions: usize, seconds: usize, events: &NexMarkEvents) -> usize {
-        (0..partitions)
+        let mut batches = vec![];
+        while let Some(batch) = reader.next().unwrap() {
+            batches.push(batch);
+        }
+        batches
+    }
+
+    /// Counts the number of events. (for testing)
+    pub fn count_events(&self, events: &NexMarkEvents) -> usize {
+        (0..self.threads)
             .map(|p| {
-                (0..seconds)
+                (0..self.seconds)
                     .map(|s| {
                         events
                             .persons
@@ -190,26 +202,25 @@ mod test {
                             .unwrap()
                             .get(&p)
                             .unwrap()
-                            .len()
+                            .1
                             + events
                                 .auctions
                                 .get(&Date::new(s))
                                 .unwrap()
                                 .get(&p)
                                 .unwrap()
-                                .len()
-                            + events
-                                .bids
-                                .get(&Date::new(s))
-                                .unwrap()
-                                .get(&p)
-                                .unwrap()
-                                .len()
+                                .1
+                            + events.bids.get(&Date::new(s)).unwrap().get(&p).unwrap().1
                     })
                     .sum::<usize>()
             })
             .sum()
     }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
 
     #[test]
     fn test_gen_data() -> Result<()> {
@@ -223,7 +234,7 @@ mod test {
         assert_eq!(events.persons.len(), 1);
         assert_eq!(events.auctions.len(), 1);
         assert_eq!(events.bids.len(), 1);
-        assert_eq!(count_events(nex.threads, nex.seconds, &events), 10_000);
+        assert_eq!(nex.count_events(&events), 10_000);
 
         let seconds = 10;
         let threads = 100;
@@ -233,7 +244,7 @@ mod test {
         assert_eq!(events.persons.len(), 10);
         assert_eq!(events.auctions.len(), 10);
         assert_eq!(events.bids.len(), 10);
-        assert_eq!(count_events(nex.threads, nex.seconds, &events), 100_000);
+        assert_eq!(nex.count_events(&events), 100_000);
 
         Ok(())
     }

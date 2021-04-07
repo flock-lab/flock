@@ -17,7 +17,7 @@
 
 use crate::datasource::nexmark::config::{Config, NEXMarkConfig};
 use crate::datasource::nexmark::event::{Auction, Bid, Date, Event, Person};
-use std::io::{Error, ErrorKind, Result};
+use std::io::{Error, ErrorKind, Result, Write};
 
 /// The NexMark event generator.
 #[derive(Clone)]
@@ -44,17 +44,25 @@ impl NEXMarkGenerator {
     pub fn next_epoch(
         &mut self,
         p: usize,
-    ) -> Result<(Date, (Vec<Person>, Vec<Auction>, Vec<Bid>))> {
-        let mut persons = Vec::with_capacity((1000.0 / self.config.inter_event_delays[0]) as usize);
-        let mut auctions =
-            Vec::with_capacity((1000.0 / self.config.inter_event_delays[0]) as usize);
-        let mut bids = Vec::with_capacity((1000.0 / self.config.inter_event_delays[0]) as usize);
+    ) -> Result<(Date, ((Vec<u8>, usize), (Vec<u8>, usize), (Vec<u8>, usize)))> {
         let epoch = (self
             .config
             .event_timestamp(self.events + self.config.first_event_id)
             - self.config.base_time)
             / 1000;
 
+        let mut p_buf = Vec::with_capacity(
+            200 * self.config.events_per_epoch / self.config.num_event_generators,
+        );
+        let mut a_buf = Vec::with_capacity(
+            500 * self.config.events_per_epoch / self.config.num_event_generators,
+        );
+        let mut b_buf = Vec::with_capacity(
+            100 * self.config.events_per_epoch / self.config.num_event_generators,
+        );
+        let mut p_num = 0;
+        let mut a_num = 0;
+        let mut b_num = 0;
         loop {
             let time = self
                 .config
@@ -65,16 +73,31 @@ impl NEXMarkGenerator {
             if next_epoch < self.seconds && next_epoch == epoch {
                 self.events += 1;
                 match event {
-                    Event::Person(person) => persons.push(person),
-                    Event::Auction(auction) => auctions.push(auction),
-                    Event::Bid(bid) => bids.push(bid),
+                    Event::Person(person) => {
+                        p_buf.extend(serde_json::to_vec(&person).unwrap());
+                        p_buf.extend(vec![10]);
+                        p_num += 1;
+                    }
+                    Event::Auction(auction) => {
+                        a_buf.extend(serde_json::to_vec(&auction).unwrap());
+                        a_buf.extend(vec![10]);
+                        a_num += 1;
+                    }
+                    Event::Bid(bid) => {
+                        b_buf.extend(serde_json::to_vec(&bid).unwrap());
+                        b_buf.extend(vec![10]);
+                        b_num += 1;
+                    }
                 }
             } else {
                 break;
             }
         }
 
-        Ok((Date::new(epoch), (persons, auctions, bids)))
+        Ok((
+            Date::new(epoch),
+            ((p_buf, p_num), (a_buf, a_num), (b_buf, b_num)),
+        ))
     }
 
     /// Produces the events in the next epoch (for testing).
