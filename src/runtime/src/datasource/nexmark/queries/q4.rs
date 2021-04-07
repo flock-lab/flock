@@ -31,9 +31,9 @@ mod tests {
     use std::sync::Arc;
 
     #[tokio::test]
-    async fn local_query_3() -> Result<()> {
+    async fn local_query_4() -> Result<()> {
         // benchmark configuration
-        let seconds = 5;
+        let seconds = 2;
         let threads = 1;
         let event_per_second = 1000;
         let nex = NexMarkSource::new(seconds, threads, event_per_second, StreamWindow::None);
@@ -43,15 +43,19 @@ mod tests {
 
         let sql = concat!(
             "SELECT ",
-            "    name, city, state, a_id ",
-            "FROM ",
-            "    auction INNER JOIN person on seller = p_id ",
-            "WHERE ",
-            "    category = 10 and (state = 'or' OR state = 'id' OR state = 'ca');"
+            "    category, ",
+            "    AVG(final) ",
+            "FROM ( ",
+            "    SELECT MAX(price) AS final, category ",
+            "    FROM auction INNER JOIN bid on a_id = auction ",
+            "    WHERE b_date_time BETWEEN a_date_time AND expires ",
+            "    GROUP BY a_id, category ",
+            ") as Q ",
+            "GROUP BY category;"
         );
 
         let auction_schema = Arc::new(Auction::schema());
-        let person_schema = Arc::new(Person::schema());
+        let bid_schema = Arc::new(Bid::schema());
 
         // sequential processing
         for i in 0..seconds {
@@ -60,17 +64,17 @@ mod tests {
             let (auctions, _) = am.get(&0).unwrap();
             let auctions_batches = NexMarkSource::to_batch(&auctions, auction_schema.clone());
 
-            let pm = events.persons.get(&Date::new(i)).unwrap();
-            let (persons, _) = pm.get(&0).unwrap();
-            let person_batches = NexMarkSource::to_batch(&persons, person_schema.clone());
+            let bm = events.bids.get(&Date::new(i)).unwrap();
+            let (bids, _) = bm.get(&0).unwrap();
+            let bids_batches = NexMarkSource::to_batch(&bids, bid_schema.clone());
 
             // register memory tables
             let mut ctx = datafusion::execution::context::ExecutionContext::new();
             let auction_table = MemTable::try_new(auction_schema.clone(), vec![auctions_batches])?;
             ctx.register_table("auction", Arc::new(auction_table));
 
-            let person_table = MemTable::try_new(person_schema.clone(), vec![person_batches])?;
-            ctx.register_table("person", Arc::new(person_table));
+            let bid_table = MemTable::try_new(bid_schema.clone(), vec![bids_batches])?;
+            ctx.register_table("bid", Arc::new(bid_table));
 
             // optimize query plan and execute it
             let physical_plan = physical_plan(&mut ctx, &sql)?;
