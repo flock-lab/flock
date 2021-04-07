@@ -22,6 +22,7 @@ mod tests {
     use crate::datasource::nexmark::{NexMarkEvents, NexMarkSource};
     use crate::error::Result;
     use crate::executor::plan::physical_plan;
+    use crate::query::StreamWindow;
     use arrow::json;
     use datafusion::datasource::MemTable;
     use datafusion::physical_plan::collect;
@@ -32,12 +33,8 @@ mod tests {
     #[tokio::test]
     async fn local_query_1() -> Result<()> {
         // benchmark configuration
-        let nex = NexMarkSource {
-            seconds: 3,
-            threads: 1,
-            events_per_second: 200,
-            ..Default::default()
-        };
+        let nex = NexMarkSource::new(3, 1, 200, StreamWindow::None);
+
         // data source generation
         let events = nex.generate_data()?;
 

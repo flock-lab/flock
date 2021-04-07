@@ -177,13 +177,13 @@ impl Person {
     /// Returns `Person`'s schema.
     pub fn schema() -> Schema {
         Schema::new(vec![
-            Field::new("id", DataType::Int32, false),
+            Field::new("p_id", DataType::Int32, false),
             Field::new("name", DataType::Utf8, false),
             Field::new("email_address", DataType::Utf8, false),
             Field::new("credit_card", DataType::Utf8, false),
             Field::new("city", DataType::Utf8, false),
             Field::new("state", DataType::Utf8, false),
-            Field::new("date_time", DataType::Date64, false),
+            Field::new("p_date_time", DataType::Date64, false),
         ])
     }
 
@@ -260,12 +260,12 @@ impl Auction {
     /// Returns `Auction`'s schema.
     pub fn schema() -> Schema {
         Schema::new(vec![
-            Field::new("id", DataType::Int32, false),
+            Field::new("a_id", DataType::Int32, false),
             Field::new("item_name", DataType::Utf8, false),
             Field::new("description", DataType::Utf8, false),
             Field::new("initial_bid", DataType::Int32, false),
             Field::new("reserve", DataType::Int32, false),
-            Field::new("date_time", DataType::Date64, false),
+            Field::new("a_date_time", DataType::Date64, false),
             Field::new("expires", DataType::Date64, false),
             Field::new("seller", DataType::Int32, false),
             Field::new("category", DataType::Int32, false),

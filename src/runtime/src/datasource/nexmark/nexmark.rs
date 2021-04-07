@@ -60,24 +60,20 @@ impl NexMarkEvents {
 /// A struct to manage all Nexmark info in cloud environment.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct NexMarkSource {
-    /// The execution time of the queries.
-    pub seconds:           usize,
-    /// The number of generator threads (data source per thread).
-    pub threads:           usize,
-    /// The number of events (Person, Auction or Bid) per second.
-    pub events_per_second: usize,
+    /// The NexMark configuration.
+    pub config: Config,
     /// The windows group stream elements by time or rows.
-    pub window:            StreamWindow,
+    pub window: StreamWindow,
 }
 
 impl Default for NexMarkSource {
     fn default() -> Self {
-        NexMarkSource {
-            seconds:           10,
-            threads:           100,
-            events_per_second: 100_000,
-            window:            StreamWindow::None,
-        }
+        let mut config = Config::new();
+        config.insert("threads", 100.to_string());
+        config.insert("seconds", 10.to_string());
+        config.insert("events-per-second", 100_1000.to_string());
+        let window = StreamWindow::None;
+        NexMarkSource { config, window }
     }
 }
 
@@ -89,12 +85,11 @@ impl NexMarkSource {
         events_per_second: usize,
         window: StreamWindow,
     ) -> Self {
-        NexMarkSource {
-            seconds,
-            threads,
-            events_per_second,
-            window,
-        }
+        let mut config = Config::new();
+        config.insert("threads", threads.to_string());
+        config.insert("seconds", seconds.to_string());
+        config.insert("events-per-second", events_per_second.to_string());
+        NexMarkSource { config, window }
     }
 
     /// Assigns each event with the specific type for the upcoming processing.
@@ -142,21 +137,19 @@ impl NexMarkSource {
 
     /// Generates data events for Nexmark benchmark.
     pub fn generate_data(&self) -> Result<NexMarkEvents> {
-        let mut config = Config::new();
-        config.insert("threads", self.threads.to_string());
-        config.insert("seconds", self.seconds.to_string());
-        config.insert("events-per-second", self.events_per_second.to_string());
+        let partitions: usize = self.config.get_as_or("threads", 100);
+        let seconds: usize = self.config.get_as_or("seconds", 10);
 
         info!(
             "Generating events for {}s over {} partitions.",
-            self.seconds, self.threads
+            seconds, partitions
         );
 
-        let generator = NEXMarkGenerator::new(&config);
+        let generator = NEXMarkGenerator::new(&self.config);
         let events_handle = Arc::new(Mutex::new(NexMarkEvents::new()));
 
         let mut threads = vec![];
-        for p in 0..self.threads {
+        for p in 0..partitions {
             let mut generator = generator.clone();
             let events_handle = Arc::clone(&events_handle);
             threads.push(thread::spawn(move || loop {
@@ -191,9 +184,11 @@ impl NexMarkSource {
 
     /// Counts the number of events. (for testing)
     pub fn count_events(&self, events: &NexMarkEvents) -> usize {
-        (0..self.threads)
+        let threads: usize = self.config.get_as_or("threads", 100);
+        let seconds: usize = self.config.get_as_or("seconds", 10);
+        (0..threads)
             .map(|p| {
-                (0..self.seconds)
+                (0..seconds)
                     .map(|s| {
                         events
                             .persons
@@ -223,10 +218,12 @@ mod test {
 
     #[test]
     fn test_gen_data() -> Result<()> {
+        let mut config = Config::new();
+        config.insert("threads", 10.to_string());
+        config.insert("seconds", 1.to_string());
+        config.insert("events-per-second", 10_000.to_string());
         let nex = NexMarkSource {
-            seconds: 1,
-            threads: 10,
-            events_per_second: 10_000,
+            config,
             ..Default::default()
         };
         let events = nex.generate_data()?;

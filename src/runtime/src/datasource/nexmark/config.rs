@@ -14,12 +14,13 @@
 
 //! The NexMark Benchmark Configuration.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{Error, ErrorKind, Result};
 use std::str::FromStr;
 
 /// This is a simple command line options parser.
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Config {
     args: HashMap<String, String>,
 }
