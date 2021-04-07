@@ -150,7 +150,7 @@ impl Event {
 )]
 pub struct Person {
     /// A person-unique integer ID.
-    pub id:            Id,
+    pub p_id:          Id,
     /// A string for the person’s full name.
     pub name:          String,
     /// The person’s email address as a string.
@@ -162,7 +162,7 @@ pub struct Person {
     /// One of several US states as a two-letter string.
     pub state:         String,
     /// A millisecond timestamp for the event origin.
-    pub date_time:     Date,
+    pub p_date_time:   Date,
 }
 
 impl Person {
@@ -190,7 +190,7 @@ impl Person {
     /// Creates a new `Person` event.
     fn new(id: usize, time: Date, rng: &mut SmallRng, nex: &NEXMarkConfig) -> Self {
         Person {
-            id:            Self::last_id(id, nex) + nex.first_person_id,
+            p_id:          Self::last_id(id, nex) + nex.first_person_id,
             name:          format!(
                 "{} {}",
                 nex.first_names.choose(rng).unwrap(),
@@ -203,7 +203,7 @@ impl Person {
                 .join(" "),
             city:          nex.us_cities.choose(rng).unwrap().clone(),
             state:         nex.us_states.choose(rng).unwrap().clone(),
-            date_time:     time,
+            p_date_time:   time,
         }
     }
 
@@ -229,7 +229,7 @@ impl Person {
 )]
 pub struct Auction {
     /// An auction-unique integer ID.
-    pub id:          Id,
+    pub a_id:        Id,
     /// The name of the item being auctioned.
     pub item_name:   String,
     /// A short description of the item.
@@ -239,7 +239,7 @@ pub struct Auction {
     /// The minimum price for the auction to succeed.
     pub reserve:     usize,
     /// A millisecond timestamp for the event origin.
-    pub date_time:   Date,
+    pub a_date_time: Date,
     /// A UNIX epoch timestamp for the expiration date of the auction.
     pub expires:     Date,
     /// The ID of the person that created this auction.
@@ -286,12 +286,12 @@ impl Auction {
             Person::next_id(id, rng, nex)
         };
         Auction {
-            id: Self::last_id(id, nex) + nex.first_auction_id,
+            a_id: Self::last_id(id, nex) + nex.first_auction_id,
             item_name: rng.gen_string(20),
             description: rng.gen_string(100),
             initial_bid,
             reserve: initial_bid + rng.gen_price(),
-            date_time: time,
+            a_date_time: time,
             expires: time + Self::next_length(events_so_far, rng, time, nex),
             seller: seller + nex.first_person_id,
             category: nex.first_category_id + rng.gen_range(0..nex.num_categories),
@@ -344,13 +344,13 @@ impl Auction {
 )]
 pub struct Bid {
     /// The ID of the auction this bid is for.
-    pub auction:   Id,
+    pub auction:     Id,
     /// The ID of the person that placed this bid.
-    pub bidder:    Id,
+    pub bidder:      Id,
     /// The price in cents that the person bid for.
-    pub price:     usize,
+    pub price:       usize,
     /// A millisecond timestamp for the event origin.
-    pub date_time: Date,
+    pub b_date_time: Date,
 }
 
 impl Bid {
@@ -384,10 +384,10 @@ impl Bid {
             Person::next_id(id, rng, nex)
         };
         Bid {
-            auction:   auction + nex.first_auction_id,
-            bidder:    bidder + nex.first_person_id,
-            price:     rng.gen_price(),
-            date_time: time,
+            auction:     auction + nex.first_auction_id,
+            bidder:      bidder + nex.first_person_id,
+            price:       rng.gen_price(),
+            b_date_time: time,
         }
     }
 }
