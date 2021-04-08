@@ -36,7 +36,9 @@ use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::sync::Arc;
 
-type Slide = i64; // seconds
+type Slide = usize; // seconds
+type Window = usize; // seconds
+type Hop = usize; // seconds
 
 /// You can set up a rule to run an AWS Lambda function on a schedule.
 #[rustfmt::skip]
@@ -58,7 +60,7 @@ pub enum Schedule {
     /// Standard rate for frequencies of up to once per minute.
     Rate(String),
     /// Where Unit can and only can be second(s),
-    Seconds(i64),
+    Seconds(usize),
     /// Cron expressions have the following format:
     ///
     /// Cron(`Minutes` `Hours` `Day-of-month` `Month` `Day-of-week` `Year`)
@@ -77,7 +79,7 @@ pub enum Schedule {
     /// Cron expressionsfor frequencies of up to once per minute.
     Cron(String),
     /// The window size in terms of the number of rows.
-    Rows(u64),
+    Rows(usize),
 }
 
 /// A enum `StreamWindow` to define different window types.
@@ -88,9 +90,15 @@ pub enum StreamWindow {
     /// in-application stream belongs to a specific window. It is processed only
     /// once (when the query processes the window to which the record belongs).
     TumblingWindow(Schedule),
+    /// Unlike tumbling windows, hopping windows model scheduled overlapping
+    /// windows. A hopping window specification consist of: the window size (how
+    /// long each window lasts) and the hop size (by how much each window moves
+    /// forward relative to the previous one). Note that a tumbling window is
+    /// simply a hopping window whose 'hop' is equal to its window.
+    HoppingWindow((Window, Hop)),
     /// A query that aggregates data continuously, using a fixed time or
     /// rowcount interval.
-    SlidingWindow((Schedule, Slide)),
+    SlidingWindow((Window, Slide)),
     /// Session windows group events that arrive at similar times, filtering out
     /// periods of time where there is no data. Session window function has
     /// three main parameters: timeout, maximum duration, and partitioning key
@@ -115,13 +123,13 @@ impl Default for StreamWindow {
 
 impl StreamWindow {
     /// Returns a new tumbling window.
-    pub fn tumbling_window(sec: i64) -> StreamWindow {
+    pub fn tumbling_window(sec: usize) -> StreamWindow {
         StreamWindow::TumblingWindow(Schedule::Seconds(sec))
     }
 
     /// Returns a new sliding window.
-    pub fn sliding_window(sec: i64, slide: i64) -> StreamWindow {
-        StreamWindow::SlidingWindow((Schedule::Seconds(sec), slide))
+    pub fn sliding_window(sec: usize, slide: usize) -> StreamWindow {
+        StreamWindow::SlidingWindow((sec, slide))
     }
 }
 

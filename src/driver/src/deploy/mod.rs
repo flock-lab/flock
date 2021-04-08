@@ -104,7 +104,7 @@ impl ExecutionEnvironment {
                     let request = kinesis::create_event_source_mapping_request(
                         &event.stream_name,
                         &ctx.name,
-                        *window_in_seconds,
+                        *window_in_seconds as i64,
                     )
                     .await?;
                     match client.create_event_source_mapping(request).await {
@@ -124,7 +124,7 @@ impl ExecutionEnvironment {
                     };
                     let request = kafka::create_event_source_mapping_request(
                         &ctx.name,
-                        *window_in_seconds,
+                        *window_in_seconds as i64,
                         &event.cluster_arn,
                         &event.topics,
                     )
