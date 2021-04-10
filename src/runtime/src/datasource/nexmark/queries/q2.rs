@@ -33,7 +33,7 @@ mod tests {
     #[tokio::test]
     async fn local_query_2() -> Result<()> {
         // benchmark configuration
-        let nex = NexMarkSource::new(3, 1, 200, StreamWindow::None);
+        let nex = NexMarkSource::new(2, 1, 10_000, StreamWindow::None);
 
         // data source generation
         let events = nex.generate_data()?;
