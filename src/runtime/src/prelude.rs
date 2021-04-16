@@ -26,7 +26,7 @@ pub use crate::arena::{Arena, WindowSession};
 pub use crate::config;
 pub use crate::config::GLOBALS as globals;
 pub use crate::context::{CloudFunction, ExecutionContext};
-pub use crate::datasource::{kafka, kinesis, DataSource};
+pub use crate::datasource::{kafka, kinesis, nexmark, DataSource};
 pub use crate::encoding::Encoding;
 pub use crate::error::{Result, SquirtleError};
 pub use crate::executor::{plan::physical_plan, ExecutionStrategy, Executor, LambdaExecutor};

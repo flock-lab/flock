@@ -19,7 +19,7 @@ fn main() {}
 mod tests {
     use super::*;
     use crate::datasource::nexmark::event::{Auction, Bid, Date, Person};
-    use crate::datasource::nexmark::{NexMarkEvents, NexMarkSource};
+    use crate::datasource::nexmark::{NexMarkSource, NexMarkStream};
     use crate::error::Result;
     use crate::executor::plan::physical_plan;
     use crate::query::{Schedule, StreamWindow};
