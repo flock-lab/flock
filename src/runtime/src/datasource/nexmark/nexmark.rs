@@ -299,7 +299,6 @@ mod test {
     }
 
     #[test]
-    #[ignore]
     fn test_nexmark_serialization() -> Result<()> {
         let mut config = Config::new();
         config.insert("threads", 10.to_string());

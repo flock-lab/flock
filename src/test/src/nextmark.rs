@@ -84,6 +84,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn umd_serde_on_cloud() -> Result<()> {
         let mut config = Config::new();
         config.insert("threads", 10.to_string());
