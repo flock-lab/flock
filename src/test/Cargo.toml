@@ -8,7 +8,6 @@ keywords = [ "testing", "utility", "fake", "dataset" ]
 edition = "2018"
 
 [dependencies]
-abomonation = { git = "https://github.com/TimelyDataflow/abomonation", branch = "master" }
 arrow = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq", features = [ "simd" ] }
 base64 = "0.13.0"
 chrono = { version = "0.4.19", features = [ "serde" ] }
@@ -16,17 +15,20 @@ daggy = "0.7.0"
 datafusion = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq", features = [ "simd" ] }
 driver = { path = "../driver" }
 fake = { version = "2.4", features = [ 'derive', 'chrono' ] }
+lambda_runtime = { git = "https://github.com/awslabs/aws-lambda-rust-runtime/", branch = "master" }
+
 rand = "0.8.3"
 runtime = { path = "../runtime" }
 serde = { version = "1.0", features = [ "derive" ] }
 serde_bytes = "0.11"
 serde_json = "1.0"
-
 tokio = { version = "1.2", features = [ "macros", "io-util", "sync", "rt-multi-thread" ] }
-umd_lambda_runtime = { git = "https://github.com/DSLAM-UMD/aws-lambda-rust-runtime", branch = "scq" }
 
 [dev-dependencies]
 aws_lambda_events = "0.4"
+rusoto_core = "0.46.0"
+
+rusoto_lambda = "0.46.0"
 
 [lib]
 name = "test_utils"
@@ -34,5 +36,5 @@ path = "src/lib.rs"
 crate-type = [ "lib" ]
 
 [[bin]]
-name = "test_umd_runtime"
-path = "src/umd_runtime.rs"
+name = "test_nextmark"
+path = "src/nextmark.rs"
