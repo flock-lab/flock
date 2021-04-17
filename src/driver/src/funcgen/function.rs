@@ -111,10 +111,11 @@ impl QueryFlow {
         ctx.insert(
             root,
             ExecutionContext {
-                plan:       dag.get_node(root).unwrap().plan.clone(),
-                name:       Self::function_name(&query_code, &root, &timestamp),
-                next:       CloudFunction::None,
-                datasource: DataSource::Payload,
+                plan:         dag.get_node(root).unwrap().plan.clone(),
+                name:         Self::function_name(&query_code, &root, &timestamp),
+                next:         CloudFunction::None,
+                datasource:   DataSource::Payload,
+                query_number: None,
             },
         );
 
@@ -130,9 +131,9 @@ impl QueryFlow {
                 ctx.insert(
                     node,
                     ExecutionContext {
-                        plan:       dag.get_node(node).unwrap().plan.clone(),
-                        name:       Self::function_name(&query_code, &node, &timestamp),
-                        next:       {
+                        plan:         dag.get_node(node).unwrap().plan.clone(),
+                        name:         Self::function_name(&query_code, &node, &timestamp),
+                        next:         {
                             let name = ctx.get(&parent).unwrap().name.clone();
                             if dag.get_node(parent).unwrap().concurrency == 1 {
                                 CloudFunction::Chorus((name, CONCURRENCY_8))
@@ -140,13 +141,14 @@ impl QueryFlow {
                                 CloudFunction::Solo(name)
                             }
                         },
-                        datasource: {
+                        datasource:   {
                             if node.index() == ncount - 1 {
                                 (*query.datasource()).clone()
                             } else {
                                 DataSource::Payload
                             }
                         },
+                        query_number: None,
                     },
                 );
                 queue.push_back(node);

@@ -392,26 +392,29 @@ mod tests {
 
         // Feed record batches back to the plan
         let mut ctx = ExecutionContext {
-            plan:       plan.clone(),
-            name:       "test".to_string(),
-            next:       CloudFunction::None,
-            datasource: DataSource::UnknownEvent,
+            plan:         plan.clone(),
+            name:         "test".to_string(),
+            next:         CloudFunction::None,
+            datasource:   DataSource::UnknownEvent,
+            query_number: None,
         };
         LambdaExecutor::next_function(&ctx).expect_err("No distributed execution plan");
 
         ctx = ExecutionContext {
-            plan:       plan.clone(),
-            name:       "test".to_string(),
-            next:       CloudFunction::Solo("solo".to_string()),
-            datasource: DataSource::UnknownEvent,
+            plan:         plan.clone(),
+            name:         "test".to_string(),
+            next:         CloudFunction::Solo("solo".to_string()),
+            datasource:   DataSource::UnknownEvent,
+            query_number: None,
         };
         assert_eq!("solo", LambdaExecutor::next_function(&ctx)?);
 
         ctx = ExecutionContext {
-            plan:       plan.clone(),
-            name:       "test".to_string(),
-            next:       CloudFunction::Chorus(("chorus".to_string(), 24)),
-            datasource: DataSource::UnknownEvent,
+            plan:         plan.clone(),
+            name:         "test".to_string(),
+            next:         CloudFunction::Chorus(("chorus".to_string(), 24)),
+            datasource:   DataSource::UnknownEvent,
+            query_number: None,
         };
 
         let lambdas: Vec<String> = (0..100)

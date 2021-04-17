@@ -16,6 +16,8 @@ aws_lambda_events = "0.4"
 datafusion = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq", features = [ "simd" ] }
 futures = "0.3.12"
 lambda_runtime = { git = "https://github.com/awslabs/aws-lambda-rust-runtime/", branch = "master" }
+lazy_static = "1.4"
+
 log = "0.4.14"
 rayon = "1.5"
 runtime = { path = "../runtime" }
@@ -30,5 +32,9 @@ driver = { path = "../driver" }
 test_utils = { path = "../test" }
 
 [[bin]]
-name = "aws"
+name = "aws_lambda"
 path = "src/aws/lambda.rs"
+
+[[bin]]
+name = "nexmark_lambda"
+path = "src/aws/nexmark/lambda.rs"

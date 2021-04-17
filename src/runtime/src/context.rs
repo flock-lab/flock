@@ -81,7 +81,7 @@ impl Default for CloudFunction {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ExecutionContext {
     /// The physical sub-plan.
-    pub plan:       Arc<dyn ExecutionPlan>,
+    pub plan:         Arc<dyn ExecutionPlan>,
     /// Cloud Function name in the current execution context.
     ///
     /// |      Cloud Function Naming Convention       |
@@ -105,11 +105,13 @@ pub struct ExecutionContext {
     /// at a certain moment.
     ///
     /// SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836Z
-    pub name:       CloudFunctionName,
+    pub name:         CloudFunctionName,
     /// Lambda function name(s) for next invocation(s).
-    pub next:       CloudFunction,
+    pub next:         CloudFunction,
     /// Data source where data that is being used originates from.
-    pub datasource: DataSource,
+    pub datasource:   DataSource,
+    /// The Nexmark query number for testing purposes.
+    pub query_number: Option<usize>,
 }
 
 impl PartialEq for ExecutionContext {
@@ -260,6 +262,7 @@ mod tests {
             name,
             next,
             datasource,
+            query_number: None,
         };
 
         let json = lambda_context.marshal(Encoding::default());
@@ -297,6 +300,7 @@ mod tests {
             name: "test".to_string(),
             next: CloudFunction::None,
             datasource: DataSource::UnknownEvent,
+            query_number: None,
         };
         ctx.feed_one_source(&partitions);
 
@@ -377,6 +381,7 @@ mod tests {
             name: "test".to_string(),
             next: CloudFunction::None,
             datasource: DataSource::UnknownEvent,
+            query_number: None,
         };
         ctx.feed_two_source(&partitions1, &partitions2);
 
