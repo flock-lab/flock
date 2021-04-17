@@ -11,6 +11,6 @@ codecov:
 
 ignore:
   - "src/legacy"
-  - "src/function/src/aws/lambda.rs"
+  - "src/function/src/aws"
   - "src/driver/src/build"
   - "**/*.md"
