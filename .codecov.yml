@@ -13,4 +13,5 @@ ignore:
   - "src/legacy"
   - "src/function/src/aws"
   - "src/driver/src/build"
+  - "src/bin/cli/repl.rs"
   - "**/*.md"

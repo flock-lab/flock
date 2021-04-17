@@ -16,6 +16,7 @@ use clap::{crate_version, App, Arg};
 use runtime::error::Result;
 use rustyline::Editor;
 use std::env;
+use std::f64::consts::PI;
 
 #[tokio::main]
 pub async fn main() {
@@ -24,27 +25,11 @@ pub async fn main() {
         .version(crate_version!())
         .about("Command Line Interactive Contoller for Squirtle")
         .arg(
-            Arg::with_name("config")
-                .short("c")
-                .long("config")
+            Arg::with_name("function_code")
+                .short("u")
+                .long("upload")
                 .value_name("FILE")
-                .help("Specify a custom config file to find AWS credentials configs")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("exec")
-                .short("e")
-                .long("exec")
-                .value_name("COMMAND")
-                .help("Execute the specified command then exit")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("filename")
-                .short("f")
-                .long("file")
-                .value_name("FILE")
-                .help("Read commands from the file rather than standard input")
+                .help("Upload lambda execution code to S3.")
                 .takes_value(true),
         )
         .arg(
@@ -55,9 +40,30 @@ pub async fn main() {
         )
         .get_matches();
 
-    println!("{}", include_str!("./squirtle.txt"));
-    let _config = matches.value_of("config").unwrap_or("default.conf");
+    rainbow_println(include_str!("./squirtle.txt"));
 
+    match matches.value_of("function_code") {
+        Some(lambda) => {
+            rainbow_println("============================================");
+            rainbow_println("         Upload function code to S3         ");
+            rainbow_println("============================================");
+            println!("{}", lambda);
+            if !std::path::Path::new(lambda).exists() {
+                rainbow_println(&format!(
+                    "[ERROR]: function code '{}' doesn't exist!",
+                    lambda
+                ));
+                rainbow_println("[EXIT]: ..............");
+                std::process::exit(-1);
+            }
+        }
+        None => {
+            cli().await;
+        }
+    }
+}
+
+async fn cli() {
     let mut rl = Editor::<()>::new();
     rl.load_history(".history").ok();
 
@@ -95,7 +101,39 @@ fn is_exit_command(line: &str) -> bool {
     line == "quit" || line == "exit"
 }
 
-#[allow(unused_variables)]
-async fn exec_and_print(sql: String) -> Result<()> {
+async fn exec_and_print(_: String) -> Result<()> {
+    rainbow_println("CLI is under construction. Please try Squirtle API directly.");
     Ok(())
+}
+
+/// Prints the text in the rainbow fansion.
+pub fn rainbow_println(line: &str) {
+    let frequency: f64 = 0.1;
+    let spread: f64 = 3.0;
+    for (i, c) in line.char_indices() {
+        let (r, g, b) = rgb(frequency, spread, i as f64);
+        print!("\x1b[38;2;{};{};{}m{}\x1b[0m", r, g, b, c);
+    }
+    println!();
+}
+
+/// Generates RGB for rainbow print.
+fn rgb(freq: f64, spread: f64, i: f64) -> (u8, u8, u8) {
+    let j = i / spread;
+    let red = (freq * j + 0.0).sin() * 127.0 + 128.0;
+    let green = (freq * j + 2.0 * PI / 3.0).sin() * 127.0 + 128.0;
+    let blue = (freq * j + 4.0 * PI / 3.0).sin() * 127.0 + 128.0;
+
+    (red as u8, green as u8, blue as u8)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rainbow_print() {
+        let text = include_str!("./squirtle.txt");
+        rainbow_println(text);
+    }
 }
