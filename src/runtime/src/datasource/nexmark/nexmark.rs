@@ -54,36 +54,15 @@ pub struct NexMarkStream {
 #[derive(Debug, Default, Serialize, Deserialize, Abomonation, PartialEq, Eq)]
 pub struct NexMarkEvent {
     /// The encoded Person events.
-    pub persons:      Vec<u8>,
+    pub persons:  Vec<u8>,
     /// The encoded Auction events.
-    pub auctions:     Vec<u8>,
+    pub auctions: Vec<u8>,
     /// The encoded Bid events.
-    pub bids:         Vec<u8>,
-    /// The number of Person events.
-    pub num_persons:  usize,
-    /// The number of Auction events.
-    pub num_auctions: usize,
-    /// The number pf Bid events.
-    pub num_bids:     usize,
+    pub bids:     Vec<u8>,
     /// The logical timestamp for the current epoch.
-    pub epoch:        usize,
+    pub epoch:    usize,
     /// The data source identifier.
-    pub source:       usize,
-}
-
-impl NexMarkEvent {
-    /// Encoding NexMarkEvent to bytes for network transmission.
-    pub fn encode(&self, encoding: Encoding) -> Vec<u8> {
-        let mut bytes = Vec::new();
-        unsafe {
-            encode(self, &mut bytes).unwrap();
-        }
-        if encoding != Encoding::None {
-            bytes = encoding.compress(&bytes);
-        }
-
-        bytes
-    }
+    pub source:   usize,
 }
 
 impl NexMarkStream {
@@ -106,27 +85,24 @@ impl NexMarkStream {
         let epoch = Epoch::new(time);
 
         if let Some(map) = self.persons.get(&epoch) {
-            if let Some((persons, num_persons)) = map.get(&source) {
+            if let Some((persons, _)) = map.get(&source) {
                 event.persons = persons.clone();
-                event.num_persons = *num_persons;
             }
         }
 
         if let Some(map) = self.auctions.get(&epoch) {
-            if let Some((auctions, num_auctions)) = map.get(&source) {
+            if let Some((auctions, _)) = map.get(&source) {
                 event.auctions = auctions.clone();
-                event.num_auctions = *num_auctions;
             }
         }
 
         if let Some(map) = self.bids.get(&epoch) {
-            if let Some((bids, num_bids)) = map.get(&source) {
+            if let Some((bids, _)) = map.get(&source) {
                 event.bids = bids.clone();
-                event.num_bids = *num_bids;
             }
         }
 
-        if event.num_persons == 0 && event.num_auctions == 0 && event.num_bids == 0 {
+        if event.persons.is_empty() && event.auctions.is_empty() && event.bids.is_empty() {
             return None;
         }
 
@@ -336,30 +312,25 @@ mod test {
         let events = events.select(0, 1).unwrap();
 
         // serialization and compression
-        let en_events = events.encode(Encoding::Zstd);
+        let values = serde_json::to_value(events).unwrap();
 
         // decompression and deserialization
-        unsafe {
-            let mut bytes = Encoding::Zstd.decompress(&en_events);
-            if let Some((de_events, _)) = decode::<NexMarkEvent>(&mut bytes) {
-                assert_eq!(events, *de_events);
+        let de_events: NexMarkEvent = serde_json::from_value(values).unwrap();
 
-                let person_schema = Arc::new(Person::schema());
-                let batches = NexMarkSource::to_batch(&(*de_events).persons, person_schema);
-                let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
-                println!("{}", formatted);
+        let person_schema = Arc::new(Person::schema());
+        let batches = NexMarkSource::to_batch(&de_events.persons, person_schema);
+        let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
+        println!("{}", formatted);
 
-                let auction_schema = Arc::new(Auction::schema());
-                let batches = NexMarkSource::to_batch(&(*de_events).auctions, auction_schema);
-                let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
-                println!("{}", formatted);
+        let auction_schema = Arc::new(Auction::schema());
+        let batches = NexMarkSource::to_batch(&de_events.auctions, auction_schema);
+        let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
+        println!("{}", formatted);
 
-                let bid_schema = Arc::new(Bid::schema());
-                let batches = NexMarkSource::to_batch(&(*de_events).bids, bid_schema);
-                let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
-                println!("{}", formatted);
-            }
-        }
+        let bid_schema = Arc::new(Bid::schema());
+        let batches = NexMarkSource::to_batch(&de_events.bids, bid_schema);
+        let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
+        println!("{}", formatted);
 
         Ok(())
     }
