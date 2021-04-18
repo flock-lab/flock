@@ -14,7 +14,7 @@ The generic lambda function code is built in advance and uploaded to AWS S3.
 
 | Lambda Function Code    | S3 Bucket      | S3 Key           |    S3 URL                        |
 | ----------------------- | ---------------| ---------------- | -------------------------------- |
-| Nexmark Benchamark      | umd-squirtle   |   nexmark        |  https://umd-squirtle.s3.amazonaws.com/netmark      |
+| Nexmark Benchmark      | umd-squirtle   |   nexmark        |  https://umd-squirtle.s3.amazonaws.com/netmark      |
 
 
 All the following Nexmark queries share the same lambda function code.
