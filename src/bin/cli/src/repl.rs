@@ -13,10 +13,17 @@
 // limitations under the License.
 
 use clap::{crate_version, App, Arg};
+use futures::executor::block_on;
 use runtime::error::Result;
+use rusoto_core::Region;
+use rusoto_s3::PutObjectRequest;
+use rusoto_s3::{S3Client, S3};
 use rustyline::Editor;
 use std::env;
 use std::f64::consts::PI;
+use std::fs;
+
+pub static S3_BUCKET: &str = "umd-squirtle";
 
 #[tokio::main]
 pub async fn main() {
@@ -33,6 +40,14 @@ pub async fn main() {
                 .takes_value(true),
         )
         .arg(
+            Arg::with_name("function_key")
+                .short("k")
+                .long("key")
+                .value_name("STRING")
+                .help("AWS S3 key for this function code.")
+                .takes_value(true),
+        )
+        .arg(
             Arg::with_name("v")
                 .short("v")
                 .multiple(true)
@@ -43,16 +58,23 @@ pub async fn main() {
     rainbow_println(include_str!("./squirtle.txt"));
 
     match matches.value_of("function_code") {
-        Some(lambda) => {
+        Some(bin_path) => {
             rainbow_println("============================================");
             rainbow_println("         Upload function code to S3         ");
-            rainbow_println("============================================");
-            println!("{}", lambda);
-            if !std::path::Path::new(lambda).exists() {
+            rainbow_println("============================================\n\n");
+            if !std::path::Path::new(bin_path).exists() {
                 rainbow_println(&format!(
                     "[ERROR]: function code '{}' doesn't exist!",
-                    lambda
+                    bin_path
                 ));
+                rainbow_println("[EXIT]: ..............");
+                std::process::exit(-1);
+            }
+
+            if let Some(key) = matches.value_of("function_key") {
+                put_object_to_s3(S3_BUCKET, key, bin_path);
+            } else {
+                rainbow_println("[ERROR]: AWS S3 key is missing!");
                 rainbow_println("[EXIT]: ..............");
                 std::process::exit(-1);
             }
@@ -125,6 +147,27 @@ fn rgb(freq: f64, spread: f64, i: f64) -> (u8, u8, u8) {
     let blue = (freq * j + 4.0 * PI / 3.0).sin() * 127.0 + 128.0;
 
     (red as u8, green as u8, blue as u8)
+}
+
+/// Puts a lambda function code to AWS S3.
+pub fn put_object_to_s3(bucket: &str, key: &str, object: &str) {
+    if let Ok(bytes) = fs::read(object) {
+        let put_obj_req = PutObjectRequest {
+            bucket: String::from(bucket),
+            key: String::from(key),
+            body: Some(bytes.into()),
+            ..Default::default()
+        };
+
+        let client = S3Client::new(Region::default());
+        rainbow_println("[UPLOAD] ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒... ... ... ...");
+        block_on(client.put_object(put_obj_req)).unwrap();
+        rainbow_println("[OK] Upload Succeed.")
+    } else {
+        rainbow_println(&format!("[ERROR]: failed to read {}!", object));
+        rainbow_println("[EXIT]: ..............");
+        std::process::exit(-1);
+    }
 }
 
 #[cfg(test)]

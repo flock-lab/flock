@@ -17,6 +17,8 @@ cli = [ "rustyline" ]
 [dependencies]
 clap = "2.33.3"
 ctrlc = "3.1.1"
+futures = "0.3.12"
+
 lazy_static = "1.4.0"
 runtime = { path = "../../runtime" }
 rusoto_core = "0.46.0"

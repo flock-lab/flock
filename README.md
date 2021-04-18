@@ -12,9 +12,9 @@
 
 The generic lambda function code is built in advance and uploaded to AWS S3.
 
-| Lambda Function Code    | S3 Bucket  | S3 Key |
-| ----------------------- | ---------- | ------ |
-| Nexmark Benchamark      |    ***     |   ***  |  
+| Lambda Function Code    | S3 Bucket      | S3 Key           |    S3 URL                        |
+| ----------------------- | ---------------| ---------------- | -------------------------------- |
+| Nexmark Benchamark      | umd-squirtle   |   nexmark        |  s3://umd-squirtle/nexmark       |
 
 
 All the following Nexmark queries share the same lambda function code.
