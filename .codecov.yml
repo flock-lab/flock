@@ -15,3 +15,4 @@ ignore:
   - "src/driver/src/build"
   - "src/bin/cli"
   - "**/*.md"
+  - "benchmarks"
