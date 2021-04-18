@@ -14,7 +14,6 @@
 
 use clap::{crate_version, App, Arg};
 use futures::executor::block_on;
-use runtime::error::Result;
 use rusoto_core::Region;
 use rusoto_s3::PutObjectRequest;
 use rusoto_s3::{S3Client, S3};
@@ -22,7 +21,10 @@ use rustyline::Editor;
 use std::env;
 use std::f64::consts::PI;
 use std::fs;
+use std::io::Write;
+use std::path::Path;
 
+type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
 pub static S3_BUCKET: &str = "umd-squirtle";
 
 #[tokio::main]
@@ -72,7 +74,7 @@ pub async fn main() {
             }
 
             if let Some(key) = matches.value_of("function_key") {
-                put_object_to_s3(S3_BUCKET, key, bin_path);
+                put_object_to_s3(S3_BUCKET, key, bin_path).unwrap();
             } else {
                 rainbow_println("[ERROR]: AWS S3 key is missing!");
                 rainbow_println("[EXIT]: ..............");
@@ -123,7 +125,7 @@ fn is_exit_command(line: &str) -> bool {
     line == "quit" || line == "exit"
 }
 
-async fn exec_and_print(_: String) -> Result<()> {
+async fn exec_and_print(_: String) -> Result<(), Error> {
     rainbow_println("CLI is under construction. Please try Squirtle API directly.");
     Ok(())
 }
@@ -150,8 +152,28 @@ fn rgb(freq: f64, spread: f64, i: f64) -> (u8, u8, u8) {
 }
 
 /// Puts a lambda function code to AWS S3.
-pub fn put_object_to_s3(bucket: &str, key: &str, object: &str) {
-    if let Ok(bytes) = fs::read(object) {
+pub fn put_object_to_s3(bucket: &str, key: &str, obj_path: &str) -> Result<(), Error> {
+    // compress lambda function code to bootstrap.zip
+    let fname = Path::new(obj_path).parent().unwrap().join("bootstrap.zip");
+    let w = std::fs::File::create(&fname)?;
+    let mut zip = zip::ZipWriter::new(w);
+    let options =
+        zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
+    zip.start_file("bootstrap", options)?;
+    zip.write_all(&fs::read(&obj_path)?)?;
+    zip.finish()?;
+
+    if !fname.exists() {
+        rainbow_println(&format!(
+            "[ERROR]: failed to rename the binary {} to {:?}!",
+            obj_path, fname
+        ));
+        rainbow_println("[EXIT]: ..............");
+        std::process::exit(-1);
+    }
+
+    // uploads bootstrap.zip to AWS S3
+    if let Ok(bytes) = fs::read(&fname) {
         let put_obj_req = PutObjectRequest {
             bucket: String::from(bucket),
             key: String::from(key),
@@ -161,13 +183,15 @@ pub fn put_object_to_s3(bucket: &str, key: &str, object: &str) {
 
         let client = S3Client::new(Region::default());
         rainbow_println("[UPLOAD] ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒... ... ... ...");
-        block_on(client.put_object(put_obj_req)).unwrap();
-        rainbow_println("[OK] Upload Succeed.")
+        block_on(client.put_object(put_obj_req))?;
+        rainbow_println("[OK] Upload Succeed.");
     } else {
-        rainbow_println(&format!("[ERROR]: failed to read {}!", object));
+        rainbow_println(&format!("[ERROR]: failed to read {:?}!", fname));
         rainbow_println("[EXIT]: ..............");
         std::process::exit(-1);
     }
+
+    Ok(())
 }
 
 #[cfg(test)]
