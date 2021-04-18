@@ -10,19 +10,28 @@
 
 ## Nexmark Benchmark
 
-| Query  | Name | Summary | Squirtle |  Function Code (S3) |
-| -------- | -------- | -------- | ------ | ------ |
-| q0 | Pass Through | Measures the monitoring overhead including the source generator. | ✅ ||
-| q1 | Currency Conversion | Convert each bid value from dollars to euros. | ✅ ||
-| q2 | Selection | Find bids with specific auction ids and show their bid price. | ✅ ||
-| q3 | Local Item Suggestion | Who is selling in OR, ID or CA in category 10, and for what auction ids?  | ✅ ||
-| q4 | Average Price for a Category | Select the average of the wining bid prices for all auctions in each category. | ✅ ||
-| q5 | Hot Items | Which auctions have seen the most bids in the last period? | ✅ ||
-| q6 | Average Selling Price by Seller | What is the average selling price per seller for their last 10 closed auctions. | ✅ ||
-| q7 | Highest Bid | Select the bids with the highest bid price in the last period. | ✅ ||
-| q8 | Monitor New Users | Select people who have entered the system and created auctions in the last period. | ✅ ||
-| q9 | Winning Bids | Find the winning bid for each auction. | ✅ ||
-| q13 | Bounded Side Input Join | Joins a stream to a bounded side input, modeling basic stream enrichment. | ✅ ||
+The generic lambda function code is built in advance and uploaded to AWS S3.
+
+| Lambda Function Code    | S3 Bucket      | S3 Key           |    S3 URL                        |
+| ----------------------- | ---------------| ---------------- | -------------------------------- |
+| Nexmark Benchamark      | umd-squirtle   |   nexmark        |  s3://umd-squirtle/nexmark       |
+
+
+All the following Nexmark queries share the same lambda function code.
+
+| Query    | Name     | Summary  | Squirtle |
+| -------- | -------- | -------- | -------- |
+| q0 | Pass Through | Measures the monitoring overhead including the source generator. | ✅ |
+| q1 | Currency Conversion | Convert each bid value from dollars to euros. | ✅ |
+| q2 | Selection | Find bids with specific auction ids and show their bid price. | ✅ |
+| q3 | Local Item Suggestion | Who is selling in OR, ID or CA in category 10, and for what auction ids?  | ✅ |
+| q4 | Average Price for a Category | Select the average of the wining bid prices for all auctions in each category. | ✅ |
+| q5 | Hot Items | Which auctions have seen the most bids in the last period? | ✅ |
+| q6 | Average Selling Price by Seller | What is the average selling price per seller for their last 10 closed auctions. | ✅ |
+| q7 | Highest Bid | Select the bids with the highest bid price in the last period. | ✅ |
+| q8 | Monitor New Users | Select people who have entered the system and created auctions in the last period. | ✅ |
+| q9 | Winning Bids | Find the winning bid for each auction. | ✅ |
+| q13 | Bounded Side Input Join | Joins a stream to a bounded side input, modeling basic stream enrichment. | ✅ |
 
 ## License
 
