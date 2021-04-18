@@ -1,0 +1,18 @@
+[package]
+name = "squirtle-benchmarks"
+version = "0.1.0"
+authors = [ "Gang Liao <gangliao@cs.umd.edu>" ]
+edition = "2018"
+publish = false
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+env_logger = "^0.8"
+futures = "0.3"
+
+tokio = { version = "1.2", features = [ "macros", "io-util", "sync", "rt-multi-thread" ] }
+
+[[bin]]
+name = "nexmark_bench"
+path = "nexmark/main.rs"
