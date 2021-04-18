@@ -18,6 +18,7 @@ futures = "0.3.12"
 lambda_runtime = { git = "https://github.com/awslabs/aws-lambda-rust-runtime/", branch = "master" }
 lazy_static = "1.4"
 log = "0.4.14"
+mimalloc = { version = "0.1", optional = true, default-features = false }
 rayon = "1.5"
 runtime = { path = "../runtime" }
 rusoto_core = "0.46.0"
