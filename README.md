@@ -8,7 +8,6 @@
 <a href="https://cla-assistant.io/DSLAM-UMD/Squirtle"><img src="https://cla-assistant.io/readme/badge/DSLAM-UMD/Squirtle" alt="CLA assistant" /></a>
 [![License](https://img.shields.io/badge/license-Apache%202-blue.svg)](LICENSE)
 
-## Nexmark Benchmark
 
 The generic lambda function code is built in advance and uploaded to AWS S3.
 
@@ -17,6 +16,7 @@ The generic lambda function code is built in advance and uploaded to AWS S3.
 | [Nexmark Benchmark](https://beam.apache.org/documentation/sdks/java/testing/nexmark/)      | umd-squirtle   |   nexmark        |  https://umd-squirtle.s3.amazonaws.com/netmark      |
 | [TPC-H](http://tpc.org/tpch/)                    | umd-squirtle  |   tpch           |  `coming soon`
 
+## Nexmark Benchmark
 
 All the following Nexmark queries share the same lambda function code.
 
