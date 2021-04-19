@@ -77,8 +77,15 @@ struct LambdaMemoryFootprint {
 lazy_static! {
     static ref LAMBDA_DEPLOYMENT_PACKAGE: LambdaDeploymentPackage<'static> =
         LambdaDeploymentPackage {
-            s3_bucket:         "squirtle",
-            s3_key:            "one-function-fits-all",
+            s3_bucket:         "umd-squirtle",
+            s3_key:            "regular",
+            s3_object_version: env!("CARGO_PKG_VERSION"),
+        };
+
+    static ref NEXMARK_DEPLOYMENT_PACKAGE: LambdaDeploymentPackage<'static> =
+        LambdaDeploymentPackage {
+            s3_bucket:         "umd-squirtle",
+            s3_key:            "nexmark",
             s3_object_version: env!("CARGO_PKG_VERSION"),
         };
 
@@ -96,12 +103,23 @@ lazy_static! {
         };
 }
 
-/// The code for the function where we specify an object in Amazon S3.
+/// The lambda function code in Amazon S3.
 pub fn function_code() -> FunctionCode {
     FunctionCode {
         s3_bucket:         Some(LAMBDA_DEPLOYMENT_PACKAGE.s3_bucket.to_owned()),
         s3_key:            Some(LAMBDA_DEPLOYMENT_PACKAGE.s3_key.to_owned()),
         s3_object_version: Some(LAMBDA_DEPLOYMENT_PACKAGE.s3_object_version.to_owned()),
+        zip_file:          None,
+        image_uri:         None,
+    }
+}
+
+/// The nexmark benchmark code in Amazon S3.
+pub fn nexmark_function_code() -> FunctionCode {
+    FunctionCode {
+        s3_bucket:         Some(NEXMARK_DEPLOYMENT_PACKAGE.s3_bucket.to_owned()),
+        s3_key:            Some(NEXMARK_DEPLOYMENT_PACKAGE.s3_key.to_owned()),
+        s3_object_version: Some(NEXMARK_DEPLOYMENT_PACKAGE.s3_object_version.to_owned()),
         zip_file:          None,
         image_uri:         None,
     }
