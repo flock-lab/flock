@@ -65,14 +65,14 @@ pub enum DataSource {
 
 impl Default for DataSource {
     fn default() -> Self {
-        DataSource::KinesisEvent(KinesisSource::default())
+        DataSource::NexMarkEvent(NexMarkSource::default())
     }
 }
 
 impl DataSource {
     /// Return Kinesis type with default settings.
     pub fn kinesis() -> Self {
-        DataSource::default()
+        DataSource::KinesisEvent(KinesisSource::default())
     }
 }
 

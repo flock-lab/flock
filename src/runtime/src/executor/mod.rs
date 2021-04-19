@@ -390,7 +390,6 @@ mod tests {
         // Deserialize the physical plan that doesn't contain record batches
         let plan: Arc<dyn ExecutionPlan> = serde_json::from_str(&plan)?;
 
-        // Feed record batches back to the plan
         let mut ctx = ExecutionContext {
             plan:         plan.clone(),
             name:         "test".to_string(),

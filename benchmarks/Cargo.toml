@@ -8,9 +8,18 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+arrow = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq", features = [ "simd" ] }
+datafusion = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq", features = [ "simd" ] }
+driver = { path = "../src/driver" }
 env_logger = "^0.8"
 futures = "0.3"
+lazy_static = "1.4"
 
+runtime = { path = "../src/runtime" }
+rusoto_core = "0.46.0"
+rusoto_lambda = "0.46.0"
+serde_json = "1.0"
+structopt = { version = "0.3", default-features = false }
 tokio = { version = "1.2", features = [ "macros", "io-util", "sync", "rt-multi-thread" ] }
 
 [[bin]]
