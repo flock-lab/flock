@@ -72,7 +72,7 @@ impl Default for DataSource {
 impl DataSource {
     /// Return Kinesis type with default settings.
     pub fn kinesis() -> Self {
-        DataSource::default()
+        DataSource::KinesisEvent(KinesisSource::default())
     }
 }
 
