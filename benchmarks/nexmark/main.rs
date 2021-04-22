@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[macro_use]
+extern crate itertools;
+
 use arrow::record_batch::RecordBatch;
 use datafusion::datasource::MemTable;
 use driver::deploy::lambda;
@@ -23,9 +26,10 @@ use nexmark::NexMarkSource;
 use runtime::prelude::*;
 use rusoto_core::Region;
 use rusoto_lambda::{
-    CreateFunctionRequest, GetFunctionRequest, InvocationRequest, InvocationResponse, Lambda,
-    LambdaClient,
+    CreateFunctionRequest, DeleteFunctionRequest, GetFunctionRequest, InvocationRequest,
+    InvocationResponse, Lambda, LambdaClient,
 };
+use serde_json::Value;
 use std::sync::Arc;
 use structopt::StructOpt;
 
@@ -120,8 +124,7 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
     info!("[OK] Generate nexmark events.");
 
     if let StreamWindow::None = nexmark.window {
-        let tasks = (0..opt.seconds)
-            .zip(0..opt.generators)
+        let tasks = iproduct!(0..opt.seconds, 0..opt.generators)
             .map(|(i, j)| {
                 let func_arn = func_arn.clone();
                 let event = events.select(i, j).unwrap();
@@ -137,8 +140,8 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
             let response = task.await.expect("Lambda function execution failed.")?;
             if opt.debug {
                 println!(
-                    "{}",
-                    serde_json::from_slice::<String>(&response.payload.unwrap())?
+                    "{:?}",
+                    serde_json::from_slice::<Value>(&response.payload.unwrap())?
                 );
             }
         }
@@ -174,18 +177,22 @@ async fn invoke_lambda_function(
 
 /// Creates a single lambda function using bootstrap.zip in Amazon S3.
 async fn create_lambda_function(ctx: &ExecutionContext) -> Result<String> {
-    if let Ok(reponse) = LAMBDA_CLIENT
+    if LAMBDA_CLIENT
         .get_function(GetFunctionRequest {
             function_name: ctx.name.clone(),
             ..Default::default()
         })
         .await
+        .is_ok()
     {
-        if let Some(config) = reponse.configuration {
-            return config.function_arn.ok_or_else(|| {
-                SquirtleError::Internal("Lambda function arn dones't exist.".to_string())
-            });
-        }
+        // Delete previous lambda function to avoid the outdated code in S3.
+        LAMBDA_CLIENT
+            .delete_function(DeleteFunctionRequest {
+                function_name: ctx.name.clone(),
+                ..Default::default()
+            })
+            .await
+            .map_err(|e| SquirtleError::Internal(e.to_string()))?;
     }
 
     match LAMBDA_CLIENT
