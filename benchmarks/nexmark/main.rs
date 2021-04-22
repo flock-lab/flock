@@ -120,16 +120,22 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
     info!("[OK] Generate nexmark events.");
     // TODO:
     // 1. out-of-order epoch-based stream processing
-    // 2. async io programming
     if let StreamWindow::None = nexmark.window {
         for i in 0..opt.seconds {
-            for j in 0..opt.generators {
-                let event = events.select(i, j).ok_or_else(|| {
-                    SquirtleError::Execution("Event selection failed.".to_string())
-                })?;
-                info!("[OK] Send nexmark event (time: {}, source: {}).", i, j);
-                let response =
-                    invoke_lambda_function(func_arn.clone(), serde_json::to_vec(&event)?).await?;
+            let tasks = (0..opt.generators)
+                .map(|j| {
+                    let func_arn = func_arn.clone();
+                    let event = events.select(i, j).unwrap();
+                    tokio::spawn(async move {
+                        info!("[OK] Send nexmark event (time: {}, source: {}).", i, j);
+                        invoke_lambda_function(func_arn.clone(), serde_json::to_vec(&event)?).await
+                    })
+                })
+                // this collect *is needed* so that the join below can switch between tasks.
+                .collect::<Vec<_>>();
+
+            for task in tasks {
+                let response = task.await.expect("Lambda function execution failed.")?;
                 if opt.debug {
                     println!(
                         "{}",
