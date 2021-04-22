@@ -118,30 +118,28 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
 
     let events = nexmark.generate_data()?;
     info!("[OK] Generate nexmark events.");
-    // TODO:
-    // 1. out-of-order epoch-based stream processing
-    if let StreamWindow::None = nexmark.window {
-        for i in 0..opt.seconds {
-            let tasks = (0..opt.generators)
-                .map(|j| {
-                    let func_arn = func_arn.clone();
-                    let event = events.select(i, j).unwrap();
-                    tokio::spawn(async move {
-                        info!("[OK] Send nexmark event (time: {}, source: {}).", i, j);
-                        invoke_lambda_function(func_arn.clone(), serde_json::to_vec(&event)?).await
-                    })
-                })
-                // this collect *is needed* so that the join below can switch between tasks.
-                .collect::<Vec<_>>();
 
-            for task in tasks {
-                let response = task.await.expect("Lambda function execution failed.")?;
-                if opt.debug {
-                    println!(
-                        "{}",
-                        serde_json::from_slice::<String>(&response.payload.unwrap())?
-                    );
-                }
+    if let StreamWindow::None = nexmark.window {
+        let tasks = (0..opt.seconds)
+            .zip(0..opt.generators)
+            .map(|(i, j)| {
+                let func_arn = func_arn.clone();
+                let event = events.select(i, j).unwrap();
+                tokio::spawn(async move {
+                    info!("[OK] Send nexmark event (time: {}, source: {}).", i, j);
+                    invoke_lambda_function(func_arn.clone(), serde_json::to_vec(&event)?).await
+                })
+            })
+            // this collect *is needed* so that the join below can switch between tasks.
+            .collect::<Vec<_>>();
+
+        for task in tasks {
+            let response = task.await.expect("Lambda function execution failed.")?;
+            if opt.debug {
+                println!(
+                    "{}",
+                    serde_json::from_slice::<String>(&response.payload.unwrap())?
+                );
             }
         }
     } else {
