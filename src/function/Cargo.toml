@@ -38,3 +38,7 @@ path = "src/aws/lambda.rs"
 [[bin]]
 name = "nexmark_lambda"
 path = "src/aws/nexmark/lambda.rs"
+
+[[bin]]
+name = "hello"
+path = "src/aws/hello.rs"

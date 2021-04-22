@@ -108,7 +108,7 @@ pub fn function_code() -> FunctionCode {
     FunctionCode {
         s3_bucket:         Some(LAMBDA_DEPLOYMENT_PACKAGE.s3_bucket.to_owned()),
         s3_key:            Some(LAMBDA_DEPLOYMENT_PACKAGE.s3_key.to_owned()),
-        s3_object_version: Some(LAMBDA_DEPLOYMENT_PACKAGE.s3_object_version.to_owned()),
+        s3_object_version: None,
         zip_file:          None,
         image_uri:         None,
     }
@@ -119,7 +119,7 @@ pub fn nexmark_function_code() -> FunctionCode {
     FunctionCode {
         s3_bucket:         Some(NEXMARK_DEPLOYMENT_PACKAGE.s3_bucket.to_owned()),
         s3_key:            Some(NEXMARK_DEPLOYMENT_PACKAGE.s3_key.to_owned()),
-        s3_object_version: Some(NEXMARK_DEPLOYMENT_PACKAGE.s3_object_version.to_owned()),
+        s3_object_version: None,
         zip_file:          None,
         image_uri:         None,
     }
@@ -186,7 +186,7 @@ pub fn runtime() -> Option<String> {
 /// function. The format includes the file name. It can also include namespaces
 /// and other qualifiers, depending on the runtime.
 pub fn handler() -> Option<String> {
-    Some("doesn't matter".to_owned())
+    Some("handler".to_owned())
 }
 
 /// The amount of memory that your function has access to. Increasing the

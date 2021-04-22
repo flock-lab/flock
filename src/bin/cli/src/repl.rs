@@ -158,8 +158,9 @@ pub fn put_object_to_s3(bucket: &str, key: &str, obj_path: &str) -> Result<(), E
     let fname = Path::new(obj_path).parent().unwrap().join("bootstrap.zip");
     let w = std::fs::File::create(&fname)?;
     let mut zip = zip::ZipWriter::new(w);
-    let options =
-        zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Bzip2);
+    let options = zip::write::FileOptions::default()
+        .compression_method(zip::CompressionMethod::Bzip2)
+        .unix_permissions(777);
     zip.start_file("bootstrap", options)?;
     zip.write_all(&fs::read(&obj_path)?)?;
     zip.finish()?;
