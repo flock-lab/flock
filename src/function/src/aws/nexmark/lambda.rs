@@ -26,6 +26,7 @@ use rayon::prelude::*;
 use runtime::prelude::*;
 use rusoto_core::Region;
 use rusoto_lambda::{InvokeAsyncRequest, Lambda, LambdaClient};
+use serde_json::json;
 use serde_json::Value;
 use std::cell::Cell;
 use std::sync::Arc;
@@ -181,6 +182,8 @@ async fn payload_handler(
 }
 
 async fn nexmark_bench_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Value> {
+    let event: NexMarkEvent = serde_json::from_value(event)?;
+    let (epoch, source) = (event.epoch, event.source);
     if let DataSource::NexMarkEvent(source) = &ctx.datasource {
         match source.window {
             StreamWindow::TumblingWindow(Schedule::Seconds(_sec)) => {
@@ -198,7 +201,7 @@ async fn nexmark_bench_handler(ctx: &mut ExecutionContext, event: Value) -> Resu
         }
     }
 
-    Ok(serde_json::to_value(&ctx.name)?)
+    Ok(json!({"name": &ctx.name, "epoch": epoch, "source": source}))
 }
 
 async fn handler(event: Value, _: Context) -> Result<Value> {
@@ -234,8 +237,7 @@ async fn feed_one_source(ctx: &mut ExecutionContext, batches: Vec<RecordBatch>) 
     Ok(())
 }
 
-async fn collect(ctx: &mut ExecutionContext, value: Value) -> Result<Vec<RecordBatch>> {
-    let event: NexMarkEvent = serde_json::from_value(value).unwrap();
+async fn collect(ctx: &mut ExecutionContext, event: NexMarkEvent) -> Result<Vec<RecordBatch>> {
     let person_batches = NexMarkSource::to_batch(&event.persons, PERSON_SCHEMA.clone());
     let auction_batches = NexMarkSource::to_batch(&event.auctions, AUCTION_SCHEMA.clone());
     let bid_batches = NexMarkSource::to_batch(&event.bids, BID_SCHEMA.clone());
