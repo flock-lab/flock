@@ -16,13 +16,15 @@ use arrow::record_batch::RecordBatch;
 use datafusion::datasource::MemTable;
 use driver::deploy::lambda;
 use lazy_static::lazy_static;
+use log::info;
 use nexmark::config::Config;
 use nexmark::event::{Auction, Bid, Person};
 use nexmark::NexMarkSource;
 use runtime::prelude::*;
 use rusoto_core::Region;
 use rusoto_lambda::{
-    CreateFunctionRequest, InvocationRequest, InvocationResponse, Lambda, LambdaClient,
+    CreateFunctionRequest, GetFunctionRequest, InvocationRequest, InvocationResponse, Lambda,
+    LambdaClient,
 };
 use std::sync::Arc;
 use structopt::StructOpt;
@@ -111,26 +113,30 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
     };
 
     // create lambda function based on the generic lambda function code on AWS S3.
-    let function_arn = create_lambda_function(&lambda_ctx).await?;
-    let _events = nexmark.generate_data()?;
+    let func_arn = create_lambda_function(&lambda_ctx).await?;
+    info!("[OK] Create lambda function {}.", func_arn);
+
+    let events = nexmark.generate_data()?;
+    info!("[OK] Generate nexmark events.");
     // TODO:
     // 1. out-of-order epoch-based stream processing
     // 2. async io programming
-    //
-    // let events = events.select(0, 1).ok_or_else(|| {
-    //     SquirtleError::Execution("Failed to select events for Nexmark
-    // benchmark.".to_string()) })?;
-
-    // serialization
-    // let en_events = serde_json::to_vec(&events).unwrap();
-
     if let StreamWindow::None = nexmark.window {
-        let response = invoke_lambda_function(function_arn, vec![]).await?;
-        if opt.debug {
-            println!(
-                "{}",
-                serde_json::from_slice::<String>(&response.payload.unwrap())?
-            );
+        for i in 0..opt.seconds {
+            for j in 0..opt.generators {
+                let event = events.select(i, j).ok_or_else(|| {
+                    SquirtleError::Execution("Event selection failed.".to_string())
+                })?;
+                info!("[OK] Send nexmark event (time: {}, source: {}).", i, j);
+                let response =
+                    invoke_lambda_function(func_arn.clone(), serde_json::to_vec(&event)?).await?;
+                if opt.debug {
+                    println!(
+                        "{}",
+                        serde_json::from_slice::<String>(&response.payload.unwrap())?
+                    );
+                }
+            }
         }
     } else {
         unimplemented!();
@@ -164,6 +170,20 @@ async fn invoke_lambda_function(
 
 /// Creates a single lambda function using bootstrap.zip in Amazon S3.
 async fn create_lambda_function(ctx: &ExecutionContext) -> Result<String> {
+    if let Ok(reponse) = LAMBDA_CLIENT
+        .get_function(GetFunctionRequest {
+            function_name: ctx.name.clone(),
+            ..Default::default()
+        })
+        .await
+    {
+        if let Some(config) = reponse.configuration {
+            return config.function_arn.ok_or_else(|| {
+                SquirtleError::Internal("Lambda function arn dones't exist.".to_string())
+            });
+        }
+    }
+
     match LAMBDA_CLIENT
         .create_function(CreateFunctionRequest {
             code: lambda::nexmark_function_code(),

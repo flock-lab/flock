@@ -14,7 +14,7 @@ driver = { path = "../src/driver" }
 env_logger = "^0.8"
 futures = "0.3"
 lazy_static = "1.4"
-
+log = "0.4.14"
 runtime = { path = "../src/runtime" }
 rusoto_core = "0.46.0"
 rusoto_lambda = "0.46.0"
