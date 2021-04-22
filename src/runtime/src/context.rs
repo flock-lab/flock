@@ -119,6 +119,7 @@ impl PartialEq for ExecutionContext {
         self.name == other.name
             && self.next == other.next
             && self.datasource == other.datasource
+            && self.query_number == other.query_number
             && serde_json::to_string(&self.plan).unwrap()
                 == serde_json::to_string(&other.plan).unwrap()
     }
@@ -222,6 +223,7 @@ impl ExecutionContext {
                                 .unwrap()
                                 .set_partitions(&partition);
                         }
+                        break;
                     }
                 }
             }
