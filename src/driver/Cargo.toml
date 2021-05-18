@@ -27,7 +27,7 @@ rusoto_lambda = "0.46.0"
 
 # A list of all of the optional dependencies, some of which are included in the
 # above `features`. They can be opted into by apps.
-cargo = { version = "0.52.0", optional = true }
+cargo = { version = "0.53.0", optional = true }
 serde_json = "1.0"
 filetime = { version = "0.2", optional = true }
 fixedbitset = { version = "0.4.0", optional = true }
