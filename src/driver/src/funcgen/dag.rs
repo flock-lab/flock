@@ -722,7 +722,7 @@ mod tests {
             .contains(r#"execution_plan":"projection_exec"#));
         assert!(subplan
             .get_plan_str()
-            .contains(r#"execution_plan":"hash_aggregate_exec","mode":"FinalPartitioned"#));
+            .contains(r#"execution_plan":"hash_aggregate_exec","mode":"Final"#));
         assert!(subplan
             .get_plan_str()
             .contains(r#"execution_plan":"memory_exec"#));
@@ -774,7 +774,7 @@ mod tests {
             .contains(r#"execution_plan":"projection_exec"#));
         assert!(subplan
             .get_plan_str()
-            .contains(r#"execution_plan":"hash_aggregate_exec","mode":"FinalPartitioned"#));
+            .contains(r#"execution_plan":"hash_aggregate_exec","mode":"Final"#));
         assert!(subplan
             .get_plan_str()
             .contains(r#"execution_plan":"memory_exec"#));
@@ -925,8 +925,8 @@ mod tests {
         assert!(json.contains(r#"execution_plan":"projection_exec"#));
         assert!(json.contains(r#"execution_plan":"coalesce_batches_exec"#));
         assert!(json.contains(r#"execution_plan":"hash_join_exec"#));
-        assert!(json.contains(r#"left":{"execution_plan":"coalesce_batches_exec"#));
-        assert!(json.contains(r#"right":{"execution_plan":"coalesce_batches_exec"#));
+        assert!(json.contains(r#"left":{"#));
+        assert!(json.contains(r#"right":{"#));
 
         let dag = &mut QueryDag::from(&plan);
 
@@ -956,10 +956,8 @@ mod tests {
             .contains(r#"execution_plan":"hash_join_exec"#));
         assert!(subplan
             .get_plan_str()
-            .contains(r#"right":{"execution_plan":"coalesce_batches_exec"#));
-        assert!(subplan
-            .get_plan_str()
-            .contains(r#"left":{"execution_plan":"coalesce_batches_exec"#));
+            .contains(r#"right":{"execution_plan"#));
+        assert!(subplan.get_plan_str().contains(r#"left":{"execution_plan"#));
 
         let mut iter = dag.node_weights_mut();
         let mut subplan = iter.next().unwrap();
@@ -985,10 +983,8 @@ mod tests {
             .contains(r#"execution_plan":"hash_join_exec"#));
         assert!(subplan
             .get_plan_str()
-            .contains(r#"right":{"execution_plan":"coalesce_batches_exec"#));
-        assert!(subplan
-            .get_plan_str()
-            .contains(r#"left":{"execution_plan":"coalesce_batches_exec"#));
+            .contains(r#"right":{"execution_plan"#));
+        assert!(subplan.get_plan_str().contains(r#"left":{"execution_plan"#));
 
         let batches = collect(plan).await?;
 
