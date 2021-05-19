@@ -281,7 +281,7 @@ mod tests {
         let mut ctx = datafusion::execution::context::ExecutionContext::new();
         let provider = MemTable::try_new(partitions[0][0].schema(), partitions.clone())?;
 
-        ctx.register_table("test", Arc::new(provider));
+        ctx.register_table("test", Arc::new(provider))?;
 
         let sql = "SELECT MAX(c1), MIN(c2), c3 FROM test WHERE c2 < 99 GROUP BY c3";
         let logical_plan = ctx.create_logical_plan(&sql)?;
@@ -355,13 +355,13 @@ mod tests {
         let table1 = MemTable::try_new(schema1, partitions1.clone())?;
         let table2 = MemTable::try_new(schema2, partitions2.clone())?;
 
-        ctx.register_table("t1", Arc::new(table1));
-        ctx.register_table("t2", Arc::new(table2));
+        ctx.register_table("t1", Arc::new(table1))?;
+        ctx.register_table("t2", Arc::new(table2))?;
 
         let sql = concat!(
             "SELECT a, b, d ",
             "FROM t1 JOIN t2 ON a = c ",
-            "ORDER BY b ASC ",
+            "ORDER BY a ASC ",
             "LIMIT 3"
         );
 

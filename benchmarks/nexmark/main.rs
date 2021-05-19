@@ -86,21 +86,21 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
             person_schema.clone(),
             vec![vec![RecordBatch::new_empty(person_schema)]],
         )?;
-        ctx.register_table("person", Arc::new(person_table));
+        ctx.register_table("person", Arc::new(person_table))?;
 
         let auction_schema = Arc::new(Auction::schema());
         let auction_table = MemTable::try_new(
             auction_schema.clone(),
             vec![vec![RecordBatch::new_empty(auction_schema)]],
         )?;
-        ctx.register_table("auction", Arc::new(auction_table));
+        ctx.register_table("auction", Arc::new(auction_table))?;
 
         let bid_schema = Arc::new(Bid::schema());
         let bid_table = MemTable::try_new(
             bid_schema.clone(),
             vec![vec![RecordBatch::new_empty(bid_schema)]],
         )?;
-        ctx.register_table("bid", Arc::new(bid_table));
+        ctx.register_table("bid", Arc::new(bid_table))?;
     }
 
     // marshal physical plan into cloud environment

@@ -8,11 +8,11 @@ keywords = [ "testing", "utility", "fake", "dataset" ]
 edition = "2018"
 
 [dependencies]
-arrow = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq", features = [ "simd" ] }
+arrow = { git = "https://github.com/DSLAM-UMD/arrow-rs", branch = "squirtle", features = [ "simd" ] }
 base64 = "0.13.0"
 chrono = { version = "0.4.19", features = [ "serde" ] }
 daggy = "0.7.0"
-datafusion = { git = "https://github.com/DSLAM-UMD/arrow", branch = "scq", features = [ "simd" ] }
+datafusion = { git = "https://github.com/DSLAM-UMD/arrow-datafusion", branch = "squirtle" }
 driver = { path = "../driver" }
 fake = { version = "2.4", features = [ 'derive', 'chrono' ] }
 lambda_runtime = { git = "https://github.com/awslabs/aws-lambda-rust-runtime/", branch = "master" }
