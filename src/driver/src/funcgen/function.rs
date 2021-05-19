@@ -191,7 +191,7 @@ mod tests {
 
         let table = MemTable::try_new(schema.clone(), vec![vec![batch]])?;
 
-        ctx.register_table("t", Arc::new(table));
+        ctx.register_table("t", Arc::new(table))?;
 
         let plan = physical_plan(&mut ctx, &sql)?;
         let query: Box<dyn Query> = Box::new(StreamQuery {

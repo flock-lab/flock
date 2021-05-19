@@ -61,11 +61,12 @@ jobs:
       - name: update umd-arrow
         run: |
           cargo update --package arrow
+          cargo update --package datafusion
       - name: Run cargo-tarpaulin
         uses: actions-rs/tarpaulin@v0.1
         with:
           version: '0.15.0'
-          args: '-- --test-threads 4'
+          args: '-- --test-threads 8'
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v1.0.2
         with:

@@ -132,8 +132,8 @@ mod tests {
         let table1 = MemTable::try_new(schema1, vec![vec![batch1]])?;
         let table2 = MemTable::try_new(schema2, vec![vec![batch2]])?;
 
-        ctx.register_table("t1", Arc::new(table1));
-        ctx.register_table("t2", Arc::new(table2));
+        ctx.register_table("t1", Arc::new(table1))?;
+        ctx.register_table("t2", Arc::new(table2))?;
 
         let sql = concat!(
             "SELECT a, b, d ",

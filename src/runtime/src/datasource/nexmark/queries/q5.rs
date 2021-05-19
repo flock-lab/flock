@@ -21,6 +21,7 @@ mod tests {
     use crate::datasource::nexmark::event::{Auction, Bid, Date, Person};
     use crate::datasource::nexmark::{NexMarkSource, NexMarkStream};
     use crate::error::Result;
+    use crate::error::SquirtleError;
     use crate::executor::plan::physical_plan;
     use crate::query::StreamWindow;
     use arrow::json;
@@ -103,7 +104,7 @@ mod tests {
             // register the memory tables
             let mut ctx = datafusion::execution::context::ExecutionContext::new();
             let bid_table = MemTable::try_new(bid_schema.clone(), bids_batches)?;
-            ctx.register_table("bid", Arc::new(bid_table));
+            ctx.register_table("bid", Arc::new(bid_table))?;
 
             // optimize the query plan and execute it
             let physical_plan = physical_plan(&mut ctx, &sql)?;
@@ -114,11 +115,18 @@ mod tests {
             println!("{}", formatted);
 
             unsafe {
-                bids_batches = Arc::get_mut_unchecked(&mut ctx.deregister_table("bid").unwrap())
-                    .as_mut_any()
-                    .downcast_mut::<MemTable>()
-                    .unwrap()
-                    .batches();
+                bids_batches = Arc::get_mut_unchecked(
+                    &mut ctx
+                        .deregister_table("bid")
+                        .map_err(SquirtleError::DataFusion)?
+                        .ok_or_else(|| {
+                            SquirtleError::Internal("Failed to deregister Table bid".to_string())
+                        })?,
+                )
+                .as_mut_any()
+                .downcast_mut::<MemTable>()
+                .unwrap()
+                .batches();
             }
         }
 

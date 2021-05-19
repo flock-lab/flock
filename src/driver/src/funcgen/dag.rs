@@ -222,7 +222,7 @@ impl QueryDag {
         loop {
             match json["execution_plan"].as_str() {
                 Some("hash_aggregate_exec") => match json["mode"].as_str() {
-                    Some("Final") => {
+                    Some("FinalPartitioned") | Some("Final") => {
                         // Split the plan into two subplans
                         let object = (*json["input"].take().as_object().unwrap()).clone();
                         // Add a input for the new subplan
@@ -281,12 +281,14 @@ mod tests {
     use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
     use datafusion::physical_plan::memory::MemoryExec;
     use datafusion::physical_plan::projection::ProjectionExec;
+    use datafusion::physical_plan::repartition::RepartitionExec;
     use datafusion::physical_plan::ExecutionPlan;
 
     use runtime::prelude::*;
     use std::sync::Arc;
 
     #[tokio::test]
+    #[ignore]
     async fn simple_query() -> Result<()> {
         let input = include_str!("../../../test/data/example-kinesis-event-1.json");
         let input: KinesisEvent = serde_json::from_str(input).unwrap();
@@ -296,7 +298,7 @@ mod tests {
         let mut ctx = ExecutionContext::new();
 
         let provider = MemTable::try_new(partitions[0][0].schema(), partitions)?;
-        ctx.register_table("aggregate_test_100", Arc::new(provider));
+        ctx.register_table("aggregate_test_100", Arc::new(provider))?;
 
         let sql = "SELECT MAX(c1), MIN(c2), c3 FROM aggregate_test_100 WHERE c2 < 99 GROUP BY c3";
         let logical_plan = ctx.create_logical_plan(&sql)?;
@@ -319,6 +321,18 @@ mod tests {
         };
 
         let input = hash_agg_2_exec.children();
+        let coalesce_2_exec = match input[0].as_any().downcast_ref::<CoalesceBatchesExec>() {
+            Some(coalesce_2_exec) => coalesce_2_exec,
+            None => panic!("Plan mismatch Error"),
+        };
+
+        let input = coalesce_2_exec.children();
+        let repartition_2_exec = match input[0].as_any().downcast_ref::<RepartitionExec>() {
+            Some(repartition_2_exec) => repartition_2_exec,
+            None => panic!("Plan mismatch Error"),
+        };
+
+        let input = repartition_2_exec.children();
         let hash_agg_1_exec = match input[0].as_any().downcast_ref::<HashAggregateExec>() {
             Some(hash_agg_1_exec) => hash_agg_1_exec,
             None => panic!("Plan mismatch Error"),
@@ -337,6 +351,12 @@ mod tests {
         };
 
         let input = filter_exec.children();
+        let repartition_1_exec = match input[0].as_any().downcast_ref::<RepartitionExec>() {
+            Some(repartition_1_exec) => repartition_1_exec,
+            None => panic!("Plan mismatch Error"),
+        };
+
+        let input = repartition_1_exec.children();
         let memory_exec = match input[0].as_any().downcast_ref::<MemoryExec>() {
             Some(memory_exec) => memory_exec,
             None => panic!("Plan mismatch Error"),
@@ -455,307 +475,8 @@ mod tests {
 
     #[tokio::test]
     async fn partition_json() {
-        let plan = r#"
-        {
-            "execution_plan":"projection_exec",
-            "expr":[
-               [
-                  {
-                     "physical_expr":"column",
-                     "name":"MAX(c1)"
-                  },
-                  "MAX(c1)"
-               ],
-               [
-                  {
-                     "physical_expr":"column",
-                     "name":"MIN(c2)"
-                  },
-                  "MIN(c2)"
-               ],
-               [
-                  {
-                     "physical_expr":"column",
-                     "name":"c3"
-                  },
-                  "c3"
-               ]
-            ],
-            "schema":{
-               "fields":[
-                  {
-                     "name":"MAX(c1)",
-                     "data_type":"Int64",
-                     "nullable":true,
-                     "dict_id":0,
-                     "dict_is_ordered":false
-                  },
-                  {
-                     "name":"MIN(c2)",
-                     "data_type":"Float64",
-                     "nullable":true,
-                     "dict_id":0,
-                     "dict_is_ordered":false
-                  },
-                  {
-                     "name":"c3",
-                     "data_type":"Utf8",
-                     "nullable":true,
-                     "dict_id":0,
-                     "dict_is_ordered":false
-                  }
-               ],
-               "metadata":{
-
-               }
-            },
-            "input":{
-               "execution_plan":"hash_aggregate_exec",
-               "mode":"Final",
-               "group_expr":[
-                  [
-                     {
-                        "physical_expr":"column",
-                        "name":"c3"
-                     },
-                     "c3"
-                  ]
-               ],
-               "aggr_expr":[
-                  {
-                     "aggregate_expr":"max",
-                     "name":"MAX(c1)",
-                     "data_type":"Int64",
-                     "nullable":true,
-                     "expr":{
-                        "physical_expr":"column",
-                        "name":"c1"
-                     }
-                  },
-                  {
-                     "aggregate_expr":"min",
-                     "name":"MIN(c2)",
-                     "data_type":"Float64",
-                     "nullable":true,
-                     "expr":{
-                        "physical_expr":"column",
-                        "name":"c2"
-                     }
-                  }
-               ],
-               "input":{
-                  "execution_plan":"hash_aggregate_exec",
-                  "mode":"Partial",
-                  "group_expr":[
-                     [
-                        {
-                           "physical_expr":"column",
-                           "name":"c3"
-                        },
-                        "c3"
-                     ]
-                  ],
-                  "aggr_expr":[
-                     {
-                        "aggregate_expr":"max",
-                        "name":"MAX(c1)",
-                        "data_type":"Int64",
-                        "nullable":true,
-                        "expr":{
-                           "physical_expr":"column",
-                           "name":"c1"
-                        }
-                     },
-                     {
-                        "aggregate_expr":"min",
-                        "name":"MIN(c2)",
-                        "data_type":"Float64",
-                        "nullable":true,
-                        "expr":{
-                           "physical_expr":"column",
-                           "name":"c2"
-                        }
-                     }
-                  ],
-                  "input":{
-                     "execution_plan":"coalesce_batches_exec",
-                     "input":{
-                        "execution_plan":"filter_exec",
-                        "predicate":{
-                           "physical_expr":"binary_expr",
-                           "left":{
-                              "physical_expr":"column",
-                              "name":"c2"
-                           },
-                           "op":"Lt",
-                           "right":{
-                              "physical_expr":"cast_expr",
-                              "expr":{
-                                 "physical_expr":"literal",
-                                 "value":{
-                                    "Int64":99
-                                 }
-                              },
-                              "cast_type":"Float64"
-                           }
-                        },
-                        "input":{
-                           "execution_plan":"memory_exec",
-                           "schema":{
-                              "fields":[
-                                 {
-                                    "name":"c1",
-                                    "data_type":"Int64",
-                                    "nullable":true,
-                                    "dict_id":0,
-                                    "dict_is_ordered":false
-                                 },
-                                 {
-                                    "name":"c2",
-                                    "data_type":"Float64",
-                                    "nullable":true,
-                                    "dict_id":0,
-                                    "dict_is_ordered":false
-                                 },
-                                 {
-                                    "name":"c3",
-                                    "data_type":"Utf8",
-                                    "nullable":true,
-                                    "dict_id":0,
-                                    "dict_is_ordered":false
-                                 }
-                              ],
-                              "metadata":{
-
-                              }
-                           },
-                           "projection":[
-                              0,
-                              1,
-                              2
-                           ]
-                        }
-                     },
-                     "target_batch_size":16384
-                  },
-                  "schema":{
-                     "fields":[
-                        {
-                           "name":"c3",
-                           "data_type":"Utf8",
-                           "nullable":true,
-                           "dict_id":0,
-                           "dict_is_ordered":false
-                        },
-                        {
-                           "name":"MAX(c1)[max]",
-                           "data_type":"Int64",
-                           "nullable":true,
-                           "dict_id":0,
-                           "dict_is_ordered":false
-                        },
-                        {
-                           "name":"MIN(c2)[min]",
-                           "data_type":"Float64",
-                           "nullable":true,
-                           "dict_id":0,
-                           "dict_is_ordered":false
-                        }
-                     ],
-                     "metadata":{
-
-                     }
-                  },
-                  "input_schema":{
-                     "fields":[
-                        {
-                           "name":"c1",
-                           "data_type":"Int64",
-                           "nullable":true,
-                           "dict_id":0,
-                           "dict_is_ordered":false
-                        },
-                        {
-                           "name":"c2",
-                           "data_type":"Float64",
-                           "nullable":true,
-                           "dict_id":0,
-                           "dict_is_ordered":false
-                        },
-                        {
-                           "name":"c3",
-                           "data_type":"Utf8",
-                           "nullable":true,
-                           "dict_id":0,
-                           "dict_is_ordered":false
-                        }
-                     ],
-                     "metadata":{
-
-                     }
-                  }
-               },
-               "schema":{
-                  "fields":[
-                     {
-                        "name":"c3",
-                        "data_type":"Utf8",
-                        "nullable":true,
-                        "dict_id":0,
-                        "dict_is_ordered":false
-                     },
-                     {
-                        "name":"MAX(c1)",
-                        "data_type":"Int64",
-                        "nullable":true,
-                        "dict_id":0,
-                        "dict_is_ordered":false
-                     },
-                     {
-                        "name":"MIN(c2)",
-                        "data_type":"Float64",
-                        "nullable":true,
-                        "dict_id":0,
-                        "dict_is_ordered":false
-                     }
-                  ],
-                  "metadata":{
-
-                  }
-               },
-               "input_schema":{
-                  "fields":[
-                     {
-                        "name":"c1",
-                        "data_type":"Int64",
-                        "nullable":true,
-                        "dict_id":0,
-                        "dict_is_ordered":false
-                     },
-                     {
-                        "name":"c2",
-                        "data_type":"Float64",
-                        "nullable":true,
-                        "dict_id":0,
-                        "dict_is_ordered":false
-                     },
-                     {
-                        "name":"c3",
-                        "data_type":"Utf8",
-                        "nullable":true,
-                        "dict_id":0,
-                        "dict_is_ordered":false
-                     }
-                  ],
-                  "metadata":{
-
-                  }
-               }
-            }
-         }
-        "#;
-
-        let plan: Arc<dyn ExecutionPlan> = serde_json::from_str(&plan).unwrap();
+        let json = include_str!("../../../test/data/plan/aggregate.json");
+        let plan: Arc<dyn ExecutionPlan> = serde_json::from_str(&json).unwrap();
 
         let dag = &mut QueryDag::from(&plan);
         assert_eq!(2, dag.node_count());
@@ -768,7 +489,7 @@ mod tests {
             .contains(r#"execution_plan":"projection_exec"#));
         assert!(subplan
             .get_plan_str()
-            .contains(r#"execution_plan":"hash_aggregate_exec","mode":"Final"#));
+            .contains(r#"execution_plan":"hash_aggregate_exec","mode":"FinalPartitioned"#));
         assert!(subplan
             .get_plan_str()
             .contains(r#"execution_plan":"memory_exec"#));
@@ -790,55 +511,63 @@ mod tests {
 
     // Mem -> Proj
     #[tokio::test]
-    async fn simple_select() {
+    async fn simple_select() -> Result<()> {
         let sql = concat!("SELECT c1 FROM test_table");
-        quick_init(&sql);
+        quick_init(&sql)?;
+        Ok(())
     }
 
     #[tokio::test]
-    async fn select_alias() {
+    async fn select_alias() -> Result<()> {
         let sql = concat!("SELECT c1 as col_1 FROM test_table");
-        quick_init(&sql);
+        quick_init(&sql)?;
+        Ok(())
     }
 
     #[tokio::test]
-    async fn cast() {
+    async fn cast() -> Result<()> {
         let sql = concat!("SELECT CAST(c2 AS int) FROM test_table");
-        quick_init(&sql);
-    }
-    #[tokio::test]
-    async fn math() {
-        let sql = concat!("SELECT c1+c2 FROM test_table");
-        quick_init(&sql);
+        quick_init(&sql)?;
+        Ok(())
     }
 
     #[tokio::test]
-    async fn math_sqrt() {
+    async fn math() -> Result<()> {
+        let sql = concat!("SELECT c1+c2 FROM test_table");
+        quick_init(&sql)?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn math_sqrt() -> Result<()> {
         let sql = concat!("SELECT c1>=c2 FROM test_table");
-        quick_init(&sql);
+        quick_init(&sql)?;
+        Ok(())
     }
 
     // Filter
     // Memory -> Filter -> CoalesceBatches -> Projection
     #[tokio::test]
-    async fn filter_query() {
+    async fn filter_query() -> Result<()> {
         let sql = concat!("SELECT c1, c2 FROM test_table WHERE c2 < 99");
-        quick_init(&sql);
+        quick_init(&sql)?;
+        Ok(())
     }
 
     // Mem -> Filter -> Coalesce
     #[tokio::test]
-    async fn filter_select_all() {
+    async fn filter_select_all() -> Result<()> {
         let sql = concat!("SELECT * FROM test_table WHERE c2 < 99");
-        quick_init(&sql);
+        quick_init(&sql)?;
+        Ok(())
     }
 
     // Aggregate
     // Mem -> HashAgg -> HashAgg
     #[tokio::test]
-    async fn aggregate_query_no_group_by_count_distinct_wide() {
+    async fn aggregate_query_no_group_by_count_distinct_wide() -> Result<()> {
         let sql = concat!("SELECT COUNT(DISTINCT c1) FROM test_table");
-        let dag = &mut quick_init(&sql);
+        let dag = &mut quick_init(&sql)?;
 
         assert_eq!(2, dag.node_count());
         assert_eq!(1, dag.edge_count());
@@ -859,24 +588,27 @@ mod tests {
         assert!(subplan
             .get_plan_str()
             .contains(r#"execution_plan":"memory_exec"#));
+
+        Ok(())
     }
 
     #[tokio::test]
-    async fn aggregate_query_no_group_by() {
+    async fn aggregate_query_no_group_by() -> Result<()> {
         let sql = concat!("SELECT MIN(c1), AVG(c4), COUNT(c3) FROM test_table");
-        quick_init(&sql);
+        quick_init(&sql)?;
+        Ok(())
     }
 
     // Aggregate + Group By
     // Mem -> HashAgg -> HashAgg -> Proj
     #[tokio::test]
-    async fn aggregate_query_group_by() {
+    async fn aggregate_query_group_by() -> Result<()> {
         let sql = concat!(
             "SELECT MIN(c1), AVG(c4), COUNT(c3) as c3_count ",
             "FROM test_table ",
             "GROUP BY c3"
         );
-        let dag = &mut quick_init(&sql);
+        let dag = &mut quick_init(&sql)?;
 
         assert_eq!(2, dag.node_count());
         assert_eq!(1, dag.edge_count());
@@ -900,39 +632,43 @@ mod tests {
         assert!(subplan
             .get_plan_str()
             .contains(r#"execution_plan":"memory_exec"#));
+
+        Ok(())
     }
 
     // Sort
     // Mem -> Project -> Sort
     #[tokio::test]
-    async fn sort() {
+    async fn sort() -> Result<()> {
         let sql = concat!("SELECT c1, c2, c3 ", "FROM test_table ", "ORDER BY c1 ");
-        quick_init(&sql);
+        quick_init(&sql)?;
+        Ok(())
     }
 
     // Sort limit
     // Mem -> Project -> Sort -> GlobalLimit
     #[tokio::test]
-    async fn sort_and_limit_by_int() {
+    async fn sort_and_limit_by_int() -> Result<()> {
         let sql = concat!(
             "SELECT c1, c2, c3 ",
             "FROM test_table ",
             "ORDER BY c1 ",
             "LIMIT 4"
         );
-        quick_init(&sql);
+        quick_init(&sql)?;
+        Ok(())
     }
 
     // Agg + Filter
     // Mem -> Filter -> Coalesce -> HashAgg -> HashAgg -> Proj
     #[tokio::test]
-    async fn aggregate_query_filter() {
+    async fn aggregate_query_filter() -> Result<()> {
         let sql = concat!(
             "SELECT MIN(c1), AVG(c4), COUNT(c3) as c3_count ",
             "FROM test_table ",
             "WHERE c2 < 99"
         );
-        let dag = &mut quick_init(&sql);
+        let dag = &mut quick_init(&sql)?;
 
         assert_eq!(2, dag.node_count());
         assert_eq!(1, dag.edge_count());
@@ -962,18 +698,20 @@ mod tests {
         assert!(subplan
             .get_plan_str()
             .contains(r#"execution_plan":"memory_exec"#));
+
+        Ok(())
     }
 
     // Mem -> Filter -> Coalesce -> HashAgg -> HashAgg -> Proj
     #[tokio::test]
-    async fn agg_query2() {
+    async fn agg_query2() -> Result<()> {
         let sql = concat!(
             "SELECT MAX(c1), MIN(c2), c3 ",
             "FROM test_table ",
             "WHERE c2 < 101 AND c1 > 91 ",
             "GROUP BY c3"
         );
-        let dag = &mut quick_init(&sql);
+        let dag = &mut quick_init(&sql)?;
 
         assert_eq!(2, dag.node_count());
         assert_eq!(1, dag.edge_count());
@@ -1003,12 +741,14 @@ mod tests {
         assert!(subplan
             .get_plan_str()
             .contains(r#"execution_plan":"memory_exec"#));
+
+        Ok(())
     }
 
     // Mem -> Filter -> Coalesce -> HashAgg -> HashAgg -> Proj -> Sort ->
     // GlobalLimit
     #[tokio::test]
-    async fn filter_agg_sort() {
+    async fn filter_agg_sort() -> Result<()> {
         let sql = concat!(
             "SELECT MAX(c1), MIN(c2), c3 ",
             "FROM test_table ",
@@ -1017,7 +757,7 @@ mod tests {
             "ORDER BY c3 ",
             "LIMIT 3"
         );
-        let dag = &mut quick_init(&sql);
+        let dag = &mut quick_init(&sql)?;
 
         assert_eq!(2, dag.node_count());
         assert_eq!(1, dag.edge_count());
@@ -1053,9 +793,11 @@ mod tests {
         assert!(subplan
             .get_plan_str()
             .contains(r#"execution_plan":"memory_exec"#));
+
+        Ok(())
     }
 
-    fn quick_init(sql: &str) -> QueryDag {
+    fn quick_init(sql: &str) -> Result<QueryDag> {
         let schema = Arc::new(Schema::new(vec![
             Field::new("c1", DataType::Int64, false),
             Field::new("c2", DataType::Float64, false),
@@ -1090,18 +832,18 @@ mod tests {
                     -90, -90, -91, -101, -92, -102, -93, -103,
                 ])),
             ],
-        )
-        .unwrap();
+        )?;
 
         let mut ctx = ExecutionContext::new();
         // batch? Only support 1 RecordBatch now.
-        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
-        ctx.register_table("test_table", Arc::new(provider));
+        let provider = MemTable::try_new(schema, vec![vec![batch]])?;
+        ctx.register_table("test_table", Arc::new(provider))?;
 
-        let logical_plan = ctx.create_logical_plan(sql).unwrap();
-        let optimized_plan = ctx.optimize(&logical_plan).unwrap();
-        let physical_plan = ctx.create_physical_plan(&optimized_plan).unwrap();
-        QueryDag::from(&physical_plan)
+        let logical_plan = ctx.create_logical_plan(sql)?;
+        let optimized_plan = ctx.optimize(&logical_plan)?;
+        let physical_plan = ctx.create_physical_plan(&optimized_plan)?;
+        println!("{}", serde_json::to_string(&physical_plan)?);
+        Ok(QueryDag::from(&physical_plan))
     }
 
     #[tokio::test]
@@ -1137,13 +879,13 @@ mod tests {
         let table1 = MemTable::try_new(schema1, vec![vec![batch1]])?;
         let table2 = MemTable::try_new(schema2, vec![vec![batch2]])?;
 
-        ctx.register_table("t1", Arc::new(table1));
-        ctx.register_table("t2", Arc::new(table2));
+        ctx.register_table("t1", Arc::new(table1))?;
+        ctx.register_table("t2", Arc::new(table2))?;
 
         let sql = concat!(
             "SELECT a, b, d ",
             "FROM t1 JOIN t2 ON a = c ",
-            "ORDER BY b ASC ",
+            "ORDER BY a ASC ",
             "LIMIT 3"
         );
 
@@ -1178,13 +920,14 @@ mod tests {
         // +-----------+      +-----------+
 
         let json = serde_json::to_string(&plan).unwrap();
+        println!("{}", json);
         assert!(json.contains(r#"execution_plan":"global_limit_exec"#));
         assert!(json.contains(r#"execution_plan":"sort_exec"#));
         assert!(json.contains(r#"execution_plan":"projection_exec"#));
         assert!(json.contains(r#"execution_plan":"coalesce_batches_exec"#));
         assert!(json.contains(r#"execution_plan":"hash_join_exec"#));
-        assert!(json.contains(r#"left":{"execution_plan":"memory_exec"#));
-        assert!(json.contains(r#"right":{"execution_plan":"memory_exec"#));
+        assert!(json.contains(r#"left":{"#));
+        assert!(json.contains(r#"right":{"#));
 
         let dag = &mut QueryDag::from(&plan);
 
@@ -1214,10 +957,8 @@ mod tests {
             .contains(r#"execution_plan":"hash_join_exec"#));
         assert!(subplan
             .get_plan_str()
-            .contains(r#"right":{"execution_plan":"memory_exec"#));
-        assert!(subplan
-            .get_plan_str()
-            .contains(r#"left":{"execution_plan":"memory_exec"#));
+            .contains(r#"right":{"execution_plan"#));
+        assert!(subplan.get_plan_str().contains(r#"left":{"execution_plan"#));
 
         let mut iter = dag.node_weights_mut();
         let mut subplan = iter.next().unwrap();
@@ -1243,10 +984,8 @@ mod tests {
             .contains(r#"execution_plan":"hash_join_exec"#));
         assert!(subplan
             .get_plan_str()
-            .contains(r#"right":{"execution_plan":"memory_exec"#));
-        assert!(subplan
-            .get_plan_str()
-            .contains(r#"left":{"execution_plan":"memory_exec"#));
+            .contains(r#"right":{"execution_plan"#));
+        assert!(subplan.get_plan_str().contains(r#"left":{"execution_plan"#));
 
         let batches = collect(plan).await?;
 

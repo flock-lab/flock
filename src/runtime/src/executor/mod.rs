@@ -377,7 +377,7 @@ mod tests {
         let mut ctx = datafusion::execution::context::ExecutionContext::new();
         let provider = MemTable::try_new(partitions[0][0].schema(), partitions.clone())?;
 
-        ctx.register_table("test", Arc::new(provider));
+        ctx.register_table("test", Arc::new(provider))?;
 
         let sql = "SELECT MAX(c1), MIN(c2), c3 FROM test WHERE c2 < 99 GROUP BY c3";
         let logical_plan = ctx.create_logical_plan(&sql)?;
