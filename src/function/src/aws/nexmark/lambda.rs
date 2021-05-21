@@ -52,6 +52,8 @@ lazy_static! {
     static ref PERSON_SCHEMA: SchemaRef = Arc::new(Person::schema());
     static ref AUCTION_SCHEMA: SchemaRef = Arc::new(Auction::schema());
     static ref BID_SCHEMA: SchemaRef = Arc::new(Bid::schema());
+    static ref PARALLELISM: usize = globals["lambda"]["parallelism"].parse::<usize>().unwrap();
+    static ref CONTEXT_NAME: String = globals["lambda"]["name"].to_string();
 }
 
 /// A wrapper to allow the declaration of the execution context of the lambda
@@ -69,7 +71,7 @@ macro_rules! init_exec_context {
     () => {{
         unsafe {
             // Init query executor from the cloud evironment.
-            let init_context = || match std::env::var(&globals["lambda"]["name"]) {
+            let init_context = || match std::env::var(&**CONTEXT_NAME) {
                 Ok(s) => {
                     EXECUTION_CONTEXT = CloudFunctionContext::Lambda((
                         Box::new(ExecutionContext::unmarshal(&s)),
@@ -237,17 +239,62 @@ async fn feed_one_source(ctx: &mut ExecutionContext, batches: Vec<RecordBatch>) 
     Ok(())
 }
 
-async fn collect(ctx: &mut ExecutionContext, event: NexMarkEvent) -> Result<Vec<RecordBatch>> {
-    let person_batches = NexMarkSource::to_batch(&event.persons, PERSON_SCHEMA.clone());
-    let auction_batches = NexMarkSource::to_batch(&event.auctions, AUCTION_SCHEMA.clone());
-    let bid_batches = NexMarkSource::to_batch(&event.bids, BID_SCHEMA.clone());
+async fn feed_two_source(
+    ctx: &mut ExecutionContext,
+    left: Vec<RecordBatch>,
+    right: Vec<RecordBatch>,
+) -> Result<()> {
+    let partitions = |n| {
+        if n > *PARALLELISM {
+            *PARALLELISM
+        } else if n > 1 {
+            n
+        } else {
+            1
+        }
+    };
 
-    if person_batches.is_empty() && auction_batches.is_empty() && bid_batches.is_empty() {
+    let n_left = partitions(left.len());
+    let n_right = partitions(right.len());
+
+    // repartition the batches in the left.
+    let left = if n_left == 1 {
+        vec![left]
+    } else {
+        LambdaExecutor::repartition(vec![left], Partitioning::RoundRobinBatch(n_left)).await?
+    };
+
+    // repartition the batches in the right.
+    let right = if n_right == 1 {
+        vec![right]
+    } else {
+        LambdaExecutor::repartition(vec![right], Partitioning::RoundRobinBatch(n_right)).await?
+    };
+
+    ctx.feed_two_source(&left, &right);
+    Ok(())
+}
+
+async fn collect(ctx: &mut ExecutionContext, event: NexMarkEvent) -> Result<Vec<RecordBatch>> {
+    if event.persons.is_empty() && event.auctions.is_empty() && event.bids.is_empty() {
         return Err(SquirtleError::Execution("No Nexmark input!".to_owned()));
     }
 
     match ctx.query_number {
-        Some(0) | Some(1) | Some(2) => feed_one_source(ctx, bid_batches).await?,
+        Some(0) | Some(1) | Some(2) => {
+            let bids = NexMarkSource::to_batch(&event.bids, BID_SCHEMA.clone());
+            feed_one_source(ctx, bids).await?;
+        }
+        Some(3) => {
+            let persons = NexMarkSource::to_batch(&event.persons, PERSON_SCHEMA.clone());
+            let auctions = NexMarkSource::to_batch(&event.auctions, AUCTION_SCHEMA.clone());
+            feed_two_source(ctx, persons, auctions).await?;
+        }
+        Some(4) => {
+            let auctions = NexMarkSource::to_batch(&event.auctions, AUCTION_SCHEMA.clone());
+            let bids = NexMarkSource::to_batch(&event.bids, BID_SCHEMA.clone());
+            feed_two_source(ctx, auctions, bids).await?;
+        }
         _ => unimplemented!(),
     }
 
@@ -255,8 +302,9 @@ async fn collect(ctx: &mut ExecutionContext, event: NexMarkEvent) -> Result<Vec<
     let output_partitions = ctx.execute().await?;
 
     // show output
-    let formatted = arrow::util::pretty::pretty_format_batches(&output_partitions).unwrap();
-    println!("{}", formatted);
+    // let formatted =
+    // arrow::util::pretty::pretty_format_batches(&output_partitions).unwrap();
+    // println!("{}", formatted);
 
     Ok(output_partitions)
 }

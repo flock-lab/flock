@@ -56,7 +56,7 @@ struct NexmarkBenchmarkOpt {
     seconds: usize,
 
     /// Number of events generated among generators per second
-    #[structopt(short = "eps", long = "events_per_second", default_value = "100000")]
+    #[structopt(short = "e", long = "events_per_second", default_value = "100000")]
     events_per_second: usize,
 }
 
@@ -139,7 +139,7 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
         for task in tasks {
             let response = task.await.expect("Lambda function execution failed.")?;
             if opt.debug {
-                println!(
+                info!(
                     "{:?}",
                     serde_json::from_slice::<Value>(&response.payload.unwrap())?
                 );

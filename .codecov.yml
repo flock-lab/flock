@@ -16,3 +16,10 @@ ignore:
   - "src/bin/cli"
   - "**/*.md"
   - "benchmarks"
+
+coverage:
+  status:
+    project:
+      default:
+        target: 80%    # the required coverage value
+        threshold: 2%  # the leniency in hitting the target
