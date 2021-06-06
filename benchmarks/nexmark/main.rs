@@ -185,7 +185,7 @@ async fn create_lambda_function(ctx: &ExecutionContext) -> Result<String> {
         .await
         .is_ok()
     {
-        // Delete previous lambda function to avoid the outdated code in S3.
+        // To avoid obsolete code on S3, remove the previous lambda function.
         LAMBDA_CLIENT
             .delete_function(DeleteFunctionRequest {
                 function_name: ctx.name.clone(),
