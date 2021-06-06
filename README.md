@@ -142,10 +142,30 @@ All the following Nexmark queries share the same lambda function code.
 | q9 | Winning Bids | Find the winning bid for each auction. | ✅ |
 | q13 | Bounded Side Input Join | Joins a stream to a bounded side input, modeling basic stream enrichment. | ✅ |
 
-For example, to execute q3 in the Nexmark benchmark, you can issue the following command:
+To execute q3 in the Nexmark benchmark, you can use `nexmark_bench` to issue the following command:
 
 ```shell
-RUST_LOG=info ./nexmark_bench  --query 3  -g 10 -s 2 --events_per_second 1000 --debug
+$ ./nexmark_bench --help
+
+squirtle-benchmarks 0.1.0
+
+USAGE:
+    nexmark_bench [FLAGS] [OPTIONS] --query <query>
+
+FLAGS:
+    -d, --debug      Activate debug mode to see query results
+    -h, --help       Prints help information
+    -V, --version    Prints version information
+
+OPTIONS:
+    -e, --events_per_second <events-per-second>
+            Number of events generated among generators per second [default: 100000]
+
+    -g, --generators <generators>                  Number of threads or generators of each test run [default: 100]
+    -q, --query <query>                            Query number
+    -s, --seconds <seconds>                        Number of threads to use for parallel execution [default: 10]
+
+$ RUST_LOG=info ./nexmark_bench  --query 3  -g 10 -s 2 --events_per_second 1000 --debug
 ```
 
 <details>
