@@ -121,7 +121,6 @@ Copyright (c) 2020-2021, UMD Data System Group. All rights reserved.
 [UPLOAD] ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒... ... ... ...
 [OK] Upload Succeed.
 ```
-
 </details>
 </br>
 
@@ -142,6 +141,70 @@ All the following Nexmark queries share the same lambda function code.
 | q8 | Monitor New Users | Select people who have entered the system and created auctions in the last period. | ✅ |
 | q9 | Winning Bids | Find the winning bid for each auction. | ✅ |
 | q13 | Bounded Side Input Join | Joins a stream to a bounded side input, modeling basic stream enrichment. | ✅ |
+
+For example, to execute q3 in the Nexmark benchmark, you can issue the following command:
+
+```shell
+RUST_LOG=info ./nexmark_bench  --query 3  -g 10 -s 2 --events_per_second 1000 --debug
+```
+
+<details>
+<summary>
+<strong>Output</strong>
+</summary>
+
+```bash
+Running benchmarks with the following options: NexmarkBenchmarkOpt { query: 3, debug: true, generators: 10, seconds: 2, events_per_second: 1000 }
+[2021-06-06T22:35:43Z INFO  nexmark_bench] [OK] Create lambda function arn:aws:lambda:us-east-1:942368842860:function:q3.
+[2021-06-06T22:35:43Z INFO  runtime::datasource::nexmark::nexmark] Generating events for 2s over 10 partitions.
+[2021-06-06T22:35:43Z INFO  nexmark_bench] [OK] Generate nexmark events.
+[2021-06-06T22:35:43Z INFO  nexmark_bench] [OK] Send nexmark event (time: 0, source: 1).
+[2021-06-06T22:35:43Z INFO  nexmark_bench] [OK] Send nexmark event (time: 0, source: 2).
+[2021-06-06T22:35:43Z INFO  nexmark_bench] [OK] Send nexmark event (time: 0, source: 0).
+[2021-06-06T22:35:43Z INFO  nexmark_bench] [OK] Send nexmark event (time: 0, source: 6).
+[2021-06-06T22:35:43Z INFO  nexmark_bench] [OK] Send nexmark event (time: 0, source: 4).
+[2021-06-06T22:35:43Z INFO  nexmark_bench] [OK] Send nexmark event (time: 0, source: 7).
+[2021-06-06T22:35:43Z INFO  nexmark_bench] [OK] Send nexmark event (time: 0, source: 5).
+[2021-06-06T22:35:43Z INFO  nexmark_bench] [OK] Send nexmark event (time: 0, source: 8).
+[2021-06-06T22:35:43Z INFO  nexmark_bench] [OK] Send nexmark event (time: 0, source: 9).
+[2021-06-06T22:35:43Z INFO  nexmark_bench] [OK] Send nexmark event (time: 1, source: 0).
+[2021-06-06T22:35:43Z INFO  nexmark_bench] [OK] Send nexmark event (time: 1, source: 1).
+[2021-06-06T22:35:43Z INFO  nexmark_bench] [OK] Send nexmark event (time: 1, source: 2).
+[2021-06-06T22:35:43Z INFO  nexmark_bench] [OK] Send nexmark event (time: 1, source: 3).
+[2021-06-06T22:35:43Z INFO  nexmark_bench] [OK] Send nexmark event (time: 1, source: 4).
+[2021-06-06T22:35:43Z INFO  nexmark_bench] [OK] Send nexmark event (time: 0, source: 3).
+[2021-06-06T22:35:43Z INFO  nexmark_bench] [OK] Send nexmark event (time: 1, source: 5).
+[2021-06-06T22:35:43Z INFO  nexmark_bench] [OK] Send nexmark event (time: 1, source: 6).
+[2021-06-06T22:35:43Z INFO  nexmark_bench] [OK] Send nexmark event (time: 1, source: 8).
+[2021-06-06T22:35:43Z INFO  nexmark_bench] [OK] Send nexmark event (time: 1, source: 9).
+[2021-06-06T22:35:43Z INFO  nexmark_bench] [OK] Send nexmark event (time: 1, source: 7).
+[2021-06-06T22:35:44Z INFO  nexmark_bench] Object({"name": String("q3"), "epoch": Number(0), "source": Number(0)})
+[2021-06-06T22:35:44Z INFO  nexmark_bench] Object({"name": String("q3"), "epoch": Number(0), "source": Number(1)})
+[2021-06-06T22:35:44Z INFO  nexmark_bench] Object({"name": String("q3"), "epoch": Number(0), "source": Number(2)})
+[2021-06-06T22:35:44Z INFO  nexmark_bench] Object({"name": String("q3"), "epoch": Number(0), "source": Number(3)})
+[2021-06-06T22:35:44Z INFO  nexmark_bench] Object({"name": String("q3"), "epoch": Number(0), "source": Number(4)})
+[2021-06-06T22:35:44Z INFO  nexmark_bench] Object({"name": String("q3"), "epoch": Number(0), "source": Number(5)})
+[2021-06-06T22:35:44Z INFO  nexmark_bench] Object({"name": String("q3"), "epoch": Number(0), "source": Number(6)})
+[2021-06-06T22:35:44Z INFO  nexmark_bench] Object({"name": String("q3"), "epoch": Number(0), "source": Number(7)})
+[2021-06-06T22:35:45Z INFO  nexmark_bench] Object({"name": String("q3"), "epoch": Number(0), "source": Number(8)})
+[2021-06-06T22:35:45Z INFO  nexmark_bench] Object({"name": String("q3"), "epoch": Number(0), "source": Number(9)})
+[2021-06-06T22:35:45Z INFO  nexmark_bench] Object({"name": String("q3"), "epoch": Number(1), "source": Number(0)})
+[2021-06-06T22:35:45Z INFO  nexmark_bench] Object({"name": String("q3"), "epoch": Number(1), "source": Number(1)})
+[2021-06-06T22:35:45Z INFO  nexmark_bench] Object({"name": String("q3"), "epoch": Number(1), "source": Number(2)})
+[2021-06-06T22:35:45Z INFO  nexmark_bench] Object({"name": String("q3"), "epoch": Number(1), "source": Number(3)})
+[2021-06-06T22:35:45Z INFO  nexmark_bench] Object({"name": String("q3"), "epoch": Number(1), "source": Number(4)})
+[2021-06-06T22:35:45Z INFO  nexmark_bench] Object({"name": String("q3"), "epoch": Number(1), "source": Number(5)})
+[2021-06-06T22:35:45Z INFO  nexmark_bench] Object({"name": String("q3"), "epoch": Number(1), "source": Number(6)})
+[2021-06-06T22:35:45Z INFO  nexmark_bench] Object({"name": String("q3"), "epoch": Number(1), "source": Number(7)})
+[2021-06-06T22:35:45Z INFO  nexmark_bench] Object({"name": String("q3"), "epoch": Number(1), "source": Number(8)})
+[2021-06-06T22:35:45Z INFO  nexmark_bench] Object({"name": String("q3"), "epoch": Number(1), "source": Number(9)})
+```
+</details>
+</br>
+
+AWS gives you a personalized view of the status of the query execution (`q3`).
+
+<img src="docs/q3.png" width=70%>
 
 ## License
 
