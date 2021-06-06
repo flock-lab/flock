@@ -15,6 +15,116 @@ The generic lambda function code is built in advance and uploaded to AWS S3.
 | [Nexmark Benchmark](https://beam.apache.org/documentation/sdks/java/testing/nexmark/)      | umd-squirtle   |   nexmark        |  https://umd-squirtle.s3.amazonaws.com/nexmark      |
 | [TPC-H](http://tpc.org/tpch/)                    | umd-squirtle  |   tpch           |  `coming soon`
 
+
+## Build From Source Code
+
+You can enable the features `simd` (to use SIMD instructions) and/or `mimalloc` or `snmalloc` (to use either the mimalloc or snmalloc allocator) as features by passing them in as --features:
+
+```shell
+$ cargo build --target x86_64-unknown-linux-gnu --release --features "arrow/simd datafusion/simd  mimalloc"
+```
+
+## Upgrade Cloud Function Services
+
+squirtle-cli is an interactive command-line query tool for Squirtle.
+
+```shell
+$ cd target/x86_64-unknown-linux-gnu/release/
+$ ./squirtle-cli --help
+```
+
+<details>
+<summary>
+<strong>Output</strong>
+</summary>
+
+```shell
+Squirtle 0.1.0
+Command Line Interactive Contoller for Squirtle
+
+USAGE:
+    squirtle-cli [FLAGS] [OPTIONS]
+
+FLAGS:
+    -h, --help       Prints help information
+    -v               Sets the level of verbosity
+    -V, --version    Prints version information
+
+OPTIONS:
+    -u, --upload <FILE>    Upload lambda execution code to S3.
+    -k, --key <STRING>     AWS S3 key for this function code.
+```
+</details>
+</br>
+
+For example, you can use `squirtle-cli` in response to the uploading, updating, or deleting of the cloud functions in AWS S3.
+
+```shell
+# for example, upgrade the NexMark Benchmark for streaming processing
+./squirtle-cli -u nexmark_lambda -k nexmark
+```
+
+<details>
+<summary>
+<strong>Output</strong>
+</summary>
+
+```bash
+
+                                      ```
+                                `-/shdddddhyo/-`
+                              `/hdmmmmmmmmmmmmdh+.
+                             :ymmmmmmmmmmmmmmmmmmy-
+                            /symmmmmmmmmmds/smmmhys-
+                            +s`mmmmmmmmmmym` :mmyyyo
+                            :  hmmmmmmmmd   .:hmyyy+s/
+                           `+//mmmmmmmmmm+::/sdyyyy+ds+:.
+                           -ydmmhmmdmmmmmmmmmdyhosooNsooo/`
+                        /syyyyosyhhyhhhhhhhhyhdyhmdsdm+/+++-
+              ``....``  :yoymmmmhysyhhhhyyss+ydddmmmdym++oo+:
+          -+yhdmmmmmmhyosyhmmmmmmmyydhhhhhhhhshdhhdmmmsMoooo+.
+       .odmmy+:-.``.-/ohmdsodmmmmmyyhhhysssyhhsoyyyyhhoMN/oo+/
+     `odmh/``:///`      .ommsohddhsNNNNdyNNNNNNdysoooosMh+ooo+
+    `hmy-   .mmmms`       `ymy.`-osmNNNNsNNNNNNNNyhdhomMoooooo   ./osso:.
+    ymo`       +mmo`        sms` -hyhNNNhdNNNNNNydNNNymMooooo/ -ydmmmmmmd+`
+   -ho`        :mmmo`       `mm-  :hhyhhhohhhhhyyNNNNNsmNo+o:o+dmmmmmmmmmms`
+   -+         /mmmmm+`       hm+   -omNNNmsmNNNNmhhmdhy+hmo-:smmmmmhhyydmmm/
+    :.       ommy-ymm/       dm/   .syydNNNydNNNNNhydmmhoym/+hmmmmydmmmommy/
+    -:     `smms` `hmm:.:`  /mh.  -ymmmdyyhhsoyhdyhmmmmmysosyyhmmmodmmmddyo`
+     ::`  `ymm+`   `dmmmmo`:md:   :dmmmmmhoo+oyys/mmmmmmyy+yyyyhdmyoyhhys/`
+      :+-`/++:      .s+:``+mh-    `smmmmmmdyo.--:+mmmmmmyy/://++++//----
+       .oo:``         `-ohh+`      /hmmmmmmms`   :hmmmmhys:
+         `/oso+:::/+oyhho:`        -+yhyso+/-    :hdmmhyys:
+             .-:/++/:-`                          `--+s:---`
+
+
+
+       ███████╗ ██████╗ ██╗   ██╗██╗██████╗ ████████╗██╗     ███████╗
+       ██╔════╝██╔═══██╗██║   ██║██║██╔══██╗╚══██╔══╝██║     ██╔════╝
+       ███████╗██║   ██║██║   ██║██║██████╔╝   ██║   ██║     █████╗
+       ╚════██║██║▄▄ ██║██║   ██║██║██╔══██╗   ██║   ██║     ██╔══╝
+       ███████║╚██████╔╝╚██████╔╝██║██║  ██║   ██║   ███████╗███████╗
+       ╚══════╝ ╚══▀▀═╝  ╚═════╝ ╚═╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚══════╝
+
+
+Squirtle: Serverless SQL Query Engine for Real-Time and Batch Analytics (https://github.com/DSLAM-UMD/Squirtle)
+
+Copyright (c) 2020-2021, UMD Data System Group. All rights reserved.
+
+▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒
+
+============================================
+         Upload function code to S3  
+============================================
+
+
+[UPLOAD] ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒... ... ... ...
+[OK] Upload Succeed.
+```
+
+</details>
+</br>
+
 ## Nexmark Benchmark
 
 All the following Nexmark queries share the same lambda function code.
