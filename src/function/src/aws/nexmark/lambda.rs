@@ -43,6 +43,9 @@ static ALLOC: mimalloc::MiMalloc = mimalloc::MiMalloc;
 /// Initializes the lambda function once and only once.
 static INIT: Once = Once::new();
 
+/// The function invocation counter per lambda instance.
+static mut INVOCATION_COUNTER_PER_INSTANCE: u32 = 0;
+
 thread_local! {
     /// Is in the testing environment.
     static IS_TESTING: Cell<bool> = Cell::new(false);
@@ -301,10 +304,17 @@ async fn collect(ctx: &mut ExecutionContext, event: NexMarkEvent) -> Result<Vec<
     // query execution
     let output_partitions = ctx.execute().await?;
 
-    // show output
-    // let formatted =
-    // arrow::util::pretty::pretty_format_batches(&output_partitions).unwrap();
-    // println!("{}", formatted);
+    if ctx.debug {
+        // show output
+        // let formatted =
+        // arrow::util::pretty::pretty_format_batches(&output_partitions).unwrap();
+        // println!("{}", formatted);
+
+        unsafe {
+            INVOCATION_COUNTER_PER_INSTANCE += 1;
+            println!("# invocations: {}", INVOCATION_COUNTER_PER_INSTANCE);
+        }
+    }
 
     Ok(output_partitions)
 }

@@ -294,6 +294,7 @@ mod tests {
             next,
             datasource,
             query_number: None,
+            ..Default::default()
         };
 
         let encoded = lambda_context.marshal(Encoding::default());

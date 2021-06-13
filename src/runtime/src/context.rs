@@ -18,8 +18,10 @@
 use super::datasource::DataSource;
 use super::encoding::Encoding;
 use crate::error::{Result, SquirtleError};
+use arrow::datatypes::{Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
 use datafusion::physical_plan::collect;
+use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::ExecutionPlan;
 use serde::{Deserialize, Serialize};
@@ -112,6 +114,21 @@ pub struct ExecutionContext {
     pub datasource:   DataSource,
     /// The Nexmark query number for testing purposes.
     pub query_number: Option<usize>,
+    /// Print the debug information in the lambda instance.
+    pub debug:        bool,
+}
+
+impl Default for ExecutionContext {
+    fn default() -> ExecutionContext {
+        ExecutionContext {
+            plan:         Arc::new(EmptyExec::new(false, Arc::new(Schema::empty()))),
+            name:         String::new(),
+            next:         CloudFunction::default(),
+            datasource:   DataSource::default(),
+            query_number: Some(0),
+            debug:        false,
+        }
+    }
 }
 
 impl PartialEq for ExecutionContext {
@@ -265,6 +282,7 @@ mod tests {
             next,
             datasource,
             query_number: None,
+            ..Default::default()
         };
 
         let json = lambda_context.marshal(Encoding::default());
@@ -303,6 +321,7 @@ mod tests {
             next: CloudFunction::None,
             datasource: DataSource::UnknownEvent,
             query_number: None,
+            ..Default::default()
         };
         ctx.feed_one_source(&partitions);
 
@@ -384,6 +403,7 @@ mod tests {
             next: CloudFunction::None,
             datasource: DataSource::UnknownEvent,
             query_number: None,
+            ..Default::default()
         };
         ctx.feed_two_source(&partitions1, &partitions2);
 
