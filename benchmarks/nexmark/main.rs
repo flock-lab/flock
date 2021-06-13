@@ -126,36 +126,68 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
     let func_arn = create_lambda_function(&lambda_ctx).await?;
     info!("[OK] Create lambda function {}.", func_arn);
 
-    let request = PutFunctionConcurrencyRequest {
-        function_name:                  func_arn.clone(),
-        reserved_concurrent_executions: 1,
-    };
-    let concurrency = LAMBDA_CLIENT
-        .put_function_concurrency(request)
-        .await
-        .map_err(|e| SquirtleError::Internal(e.to_string()))?;
-    assert_eq!(concurrency.reserved_concurrent_executions, Some(1));
-
-    let events = nexmark.generate_data()?;
+    let events = Arc::new(nexmark.generate_data()?);
     info!("[OK] Generate nexmark events.");
 
+    #[allow(unused_assignments)]
+    let mut tasks = vec![];
+
     if let StreamWindow::None = nexmark.window {
-        let tasks = iproduct!(0..opt.seconds, 0..opt.generators)
-            .map(|(i, j)| {
+        tasks = iproduct!(0..opt.seconds, 0..opt.generators)
+            .map(|(t, g)| {
                 let func_arn = func_arn.clone();
-                let event = events.select(i, j).unwrap();
+                let events = events.clone();
                 tokio::spawn(async move {
-                    info!("[OK] Send nexmark event (time: {}, source: {}).", i, j);
-                    invoke_lambda_function(func_arn, serde_json::to_vec(&event)?, LAMBDA_ASYNC_CALL)
-                        .await
+                    info!("[OK] Send nexmark event (time: {}, source: {}).", t, g);
+                    let response = vec![
+                        invoke_lambda_function(
+                            func_arn,
+                            serde_json::to_vec(&events.select(t, g).ok_or_else(|| {
+                                SquirtleError::Internal(
+                                    "Failed to select event from streaming data".to_string(),
+                                )
+                            })?)?,
+                            LAMBDA_SYNC_CALL,
+                        )
+                        .await?,
+                    ];
+                    Ok(response)
                 })
             })
             // this collect *is needed* so that the join below can switch between tasks.
-            .collect::<Vec<_>>();
+            .collect::<Vec<tokio::task::JoinHandle<Result<Vec<InvocationResponse>>>>>();
+    } else {
+        set_lambda_concurrency(func_arn.clone(), 1).await?;
+        tasks = (0..opt.generators)
+            .map(|g| {
+                let func_arn = func_arn.clone();
+                let seconds = opt.seconds;
+                let events = events.clone();
+                tokio::spawn(async move {
+                    let mut response = vec![];
+                    for t in 0..seconds {
+                        let event = events.select(t, g).unwrap();
+                        info!("[OK] Send nexmark event (time: {}, source: {}).", t, g);
+                        response.push(
+                            invoke_lambda_function(
+                                func_arn.clone(),
+                                serde_json::to_vec(&event)?,
+                                LAMBDA_ASYNC_CALL,
+                            )
+                            .await?,
+                        );
+                    }
+                    Ok(response)
+                })
+            })
+            // this collect *is needed* so that the join below can switch between tasks.
+            .collect::<Vec<tokio::task::JoinHandle<Result<Vec<InvocationResponse>>>>>();
+    }
 
-        for task in tasks {
-            let response = task.await.expect("Lambda function execution failed.")?;
-            if opt.debug {
+    for task in tasks {
+        let res_vec = task.await.expect("Lambda function execution failed.")?;
+        if opt.debug {
+            res_vec.into_iter().for_each(|response| {
                 // The HTTP status code is in the 200 range for a successful request.
                 // For the RequestResponse invocation type, this status code is 200.
                 // For the Event invocation type, this status code is 202.
@@ -164,7 +196,7 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
                     Some(200) => {
                         info!(
                             "{:?}",
-                            serde_json::from_slice::<Value>(&response.payload.unwrap())?
+                            serde_json::from_slice::<Value>(&response.payload.unwrap()).unwrap()
                         );
                     }
                     Some(202) => {
@@ -174,10 +206,8 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
                         panic!("Incorrect Lambda invocation!");
                     }
                 }
-            }
+            });
         }
-    } else {
-        unimplemented!();
     }
 
     Ok(())
@@ -206,6 +236,21 @@ async fn invoke_lambda_function(
             )))
         }
     }
+}
+
+/// Set the lambda function's concurrency.
+/// <https://docs.aws.amazon.com/lambda/latest/dg/configuration-concurrency.html>
+async fn set_lambda_concurrency(function_name: String, concurrency: i64) -> Result<()> {
+    let request = PutFunctionConcurrencyRequest {
+        function_name,
+        reserved_concurrent_executions: concurrency,
+    };
+    let concurrency = LAMBDA_CLIENT
+        .put_function_concurrency(request)
+        .await
+        .map_err(|e| SquirtleError::Internal(e.to_string()))?;
+    assert_ne!(concurrency.reserved_concurrent_executions, Some(0));
+    Ok(())
 }
 
 /// Creates a single lambda function using bootstrap.zip in Amazon S3.
