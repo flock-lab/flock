@@ -168,7 +168,7 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
                         );
                     }
                     Some(202) => {
-                        info!("{:?}", response.log_result);
+                        info!(" [OK] Received status from async lambda function.");
                     }
                     _ => {
                         panic!("Incorrect Lambda invocation!");
