@@ -27,11 +27,16 @@ use runtime::prelude::*;
 use rusoto_core::Region;
 use rusoto_lambda::{
     CreateFunctionRequest, DeleteFunctionRequest, GetFunctionRequest, InvocationRequest,
-    InvocationResponse, Lambda, LambdaClient,
+    InvocationResponse, Lambda, LambdaClient, PutFunctionConcurrencyRequest,
 };
 use serde_json::Value;
 use std::sync::Arc;
 use structopt::StructOpt;
+
+#[allow(dead_code)]
+static LAMBDA_SYNC_CALL: &str = "RequestResponse";
+#[allow(dead_code)]
+static LAMBDA_ASYNC_CALL: &str = "Event";
 
 lazy_static! {
     static ref LAMBDA_CLIENT: LambdaClient = LambdaClient::new(Region::default());
@@ -114,11 +119,22 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
         next:         CloudFunction::None,
         datasource:   DataSource::default(),
         query_number: Some(opt.query),
+        debug:        opt.debug,
     };
 
     // create lambda function based on the generic lambda function code on AWS S3.
     let func_arn = create_lambda_function(&lambda_ctx).await?;
     info!("[OK] Create lambda function {}.", func_arn);
+
+    let request = PutFunctionConcurrencyRequest {
+        function_name:                  func_arn.clone(),
+        reserved_concurrent_executions: 1,
+    };
+    let concurrency = LAMBDA_CLIENT
+        .put_function_concurrency(request)
+        .await
+        .map_err(|e| SquirtleError::Internal(e.to_string()))?;
+    assert_eq!(concurrency.reserved_concurrent_executions, Some(1));
 
     let events = nexmark.generate_data()?;
     info!("[OK] Generate nexmark events.");
@@ -130,7 +146,8 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
                 let event = events.select(i, j).unwrap();
                 tokio::spawn(async move {
                     info!("[OK] Send nexmark event (time: {}, source: {}).", i, j);
-                    invoke_lambda_function(func_arn.clone(), serde_json::to_vec(&event)?).await
+                    invoke_lambda_function(func_arn, serde_json::to_vec(&event)?, LAMBDA_ASYNC_CALL)
+                        .await
                 })
             })
             // this collect *is needed* so that the join below can switch between tasks.
@@ -139,10 +156,24 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
         for task in tasks {
             let response = task.await.expect("Lambda function execution failed.")?;
             if opt.debug {
-                info!(
-                    "{:?}",
-                    serde_json::from_slice::<Value>(&response.payload.unwrap())?
-                );
+                // The HTTP status code is in the 200 range for a successful request.
+                // For the RequestResponse invocation type, this status code is 200.
+                // For the Event invocation type, this status code is 202.
+                // For the DryRun invocation type, the status code is 204.
+                match response.status_code {
+                    Some(200) => {
+                        info!(
+                            "{:?}",
+                            serde_json::from_slice::<Value>(&response.payload.unwrap())?
+                        );
+                    }
+                    Some(202) => {
+                        info!("{:?}", response.log_result);
+                    }
+                    _ => {
+                        panic!("Incorrect Lambda invocation!");
+                    }
+                }
             }
         }
     } else {
@@ -156,11 +187,13 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
 async fn invoke_lambda_function(
     function_name: String,
     events: Vec<u8>,
+    invocation_type: &str,
 ) -> Result<InvocationResponse> {
+    // To invoke a function asynchronously, set InvocationType to Event.
     let request = InvocationRequest {
         function_name,
         payload: Some(events.into()),
-        invocation_type: Some("RequestResponse".to_string()),
+        invocation_type: Some(invocation_type.to_string()),
         ..Default::default()
     };
 

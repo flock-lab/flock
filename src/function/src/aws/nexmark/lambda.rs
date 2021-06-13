@@ -19,7 +19,7 @@ use datafusion::physical_plan::Partitioning;
 use futures::executor::block_on;
 use lambda_runtime::{handler_fn, Context};
 use lazy_static::lazy_static;
-use log::warn;
+use log::{info, warn};
 use nexmark::event::{Auction, Bid, Person};
 use nexmark::{NexMarkEvent, NexMarkSource};
 use rayon::prelude::*;
@@ -29,6 +29,7 @@ use rusoto_lambda::{InvokeAsyncRequest, Lambda, LambdaClient};
 use serde_json::json;
 use serde_json::Value;
 use std::cell::Cell;
+use std::env;
 use std::sync::Arc;
 use std::sync::Once;
 
@@ -42,6 +43,9 @@ static ALLOC: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 /// Initializes the lambda function once and only once.
 static INIT: Once = Once::new();
+
+/// The function invocation counter per lambda instance.
+static mut INVOCATION_COUNTER_PER_INSTANCE: u32 = 0;
 
 thread_local! {
     /// Is in the testing environment.
@@ -301,16 +305,24 @@ async fn collect(ctx: &mut ExecutionContext, event: NexMarkEvent) -> Result<Vec<
     // query execution
     let output_partitions = ctx.execute().await?;
 
-    // show output
-    // let formatted =
-    // arrow::util::pretty::pretty_format_batches(&output_partitions).unwrap();
-    // println!("{}", formatted);
+    if ctx.debug {
+        // show output
+        // let formatted =
+        // arrow::util::pretty::pretty_format_batches(&output_partitions).unwrap();
+        // info!("{}", formatted);
+
+        unsafe {
+            INVOCATION_COUNTER_PER_INSTANCE += 1;
+            info!("# invocations: {}", INVOCATION_COUNTER_PER_INSTANCE);
+        }
+    }
 
     Ok(output_partitions)
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    env::set_var("RUST_LOG", "info");
     lambda_runtime::run(handler_fn(handler)).await?;
     Ok(())
 }

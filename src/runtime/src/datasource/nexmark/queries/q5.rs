@@ -75,6 +75,11 @@ mod tests {
             "ON num = maxn;"
         );
 
+        // let _sql = concat!(
+        //     "SELECT auction, count(*) ",
+        //     "FROM bid GROUP BY auction ORDER BY count(*) DESC LIMIT 1;"
+        // );
+
         let bid_schema = Arc::new(Bid::schema());
         let (window, hop) = match nex.window {
             StreamWindow::HoppingWindow((window, hop)) => (window, hop),
