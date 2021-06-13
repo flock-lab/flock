@@ -187,26 +187,37 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
     for task in tasks {
         let res_vec = task.await.expect("Lambda function execution failed.")?;
         if opt.debug {
-            res_vec.into_iter().for_each(|response| {
-                // The HTTP status code is in the 200 range for a successful request.
-                // For the RequestResponse invocation type, this status code is 200.
-                // For the Event invocation type, this status code is 202.
-                // For the DryRun invocation type, the status code is 204.
-                match response.status_code {
-                    Some(200) => {
-                        info!(
-                            "{:?}",
-                            serde_json::from_slice::<Value>(&response.payload.unwrap()).unwrap()
-                        );
+            let _res = res_vec
+                .into_iter()
+                .map(|response| {
+                    // The HTTP status code is in the 200 range for a successful request.
+                    // - For the RequestResponse invocation type, this status code is 200.
+                    // - For the Event invocation type, this status code is 202.
+                    // - For the DryRun invocation type, the status code is 204.
+                    match response.status_code {
+                        Some(200) => {
+                            info!(
+                                "{:?}",
+                                serde_json::from_slice::<Value>(&response.payload.ok_or_else(
+                                    || {
+                                        SquirtleError::Internal(
+                                            "Failed to parse the payload of the function response."
+                                                .to_string(),
+                                        )
+                                    }
+                                )?)?
+                            );
+                        }
+                        Some(202) => {
+                            info!(" [OK] Received status from async lambda function.");
+                        }
+                        _ => {
+                            panic!("Incorrect Lambda invocation!");
+                        }
                     }
-                    Some(202) => {
-                        info!(" [OK] Received status from async lambda function.");
-                    }
-                    _ => {
-                        panic!("Incorrect Lambda invocation!");
-                    }
-                }
-            });
+                    Ok(())
+                })
+                .collect::<Vec<Result<()>>>();
         }
     }
 
