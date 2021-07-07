@@ -28,7 +28,7 @@ tokio = { version = "1.2", features = [ "macros", "io-util", "sync", "rt-multi-t
 aws_lambda_events = "0.4"
 rusoto_core = "0.46.0"
 
-rusoto_lambda = "0.46.0"
+rusoto_lambda = "0.47.0"
 
 [lib]
 name = "test_utils"
