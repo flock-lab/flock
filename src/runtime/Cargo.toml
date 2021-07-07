@@ -27,8 +27,8 @@ lz4 = "1.23.1"
 rand = { version = "0.8.3", features = [ "small_rng" ] }
 rayon = "1.5"
 rusoto_core = "0.46.0"
-rusoto_kafka = "0.46.0"
-rusoto_kinesis = "0.46.0"
+rusoto_kafka = "0.47.0"
+rusoto_kinesis = "0.47.0"
 rusoto_lambda = "0.46.0"
 rust-ini = "0.17"
 serde = { version = "1.0", features = [ "derive" ] }
