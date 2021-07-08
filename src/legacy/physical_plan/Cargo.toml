@@ -13,8 +13,8 @@ bytes = "0.6.0"
 sqlparser = "0.7.0"
 async-trait = "0.1.41"
 futures = "0.3"
-rusoto_core = "0.46.0"
-rusoto_kinesis = "0.46.0"
+rusoto_core = "0.47.0"
+rusoto_kinesis = "0.47.0"
 serde_json = "1.0"
 runtime = {path = "../runtime"}
 arrow = { git = "https://github.com/DSLAM-UMD/arrow-rs", branch = "squirtle", features = [ "simd" ] }
