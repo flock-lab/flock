@@ -26,10 +26,10 @@ log = "0.4.14"
 lz4 = "1.23.1"
 rand = { version = "0.8.3", features = [ "small_rng" ] }
 rayon = "1.5"
-rusoto_core = "0.46.0"
+rusoto_core = "0.47.0"
 rusoto_kafka = "0.47.0"
-rusoto_kinesis = "0.46.0"
-rusoto_lambda = "0.46.0"
+rusoto_kinesis = "0.47.0"
+rusoto_lambda = "0.47.0"
 rust-ini = "0.17"
 serde = { version = "1.0", features = [ "derive" ] }
 serde_bytes = "0.11"
@@ -41,7 +41,7 @@ zstd = "0.8"
 
 [dev-dependencies]
 prost = "0.7"
-prost-derive = "0.7"
+prost-derive = "0.8"
 
 test_utils = { path = "../test" }
 tokio = { version = "1.2", features = [ "macros", "io-util", "sync", "rt-multi-thread" ] }
