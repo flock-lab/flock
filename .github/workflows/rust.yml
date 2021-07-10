@@ -55,7 +55,7 @@ jobs:
           key: ${{ runner.os }}-cargo-target-coverage-cache
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
+          toolchain: 1.51.0
           override: true
           components: rustfmt, clippy
       - name: update umd-arrow
