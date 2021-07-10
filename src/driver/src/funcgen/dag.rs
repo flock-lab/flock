@@ -396,24 +396,24 @@ mod tests {
         let mut lambda_dag = QueryDag::new();
 
         let node = DagNode::from(hash_agg_2);
-        let p = lambda_dag.add_node(node);
+        let h2 = lambda_dag.add_node(node);
 
         let node = DagNode::from(hash_agg_1);
-        let h = lambda_dag.add_child(p, node);
+        let h1 = lambda_dag.add_child(h2, node);
 
         let node = DagNode::from(coalesce);
-        let c = lambda_dag.add_child(h, node);
+        let co = lambda_dag.add_child(h1, node);
 
         let node = DagNode::from(filter);
-        let f = lambda_dag.add_child(c, node);
+        let fi = lambda_dag.add_child(co, node);
 
         let node = DagNode::from(memory);
-        let m = lambda_dag.add_child(f, node);
+        let me = lambda_dag.add_child(fi, node);
 
-        assert!(lambda_dag.get_plan_str(p).contains("hash_aggregate_exec"));
+        assert!(lambda_dag.get_plan_str(h2).contains("hash_aggregate_exec"));
 
         // Forward traversal from root
-        let plans = lambda_dag.get_sub_plans(p);
+        let plans = lambda_dag.get_sub_plans(h2);
         let mut iter = plans.iter();
 
         assert!(iter
@@ -442,7 +442,7 @@ mod tests {
             .contains("memory_exec"));
 
         // Backward traversal from leaf
-        let plans = lambda_dag.get_depended_plans(m);
+        let plans = lambda_dag.get_depended_plans(me);
         let mut iter = plans.iter();
 
         assert!(iter

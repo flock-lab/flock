@@ -20,10 +20,10 @@ daggy = "0.7.0"
 datafusion = { git = "https://github.com/DSLAM-UMD/arrow-datafusion", branch = "squirtle" }
 lazy_static = "1.4"
 runtime = { path = "../../src/runtime" }
-rusoto_core = "0.46.0"
-rusoto_iam = "0.46.0"
-rusoto_kinesis = "0.46.0"
-rusoto_lambda = "0.46.0"
+rusoto_core = "0.47.0"
+rusoto_iam = "0.47.0"
+rusoto_kinesis = "0.47.0"
+rusoto_lambda = "0.47.0"
 
 # A list of all of the optional dependencies, some of which are included in the
 # above `features`. They can be opted into by apps.
