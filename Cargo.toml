@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "benchmarks",
+    "bench",
     "src/bin/cli",
     "src/driver",
     "src/function",
