@@ -13,7 +13,6 @@ The generic lambda function code is built in advance and uploaded to AWS S3.
 | Lambda Function Code    | S3 Bucket      | S3 Key           |    S3 URL                        |
 | ----------------------- | ---------------| ---------------- | -------------------------------- |
 | [Nexmark Benchmark](https://beam.apache.org/documentation/sdks/java/testing/nexmark/)      | umd-squirtle   |   nexmark        |  https://umd-squirtle.s3.amazonaws.com/nexmark      |
-| [TPC-H](http://tpc.org/tpch/)                    | umd-squirtle  |   tpch           |  `coming soon`
 
 
 ## Build From Source Code
