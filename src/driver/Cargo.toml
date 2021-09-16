@@ -8,7 +8,7 @@ keywords = [ "AWS", "code generation", "compilation", "build", "continuous deplo
 edition = "2018"
 
 [features]
-build = [ "cargo", "filetime", "fixedbitset", "glob", "regex", "remove_dir_all", "url" ]
+build = [ "filetime", "fixedbitset", "glob", "regex", "remove_dir_all", "url" ]
 
 [dependencies]
 arrow = { git = "https://github.com/DSLAM-UMD/arrow-rs", branch = "squirtle", features = [ "simd" ] }
@@ -27,7 +27,6 @@ rusoto_lambda = "0.47.0"
 
 # A list of all of the optional dependencies, some of which are included in the
 # above `features`. They can be opted into by apps.
-cargo = { version = "0.54.0", optional = true }
 serde_json = "1.0"
 filetime = { version = "0.2", optional = true }
 fixedbitset = { version = "0.4.0", optional = true }
