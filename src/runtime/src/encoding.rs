@@ -56,10 +56,10 @@ impl Encoding {
         match *self {
             Encoding::Snappy => {
                 let mut encoder = snap::raw::Encoder::new();
-                encoder.compress_vec(&s).unwrap()
+                encoder.compress_vec(s).unwrap()
             }
-            Encoding::Lz4 => lz4::block::compress(&s, None, true).unwrap(),
-            Encoding::Zstd => zstd::block::compress(&s, 3).unwrap(),
+            Encoding::Lz4 => lz4::block::compress(s, None, true).unwrap(),
+            Encoding::Zstd => zstd::block::compress(s, 3).unwrap(),
             Encoding::None => s.into(),
             _ => unimplemented!(),
         }
@@ -70,11 +70,11 @@ impl Encoding {
         match *self {
             Encoding::Snappy => {
                 let mut decoder = snap::raw::Decoder::new();
-                decoder.decompress_vec(&s).unwrap()
+                decoder.decompress_vec(s).unwrap()
             }
-            Encoding::Lz4 => lz4::block::decompress(&s, None).unwrap(),
+            Encoding::Lz4 => lz4::block::decompress(s, None).unwrap(),
             Encoding::Zstd => zstd::block::decompress(
-                &s, 10485760, // The decompressed data should be less than 10 MB
+                s, 10485760, // The decompressed data should be less than 10 MB
             )
             .unwrap(),
             Encoding::None => s.into(),

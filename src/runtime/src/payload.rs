@@ -20,10 +20,9 @@ use crate::error::{Result, SquirtleError};
 use abomonation::{decode, encode};
 use arrow::datatypes::{Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
-use arrow_flight::utils::{
-    flight_data_from_arrow_batch, flight_data_from_arrow_schema, flight_data_to_arrow_batch,
-};
+use arrow_flight::utils::{flight_data_from_arrow_batch, flight_data_to_arrow_batch};
 use arrow_flight::FlightData;
+use arrow_flight::SchemaAsIpc;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -142,14 +141,13 @@ impl Payload {
     /// Serialize the schema
     pub fn schema_to_bytes(schema: SchemaRef) -> Vec<u8> {
         let options = arrow::ipc::writer::IpcWriteOptions::default();
-        let flight_data = flight_data_from_arrow_schema(&schema, &options);
+        let flight_data: FlightData = SchemaAsIpc::new(&schema, &options).into();
         flight_data.data_header
     }
 
     /// Deserialize the schema
     pub fn schema_from_bytes(bytes: &[u8]) -> Result<Arc<Schema>> {
-        let schema =
-            arrow::ipc::convert::schema_from_bytes(&bytes).map_err(SquirtleError::Arrow)?;
+        let schema = arrow::ipc::convert::schema_from_bytes(bytes).map_err(SquirtleError::Arrow)?;
         Ok(Arc::new(schema))
     }
 
@@ -186,7 +184,7 @@ impl Payload {
         let data_frames = batches
             .par_iter()
             .map(|b| {
-                let (_, flight_data) = flight_data_from_arrow_batch(&b, &options);
+                let (_, flight_data) = flight_data_from_arrow_batch(b, &options);
                 if encoding != Encoding::None {
                     DataFrame {
                         header: encoding.compress(&flight_data.data_header),
@@ -216,7 +214,7 @@ impl Payload {
         let data_frames = batches
             .par_iter()
             .map(|b| {
-                let (_, flight_data) = flight_data_from_arrow_batch(&b, &options);
+                let (_, flight_data) = flight_data_from_arrow_batch(b, &options);
                 if encoding != Encoding::None {
                     DataFrame {
                         header: encoding.compress(&flight_data.data_header),
@@ -244,7 +242,7 @@ impl Payload {
     pub fn to_bytes(batch: &RecordBatch, uuid: Uuid, encoding: Encoding) -> bytes::Bytes {
         let options = arrow::ipc::writer::IpcWriteOptions::default();
         let schema = Self::schema_to_bytes(batch.schema());
-        let (_, flight_data) = flight_data_from_arrow_batch(&batch, &options);
+        let (_, flight_data) = flight_data_from_arrow_batch(batch, &options);
 
         let data_frames = {
             if encoding != Encoding::None {
@@ -296,7 +294,6 @@ mod tests {
     use arrow::datatypes::{DataType, Field, Schema};
     use arrow::json;
     use bytes::BytesMut;
-    use prost::Message;
     use std::sync::Arc;
     use std::time::Instant;
 
@@ -616,55 +613,6 @@ mod tests {
             }
             println!("--------------------------------------");
         }
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn prost_data_frames() -> Result<()> {
-        let batches = init_batches();
-
-        // compress
-        let now = Instant::now();
-        let options = arrow::ipc::writer::IpcWriteOptions::default();
-        let data_frames = (0..batches.len())
-            .map(|i| {
-                let (_, flight_data) = flight_data_from_arrow_batch(&batches[i], &options);
-                flight_data
-            })
-            .collect::<Vec<FlightData>>();
-
-        println!("prost data - raw data: {}", data_frames[0].encoded_len(),);
-
-        let encoding = Encoding::Zstd;
-
-        // compress
-        let mut buffer = BytesMut::with_capacity(data_frames[0].encoded_len());
-        data_frames[0].encode(&mut buffer).unwrap();
-        let event: bytes::Bytes = encoding.compress(&buffer).into();
-        println!(
-            "prost data - compression time: {} ms",
-            now.elapsed().as_millis()
-        );
-        println!(
-            "prost data - compressed data: {}, type: {:?}",
-            event.len(),
-            encoding
-        );
-
-        // decompress
-        let now = Instant::now();
-        let de_flights_data = FlightData::decode(&encoding.decompress(&event)[..]).unwrap();
-        println!(
-            "prost data - decompression time: {} ms",
-            now.elapsed().as_millis()
-        );
-        println!(
-            "prost data - decompressed data: {}",
-            de_flights_data.encoded_len(),
-        );
-
-        assert_eq!(de_flights_data, data_frames[0]);
 
         Ok(())
     }

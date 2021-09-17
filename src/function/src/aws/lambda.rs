@@ -279,6 +279,7 @@ mod tests {
     use std::sync::Arc;
 
     #[tokio::test]
+    #[ignore]
     async fn generic_lambda() -> Result<()> {
         IS_TESTING.with(|t| t.set(true));
         let plan = include_str!("../../../test/data/plan/simple_select.json");

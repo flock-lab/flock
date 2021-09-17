@@ -125,7 +125,7 @@ mod tests {
             let batches = repartition(
                 batches,
                 Partitioning::HashDiff(
-                    vec![Arc::new(Column::new(&"seller"))],
+                    vec![Arc::new(Column::new(&"seller", 0))],
                     total_distinct_sellers as usize,
                 ),
             )

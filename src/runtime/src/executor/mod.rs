@@ -218,7 +218,7 @@ mod tests {
     use arrow::datatypes::{DataType, Field, Schema};
     use aws_lambda_events::event::kinesis::KinesisEvent;
     use datafusion::datasource::MemTable;
-    use datafusion::physical_plan::expressions::Column;
+    use datafusion::physical_plan::expressions::{col, Column};
     use tokio::task::JoinHandle;
 
     #[tokio::test]
@@ -309,7 +309,7 @@ mod tests {
 
         let output_partitions = LambdaExecutor::repartition(
             partitions,
-            Partitioning::Hash(vec![Arc::new(Column::new(&"c0"))], 8),
+            Partitioning::Hash(vec![col("c0", &schema)?], 8),
         )
         .await?;
 
