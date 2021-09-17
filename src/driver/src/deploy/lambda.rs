@@ -37,6 +37,7 @@ struct LambdaDeploymentPackage<'a> {
     pub s3_key:            &'a str,
     /// S3 object version for the pre-compiled deployment package to be
     /// compatible with the client version.
+    #[allow(dead_code)]
     pub s3_object_version: &'a str,
 }
 
@@ -69,8 +70,10 @@ struct LambdaMemoryFootprint {
     // regular operator's memory size (MB).
     pub default:    i64,
     /// OLAP aggregate operator's memory size (MB).
+    #[allow(dead_code)]
     pub agg_batch:  i64,
     /// Stream aggregate operator's memory size (MB).
+    #[allow(dead_code)]
     pub agg_stream: i64,
 }
 

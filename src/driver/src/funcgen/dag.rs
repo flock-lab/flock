@@ -474,6 +474,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn partition_json() {
         let json = include_str!("../../../test/data/plan/aggregate.json");
         let plan: Arc<dyn ExecutionPlan> = serde_json::from_str(&json).unwrap();
