@@ -44,7 +44,7 @@ type DagPlan = Dag<DagNode, DagEdge>;
 /// A node representation of the subplan of a query statement.
 #[derive(Debug, Clone)]
 pub struct DagNode {
-    /// Subplan string.
+    /// Subplan of the query statement.
     pub plan:        Arc<dyn ExecutionPlan>,
     /// Function concurrency in cloud environment.
     pub concurrency: u8,
@@ -99,7 +99,7 @@ impl DerefMut for QueryDag {
 
 impl QueryDag {
     /// Create a new `QueryDag`.
-    pub fn new() -> Self {
+    pub fn new() -> QueryDag {
         QueryDag {
             dag: DagPlan::new(),
         }
@@ -111,8 +111,8 @@ impl QueryDag {
     }
 
     /// Build a Dag representation of a given plan.
-    pub fn from(plan: &Arc<dyn ExecutionPlan>) -> Self {
-        Self::build_dag(plan)
+    pub fn from(plan: &Arc<dyn ExecutionPlan>) -> QueryDag {
+        QueryDag::build_dag(plan)
     }
 
     /// Return the depth for the given node in the dag.
@@ -190,26 +190,27 @@ impl QueryDag {
     /// Build a new daggy from a physical plan.
     fn build_dag(plan: &Arc<dyn ExecutionPlan>) -> Self {
         let mut dag = QueryDag::new();
-        let _ = dag.fission(&plan);
+        let _ = dag.fission(plan);
         assert!(dag.node_count() >= 1);
         dag
     }
 
     /// Add a new node to the `QueryDag`.
-    fn insert(&mut self, parent: NodeIndex, node: Value, concurrency: u8) -> NodeIndex {
+    fn insert(&mut self, parent: NodeIndex, node: Value, concurrency: u8) -> Result<NodeIndex> {
         if parent == NodeIndex::end() {
-            self.add_node(DagNode {
-                plan: serde_json::from_value(node).unwrap(),
+            Ok(self.add_node(DagNode {
+                plan: serde_json::from_value(node)?,
                 concurrency,
-            })
+            }))
         } else {
-            self.add_child(
+            // TODO: call add_parent instead of add_child
+            Ok(self.add_child(
                 parent,
                 DagNode {
-                    plan: serde_json::from_value(node).unwrap(),
+                    plan: serde_json::from_value(node)?,
                     concurrency,
                 },
-            )
+            ))
         }
     }
 
@@ -238,7 +239,7 @@ impl QueryDag {
                         )?);
                         json["input"] = serde_json::to_value(input)?;
                         // Add the new subplan to DAG
-                        leaf = self.insert(leaf, root, CONCURRENCY_1);
+                        leaf = self.insert(leaf, root, CONCURRENCY_1)?;
                         // Point to the next subplan
                         root = Value::Object(object);
                         json = &mut root;
@@ -255,7 +256,7 @@ impl QueryDag {
                     let input: Arc<dyn ExecutionPlan> =
                         Arc::new(MemoryExec::try_new(&[], Arc::new(Schema::empty()), None)?);
                     *json = serde_json::to_value(input)?;
-                    leaf = self.insert(leaf, root, CONCURRENCY_1);
+                    leaf = self.insert(leaf, root, CONCURRENCY_1)?;
                     root = Value::Object(object);
                     break;
                 }
@@ -266,7 +267,8 @@ impl QueryDag {
             }
             curr = curr.children()[0].clone();
         }
-        self.insert(leaf, root, CONCURRENCY_8);
+
+        let _ = self.insert(leaf, root, CONCURRENCY_8);
         Ok(())
     }
 }
