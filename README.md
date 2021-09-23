@@ -228,4 +228,4 @@ AWS gives you a personalized view of the status of the query execution (`q3`).
 ## License
 
 Copyright 2020 UMD Database Group. All Rights Reserved.
-The library, examples, and all source code are released under [Apache License 2.0](LICENSE).
+The library, examples, and all source code are released under [AGPL-3.0 License](LICENSE).
