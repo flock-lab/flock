@@ -58,6 +58,9 @@ pub enum SquirtleError {
     /// Examples include impossible casts, schema inference not possible and
     /// non-unique column names.
     Plan(String),
+    /// Error returned when the DAG partition failed in Squirtle.
+    /// This error should not happen in normal usage of Squirtle.
+    DagPartition(String),
     /// Error returned during execution of the query.
     /// Examples include files not found, errors in parsing certain types.
     Execution(String),
@@ -127,6 +130,9 @@ impl Display for SquirtleError {
                 desc
             ),
             SquirtleError::Plan(ref desc) => write!(f, "Error during planning: {}", desc),
+            SquirtleError::DagPartition(ref desc) => {
+                write!(f, "Error during DAG partitioning: {}", desc)
+            }
             SquirtleError::Execution(ref desc) => write!(f, "Execution error: {}", desc),
             SquirtleError::FunctionGeneration(ref desc) => {
                 write!(f, "Function generation error: {}", desc)

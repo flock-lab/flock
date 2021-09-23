@@ -21,7 +21,7 @@ use daggy::{Dag, NodeIndex, Walker};
 use arrow::datatypes::Schema;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::ExecutionPlan;
-
+use runtime::error::{Result, SquirtleError};
 use serde_json::Value;
 
 use std::ops::{Deref, DerefMut};
@@ -190,21 +190,21 @@ impl QueryDag {
     /// Build a new daggy from a physical plan.
     fn build_dag(plan: &Arc<dyn ExecutionPlan>) -> Self {
         let mut dag = QueryDag::new();
-        Self::fission(&mut dag, &plan);
+        let _ = dag.fission(&plan);
         assert!(dag.node_count() >= 1);
         dag
     }
 
     /// Add a new node to the `QueryDag`.
-    fn insert_dag(dag: &mut QueryDag, leaf: NodeIndex, node: Value, concurrency: u8) -> NodeIndex {
-        if leaf == NodeIndex::end() {
-            dag.add_node(DagNode {
+    fn insert(&mut self, parent: NodeIndex, node: Value, concurrency: u8) -> NodeIndex {
+        if parent == NodeIndex::end() {
+            self.add_node(DagNode {
                 plan: serde_json::from_value(node).unwrap(),
                 concurrency,
             })
         } else {
-            dag.add_child(
-                leaf,
+            self.add_child(
+                parent,
                 DagNode {
                     plan: serde_json::from_value(node).unwrap(),
                     concurrency,
@@ -214,7 +214,7 @@ impl QueryDag {
     }
 
     /// Transform a physical plan for cloud environment execution.
-    fn fission(dag: &mut QueryDag, plan: &Arc<dyn ExecutionPlan>) {
+    fn fission(&mut self, plan: &Arc<dyn ExecutionPlan>) -> Result<()> {
         let mut root = serde_json::to_value(&plan).unwrap();
         let mut json = &mut root;
         let mut leaf = NodeIndex::end();
@@ -224,15 +224,21 @@ impl QueryDag {
                 Some("hash_aggregate_exec") => match json["mode"].as_str() {
                     Some("FinalPartitioned") | Some("Final") => {
                         // Split the plan into two subplans
-                        let object = (*json["input"].take().as_object().unwrap()).clone();
+                        let object = (*json["input"].take().as_object().ok_or_else(|| {
+                            SquirtleError::DagPartition(
+                                "Failed to parse input for hash_aggregate_exec".to_string(),
+                            )
+                        })?)
+                        .clone();
                         // Add a input for the new subplan
-                        let input: Arc<dyn ExecutionPlan> = Arc::new(
-                            MemoryExec::try_new(&[], curr.children()[0].schema().clone(), None)
-                                .unwrap(),
-                        );
-                        json["input"] = serde_json::to_value(input).unwrap();
+                        let input: Arc<dyn ExecutionPlan> = Arc::new(MemoryExec::try_new(
+                            &[],
+                            curr.children()[0].schema().clone(),
+                            None,
+                        )?);
+                        json["input"] = serde_json::to_value(input)?;
                         // Add the new subplan to DAG
-                        leaf = Self::insert_dag(dag, leaf, root, CONCURRENCY_1);
+                        leaf = self.insert(leaf, root, CONCURRENCY_1);
                         // Point to the next subplan
                         root = Value::Object(object);
                         json = &mut root;
@@ -240,12 +246,16 @@ impl QueryDag {
                     _ => json = &mut json["input"],
                 },
                 Some("hash_join_exec") => {
-                    let object = (*json.take().as_object().unwrap()).clone();
-                    let input: Arc<dyn ExecutionPlan> = Arc::new(
-                        MemoryExec::try_new(&[], Arc::new(Schema::empty()), None).unwrap(),
-                    );
-                    *json = serde_json::to_value(input).unwrap();
-                    leaf = Self::insert_dag(dag, leaf, root, CONCURRENCY_1);
+                    let object = (*json.take().as_object().ok_or_else(|| {
+                        SquirtleError::DagPartition(
+                            "Failed to parse input for hash_join_exec".to_string(),
+                        )
+                    })?)
+                    .clone();
+                    let input: Arc<dyn ExecutionPlan> =
+                        Arc::new(MemoryExec::try_new(&[], Arc::new(Schema::empty()), None)?);
+                    *json = serde_json::to_value(input)?;
+                    leaf = self.insert(leaf, root, CONCURRENCY_1);
                     root = Value::Object(object);
                     break;
                 }
@@ -256,7 +266,8 @@ impl QueryDag {
             }
             curr = curr.children()[0].clone();
         }
-        Self::insert_dag(dag, leaf, root, CONCURRENCY_8);
+        self.insert(leaf, root, CONCURRENCY_8);
+        Ok(())
     }
 }
 
