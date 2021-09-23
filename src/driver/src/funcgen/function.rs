@@ -232,7 +232,7 @@ mod tests {
         });
 
         let mut dag = QueryDag::from(&query.plan());
-        QueryFlow::add_source(query.plan().clone(), &mut dag);
+        QueryFlow::add_source(query.plan(), &mut dag);
         let ctx = QueryFlow::build_context(&*query, &mut dag);
 
         Ok(QueryFlow { query, dag, ctx })
