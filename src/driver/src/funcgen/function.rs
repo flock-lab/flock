@@ -238,19 +238,38 @@ mod tests {
         Ok(QueryFlow { query, dag, ctx })
     }
 
-    fn datasource(func: &QueryFlow, idx: usize) -> String {
-        format!(
+    fn datasource(func: &QueryFlow, idx: usize) -> Result<String> {
+        Ok(format!(
             "{:?}",
-            func.ctx.get(&NodeIndex::new(idx)).unwrap().datasource
-        )
+            func.ctx
+                .get(&NodeIndex::new(idx))
+                .ok_or(SquirtleError::DagPartition(
+                    "Failed to get data source field from the hash map".to_string()
+                ))?
+                .datasource
+        ))
     }
 
-    fn function_name(func: &QueryFlow, idx: usize) -> String {
-        func.ctx.get(&NodeIndex::new(idx)).unwrap().name.clone()
+    fn function_name(func: &QueryFlow, idx: usize) -> Result<String> {
+        Ok(func
+            .ctx
+            .get(&NodeIndex::new(idx))
+            .ok_or(SquirtleError::DagPartition(
+                "Failed to get function name field from the hash map".to_string(),
+            ))?
+            .name
+            .clone())
     }
 
-    fn next_function(func: &QueryFlow, idx: usize) -> CloudFunction {
-        func.ctx.get(&NodeIndex::new(idx)).unwrap().next.clone()
+    fn next_function(func: &QueryFlow, idx: usize) -> Result<CloudFunction> {
+        Ok(func
+            .ctx
+            .get(&NodeIndex::new(idx))
+            .ok_or(SquirtleError::DagPartition(
+                "Failed to get next function field from the hash map".to_string(),
+            ))?
+            .next
+            .clone())
     }
 
     #[tokio::test]
@@ -258,15 +277,15 @@ mod tests {
         let sql = concat!("SELECT b FROM t ORDER BY b ASC LIMIT 3");
 
         let mut functions = init_query_flow(&sql).await?;
-        assert_eq!("Payload", datasource(&functions, 0));
-        assert_eq!("UnknownEvent", datasource(&functions, 1));
+        assert_eq!("Payload", datasource(&functions, 0)?);
+        assert_eq!("UnknownEvent", datasource(&functions, 1)?);
 
-        assert!(function_name(&functions, 0).contains("00"));
-        assert!(function_name(&functions, 1).contains("01"));
+        assert!(function_name(&functions, 0)?.contains("00"));
+        assert!(function_name(&functions, 1)?.contains("01"));
 
-        assert!(matches!(next_function(&functions, 0), CloudFunction::None));
+        assert!(matches!(next_function(&functions, 0)?, CloudFunction::None));
         assert!(matches!(
-            next_function(&functions, 1),
+            next_function(&functions, 1)?,
             CloudFunction::Solo(..)
         ));
 
@@ -293,21 +312,21 @@ mod tests {
         let sql = concat!("SELECT MIN(a), AVG(b) ", "FROM t ", "GROUP BY b");
 
         let mut functions = init_query_flow(&sql).await?;
-        assert_eq!("Payload", datasource(&functions, 0));
-        assert_eq!("Payload", datasource(&functions, 1));
-        assert_eq!("UnknownEvent", datasource(&functions, 2));
+        assert_eq!("Payload", datasource(&functions, 0)?);
+        assert_eq!("Payload", datasource(&functions, 1)?);
+        assert_eq!("UnknownEvent", datasource(&functions, 2)?);
 
-        assert!(function_name(&functions, 0).contains("00"));
-        assert!(function_name(&functions, 1).contains("01"));
-        assert!(function_name(&functions, 2).contains("02"));
+        assert!(function_name(&functions, 0)?.contains("00"));
+        assert!(function_name(&functions, 1)?.contains("01"));
+        assert!(function_name(&functions, 2)?.contains("02"));
 
-        assert!(matches!(next_function(&functions, 0), CloudFunction::None));
+        assert!(matches!(next_function(&functions, 0)?, CloudFunction::None));
         assert!(matches!(
-            next_function(&functions, 1),
+            next_function(&functions, 1)?,
             CloudFunction::Chorus(..)
         ));
         assert!(matches!(
-            next_function(&functions, 2),
+            next_function(&functions, 2)?,
             CloudFunction::Solo(..)
         ));
 
@@ -339,12 +358,14 @@ mod tests {
 
     #[tokio::test]
     async fn lambda_function_name() -> Result<()> {
-        // query code
+        // The hash of the SQL statement is used as the first 16 characters of the
+        // function name.
         let hash = Blake2b::digest(b"SELECT b FROM t ORDER BY b ASC LIMIT 3");
         let mut s1 = base64::encode(&hash);
         s1.truncate(16);
 
-        // plan index
+        // The sub-plan index in the dag is used as the second 2 characters of the
+        // function name.
         let s2 = format!("{:0>2}", 0);
         //                  |||
         //                  ||+-- width
@@ -352,9 +373,10 @@ mod tests {
         //                  +---- fill
         assert_eq!("00", s2);
 
-        // timestamp
+        // The timestamp is used as the last part of the function name.
         let s3 = chrono::offset::Utc::now();
 
+        // Example: "SX72HzqFz1Qij4bP-00-2021-09-23T19:25:49.633392315Z"
         let name = format!("{}-{}-{:?}", s1, s2, s3);
         println!("{}", name);
 
