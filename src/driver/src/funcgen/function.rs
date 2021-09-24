@@ -75,8 +75,7 @@ impl QueryFlow {
 
     /// Deploy the lambda functions and execution context for the query.
     ///
-    /// ## Arguments
-    ///
+    /// # Arguments
     /// * `env` - The execution environment to deploy the lambda functions. The
     ///   environment could be a local environment or a cloud platform such as
     ///   AWS Lambda, Google Compute Engine, Azure, etc.

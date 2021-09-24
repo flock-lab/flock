@@ -24,25 +24,35 @@ use dashmap::DashMap;
 use serde_json::Value;
 use std::ops::{Deref, DerefMut};
 
-/// Reassemble data fragments to separate window sessions.
+/// `DashMap` is a thread-safe hash map inside the lambda function that is used
+/// to aggregate the data frames of the previous stage of dataflow to ensure the
+/// integrity of the window data for stream processing.
+///
+/// # Key-value pairs
+/// * The key is the hash value of a SQL query statement concatenated with the
+///   query time.
+/// * The value is the data frames of the previous stage of dataflow for a given
+///   query at a given time wrapped by `WindowSession`.
 pub struct Arena(DashMap<String, WindowSession>);
 
-/// In time-streaming scenarios, performing operations on the data contained in
-/// temporal windows is a common pattern.
+/// `WindowSession` is an abstraction of a temporal window that is used to store
+/// the data frames of the previous stage of dataflow to ensure the integrity of
+/// the window data for stream processing. Performing operations on the data
+/// contained in temporal windows is a common pattern in stream processing.
 #[derive(Debug)]
 pub struct WindowSession {
-    /// The window size (# data fragments / payloads).
-    /// Note: [size] == [Uuid.seq_len]
+    /// The number of data fragments in the payload.
+    /// [`WindowSession::size`] equals to [`Uuid::seq_len`].
     pub size:    usize,
-    /// Reassembled record batches.
+    /// Reassembled record batches in the temporal window.
     pub batches: Vec<Vec<RecordBatch>>,
-    /// Validity bitmap is to track which data fragments in the window have not
-    /// been received yet.
+    /// Bitmap indicating the existence of data fragments in the temporal
+    /// window.
     pub bitmap:  Bitmap,
 }
 
 impl WindowSession {
-    /// Return the data schema for the current window session.
+    /// Return the schema of data fragments in the temporal window.
     pub fn schema(&self) -> Result<SchemaRef> {
         if self.batches.is_empty() || self.batches[0].is_empty() {
             return Err(SquirtleError::Internal(
@@ -54,12 +64,12 @@ impl WindowSession {
 }
 
 impl Arena {
-    /// Create a new [`Arena`].
+    /// Create a new `Arena`.
     pub fn new() -> Arena {
         Arena(DashMap::<String, WindowSession>::new())
     }
 
-    /// Return record batches for the current window.
+    /// Get the data fragments in the temporal window via the key.
     pub fn batches(&mut self, tid: String) -> Vec<Vec<RecordBatch>> {
         if let Some((_, v)) = (*self).remove(&tid) {
             v.batches
@@ -68,9 +78,16 @@ impl Arena {
         }
     }
 
-    /// Ressemble the payload to a specific window session.
+    /// Reassemble the data fragments in the temporal window.
     ///
-    /// Return true, if the window data collection is complete,
+    /// # Arguments
+    /// * `event` - the serialized data fragments from the previous stage of
+    /// dataflow.
+    ///
+    /// # Returns
+    /// * Return true if the window data collection is complete, otherwise
+    ///   return false. Uuid is also returned no matter whether the window data
+    ///   collection is complete.
     pub fn reassemble(&mut self, event: Value) -> (bool, Uuid) {
         let mut ready = false;
         let (fragment, uuid) = Payload::to_batch(event);

@@ -14,6 +14,11 @@
 
 //! Payload API for building and executing query plans in cloud function
 //! services.
+//!
+//! This module contains the [`Payload`] type, which is used to package up
+//! the intermediate results and metadata into a single object that can be
+//! passed to the next cloud function. [`Uuid`] represents a unique identifier
+//! of the payload for a given query at the specified time.
 
 use crate::encoding::Encoding;
 use crate::error::{Result, SquirtleError};
@@ -29,15 +34,14 @@ use serde_json::Value;
 use std::sync::Arc;
 use text_io::scan;
 
-/// A helper function to build UUIDs of a series of payloads for a given query.
+/// A helper struct for building uuids of payloads.
 #[derive(Default, Debug)]
 pub struct UuidBuilder {
-    /// The identifier of the query triggered at the specific time.
+    /// The identifier of the data fragment or the payload.
     pub tid: String,
-    /// The sequence number which builder has assigned to the latest payload.
+    /// The data fragment index in the time window.
     pub pos: usize,
-    /// The total sequence numbers after the data is fragmented to different
-    /// payloads.
+    /// The total number of data fragments in the time window.
     pub len: usize,
 }
 
@@ -88,23 +92,22 @@ impl UuidBuilder {
     }
 }
 
-/// Whether it is streaming or batch processing, each query has a unique
-/// identifier to distinguish each other, so that the lambda function can
-/// correctly separate and aggregate the results for distributed dataflow
-/// computation.
+/// The unique identifier of the payload or the data fragment in the time
+/// window.
 #[derive(Default, Debug, Clone, Abomonation, Deserialize, Serialize, PartialEq, Eq)]
 pub struct Uuid {
     /// The identifier of the query triggered at the specific time.
     ///
     /// # Note
-    ///
-    /// `tid` is also used as a random seed for choosing the next function
-    /// (with concurrency = 1) through consistent hashing.
+    /// * [`Uuid::tid`] is also used to pick the next function to execute using
+    ///   consistent hashing.
     pub tid:     String,
-    /// The sequence number of the data contained in the payload.
+    /// `seq_num` represents the position of the data fragment in the time
+    /// window, starting from 0, which will be recorded in the
+    /// `[WindowSession::bitmap]`.
     pub seq_num: usize,
-    /// The total sequence numbers after the data is fragmented to different
-    /// payloads.
+    /// `seq_len` represents the total number of fragments after the data is
+    /// fragmented into different payloads.
     pub seq_len: usize,
 }
 
