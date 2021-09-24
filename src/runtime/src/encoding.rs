@@ -12,13 +12,17 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 // Only bring in dependencies for the repl when the cli feature is enabled.
 
-//! `Encoding` is a compression/decompression module to reduce the total size of
-//! all environment variables so that they doesn't exceed 4 KB.
+//! This module contains the encoding and decoding functions to be used in the
+//! cloud function runtime.
+//!
+//! For example, it can be used to reduce the size of the payload sent between
+//! the cloud functions, and reduce the size of all environment variables to
+//! less than 4KB as well.
 
 use abomonation::{decode, encode};
 use serde::{Deserialize, Serialize};
 
-/// A compressor/decompressor type.
+/// This function encodes the given data into a byte array.
 #[derive(Debug, Clone, Abomonation, Deserialize, Serialize, PartialEq)]
 pub enum Encoding {
     /// Snappy is a LZ77-type compressor with a fixed, byte-oriented encoding.
@@ -51,7 +55,7 @@ impl Default for Encoding {
 }
 
 impl Encoding {
-    /// Compress data
+    /// Compress the given data using the encoding type.
     pub fn compress(&self, s: &[u8]) -> Vec<u8> {
         match *self {
             Encoding::Snappy => {
@@ -65,7 +69,7 @@ impl Encoding {
         }
     }
 
-    /// Decompress data
+    /// Decompress the given data using the encoding type.
     pub fn decompress(&self, s: &[u8]) -> Vec<u8> {
         match *self {
             Encoding::Snappy => {

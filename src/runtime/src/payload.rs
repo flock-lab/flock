@@ -12,9 +12,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 // Only bring in dependencies for the repl when the cli feature is enabled.
 
-//! Payload API for building and executing query plans in cloud function
-//! services.
-//!
 //! This module contains the [`Payload`] type, which is used to package up
 //! the intermediate results and metadata into a single object that can be
 //! passed to the next cloud function. [`Uuid`] represents a unique identifier
@@ -111,7 +108,8 @@ pub struct Uuid {
     pub seq_len: usize,
 }
 
-/// Arrow Flight Data format
+/// `DataFrame` is a wrapper of the Arrow Flight Data format for network
+/// transmission.
 #[derive(Default, Debug, Clone, Abomonation, Deserialize, Serialize, PartialEq, Eq)]
 pub struct DataFrame {
     /// Arrow Flight Data's header.
@@ -122,21 +120,20 @@ pub struct DataFrame {
     body:   Vec<u8>,
 }
 
-/// `Payload` is the raw structure of the function's payload passed between
-/// lambda functions. In AWS Lambda, it supports payload sizes up to 256KB for
-/// async invocation. You can pass payloads in your query workflows, allowing
-/// each lambda function to seamlessly perform related query operations.
+/// `Payload` is the wire format of the function's payload passed between
+/// cloud functions.
 #[derive(Default, Debug, Abomonation, Deserialize, Serialize, PartialEq)]
 pub struct Payload {
-    /// The data batches in the payload.
+    /// The record batches are encoded in the Arrow Flight Data format.
     pub data:     Vec<DataFrame>,
-    /// The subplan's schema.
+    /// The schema of the record batches in binary format.
     #[serde(with = "serde_bytes")]
     pub schema:   Vec<u8>,
-    /// The query's uuid.
+    /// The UUID of the payload.
     pub uuid:     Uuid,
-    /// Compress `DataFrame` to guarantee the total size
-    /// of payload doesn't exceed 256 KB.
+    /// The encoding and compression method.
+    /// Note: using this value to guarantee the total size of payload doesn't
+    /// exceed 256 KB due to the limitation of AWS Lambda's async invocation.
     pub encoding: Encoding,
 }
 

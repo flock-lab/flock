@@ -8,7 +8,7 @@ assignees: ''
 ---
 
 **Is your feature request related to a problem or challenge? Please describe what you are trying to do.**
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...] 
+A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
 (This section helps Arrow developers understand the context and *why* for this feature, in addition to  the *what*)
 
 **Describe the solution you'd like**
