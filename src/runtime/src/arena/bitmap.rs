@@ -11,22 +11,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-//! Validity bitmap is to track which data fragments in the window have not been
-//! received yet.
+//! A bitmap is a bit vector that can be used to represent a set of integers.
+//! It is a simple wrapper around a `Vec<u8>` that provides a few convenience
+//! methods to manipulate the bits.
+//!
+//! The goal of this module is to provide a fast, compact, and memory-efficient
+//! representation to track which data fragments in the current time-window are
+//! available, versus which are not.
 
 use crate::error::Result;
 use arrow::buffer::MutableBuffer;
 use arrow::util::bit_util;
 
-/// A [`Bitmap`] is to build a [`WinodowSession`] for stream processing.
+/// A bitmap is a bit vector that can be used to represent a set of flags.
 #[derive(Debug)]
 pub struct Bitmap {
-    /// A [`MutableBuffer`] is Arrow's interface.
+    /// A [`MutableBuffer`] is Arrow's interface to build a [`Buffer`] out of
+    /// items or slices of items.
     pub bits: MutableBuffer,
 }
 
 impl Bitmap {
-    /// Create a new bitmap
+    /// Creates a new bitmap with the given capacity.
     pub fn new(num_bits: usize) -> Self {
         let num_bytes = num_bits / 8 + if num_bits % 8 > 0 { 1 } else { 0 };
         let r = num_bytes % 64;
@@ -41,13 +47,13 @@ impl Bitmap {
         Bitmap { bits: buf }
     }
 
-    /// Return true if `i` is set in the bitmap.
+    /// Returns `true` if the bit is set, `false` otherwise.
     pub fn is_set(&self, i: usize) -> bool {
         assert!(i < (self.bits.len() << 3));
         unsafe { bit_util::get_bit_raw(self.bits.as_ptr(), i) }
     }
 
-    /// Set `i` into the bitmap.
+    /// Sets the bit at the given index.
     pub fn set(&mut self, i: usize) {
         assert!(i < (self.bits.len() << 3));
         unsafe {
