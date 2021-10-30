@@ -148,7 +148,7 @@ async fn payload_handler(
             if ready {
                 arena.batches(uuid.tid)
             } else {
-                return Err(SquirtleError::Execution(
+                return Err(FlockError::Execution(
                     "window data collection has not been completed.".to_string(),
                 ));
             }
@@ -160,9 +160,7 @@ async fn payload_handler(
     };
 
     if input_partitions.is_empty() || input_partitions[0].is_empty() {
-        return Err(SquirtleError::Execution(
-            "payload data is empty.".to_string(),
-        ));
+        return Err(FlockError::Execution("payload data is empty.".to_string()));
     }
 
     // TODO(gangliao): repartition input batches to speedup the operations.
@@ -280,7 +278,7 @@ async fn feed_two_source(
 
 async fn collect(ctx: &mut ExecutionContext, event: NexMarkEvent) -> Result<Vec<RecordBatch>> {
     if event.persons.is_empty() && event.auctions.is_empty() && event.bids.is_empty() {
-        return Err(SquirtleError::Execution("No Nexmark input!".to_owned()));
+        return Err(FlockError::Execution("No Nexmark input!".to_owned()));
     }
 
     match ctx.query_number {

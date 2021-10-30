@@ -21,7 +21,7 @@ use daggy::{Dag, NodeIndex, Walker};
 use arrow::datatypes::Schema;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::ExecutionPlan;
-use runtime::error::{Result, SquirtleError};
+use runtime::error::{FlockError, Result};
 use serde_json::Value;
 
 use std::ops::{Deref, DerefMut};
@@ -226,7 +226,7 @@ impl QueryDag {
                     Some("FinalPartitioned") | Some("Final") => {
                         // Split the plan into two subplans
                         let object = (*json["input"].take().as_object().ok_or_else(|| {
-                            SquirtleError::DagPartition(
+                            FlockError::DagPartition(
                                 "Failed to parse input for hash_aggregate_exec".to_string(),
                             )
                         })?)
@@ -248,7 +248,7 @@ impl QueryDag {
                 },
                 Some("hash_join_exec") => {
                     let object = (*json.take().as_object().ok_or_else(|| {
-                        SquirtleError::DagPartition(
+                        FlockError::DagPartition(
                             "Failed to parse input for hash_join_exec".to_string(),
                         )
                     })?)

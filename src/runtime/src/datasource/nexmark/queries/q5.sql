@@ -9,7 +9,7 @@
 -- i.e. in the last 10 seconds and update every 5 seconds.
 -- -------------------------------------------------------------------------------------------------
 
--- TODO: This window query will be implemented by Rust via Squirtle API.
+-- TODO: This window query will be implemented by Rust via Flock API.
 
 SELECT AuctionBids.auction, AuctionBids.num
  FROM (

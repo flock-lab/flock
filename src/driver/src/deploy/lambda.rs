@@ -27,7 +27,7 @@ use lazy_static::lazy_static;
 /// their dependencies. You use a deployment package to deploy your function
 /// code to Lambda. Lambda supports two types of deployment packages: container
 /// images and .zip files. To approach real-time query processing, you **don't
-/// require** to upload the deployment package from your local machine. Squirtle
+/// require** to upload the deployment package from your local machine. Flock
 /// uploaded the pre-compiled deployment package to Amazon Simple Storage
 /// Service (Amazon S3) in advance.
 struct LambdaDeploymentPackage<'a> {
@@ -80,14 +80,14 @@ struct LambdaMemoryFootprint {
 lazy_static! {
     static ref LAMBDA_DEPLOYMENT_PACKAGE: LambdaDeploymentPackage<'static> =
         LambdaDeploymentPackage {
-            s3_bucket:         "umd-squirtle",
+            s3_bucket:         "umd-flock",
             s3_key:            "regular",
             s3_object_version: env!("CARGO_PKG_VERSION"),
         };
 
     static ref NEXMARK_DEPLOYMENT_PACKAGE: LambdaDeploymentPackage<'static> =
         LambdaDeploymentPackage {
-            s3_bucket:         "umd-squirtle",
+            s3_bucket:         "umd-flock",
             s3_key:            "nexmark",
             s3_object_version: env!("CARGO_PKG_VERSION"),
         };
@@ -96,7 +96,7 @@ lazy_static! {
     static ref LAMABDA_RUNTIME:  &'static str = "provided.al2";
 
     /// The Amazon Resource Name (ARN) of the function's execution role.
-    static ref ROLE_NAME: &'static str = "squirtle";
+    static ref ROLE_NAME: &'static str = "flock";
 
     static ref LAMBDA_MEMORY_FOOTPRINT: LambdaMemoryFootprint =
         LambdaMemoryFootprint {

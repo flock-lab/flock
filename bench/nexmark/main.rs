@@ -142,7 +142,7 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
                         invoke_lambda_function(
                             func_arn,
                             serde_json::to_vec(&events.select(t, g).ok_or_else(|| {
-                                SquirtleError::Internal(
+                                FlockError::Internal(
                                     "Failed to select event from streaming data".to_string(),
                                 )
                             })?)?,
@@ -199,7 +199,7 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
                                 "{:?}",
                                 serde_json::from_slice::<Value>(&response.payload.ok_or_else(
                                     || {
-                                        SquirtleError::Internal(
+                                        FlockError::Internal(
                                             "Failed to parse the payload of the function response."
                                                 .to_string(),
                                         )
@@ -240,7 +240,7 @@ async fn invoke_lambda_function(
     match LAMBDA_CLIENT.invoke(request).await {
         Ok(response) => return Ok(response),
         Err(err) => {
-            return Err(SquirtleError::Execution(format!(
+            return Err(FlockError::Execution(format!(
                 "Lambda function execution failure: {}",
                 err
             )))
@@ -258,7 +258,7 @@ async fn set_lambda_concurrency(function_name: String, concurrency: i64) -> Resu
     let concurrency = LAMBDA_CLIENT
         .put_function_concurrency(request)
         .await
-        .map_err(|e| SquirtleError::Internal(e.to_string()))?;
+        .map_err(|e| FlockError::Internal(e.to_string()))?;
     assert_ne!(concurrency.reserved_concurrent_executions, Some(0));
     Ok(())
 }
@@ -280,7 +280,7 @@ async fn create_lambda_function(ctx: &ExecutionContext) -> Result<String> {
                 ..Default::default()
             })
             .await
-            .map_err(|e| SquirtleError::Internal(e.to_string()))?;
+            .map_err(|e| FlockError::Internal(e.to_string()))?;
     }
 
     match LAMBDA_CLIENT
@@ -298,11 +298,11 @@ async fn create_lambda_function(ctx: &ExecutionContext) -> Result<String> {
     {
         Ok(config) => {
             return config.function_arn.ok_or_else(|| {
-                SquirtleError::Internal("Unable to find lambda function arn.".to_string())
+                FlockError::Internal("Unable to find lambda function arn.".to_string())
             })
         }
         Err(err) => {
-            return Err(SquirtleError::Internal(format!(
+            return Err(FlockError::Internal(format!(
                 "Failed to create lambda function: {}",
                 err
             )))

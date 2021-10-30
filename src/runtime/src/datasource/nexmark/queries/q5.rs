@@ -19,8 +19,8 @@ mod tests {
     use super::*;
     use crate::datasource::nexmark::event::{Auction, Bid, Date, Person};
     use crate::datasource::nexmark::{NexMarkSource, NexMarkStream};
+    use crate::error::FlockError;
     use crate::error::Result;
-    use crate::error::SquirtleError;
     use crate::executor::plan::physical_plan;
     use crate::query::StreamWindow;
     use arrow::json;
@@ -122,9 +122,9 @@ mod tests {
                 bids_batches = Arc::get_mut_unchecked(
                     &mut ctx
                         .deregister_table("bid")
-                        .map_err(SquirtleError::DataFusion)?
+                        .map_err(FlockError::DataFusion)?
                         .ok_or_else(|| {
-                            SquirtleError::Internal("Failed to deregister Table bid".to_string())
+                            FlockError::Internal("Failed to deregister Table bid".to_string())
                         })?,
                 )
                 .as_mut_any()

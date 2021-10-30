@@ -12,13 +12,13 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 // Only bring in dependencies for the repl when the cli feature is enabled.
 
-//! By default, Squirtle supports two types of interactive execution modes:
+//! By default, Flock supports two types of interactive execution modes:
 //! central and distributed. During the planning phase in the client-side, the
 //! optimizer analyzes the query and generate the physical plan, which is
 //! compressed and serialized to the environment context of cloud functions. The
 //! execution strategy dynamically adjusts central and distributed execution
 //! modes at runtime to achieve the optimal performance and cost, that is,
-//! adaptive query optimization. In central mode, Squirtle executes the query
+//! adaptive query optimization. In central mode, Flock executes the query
 //! plan immediately using a single cloud function. In contrast, in distributed
 //! mode, the first cloud function acts as the query coordinator. It schedules
 //! work on other cloud functions that then together execute the query in a
@@ -28,7 +28,7 @@ use crate::config::GLOBALS as globals;
 use crate::context::CloudFunction;
 use crate::context::ExecutionContext;
 use crate::encoding::Encoding;
-use crate::error::{Result, SquirtleError};
+use crate::error::{FlockError, Result};
 use crate::payload::{Payload, Uuid};
 use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
@@ -193,7 +193,7 @@ impl LambdaExecutor {
         };
 
         if lambdas.is_empty() {
-            return Err(SquirtleError::Internal(
+            return Err(FlockError::Internal(
                 "No distributed execution plan".to_owned(),
             ));
         }
@@ -213,7 +213,7 @@ impl LambdaExecutor {
 mod tests {
     use super::*;
     use crate::datasource::{kinesis, DataSource};
-    use crate::error::SquirtleError;
+    use crate::error::FlockError;
     use arrow::array::UInt32Array;
     use arrow::datatypes::{DataType, Field, Schema};
     use aws_lambda_events::event::kinesis::KinesisEvent;
@@ -335,7 +335,7 @@ mod tests {
 
         let output_partitions = join_handle
             .await
-            .map_err(|e| SquirtleError::Internal(e.to_string()))??;
+            .map_err(|e| FlockError::Internal(e.to_string()))??;
 
         assert_eq!(5, output_partitions.len());
         assert_eq!(30, output_partitions[0].len());

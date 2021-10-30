@@ -1,10 +1,10 @@
 [package]
-name = "squirtle-cli"
+name = "flock-cli"
 version = "0.1.0"
-description = "A command-line REPL for Squirtle that integrates into existing cli workflows"
+description = "A command-line REPL for Flock that integrates into existing cli workflows"
 authors = [ "Gang Liao <gangliao@cs.umd.edu>" ]
 license = "Apache-2.0"
-keywords = [ "Squirtle", "repl", "client", "cli" ]
+keywords = [ "Flock", "repl", "client", "cli" ]
 categories = [ "command-line-interface", "command-line-utilities" ]
 edition = "2018"
 
@@ -28,5 +28,5 @@ tokio = { version = "1.2", features = [ "macros", "io-util", "sync", "rt-multi-t
 zip = "0.5.12"
 
 [[bin]]
-name = "squirtle-cli"
+name = "flock-cli"
 path = "src/main.rs"

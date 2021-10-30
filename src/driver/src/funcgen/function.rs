@@ -242,7 +242,7 @@ mod tests {
             "{:?}",
             func.ctx
                 .get(&NodeIndex::new(idx))
-                .ok_or(SquirtleError::DagPartition(
+                .ok_or(FlockError::DagPartition(
                     "Failed to get data source field from the hash map".to_string()
                 ))?
                 .datasource
@@ -253,7 +253,7 @@ mod tests {
         Ok(func
             .ctx
             .get(&NodeIndex::new(idx))
-            .ok_or(SquirtleError::DagPartition(
+            .ok_or(FlockError::DagPartition(
                 "Failed to get function name field from the hash map".to_string(),
             ))?
             .name
@@ -264,7 +264,7 @@ mod tests {
         Ok(func
             .ctx
             .get(&NodeIndex::new(idx))
-            .ok_or(SquirtleError::DagPartition(
+            .ok_or(FlockError::DagPartition(
                 "Failed to get next function field from the hash map".to_string(),
             ))?
             .next

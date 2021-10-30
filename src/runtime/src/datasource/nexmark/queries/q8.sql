@@ -8,7 +8,7 @@
 -- To make things a bit more dynamic and easier to test we use much shorter windows (10 seconds).
 -- -------------------------------------------------------------------------------------------------
 
--- TODO: This window query will be implemented by Rust via Squirtle API.
+-- TODO: This window query will be implemented by Rust via Flock API.
 
 SELECT P.id, P.name, P.starttime
 FROM (
