@@ -1,7 +1,7 @@
 [project]
 
-name = "squirtle"
-discription = "Squirtle: Serverless SQL Query Engine for Real-Time and Batch Analytics"
+name = "flock"
+discription = "Flock: Serverless SQL Query Engine for Real-Time and Batch Analytics"
 license = "Copyright (c) 2020-2021, UMD Database Group. All rights reserved. The library, examples, and all source code are released under Apache 2.0"
 production = false
 

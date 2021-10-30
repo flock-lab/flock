@@ -15,7 +15,7 @@
 //! the data frames of the previous stage of dataflow to ensure the integrity of
 //! the window data for stream processing.
 
-use crate::error::{Result, SquirtleError};
+use crate::error::{FlockError, Result};
 use crate::payload::{Payload, Uuid, UuidBuilder};
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
@@ -55,7 +55,7 @@ impl WindowSession {
     /// Return the schema of data fragments in the temporal window.
     pub fn schema(&self) -> Result<SchemaRef> {
         if self.batches.is_empty() || self.batches[0].is_empty() {
-            return Err(SquirtleError::Internal(
+            return Err(FlockError::Internal(
                 "Record batches are empty.".to_string(),
             ));
         }

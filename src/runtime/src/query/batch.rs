@@ -14,7 +14,7 @@
 
 //! Batch processing is the processing of a large volume of data all at once.
 //! You can store the preceding reference data as an object in Amazon Simple
-//! Storage Service (Amazon S3).  Squirtle reads the Amazon S3 object and
+//! Storage Service (Amazon S3).  Flock reads the Amazon S3 object and
 //! creates an in-application reference table that you can query in your
 //! application code. In your application code, you write a join query to join
 //! the in-application stream with the in-application reference table, to obtain

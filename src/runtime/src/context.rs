@@ -17,7 +17,7 @@
 
 use super::datasource::DataSource;
 use super::encoding::Encoding;
-use crate::error::{Result, SquirtleError};
+use crate::error::{FlockError, Result};
 use arrow::datatypes::{Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
 use datafusion::physical_plan::collect;
@@ -154,7 +154,7 @@ impl ExecutionContext {
     pub async fn execute(&mut self) -> Result<Vec<RecordBatch>> {
         match collect(self.plan().clone()).await {
             Ok(b) => Ok(b),
-            Err(e) => Err(SquirtleError::Plan(format!(
+            Err(e) => Err(FlockError::Plan(format!(
                 "{}. Failed to execute the plan '{:?}'",
                 e, self.plan
             ))),

@@ -53,7 +53,7 @@ impl ExecutionEnvironment {
     /// Deploy a query to cloud function services on a public cloud.
     pub async fn deploy(&self, query: &QueryFlow) -> Result<()> {
         match &self {
-            ExecutionEnvironment::Local => Err(SquirtleError::FunctionGeneration(
+            ExecutionEnvironment::Local => Err(FlockError::FunctionGeneration(
                 "Local execution doesn't require a deployment.".to_owned(),
             )),
             ExecutionEnvironment::Lambda => Self::lambda_deployment(&query).await,
@@ -109,7 +109,7 @@ impl ExecutionEnvironment {
                     .await?;
                     match client.create_event_source_mapping(request).await {
                         Err(e) => {
-                            return Err(SquirtleError::FunctionGeneration(format!(
+                            return Err(FlockError::FunctionGeneration(format!(
                                 "Kinesis event source mapping failed: {}.",
                                 e
                             )));
@@ -131,7 +131,7 @@ impl ExecutionEnvironment {
                     .await?;
                     match client.create_event_source_mapping(request).await {
                         Err(e) => {
-                            return Err(SquirtleError::FunctionGeneration(format!(
+                            return Err(FlockError::FunctionGeneration(format!(
                                 "Kafka event source mapping failed: {}.",
                                 e
                             )));
@@ -167,7 +167,7 @@ mod tests {
         let iam = IamClient::new(Region::default());
         let resp = iam
             .get_role(GetRoleRequest {
-                role_name: "squirtle".to_owned(),
+                role_name: "flock".to_owned(),
             })
             .await
             .unwrap();

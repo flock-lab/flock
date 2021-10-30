@@ -19,7 +19,7 @@ use lazy_static::lazy_static;
 
 lazy_static! {
     /// Global settings.
-    pub static ref GLOBALS: Ini = Ini::load_from_str(include_str!("config/squirtle.toml")).unwrap();
+    pub static ref GLOBALS: Ini = Ini::load_from_str(include_str!("config/flock.toml")).unwrap();
 }
 
 #[cfg(test)]
@@ -29,7 +29,7 @@ mod tests {
 
     #[tokio::test]
     async fn setting_shows() -> Result<()> {
-        let conf = Ini::load_from_str(include_str!("config/squirtle.toml")).unwrap();
+        let conf = Ini::load_from_str(include_str!("config/flock.toml")).unwrap();
 
         for (sec, prop) in &conf {
             println!("Section: {:?}", sec);

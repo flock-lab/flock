@@ -1,10 +1,10 @@
-<img src="docs/squirtle.png" width=20%>
+<img src="docs/flock.png" width=60%>
 
 ## Flock: A Practical Serverless Streaming Query Engine
 
-[![CI](https://github.com/DSLAM-UMD/Squirtle/workflows/CI/badge.svg?branch=code&event=pull_request)](https://github.com/DSLAM-UMD/Squirtle/actions)
-[![codecov](https://codecov.io/gh/DSLAM-UMD/Squirtle/branch/master/graph/badge.svg?token=1FOM4DJUZJ)](https://codecov.io/gh/DSLAM-UMD/Squirtle)
-<a href="https://cla-assistant.io/DSLAM-UMD/Squirtle"><img src="https://cla-assistant.io/readme/badge/DSLAM-UMD/Squirtle" alt="CLA assistant" /></a>
+[![CI](https://github.com/DSLAM-UMD/Flock/workflows/CI/badge.svg?branch=code&event=pull_request)](https://github.com/DSLAM-UMD/Flock/actions)
+[![codecov](https://codecov.io/gh/DSLAM-UMD/Flock/branch/master/graph/badge.svg?token=1FOM4DJUZJ)](https://codecov.io/gh/DSLAM-UMD/Flock)
+<a href="https://cla-assistant.io/DSLAM-UMD/Flock"><img src="https://cla-assistant.io/readme/badge/DSLAM-UMD/Flock" alt="CLA assistant" /></a>
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
 
 
@@ -12,7 +12,7 @@ The generic lambda function code is built in advance and uploaded to AWS S3.
 
 | Lambda Function Code    | S3 Bucket      | S3 Key           |    S3 URL                        |
 | ----------------------- | ---------------| ---------------- | -------------------------------- |
-| [Nexmark Benchmark](https://beam.apache.org/documentation/sdks/java/testing/nexmark/)      | umd-squirtle   |   nexmark        |  https://umd-squirtle.s3.amazonaws.com/nexmark      |
+| [Nexmark Benchmark](https://beam.apache.org/documentation/sdks/java/testing/nexmark/)      | umd-flock   |   nexmark        |  https://umd-flock.s3.amazonaws.com/nexmark      |
 
 
 ## Build From Source Code
@@ -25,11 +25,11 @@ $ cargo build --target x86_64-unknown-linux-gnu --release --features "arrow/simd
 
 ## Upgrade Cloud Function Services
 
-squirtle-cli is an interactive command-line query tool for Squirtle.
+flock-cli is an interactive command-line query tool for Flock.
 
 ```shell
 $ cd target/x86_64-unknown-linux-gnu/release/
-$ ./squirtle-cli --help
+$ ./flock-cli --help
 ```
 
 <details>
@@ -38,11 +38,11 @@ $ ./squirtle-cli --help
 </summary>
 
 ```shell
-Squirtle 0.1.0
-Command Line Interactive Contoller for Squirtle
+Flock 0.1.0
+Command Line Interactive Contoller for Flock
 
 USAGE:
-    squirtle-cli [FLAGS] [OPTIONS]
+    flock-cli [FLAGS] [OPTIONS]
 
 FLAGS:
     -h, --help       Prints help information
@@ -56,11 +56,11 @@ OPTIONS:
 </details>
 </br>
 
-For example, you can use `squirtle-cli` in response to the uploading, updating, or deleting of the cloud functions in AWS S3.
+For example, you can use `flock-cli` in response to the uploading, updating, or deleting of the cloud functions in AWS S3.
 
 ```shell
 # for example, upgrade the NexMark Benchmark for streaming processing
-./squirtle-cli -u nexmark_lambda -k nexmark
+./flock-cli -u nexmark_lambda -k nexmark
 ```
 
 <details>
@@ -69,44 +69,33 @@ For example, you can use `squirtle-cli` in response to the uploading, updating, 
 </summary>
 
 ```bash
+ /`  
+/:y/` `  
+`shdhso.  
+ -yhddh+.  
+  .yhhhy+-  
+   .syyhs+/.  
+    `+shhs++:.  
+     `:syyyo++/.  
+       .+ssys+++/-`          `.----.`  
+        ./oyyyo+++/:.`     `-/+++/-..`  
+          -/osyso++++/:.` -/++/-`  
+           .-/osssoo++++/:++++`  
+           `.-/++osooo++++++++-  
+              `-:/+oooo++++++o/  
+                `-:/+o++++++oo-                                `````             `  
+                 `.-//++++++o/   `:++:::://   .:++:`        .:///////.       .://///+-   ./++:` .++/.  
+                 ``..:+++++o+`     os`   -+     ss        `/+-`//. `-+/`   `+s:`   `o:    `so  `:+-  
+                     :+++++/`      os`  --      ss        /o`  `+o`  `++   +s:      ``    `so .+:`  
+                   `:+++++:        os:::o/      ss        o/   /+++`  :s   ss.            `ss/so`  
+                 .:++++:.`         os`  --      ss     `  /o``+/``o/:`++   +s:      `     `so .oo.  
+             `.:/++++/.            os`          ss    :+   /+:-`  .-:+/`   `+s:`    o/    `so  `+s:  
+          .-----:/++-            `:++:-       .:++::::+/    .:++//++:.       ./++///+-   .:o+:`  :o/:  
+          `.-:::-/:`                                            ``  
+        `--.``-/:`  
+            .:-`  
 
-                                      ```
-                                `-/shdddddhyo/-`
-                              `/hdmmmmmmmmmmmmdh+.
-                             :ymmmmmmmmmmmmmmmmmmy-
-                            /symmmmmmmmmmds/smmmhys-
-                            +s`mmmmmmmmmmym` :mmyyyo
-                            :  hmmmmmmmmd   .:hmyyy+s/
-                           `+//mmmmmmmmmm+::/sdyyyy+ds+:.
-                           -ydmmhmmdmmmmmmmmmdyhosooNsooo/`
-                        /syyyyosyhhyhhhhhhhhyhdyhmdsdm+/+++-
-              ``....``  :yoymmmmhysyhhhhyyss+ydddmmmdym++oo+:
-          -+yhdmmmmmmhyosyhmmmmmmmyydhhhhhhhhshdhhdmmmsMoooo+.
-       .odmmy+:-.``.-/ohmdsodmmmmmyyhhhysssyhhsoyyyyhhoMN/oo+/
-     `odmh/``:///`      .ommsohddhsNNNNdyNNNNNNdysoooosMh+ooo+
-    `hmy-   .mmmms`       `ymy.`-osmNNNNsNNNNNNNNyhdhomMoooooo   ./osso:.
-    ymo`       +mmo`        sms` -hyhNNNhdNNNNNNydNNNymMooooo/ -ydmmmmmmd+`
-   -ho`        :mmmo`       `mm-  :hhyhhhohhhhhyyNNNNNsmNo+o:o+dmmmmmmmmmms`
-   -+         /mmmmm+`       hm+   -omNNNmsmNNNNmhhmdhy+hmo-:smmmmmhhyydmmm/
-    :.       ommy-ymm/       dm/   .syydNNNydNNNNNhydmmhoym/+hmmmmydmmmommy/
-    -:     `smms` `hmm:.:`  /mh.  -ymmmdyyhhsoyhdyhmmmmmysosyyhmmmodmmmddyo`
-     ::`  `ymm+`   `dmmmmo`:md:   :dmmmmmhoo+oyys/mmmmmmyy+yyyyhdmyoyhhys/`
-      :+-`/++:      .s+:``+mh-    `smmmmmmdyo.--:+mmmmmmyy/://++++//----
-       .oo:``         `-ohh+`      /hmmmmmmms`   :hmmmmhys:
-         `/oso+:::/+oyhho:`        -+yhyso+/-    :hdmmhyys:
-             .-:/++/:-`                          `--+s:---`
-
-
-
-       ███████╗ ██████╗ ██╗   ██╗██╗██████╗ ████████╗██╗     ███████╗
-       ██╔════╝██╔═══██╗██║   ██║██║██╔══██╗╚══██╔══╝██║     ██╔════╝
-       ███████╗██║   ██║██║   ██║██║██████╔╝   ██║   ██║     █████╗
-       ╚════██║██║▄▄ ██║██║   ██║██║██╔══██╗   ██║   ██║     ██╔══╝
-       ███████║╚██████╔╝╚██████╔╝██║██║  ██║   ██║   ███████╗███████╗
-       ╚══════╝ ╚══▀▀═╝  ╚═════╝ ╚═╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚══════╝
-
-
-Squirtle: Serverless SQL Query Engine for Real-Time and Batch Analytics (https://github.com/DSLAM-UMD/Squirtle)
+Flock: Serverless SQL Query Engine for Real-Time and Batch Analytics (https://github.com/DSLAM-UMD/Flock)
 
 Copyright (c) 2020-2021, UMD Data System Group. All rights reserved.
 
@@ -127,7 +116,7 @@ Copyright (c) 2020-2021, UMD Data System Group. All rights reserved.
 
 All the following Nexmark queries share the same lambda function code.
 
-| Query    | Name     | Summary  | Squirtle |
+| Query    | Name     | Summary  | Flock |
 | -------- | -------- | -------- | -------- |
 | q0 | Pass Through | Measures the monitoring overhead including the source generator. | ✅ |
 | q1 | Currency Conversion | Convert each bid value from dollars to euros. | ✅ |
@@ -146,7 +135,7 @@ To execute q3 in the Nexmark benchmark, you can use `nexmark_bench` to issue the
 ```shell
 $ ./nexmark_bench --help
 
-squirtle-benchmarks 0.1.0
+flock-benchmarks 0.1.0
 
 USAGE:
     nexmark_bench [FLAGS] [OPTIONS] --query <query>

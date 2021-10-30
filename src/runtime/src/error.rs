@@ -12,7 +12,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 // Only bring in dependencies for the repl when the cli feature is enabled.
 
-//! Squirtle error types
+//! Flock error types
 
 use arrow::error::ArrowError;
 use datafusion::error::DataFusionError;
@@ -24,12 +24,12 @@ use std::result;
 
 use sqlparser::parser::ParserError;
 
-/// Result type for operations that could result in an [SquirtleError]
-pub type Result<T> = result::Result<T, SquirtleError>;
+/// Result type for operations that could result in an [FlockError]
+pub type Result<T> = result::Result<T, FlockError>;
 
-/// Squirtle error
+/// Flock error
 #[derive(Debug)]
-pub enum SquirtleError {
+pub enum FlockError {
     /// Error associated to Lambda runtime execution.
     LambdaError(Box<dyn std::error::Error + Send + Sync>),
     /// Error associated to I/O operations and associated traits.
@@ -48,9 +48,9 @@ pub enum SquirtleError {
     /// still have no implementation for. Often, these errors are tracked in our
     /// issue tracker.
     NotImplemented(String),
-    /// Error returned as a consequence of an error in Squirtle.
-    /// This error should not happen in normal usage of Squirtle.
-    /// Squirtle has internal invariants that we are unable to ask the
+    /// Error returned as a consequence of an error in Flock.
+    /// This error should not happen in normal usage of Flock.
+    /// Flock has internal invariants that we are unable to ask the
     /// compiler to check for us. This error is raised when one of those
     /// invariants is not verified during execution.
     Internal(String),
@@ -58,8 +58,8 @@ pub enum SquirtleError {
     /// Examples include impossible casts, schema inference not possible and
     /// non-unique column names.
     Plan(String),
-    /// Error returned when the DAG partition failed in Squirtle.
-    /// This error should not happen in normal usage of Squirtle.
+    /// Error returned when the DAG partition failed in Flock.
+    /// This error should not happen in normal usage of Flock.
     DagPartition(String),
     /// Error returned during execution of the query.
     /// Examples include files not found, errors in parsing certain types.
@@ -68,77 +68,77 @@ pub enum SquirtleError {
     FunctionGeneration(String),
 }
 
-impl From<io::Error> for SquirtleError {
+impl From<io::Error> for FlockError {
     fn from(e: io::Error) -> Self {
-        SquirtleError::IoError(e)
+        FlockError::IoError(e)
     }
 }
 
-impl From<ParserError> for SquirtleError {
+impl From<ParserError> for FlockError {
     fn from(e: ParserError) -> Self {
-        SquirtleError::SQL(e)
+        FlockError::SQL(e)
     }
 }
 
-impl From<DataFusionError> for SquirtleError {
+impl From<DataFusionError> for FlockError {
     fn from(e: DataFusionError) -> Self {
-        SquirtleError::DataFusion(e)
+        FlockError::DataFusion(e)
     }
 }
 
-impl From<ArrowError> for SquirtleError {
+impl From<ArrowError> for FlockError {
     fn from(e: ArrowError) -> Self {
-        SquirtleError::Arrow(e)
+        FlockError::Arrow(e)
     }
 }
 
-impl From<serde_json::Error> for SquirtleError {
+impl From<serde_json::Error> for FlockError {
     fn from(e: serde_json::Error) -> Self {
-        SquirtleError::SerdeJson(e)
+        FlockError::SerdeJson(e)
     }
 }
 
-impl From<Box<dyn std::error::Error + Send + Sync>> for SquirtleError {
+impl From<Box<dyn std::error::Error + Send + Sync>> for FlockError {
     fn from(e: Box<dyn std::error::Error + Send + Sync>) -> Self {
-        SquirtleError::LambdaError(e)
+        FlockError::LambdaError(e)
     }
 }
 
-impl From<base64::DecodeError> for SquirtleError {
+impl From<base64::DecodeError> for FlockError {
     fn from(e: base64::DecodeError) -> Self {
-        SquirtleError::Base64(e)
+        FlockError::Base64(e)
     }
 }
 
-impl Display for SquirtleError {
+impl Display for FlockError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match *self {
-            SquirtleError::Base64(ref desc) => write!(f, "Base64 error: {}", desc),
-            SquirtleError::LambdaError(ref desc) => write!(f, "Lambda error: {}", desc),
-            SquirtleError::IoError(ref desc) => write!(f, "IO error: {}", desc),
-            SquirtleError::SQL(ref desc) => write!(f, "SQL error: {:?}", desc),
-            SquirtleError::Arrow(ref desc) => write!(f, "Arrow error: {}", desc),
-            SquirtleError::DataFusion(ref desc) => write!(f, "DataFusion error: {:?}", desc),
-            SquirtleError::SerdeJson(ref desc) => write!(f, "serde_json error: {:?}", desc),
-            SquirtleError::NotImplemented(ref desc) => {
+            FlockError::Base64(ref desc) => write!(f, "Base64 error: {}", desc),
+            FlockError::LambdaError(ref desc) => write!(f, "Lambda error: {}", desc),
+            FlockError::IoError(ref desc) => write!(f, "IO error: {}", desc),
+            FlockError::SQL(ref desc) => write!(f, "SQL error: {:?}", desc),
+            FlockError::Arrow(ref desc) => write!(f, "Arrow error: {}", desc),
+            FlockError::DataFusion(ref desc) => write!(f, "DataFusion error: {:?}", desc),
+            FlockError::SerdeJson(ref desc) => write!(f, "serde_json error: {:?}", desc),
+            FlockError::NotImplemented(ref desc) => {
                 write!(f, "This feature is not implemented: {}", desc)
             }
-            SquirtleError::Internal(ref desc) => write!(
+            FlockError::Internal(ref desc) => write!(
                 f,
-                "Internal error: {}. This was likely caused by a bug in Squirtle's \
+                "Internal error: {}. This was likely caused by a bug in Flock's \
                     code and we would welcome that you file an bug report in our issue tracker",
                 desc
             ),
-            SquirtleError::Plan(ref desc) => write!(f, "Error during planning: {}", desc),
-            SquirtleError::DagPartition(ref desc) => {
+            FlockError::Plan(ref desc) => write!(f, "Error during planning: {}", desc),
+            FlockError::DagPartition(ref desc) => {
                 write!(f, "Error during DAG partitioning: {}", desc)
             }
-            SquirtleError::Execution(ref desc) => write!(f, "Execution error: {}", desc),
-            SquirtleError::FunctionGeneration(ref desc) => {
+            FlockError::Execution(ref desc) => write!(f, "Execution error: {}", desc),
+            FlockError::FunctionGeneration(ref desc) => {
                 write!(f, "Function generation error: {}", desc)
             }
         }
     }
 }
 
-impl error::Error for SquirtleError {}
+impl error::Error for FlockError {}

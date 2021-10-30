@@ -131,7 +131,7 @@ async fn source_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Valu
             let kinesis_event: KinesisEvent = serde_json::from_value(event).unwrap();
             let batch = kinesis::to_batch(kinesis_event);
             if batch.is_empty() {
-                return Err(SquirtleError::Execution("No Kinesis input!".to_owned()));
+                return Err(FlockError::Execution("No Kinesis input!".to_owned()));
             }
             batch
         }
@@ -139,7 +139,7 @@ async fn source_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Valu
             let kafka_event: KafkaEvent = serde_json::from_value(event).unwrap();
             let batch = kafka::to_batch(kafka_event);
             if batch.is_empty() {
-                return Err(SquirtleError::Execution("No Kafka input!".to_owned()));
+                return Err(FlockError::Execution("No Kafka input!".to_owned()));
             }
             batch
         }
@@ -219,7 +219,7 @@ async fn payload_handler(
             if ready {
                 arena.batches(uuid.tid)
             } else {
-                return Err(SquirtleError::Execution(
+                return Err(FlockError::Execution(
                     "window data collection has not been completed.".to_string(),
                 ));
             }
@@ -231,9 +231,7 @@ async fn payload_handler(
     };
 
     if input_partitions.is_empty() || input_partitions[0].is_empty() {
-        return Err(SquirtleError::Execution(
-            "payload data is empty.".to_string(),
-        ));
+        return Err(FlockError::Execution("payload data is empty.".to_string()));
     }
 
     // TODO(gangliao): repartition input batches to speedup the operations.

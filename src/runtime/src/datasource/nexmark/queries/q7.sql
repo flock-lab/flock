@@ -8,7 +8,7 @@
 -- We will use a shorter window (10 seconds) to help make testing easier.
 -- -------------------------------------------------------------------------------------------------
 
--- TODO: This window query will be implemented by Rust via Squirtle API.
+-- TODO: This window query will be implemented by Rust via Flock API.
 
 SELECT B.auction, B.price, B.bidder, B.dateTime, B.extra
 from bid B

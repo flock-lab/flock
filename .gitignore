@@ -20,7 +20,7 @@ src/ops
 .project
 .settings
 
-# Squirtle
+# Flock
 .history
 
 target/

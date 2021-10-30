@@ -25,14 +25,14 @@ use std::io::Write;
 use std::path::Path;
 
 type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
-pub static S3_BUCKET: &str = "umd-squirtle";
+pub static S3_BUCKET: &str = "umd-flock";
 
 #[tokio::main]
 pub async fn main() {
     // Command line arg parsing for scqsql itself
-    let matches = App::new("Squirtle")
+    let matches = App::new("Flock")
         .version(crate_version!())
-        .about("Command Line Interactive Contoller for Squirtle")
+        .about("Command Line Interactive Contoller for Flock")
         .arg(
             Arg::with_name("function_code")
                 .short("u")
@@ -57,7 +57,7 @@ pub async fn main() {
         )
         .get_matches();
 
-    rainbow_println(include_str!("./squirtle.txt"));
+    rainbow_println(include_str!("./flock.txt"));
 
     match matches.value_of("function_code") {
         Some(bin_path) => {
@@ -126,7 +126,7 @@ fn is_exit_command(line: &str) -> bool {
 }
 
 async fn exec_and_print(_: String) -> Result<(), Error> {
-    rainbow_println("CLI is under construction. Please try Squirtle API directly.");
+    rainbow_println("CLI is under construction. Please try Flock API directly.");
     Ok(())
 }
 
@@ -201,7 +201,7 @@ mod tests {
 
     #[test]
     fn test_rainbow_print() {
-        let text = include_str!("./squirtle.txt");
+        let text = include_str!("./flock.txt");
         rainbow_println(text);
     }
 }

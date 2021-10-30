@@ -1,5 +1,5 @@
 [package]
-name = "squirtle-benchmarks"
+name = "flock-benchmarks"
 version = "0.1.0"
 authors = [ "Gang Liao <gangliao@cs.umd.edu>" ]
 edition = "2018"
@@ -8,8 +8,8 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-arrow = { git = "https://github.com/DSLAM-UMD/arrow-rs", branch = "squirtle", features = [ "simd" ] }
-datafusion = { git = "https://github.com/DSLAM-UMD/arrow-datafusion", branch = "squirtle" }
+arrow = { git = "https://github.com/DSLAM-UMD/arrow-rs", branch = "flock", features = [ "simd" ] }
+datafusion = { git = "https://github.com/DSLAM-UMD/arrow-datafusion", branch = "flock" }
 driver = { path = "../src/driver" }
 env_logger = "^0.9"
 futures = "0.3"

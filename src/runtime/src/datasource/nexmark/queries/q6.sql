@@ -5,7 +5,7 @@
 -- Shares the same ‘winning bids’ core as for Query4, and illustrates a specialized combiner.
 -- -------------------------------------------------------------------------------------------------
 
--- TODO: This window query will be implemented by Rust via Squirtle API.
+-- TODO: This window query will be implemented by Rust via Flock API.
 
 SELECT
     Q.seller,

@@ -18,7 +18,7 @@
 //! of the payload for a given query at the specified time.
 
 use crate::encoding::Encoding;
-use crate::error::{Result, SquirtleError};
+use crate::error::{FlockError, Result};
 use abomonation::{decode, encode};
 use arrow::datatypes::{Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
@@ -147,7 +147,7 @@ impl Payload {
 
     /// Deserialize the schema
     pub fn schema_from_bytes(bytes: &[u8]) -> Result<Arc<Schema>> {
-        let schema = arrow::ipc::convert::schema_from_bytes(bytes).map_err(SquirtleError::Arrow)?;
+        let schema = arrow::ipc::convert::schema_from_bytes(bytes).map_err(FlockError::Arrow)?;
         Ok(Arc::new(schema))
     }
 
