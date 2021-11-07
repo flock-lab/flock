@@ -37,7 +37,7 @@ If we send 100 events to the `flock_pg_scatter` function, the `flock_pg_gather` 
 
 ### Example
 
-1. Run an experiment with events = 500, concurrency = 32, and ops_type = scatter_gather_ops.
+**1. Run an experiment with events = 500, concurrency = 32, and ops_type = scatter_gather_ops.**
 
 ```text
 $ ./playground -e 500 -c 32 -o scatter_gather_ops
@@ -46,20 +46,18 @@ Playground with the following options: PlaygroundOpt { ops_type: "scatter_gather
 ```
 
 <center>
-<figure>
+Figure 1 - flock_pg_scatter's CloudWatch metrics.
 <img src="../../docs/playground/flock_pg_scatter.png" width=75%>
-<figcaption>Figure 1 - flock_pg_scatter's CloudWatch metrics.</figcaption>
-</figure>
 </center>
+
 
 <center>
-<figure>
+Figure 2 - flock_pg_gather's CloudWatch metrics.
 <img src="../../docs/playground/flock_pg_gather.png" width=75%>
-<figcaption>Figure 2 - flock_pg_gather's CloudWatch metrics.</figcaption>
-</figure>
+<figcaption></figcaption>
 </center>
 
-2. Log events
+**2. Log Events**
 
 The sum of 1 to 500 is **500 * 501 / 2 = 125250**. Let's parse the logs of the `flock_pg_gather` function, and see what the sum of the events is. In [gather.rs](./scatter_gather_ops/gather.rs), we print the sum of events with UTC time stamp when the function is invoked.
 
