@@ -37,7 +37,7 @@ If we send 100 events to the `flock_pg_scatter` function, the `flock_pg_gather` 
 
 ### Example
 
-1. Run an experiment with events = 100, concurrency = 32, and ops_type = scatter_gather_ops.
+1. Run an experiment with events = 500, concurrency = 32, and ops_type = scatter_gather_ops.
 
 ```text
 $ ./playground -e 500 -c 32 -o scatter_gather_ops
