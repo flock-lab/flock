@@ -4,6 +4,7 @@ members = [
     "src/bin/cli",
     "src/driver",
     "src/function",
+    "src/playground",
     "src/runtime",
     "src/test",
 ]

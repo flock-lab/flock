@@ -136,7 +136,11 @@ pub fn rainbow_println(line: &str) {
     let spread: f64 = 3.0;
     for (i, c) in line.char_indices() {
         let (r, g, b) = rgb(frequency, spread, i as f64);
-        print!("\x1b[38;2;{};{};{}m{}\x1b[0m", r, g, b, c);
+        if c == ' ' {
+            print!("{}", c);
+        } else {
+            print!("\x1b[38;2;{};{};{}m{}\x1b[0m", r, g, b, c);
+        }
     }
     println!();
 }
