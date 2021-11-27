@@ -17,7 +17,7 @@
 
 @title[@elem[#:style 'bold]{Flock: A Serverless Streaming SQL Engine}]
 
-@image[#:scale 1/2 #:style float-right]{img/flock.png}
+@image[#:scale 1/3 #:style float-right]{img/flock.png}
 
 Flock is a cloud-native SQL query engine for event-driven analytics on cloud function services.
 One of the key benefits of serverless query engine is the ease in which it can scale to meet traffic
