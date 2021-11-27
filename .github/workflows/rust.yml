@@ -34,7 +34,6 @@ jobs:
       - name: update umd-arrow
         run: |
           cargo update --package arrow
-      - name: build and tests
       - uses: dorny/paths-filter@v2
         id: changes
         with:
@@ -42,7 +41,8 @@ jobs:
             src:
               - 'bench/**'
               - 'src/**'
-      - if: steps.changes.outputs.src == 'true'
+      - name: build and tests
+        if: steps.changes.outputs.src == 'true'
         run: |
           cargo build -j8
           cargo test
