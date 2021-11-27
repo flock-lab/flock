@@ -31,7 +31,7 @@ will show you how to deploy Flink on Kubernetes using the
 
 @section[#:style 'unnumbered]{Amazon EKS}
 
-@link["https://aws.amazon.com/eks/"]{Amazon EKS} is a fully managed Kubernetes service. EKS supports creating and managing Spot Instances using Amazon EKS 
+@link["https://aws.amazon.com/eks/"]{Amazon EKS} is a fully managed Kubernetes service. EKS supports creating and managing spot instances using Amazon EKS 
 managed node groups following Spot best practices. This enables you to take advantage of the steep savings and scale
 that Spot Instances provide for interruptible workloads. EKS-managed node groups require less operational effort 
 compared to using self-managed nodes.
@@ -100,12 +100,12 @@ Auto labeling of Pods.}
 to enable auto selection of instances based on the criteria passed.}
 ]}
 
-@item{Create service accounts for Flink
+@item{Create service accounts for Flink}
 
 @bash-repl{
 $ kubectl create serviceaccount flink-service-account
-$ kubectl create clusterrolebinding flink-role-binding-flink --clusterrole=edit --serviceaccount=default:flink-service-account
-}
+$ kubectl create clusterrolebinding flink-role-binding-flink \
+--clusterrole=edit --serviceaccount=default:flink-service-account
 }
 
 @item{Deploy Flink
