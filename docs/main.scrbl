@@ -32,3 +32,4 @@ Its major goal is to provide users with better price performance for stream proc
 change.
 
 @include-section{intro.scrbl}
+@include-section{benchmarks.scrbl}
