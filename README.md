@@ -2,9 +2,9 @@
 
 ## Flock: A Practical Serverless Streaming Query Engine
 
-[![CI](https://github.com/DSLAM-UMD/Flock/workflows/CI/badge.svg?branch=code&event=pull_request)](https://github.com/DSLAM-UMD/Flock/actions)
-[![codecov](https://codecov.io/gh/DSLAM-UMD/Flock/branch/master/graph/badge.svg?token=1FOM4DJUZJ)](https://codecov.io/gh/DSLAM-UMD/Flock)
-<a href="https://cla-assistant.io/DSLAM-UMD/Flock"><img src="https://cla-assistant.io/readme/badge/DSLAM-UMD/Flock" alt="CLA assistant" /></a>
+[![CI](https://github.com/flock-lab/Flock/workflows/CI/badge.svg?branch=code&event=pull_request)](https://github.com/flock-lab/Flock/actions)
+[![codecov](https://codecov.io/gh/flock-lab/Flock/branch/master/graph/badge.svg?token=1FOM4DJUZJ)](https://codecov.io/gh/flock-lab/Flock)
+<a href="https://cla-assistant.io/flock-lab/Flock"><img src="https://cla-assistant.io/readme/badge/flock-lab/Flock" alt="CLA assistant" /></a>
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
 
 
@@ -95,7 +95,7 @@ For example, you can use `flock-cli` in response to the uploading, updating, or 
         `--.``-/:`  
             .:-`  
 
-Flock: Serverless SQL Query Engine for Real-Time and Batch Analytics (https://github.com/DSLAM-UMD/Flock)
+Flock: Serverless SQL Query Engine for Real-Time and Batch Analytics (https://github.com/flock-lab/Flock)
 
 Copyright (c) 2020-2021, UMD Data System Group. All rights reserved.
 

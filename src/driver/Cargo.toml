@@ -11,13 +11,13 @@ edition = "2018"
 build = [ "filetime", "fixedbitset", "glob", "regex", "remove_dir_all", "url" ]
 
 [dependencies]
-arrow = { git = "https://github.com/DSLAM-UMD/arrow-rs", branch = "flock", features = [ "simd" ] }
+arrow = { git = "https://github.com/flock-lab/arrow-rs", branch = "flock", features = [ "simd" ] }
 aws_lambda_events = "0.4"
 base64 = "0.13.0"
 blake2 = "0.9"
 chrono = "0.4.19"
-daggy = { git = "https://github.com/DSLAM-UMD/daggy", branch = "master" }
-datafusion = { git = "https://github.com/DSLAM-UMD/arrow-datafusion", branch = "flock" }
+daggy = { git = "https://github.com/flock-lab/daggy", branch = "master" }
+datafusion = { git = "https://github.com/flock-lab/arrow-datafusion", branch = "flock" }
 lazy_static = "1.4"
 runtime = { path = "../../src/runtime" }
 rusoto_core = "0.47.0"
