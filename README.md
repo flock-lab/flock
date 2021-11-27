@@ -1,4 +1,4 @@
-<img src="docs/flock.png" width=60%>
+<img src="docs/img/flock.png" width=60%>
 
 ## Flock: A Practical Serverless Streaming Query Engine
 
@@ -212,7 +212,7 @@ Running benchmarks with the following options: NexmarkBenchmarkOpt { query: 3, d
 
 AWS gives you a personalized view of the status of the query execution (`q3`).
 
-<img src="docs/q3.png" width=85%>
+<img src="docs/img/q3.png" width=85%>
 
 ## License
 

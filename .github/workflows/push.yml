@@ -1,0 +1,46 @@
+on:
+  - push
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@main
+    - name: Install dependencies
+      run: |
+        curl -Ls https://github.com/jgm/pandoc/releases/download/2.11.2/pandoc-2.11.2-1-amd64.deb -o pandoc.deb
+        sudo dpkg -i pandoc.deb
+        sudo apt-get install nasm
+        sudo apt-get install fonts-stix
+    - name: Install Racket
+      uses: Bogdanp/setup-racket@v0.10
+      with:
+        architecture: 'x64'
+        distribution: 'full'
+        variant: 'CS'
+        version: '7.9'
+    - name: Build and test
+      run: |
+        make -C docs main
+    - name: Archive docs
+      uses: actions/upload-artifact@v2
+      with:
+        name: docs
+        path: docs/main
+  deploy:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+    - name: Download docs
+      uses: actions/download-artifact@v2
+      with:
+        name: docs
+        path: flock
+    - name: Deploy
+      uses: peaceiris/actions-gh-pages@v3
+      if: ${{ github.ref == 'refs/heads/main' }}
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./public
