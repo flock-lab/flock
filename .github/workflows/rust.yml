@@ -35,6 +35,14 @@ jobs:
         run: |
           cargo update --package arrow
       - name: build and tests
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            src:
+              - 'bench/**'
+              - 'src/**'
+      - if: steps.changes.outputs.src == 'true'
         run: |
           cargo build -j8
           cargo test
