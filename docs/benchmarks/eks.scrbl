@@ -100,12 +100,13 @@ Auto labeling of Pods.}
 to enable auto selection of instances based on the criteria passed.}
 ]}
 
-@item{Create service accounts for Flink}
+@item{Create service accounts for Flink
 
 @bash-repl{
 $ kubectl create serviceaccount flink-service-account
 $ kubectl create clusterrolebinding flink-role-binding-flink \
 --clusterrole=edit --serviceaccount=default:flink-service-account
+}
 }
 
 @item{Deploy Flink
