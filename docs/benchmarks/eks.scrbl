@@ -29,7 +29,7 @@ Flink supports different deployment modes when running on @link["https://kuberne
 will show you how to deploy Flink on Kubernetes using the 
 @link["https://nightlies.apache.org/flink/flink-docs-release-1.13/docs/deployment/resource-providers/native_kubernetes/"]{Native Kubernetes Deployment}.
 
-@section[#:style 'unnumbered]{Amazon EKS}
+@section{Amazon EKS}
 
 @link["https://aws.amazon.com/eks/"]{Amazon EKS} is a fully managed Kubernetes service. EKS supports creating and managing spot instances using Amazon EKS 
 managed node groups following Spot best practices. This enables you to take advantage of the steep savings and scale
@@ -47,7 +47,7 @@ cluster and the applications competes for the resources. There may be multiple j
 parallel. Its main advantage is that it saves time on spinning up a new Flink cluster for new jobs, however if one 
 of the Task Managers fails it may impact all the jobs running on that.
 
-@section[#:style 'unnumbered]{AWS Spot Instances}
+@section{AWS Spot Instances}
 
 Flink is distributed to manage and process high volumes of data. Designed for failure, they can run on machines with 
 different configurations, inherently resilient and flexible. Spot Instances can optimize runtimes by increasing 
@@ -60,7 +60,7 @@ Instances.
 Flink supports elastic scaling via @link["https://nightlies.apache.org/flink/flink-docs-master/docs/deployment/elastic_scaling/"]{Reactive Mode}. 
 This is ideal with Spot Instances as it implements elastic scaling with higher throughput in a cost optimized way.
 
-@section[#:style 'unnumbered]{Flink Deployment}
+@section{Flink Deployment}
 
 For production use, we recommend deploying Flink Applications in the @bold{Application Mode}, as these modes provide a 
 better isolation for the Applications. We will be bundling the user code in the Flink image for that purpose and 
@@ -126,7 +126,7 @@ load and scale accordingly.}
 ]
 
 
-@section[#:style 'unnumbered]{Conclusion}
+@section{Conclusion}
 
 In this post, we demonstrated how you can run Flink workloads on a Kubernetes Cluster using Spot Instances, 
 achieving scalability, resilience, and cost optimization. 
