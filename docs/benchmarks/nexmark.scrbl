@@ -11,7 +11,7 @@
 @section{What is Nexmark}
 
 Nexmark is a benchmark suite for queries over continuous data streams. This benchmark is inspired by 
-the @link["https://web.archive.org/web/20100620010601/http://datalab.cs.pdx.edu/niagaraST/NEXMark/"]{NEXMark research paper}.
+the @link["https://web.archive.org/web/20100620010601/http://datalab.cs.pdx.edu/niagaraST/NEXMark/"]{NEXMark research paper} and Apache Beam.
 
 These are multiple queries over a three entities model representing on online auction system:
 
@@ -45,3 +45,28 @@ These are multiple queries over a three entities model representing on online au
             (list "q13"	"Bounded Side Input Join"	"Joins a stream to a bounded side input, modeling basic stream enrichment.")
 
             ))]
+
+@emph{q1 ~ q8 are from original NEXMark queries, q9 ~ q13 are from Apache Beam.}
+
+@section{Benchmark Guideline}
+
+The Nexmark benchmark framework runs Flink queries on standalone cluster (Session Mode). The cluster should consist of 
+one master node and one or more worker nodes. All of them should be Linux environment (the CPU monitor script requries to 
+run on Linux). Please make sure you have the following software installed on each node:
+
+@itemlist[#:style 'unnumbered
+    @item{JDK 1.8.x or higher (Nexmark scripts uses some tools of JDK)}
+    @item{ssh (sshd must be running to use the Flink and Nexmark scripts that manage remote components)}
+]
+
+Having @link["https://linuxize.com/post/how-to-setup-passwordless-ssh-login/"](passwordless SSH) and the same directory structure 
+on all your cluster nodes will allow you to use our scripts to control everything.
+
+@section[#:style 'unnumbered]{References}
+
+@itemlist[#:style 'ordered
+  @item{Pete Tucker, Kristin Tufte, Vassilis Papadimos, David Maier. NEXMark – A Benchmark for Queries over Data Streams. June 2010.}
+  @item{Apache Beam, @link["https://beam.apache.org/"]{https://beam.apache.org/}}
+  @item{Nexmark, @link["https://web.archive.org/web/20100620010601/http://datalab.cs.pdx.edu/niagaraST/NEXMark/"]{https://web.archive.org/web/20100620010601/http://datalab.cs.pdx.edu/niagaraST/NEXMark/}}
+  @item{Nexmark Benchmark Suite, @link["https://github.com/nexmark/nexmark"]{https://github.com/nexmark/nexmark}}
+]
