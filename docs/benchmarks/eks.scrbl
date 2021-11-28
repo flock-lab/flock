@@ -36,16 +36,7 @@ managed node groups following Spot best practices. This enables you to take adva
 that Spot Instances provide for interruptible workloads. EKS-managed node groups require less operational effort 
 compared to using self-managed nodes.
 
-Flink can run jobs on Kubernetes via Application and Session Modes only:
-
-@bold{Application Mode}: This is a lightweight and scalable way to submit an application on Flink and is the preferred way 
-to launch application as it supports better resource isolation. Resource isolation is achieved by running a cluster 
-per job. Once the application shuts down all the Flink components are cleaned up.
-
-@bold{Session Mode}: This is a long running Kubernetes deployment of Flink. Multiple applications can be launched on a 
-cluster and the applications competes for the resources. There may be multiple jobs running on a TaskManager in 
-parallel. Its main advantage is that it saves time on spinning up a new Flink cluster for new jobs, however if one 
-of the Task Managers fails it may impact all the jobs running on that.
+Flink can run jobs on Kubernetes via Application and Session Modes only.
 
 @section{AWS Spot Instances}
 

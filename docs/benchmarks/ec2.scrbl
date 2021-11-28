@@ -117,4 +117,53 @@ There are two things you need to fix to make that work.
   }
 ]
 
-After that, you successfully set up an EC2 Amazon Machine Image with Docker, docker-compose, and access to Amazon ECR.
+@margin-note{After that, you successfully set up an EC2 Amazon Machine Image with Docker, docker-compose, and access to Amazon ECR.}
+
+@section{How To Run Flink on EC2}
+
+The next step is to run Flink on EC2. We'll use the @bold{flink-1.13.3-scala_2.12-java11} image. To deploy a Flink Session cluster with Docker, 
+you need to start a JobManager container. To enable communication between the containers, we first set a required 
+Flink configuration property and create a network:
+
+@bash-repl{
+FLINK_PROPERTIES="jobmanager.rpc.address: jobmanager"
+[ec2-user ~]$ sudo docker network create flink-network
+}
+
+Then we launch the JobManager:
+
+@bash-repl{
+docker run \
+    --rm \
+    --name=jobmanager \
+    --network flink-network \
+    --publish 8081:8081 \
+    --env FLINK_PROPERTIES="${FLINK_PROPERTIES}" \
+    flink:latest jobmanager & 
+}
+
+and one or more TaskManager containers:
+
+@bash-repl{
+docker run \
+    --rm \
+    --name=taskmanager \
+    --network flink-network \
+    --env FLINK_PROPERTIES="${FLINK_PROPERTIES}" \
+    flink:latest taskmanager &   
+}
+
+@bash-repl{
+[ec2-user ~]$ sudo docker ps
+CONTAINER ID   IMAGE          COMMAND                  CREATED          STATUS          PORTS                                                 NAMES
+4c2e97bcedc6   flink:latest   "/docker-entrypoint.…"   11 minutes ago   Up 11 minutes   6123/tcp, 8081/tcp                                    taskmanager
+9f590618dcb9   flink:latest   "/docker-entrypoint.…"   12 minutes ago   Up 12 minutes   6123/tcp, 0.0.0.0:8081->8081/tcp, :::8081->8081/tcp   jobmanager
+}
+
+The web interface is now available at localhost:8081.
+
+@image[#:scale 1/2]{img/benchmarks/flink-ui.png}
+The Flink web interface
+
+To shut down the cluster, either terminate (e.g. with CTRL-C) the JobManager and TaskManager processes, or 
+use @bold{docker ps} to identify and @bold{docker stop} to terminate the containers.
