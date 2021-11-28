@@ -101,7 +101,6 @@ to enable auto selection of instances based on the criteria passed.}
 ]}
 
 @item{Create service accounts for Flink
-
 @bash-repl{
 $ kubectl create serviceaccount flink-service-account
 $ kubectl create clusterrolebinding flink-role-binding-flink \
