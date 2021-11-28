@@ -126,8 +126,8 @@ you need to start a JobManager container. To enable communication between the co
 Flink configuration property and create a network:
 
 @bash-repl{
-FLINK_PROPERTIES="jobmanager.rpc.address: jobmanager"
-[ec2-user ~]$ sudo docker network create flink-network
+export FLINK_PROPERTIES="jobmanager.rpc.address: jobmanager"
+sudo docker network create flink-network
 }
 
 Then we launch the JobManager:

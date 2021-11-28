@@ -1,10 +1,23 @@
 #lang scribble/manual
-@(require scribble/core
-	scriblib/footnote
-    scribble/decode
-    scribble/html-properties
-    "../defns.rkt"
-    "../utils.rkt")
+@(require "../fancyverb.rkt" "../utils.rkt")
+@(require scribble/core racket/list)
+@(require (for-label racket rackunit))
+@(require redex/reduction-semantics
+          redex/pict (only-in pict scale))
+
+@(require scribble/examples racket/sandbox)
+
+@(define core-racket
+  (parameterize ([sandbox-output 'string]
+                 [sandbox-error-output 'string]
+                 [sandbox-memory-limit 50])
+    (make-evaluator 'racket)))
+
+@(core-racket '(require racket/match))
+
+@(define (bash-repl . s)
+  (filebox (emph "shell")
+    (apply fancyverbatim "bash" s)))
 
 @title[#:tag "flink_nexmark" #:style 'unnumbered]{Nexmark Benchmark for Apache Flink}
 
@@ -61,6 +74,25 @@ run on Linux). Please make sure you have the following software installed on eac
 
 Having @link["https://linuxize.com/post/how-to-setup-passwordless-ssh-login/"](passwordless SSH) and the same directory structure 
 on all your cluster nodes will allow you to use our scripts to control everything.
+
+@subsection{Build Nexmark}
+
+Before start to run the benchmark, you should build the Nexmark benchmark first to have a benchmark package. 
+Please make sure you have installed maven in your build machine. And run the emph{./build.sh} command under nexmark-flink directoy. 
+Then you will get the nexmark-flink.tgz archive under the directory.
+
+@bash-repl{
+$ git clone https://github.com/nexmark/nexmark
+$ cd nexmark-flink
+[nexmark-flink ~] mvn package -DskipTests
+[nexmark-flink ~] ls target/
+nexmark-flink-0.2-SNAPSHOT.jar  original-nexmark-flink-0.2-SNAPSHOT.jar
+[nexmark-flink ~] ls
+build.sh*  nexmark-flink.tgz  pom.xml  src/  target/
+}
+
+@subsection{Setup Flink Cluster}
+
 
 @section[#:style 'unnumbered]{References}
 
