@@ -56,7 +56,7 @@ a, .toclink, .toptoclink, .tocviewlink, .tocviewselflink, .tocviewtoggle, .plain
 }
 
 .boxed {
-    background: #fbfafb;
+    background: white;
 }
 
 .navsettop a, .navsetbottom a {
