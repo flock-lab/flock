@@ -31,7 +31,7 @@ to run the Flink cluster. Each instance has 32 threads and 244 GB of memory.
 The first step is to login to the EC2 instance. We use the @bold{ssh} command to login to the instance.
 
 @bash-repl{
-$ ssh -i "xxx.pem" ec2-user@ec2-18-208-228-89.compute-1.amazonaws.com
+ssh -i "xxx.pem" ...compute-1.amazonaws.com
 
 The authenticity of host 'ec2-18-208-228-89.compute-1.amazonaws.com (18.208.228.89)' can't be established.
 ECDSA key fingerprint is SHA256:/MHCQjLdRmG6AubJo366zoYxYoPWfT0Ie2daqVJSgGM.
@@ -45,7 +45,7 @@ Warning: Permanently added 'ec2-18-208-228-89.compute-1.amazonaws.com,18.208.228
 https://aws.amazon.com/amazon-linux-2/
 
 
-[ec2-user@ip-172-31-33-4 ~]$ 
+[ec2-user ~]$ 
 }
 
 Then, we need to install Docker on the instance. We use the @bold{sudo} command to install Docker.
@@ -83,15 +83,15 @@ with the command @bold{docker-compose up -d} and stopped with @bold{docker-compo
 You can install Docker-Compose using the following commands:
 
 @bash-repl{
-[ec2-user@ip-172-31-33-4 ~]$ sudo curl -L "https://github.com/docker/compose/releases/download/v2.2.0/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose
+[ec2-user ~]$ sudo curl -L "https://github.com/docker/compose/releases/download/v2.2.0/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose
   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
                                  Dload  Upload   Total   Spent    Left  Speed
 100   664  100   664    0     0   8623      0 --:--:-- --:--:-- --:--:--  8623
 100 23.5M  100 23.5M    0     0  44.5M      0 --:--:-- --:--:-- --:--:-- 70.3M
 
-[ec2-user@ip-172-31-33-4 ~]$ sudo chmod +x /usr/local/bin/docker-compose
-[ec2-user@ip-172-31-33-4 ~]$ sudo ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
-[ec2-user@ip-172-31-33-4 ~]$ docker-compose --version
+[ec2-user ~]$ sudo chmod +x /usr/local/bin/docker-compose
+[ec2-user ~]$ sudo ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
+[ec2-user ~]$ docker-compose --version
 Docker Compose version v2.2.0
 }
 
@@ -103,7 +103,7 @@ Now you've got docker-compose as a tool available inside EC2!
 You'll probably try is to pull a Docker image from Amazon ECR. If you don't configure anything, it will fail. 
 There are two things you need to fix to make that work.
 
-@itemlist{#:style 'numbered'
+@itemlist[#:style 'ordered
   @item{
     Select an IAM role. We'll need at least read access to ECR to pull Docker images from a private repository.
   }
@@ -115,6 +115,6 @@ There are two things you need to fix to make that work.
         --password-stdin XXXXXX.dkr.ecr.us-east-1.amazonaws.com
     }
   }
-}
+]
 
 After that, you successfully set up an EC2 Amazon Machine Image with Docker, docker-compose, and access to Amazon ECR.
