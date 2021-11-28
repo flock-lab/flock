@@ -7,3 +7,4 @@
 @include-section{benchmarks/ec2.scrbl}
 @include-section{benchmarks/eks.scrbl}
 @include-section{benchmarks/kinesis.scrbl}
+@include-section{benchmarks/nexmark.scrbl}
