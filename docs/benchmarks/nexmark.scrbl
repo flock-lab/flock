@@ -93,6 +93,47 @@ build.sh*  nexmark-flink.tgz  pom.xml  src/  target/
 
 @subsection{Setup Flink Cluster}
 
+@itemlist[#:style 'ordered
+    @item{Download the latest Flink package from the download page.
+    @bash-repl{
+      $ wget https://dlcdn.apache.org/flink/flink-1.13.3/flink-1.13.3-bin-scala_2.12.tgz --no-check-certificate
+      $ tar xzf flink-1.13.3-bin-scala_2.12.tgz; tar xzf nexmark-flink.tgz
+      $ mv flink-1.13.3 flink; mv nexmark-flink nexmark
+    }
+    }
+    @item{Copy the jars under @emph{nexmark/lib} to @emph{flink/lib} which contains the Nexmark source generator.}
+    @item{Configure Flink
+    @itemlist[#:style 'unnumbered
+        @item{Edit @emph{flink/conf/workers} and enters the IP address of each worker node. Recommand to set 8 entries.}
+        @item{Replace @emph{flink/conf/sql-client-defaults.yaml} by @emph{nexmark/conf/sql-client-defaults.yaml}}
+        @item{Replace @emph{flink/conf/flink-conf.yaml} by @emph{nexmark/conf/flink-conf.yaml}. Remember to update the following configurations:
+          @itemlist[#:style 'unnumbered
+            @item{Set @emph{jobmanager.rpc.address} to you master IP address}
+            @item{Set @emph{state.checkpoints.dir} to your local file path (recommend to use SSD), e.g. @emph{file:///home/username/checkpoint}.}
+            @item{Set @emph{state.backend.rocksdb.localdir} to your local file path (recommend to use SSD), e.g. @emph{/home/username/rocksdb}.}
+          ] 
+        }
+
+    ]
+    }
+    @item{Configure Nexmark benchmark. Set @emph{nexmark.metric.reporter.host} in @emph{nexmark/conf/nexmark.yaml} to your master IP address.}
+    @item{Copy @emph{flink} and @emph{nexmark} folders to your worker nodes using @emph{scp}.}
+    @item{Start Flink Cluster by running @emph{flink/bin/start-cluster.sh} on the master node.}
+    @item{Start Nexmark benchmark by running @emph{nexmark/bin/setup_cluster.sh} on the master node.}
+]
+
+
+@subsection{Run Nexmark Benchmark}
+
+You can run the Nexmark benchmark by running @emph{nexmark/bin/run_query.sh all} on the master node. 
+It will run all the queries one by one, and collect benchmark metrics automatically. It will take 50 minutes 
+to finish the benchmark by default. At last, it will print the benchmark summary result (Cores * Time(s) 
+for each query) on the console. You can also run specific queries by running the following command:
+
+@centered{nexmark/bin/run_query.sh q1,q2}
+
+You can also tune the workload of the queries by editing @emph{nexmark/conf/nexmark.yaml} with the 
+@emph{nexmark.workload.*} prefix options.
 
 @section[#:style 'unnumbered]{References}
 
