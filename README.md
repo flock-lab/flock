@@ -20,7 +20,8 @@ The generic lambda function code is built in advance and uploaded to AWS S3.
 You can enable the features `simd` (to use SIMD instructions) and/or `mimalloc` or `snmalloc` (to use either the mimalloc or snmalloc allocator) as features by passing them in as --features:
 
 ```shell
-$ cargo build --target x86_64-unknown-linux-gnu --release --features "arrow/simd datafusion/simd  mimalloc"
+$ RUST_LOG=info RUSTFLAGS='-C target-cpu=native -C codegen-units=1 -C embed-bitcode' \
+cargo +nightly build --target x86_64-unknown-linux-gnu --release --features "arrow/simd datafusion/simd snmalloc"
 ```
 
 ## Upgrade Cloud Function Services
