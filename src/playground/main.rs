@@ -19,8 +19,8 @@ use log::info;
 use runtime::prelude::*;
 use rusoto_core::Region;
 use rusoto_lambda::{
-    CreateFunctionRequest, DeleteFunctionRequest, FunctionCode, GetFunctionRequest,
-    InvocationRequest, InvocationResponse, Lambda, LambdaClient, PutFunctionConcurrencyRequest,
+    CreateFunctionRequest, FunctionCode, GetFunctionRequest, InvocationRequest, InvocationResponse,
+    Lambda, LambdaClient, PutFunctionConcurrencyRequest, UpdateFunctionCodeRequest,
 };
 use serde_json::json;
 use serde_json::Value;
@@ -46,6 +46,7 @@ struct PlaygroundOpt {
 }
 
 async fn create_function(func_name: &str) -> Result<String> {
+    let s3_bucket = globals["lambda"]["s3_bucket"].to_string();
     if LAMBDA_CLIENT
         .get_function(GetFunctionRequest {
             function_name: String::from(func_name),
@@ -54,43 +55,54 @@ async fn create_function(func_name: &str) -> Result<String> {
         .await
         .is_ok()
     {
-        // To avoid obsolete code on S3, remove the previous lambda function.
-        LAMBDA_CLIENT
-            .delete_function(DeleteFunctionRequest {
+        match LAMBDA_CLIENT
+            .update_function_code(UpdateFunctionCodeRequest {
                 function_name: String::from(func_name),
+                s3_bucket: Some(s3_bucket.clone()),
+                s3_key: Some(String::from(func_name)),
                 ..Default::default()
             })
             .await
-            .map_err(|e| FlockError::Internal(e.to_string()))?;
-    }
-
-    match LAMBDA_CLIENT
-        .create_function(CreateFunctionRequest {
-            code: FunctionCode {
-                s3_bucket:         Some("umd-flock".to_string()),
-                s3_key:            Some(String::from(func_name)),
-                s3_object_version: None,
-                zip_file:          None,
-                image_uri:         None,
-            },
-            function_name: String::from(func_name),
-            handler: lambda::handler(),
-            role: lambda::role().await,
-            runtime: lambda::runtime(),
-            ..Default::default()
-        })
-        .await
-    {
-        Ok(config) => {
-            return config.function_name.ok_or_else(|| {
-                FlockError::Internal("Unable to find lambda function arn.".to_string())
-            })
+        {
+            Ok(config) => {
+                return config.function_name.ok_or_else(|| {
+                    FlockError::Internal("Unable to find lambda function arn.".to_string())
+                })
+            }
+            Err(err) => {
+                return Err(FlockError::Internal(format!(
+                    "Failed to update lambda function: {}",
+                    err
+                )))
+            }
         }
-        Err(err) => {
-            return Err(FlockError::Internal(format!(
-                "Failed to create lambda function: {}",
-                err
-            )))
+    } else {
+        match LAMBDA_CLIENT
+            .create_function(CreateFunctionRequest {
+                code: FunctionCode {
+                    s3_bucket: Some(s3_bucket.clone()),
+                    s3_key: Some(String::from(func_name)),
+                    ..Default::default()
+                },
+                function_name: String::from(func_name),
+                handler: lambda::handler(),
+                role: lambda::role().await,
+                runtime: lambda::runtime(),
+                ..Default::default()
+            })
+            .await
+        {
+            Ok(config) => {
+                return config.function_name.ok_or_else(|| {
+                    FlockError::Internal("Unable to find lambda function arn.".to_string())
+                })
+            }
+            Err(err) => {
+                return Err(FlockError::Internal(format!(
+                    "Failed to create lambda function: {}",
+                    err
+                )))
+            }
         }
     }
 }

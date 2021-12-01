@@ -25,8 +25,8 @@ use nexmark::NexMarkSource;
 use runtime::prelude::*;
 use rusoto_core::Region;
 use rusoto_lambda::{
-    CreateFunctionRequest, DeleteFunctionRequest, GetFunctionRequest, InvocationRequest,
-    InvocationResponse, Lambda, LambdaClient, PutFunctionConcurrencyRequest,
+    CreateFunctionRequest, FunctionCode, GetFunctionRequest, InvocationRequest, InvocationResponse,
+    Lambda, LambdaClient, PutFunctionConcurrencyRequest, UpdateFunctionCodeRequest,
 };
 use serde_json::Value;
 use std::sync::Arc;
@@ -265,6 +265,9 @@ async fn set_lambda_concurrency(function_name: String, concurrency: i64) -> Resu
 
 /// Creates a single lambda function using bootstrap.zip in Amazon S3.
 async fn create_lambda_function(ctx: &ExecutionContext) -> Result<String> {
+    let s3_bucket = globals["lambda"]["s3_bucket"].to_string();
+    let s3_key = globals["lambda"]["s3_nexmark_key"].to_string();
+    let func_name = ctx.name.clone();
     if LAMBDA_CLIENT
         .get_function(GetFunctionRequest {
             function_name: ctx.name.clone(),
@@ -273,39 +276,54 @@ async fn create_lambda_function(ctx: &ExecutionContext) -> Result<String> {
         .await
         .is_ok()
     {
-        // To avoid obsolete code on S3, remove the previous lambda function.
-        LAMBDA_CLIENT
-            .delete_function(DeleteFunctionRequest {
-                function_name: ctx.name.clone(),
+        match LAMBDA_CLIENT
+            .update_function_code(UpdateFunctionCodeRequest {
+                function_name: func_name.clone(),
+                s3_bucket: Some(s3_bucket.clone()),
+                s3_key: Some(s3_key.clone()),
                 ..Default::default()
             })
             .await
-            .map_err(|e| FlockError::Internal(e.to_string()))?;
-    }
-
-    match LAMBDA_CLIENT
-        .create_function(CreateFunctionRequest {
-            code: lambda::nexmark_function_code(),
-            environment: lambda::environment(&ctx),
-            function_name: ctx.name.clone(),
-            handler: lambda::handler(),
-            memory_size: lambda::memory_size(&ctx),
-            role: lambda::role().await,
-            runtime: lambda::runtime(),
-            ..Default::default()
-        })
-        .await
-    {
-        Ok(config) => {
-            return config.function_arn.ok_or_else(|| {
-                FlockError::Internal("Unable to find lambda function arn.".to_string())
-            })
+        {
+            Ok(config) => {
+                return config.function_name.ok_or_else(|| {
+                    FlockError::Internal("Unable to find lambda function arn.".to_string())
+                })
+            }
+            Err(err) => {
+                return Err(FlockError::Internal(format!(
+                    "Failed to update lambda function: S3 Bucket: {}. S3 Key: {}. {}",
+                    s3_bucket, s3_key, err
+                )))
+            }
         }
-        Err(err) => {
-            return Err(FlockError::Internal(format!(
-                "Failed to create lambda function: {}",
-                err
-            )))
+    } else {
+        match LAMBDA_CLIENT
+            .create_function(CreateFunctionRequest {
+                code: FunctionCode {
+                    s3_bucket: Some(s3_bucket.clone()),
+                    s3_key: Some(s3_key.clone()),
+                    ..Default::default()
+                },
+                function_name: func_name.clone(),
+                handler: lambda::handler(),
+                role: lambda::role().await,
+                runtime: lambda::runtime(),
+                ..Default::default()
+            })
+            .await
+        {
+            Ok(config) => {
+                return config.function_name.ok_or_else(|| {
+                    FlockError::Internal("Unable to find lambda function arn.".to_string())
+                })
+            }
+            Err(err) => {
+                return Err(FlockError::Internal(format!(
+                    "Failed to create lambda function: {}",
+                    err
+                )))
+            }
         }
     }
 }

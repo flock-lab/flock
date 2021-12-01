@@ -1,8 +1,8 @@
 [project]
 
 name = "flock"
-discription = "Flock: Serverless SQL Query Engine for Real-Time and Batch Analytics"
-license = "Copyright (c) 2020-2021, UMD Database Group. All rights reserved. The library, examples, and all source code are released under Apache 2.0"
+discription = "Flock: A Practical Serverless Streaming SQL Query Engine"
+license = "Copyright (c) 2020-2021, UMD Database Group. All rights reserved. The library, examples, and all source code are released AGPL-3.0 License."
 production = false
 
 [lambda]
@@ -21,3 +21,8 @@ parallelism = 8
 join_threshold = 5242880
 aggregate_threshold = 10485760
 regular_threshold = 20971520
+
+# default s3 address to store the generic function code
+s3_bucket = "umd-flock"
+s3_key = "flock"
+s3_nexmark_key = "nexmark"

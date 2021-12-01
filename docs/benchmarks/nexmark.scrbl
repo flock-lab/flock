@@ -23,7 +23,7 @@
 
 @section{What is Nexmark}
 
-Nexmark is a benchmark suite for queries over continuous data streams. This benchmark is inspired by 
+Nexmark is a benchmark suite for queries over continuous data streams. This benchmark is inspired by
 the @link["https://web.archive.org/web/20100620010601/http://datalab.cs.pdx.edu/niagaraST/NEXMark/"]{NEXMark research paper} and Apache Beam.
 
 These are multiple queries over a three entities model representing on online auction system:
@@ -36,12 +36,12 @@ These are multiple queries over a three entities model representing on online au
 
 @section{The Queries}
 
-@tabular[#:style 'boxed 
+@tabular[#:style 'boxed
          #:row-properties '(bottom-border ())
          #:sep @hspace[2]
 	 (list* (list @bold{Nexmark Benchmark Suite} 'cont 'cont)
 	        (list @elem{@bold{Query}} @elem{@bold{Name}} @elem{@bold{Summary}})
-            (list 
+            (list
             (list "q0"	"Pass Through"	"Measures the monitoring overhead including the source generator.")
             (list "q1"	"Currency Conversion"	"Convert each bid value from dollars to euros.")
             (list "q2"	"Selection"	"Find bids with specific auction ids and show their bid price.")
@@ -63,8 +63,8 @@ These are multiple queries over a three entities model representing on online au
 
 @section{Benchmark Guideline}
 
-The Nexmark benchmark framework runs Flink queries on standalone cluster (Session Mode). The cluster should consist of 
-one master node and one or more worker nodes. All of them should be Linux environment (the CPU monitor script requries to 
+The Nexmark benchmark framework runs Flink queries on standalone cluster (Session Mode). The cluster should consist of
+one master node and one or more worker nodes. All of them should be Linux environment (the CPU monitor script requries to
 run on Linux). Please make sure you have the following software installed on each node:
 
 @itemlist[#:style 'unnumbered
@@ -72,13 +72,13 @@ run on Linux). Please make sure you have the following software installed on eac
     @item{ssh (sshd must be running to use the Flink and Nexmark scripts that manage remote components)}
 ]
 
-Having @link["https://linuxize.com/post/how-to-setup-passwordless-ssh-login/"](passwordless SSH) and the same directory structure 
+Having @link["https://linuxize.com/post/how-to-setup-passwordless-ssh-login/"](passwordless SSH) and the same directory structure
 on all your cluster nodes will allow you to use our scripts to control everything.
 
 @subsection{Build Nexmark}
 
-Before start to run the benchmark, you should build the Nexmark benchmark first to have a benchmark package. 
-Please make sure you have installed maven in your build machine. And run the emph{./build.sh} command under nexmark-flink directoy. 
+Before start to run the benchmark, you should build the Nexmark benchmark first to have a benchmark package.
+Please make sure you have installed maven in your build machine. And run the emph{./build.sh} command under nexmark-flink directoy.
 Then you will get the nexmark-flink.tgz archive under the directory.
 
 @bash-repl{
