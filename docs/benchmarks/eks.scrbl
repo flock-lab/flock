@@ -25,37 +25,37 @@
 
 @section{Overview}
 
-Flink supports different deployment modes when running on @link["https://kubernetes.io/"]{Kubernetes}.  We 
-will show you how to deploy Flink on Kubernetes using the 
+Flink supports different deployment modes when running on @link["https://kubernetes.io/"]{Kubernetes}.  We
+will show you how to deploy Flink on Kubernetes using the
 @link["https://nightlies.apache.org/flink/flink-docs-release-1.13/docs/deployment/resource-providers/native_kubernetes/"]{Native Kubernetes Deployment}.
 
 @section{Amazon EKS}
 
-@link["https://aws.amazon.com/eks/"]{Amazon EKS} is a fully managed Kubernetes service. EKS supports creating and managing spot instances using Amazon EKS 
+@link["https://aws.amazon.com/eks/"]{Amazon EKS} is a fully managed Kubernetes service. EKS supports creating and managing spot instances using Amazon EKS
 managed node groups following Spot best practices. This enables you to take advantage of the steep savings and scale
-that Spot Instances provide for interruptible workloads. EKS-managed node groups require less operational effort 
+that Spot Instances provide for interruptible workloads. EKS-managed node groups require less operational effort
 compared to using self-managed nodes.
 
 Flink can run jobs on Kubernetes via Application and Session Modes only.
 
 @section{AWS Spot Instances}
 
-Flink is distributed to manage and process high volumes of data. Designed for failure, they can run on machines with 
-different configurations, inherently resilient and flexible. Spot Instances can optimize runtimes by increasing 
+Flink is distributed to manage and process high volumes of data. Designed for failure, they can run on machines with
+different configurations, inherently resilient and flexible. Spot Instances can optimize runtimes by increasing
 throughput, while spending the same (or less). Flink can tolerate interruptions using restart and failover strategies.
 
-Job Manager and Task Manager are key building blocks of Flink. The Task Manager is the compute intensive part and 
-Job Manager is the orchestrator. We would be running Task Manager on Spot Instances and Job Manager on On Demand 
+Job Manager and Task Manager are key building blocks of Flink. The Task Manager is the compute intensive part and
+Job Manager is the orchestrator. We would be running Task Manager on Spot Instances and Job Manager on On Demand
 Instances.
 
-Flink supports elastic scaling via @link["https://nightlies.apache.org/flink/flink-docs-master/docs/deployment/elastic_scaling/"]{Reactive Mode}. 
+Flink supports elastic scaling via @link["https://nightlies.apache.org/flink/flink-docs-master/docs/deployment/elastic_scaling/"]{Reactive Mode}.
 This is ideal with Spot Instances as it implements elastic scaling with higher throughput in a cost optimized way.
 
 @section{Flink Deployment}
 
-For production use, we recommend deploying Flink Applications in the @bold{Application Mode}, as these modes provide a 
-better isolation for the Applications. We will be bundling the user code in the Flink image for that purpose and 
-upload in @link["https://aws.amazon.com/ecr/"]{Amazon ECR}. Amazon ECR is a fully managed container registry that 
+For production use, we recommend deploying Flink Applications in the @bold{Application Mode}, as these modes provide a
+better isolation for the Applications. We will be bundling the user code in the Flink image for that purpose and
+upload in @link["https://aws.amazon.com/ecr/"]{Amazon ECR}. Amazon ECR is a fully managed container registry that
 makes it easy to store, manage, share, and deploy your container images and artifacts anywhere.
 
 @itemlist[#:style 'ordered
@@ -76,15 +76,15 @@ Run the following to create the policy. Note the ARN.}
 @item{Cluster and node groups deployment
 @itemlist[
 @item{Create an EKS cluster. The cluster takes approximately 15 minutes to launch.}
-@item{Create the node group using the nodeGroup config file. We are using multiple nodeGroups of different 
-sizes to adapt Spot best practice of diversification.  Replace the <<Policy ARN>> string using the ARN string 
+@item{Create the node group using the nodeGroup config file. We are using multiple nodeGroups of different
+sizes to adapt Spot best practice of diversification.  Replace the <<Policy ARN>> string using the ARN string
 from the previous step.}
 @item{Download the Cluster Autoscaler and edit it to add the cluster-name.}
 ]}
 
 @item{Install the Cluster AutoScaler using the following command: kubectl apply -f cluster-autoscaler-autodiscover.yaml
 @itemlist[
-@item{Using EKS Managed node groups requires significantly less operational effort compared to using self-managed 
+@item{Using EKS Managed node groups requires significantly less operational effort compared to using self-managed
 node group and enables: 1) Auto enforcement of Spot best practices. 2) Spot Instance lifecycle management. 3)
 Auto labeling of Pods.}
 @item{eksctl has integrated @link["https://github.com/aws/amazon-ec2-instance-selector"]{amazon-ec2-instance-selector}
@@ -101,13 +101,13 @@ $ kubectl create clusterrolebinding flink-role-binding-flink \
 
 @item{Deploy Flink
 
-This install folder here has all the YAML files required to deploy a standalone Flink cluster. Run the install.sh 
-file. This will deploy the cluster with a JobManager, a pool of TaskManagers and a Service exposing JobManager’s 
+This install folder here has all the YAML files required to deploy a standalone Flink cluster. Run the install.sh
+file. This will deploy the cluster with a JobManager, a pool of TaskManagers and a Service exposing JobManager’s
 ports.
 
 @itemlist[
 @item{This is a High-Availability(HA) deployment of Flink with the use of Kubernetes high availability service.}
-@item{The JobManager runs on OnDemand and TaskManager on Spot. As the cluster is launched in Application Mode, 
+@item{The JobManager runs on OnDemand and TaskManager on Spot. As the cluster is launched in Application Mode,
 if a node is interrupted only one job will be restarted.}
 @item{Autoscaling is enabled by the use of Reactive Mode. Horizontal Pod Autoscaler is used to monitor the CPU
 load and scale accordingly.}
@@ -119,8 +119,8 @@ load and scale accordingly.}
 
 @section{Conclusion}
 
-In this post, we demonstrated how you can run Flink workloads on a Kubernetes Cluster using Spot Instances, 
-achieving scalability, resilience, and cost optimization. 
+In this post, we demonstrated how you can run Flink workloads on a Kubernetes Cluster using Spot Instances,
+achieving scalability, resilience, and cost optimization.
 
 
 @section[#:style 'unnumbered]{Reference}

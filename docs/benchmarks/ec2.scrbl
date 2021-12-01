@@ -25,8 +25,8 @@
 
 @section{Install Docker in EC2 Instance}
 
-In this section, we will describe how to deploy a Flink cluster on Amazon EC2. We use a @bold{r4.8xlarge} instance 
-to run the Flink cluster. Each instance has 32 threads and 244 GB of memory. 
+In this section, we will describe how to deploy a Flink cluster on Amazon EC2. We use a @bold{r4.8xlarge} instance
+to run the Flink cluster. Each instance has 32 threads and 244 GB of memory.
 
 The first step is to login to the EC2 instance. We use the @bold{ssh} command to login to the instance.
 
@@ -45,7 +45,7 @@ Warning: Permanently added 'ec2-18-208-228-89.compute-1.amazonaws.com,18.208.228
 https://aws.amazon.com/amazon-linux-2/
 
 
-[ec2-user ~]$ 
+[ec2-user ~]$
 }
 
 Then, we need to install Docker on the instance. We use the @bold{sudo} command to install Docker.
@@ -57,7 +57,7 @@ sudo service docker start
 sudo usermod -a -G docker ec2-user
 }
 
-But there is one more subtle detail. Every time your Amazon AMI is rebooted, you want the Docker service to remain 
+But there is one more subtle detail. Every time your Amazon AMI is rebooted, you want the Docker service to remain
 up and running. Therefore, we have one final command to use:
 
 @bash-repl{
@@ -75,9 +75,9 @@ CONTAINER ID   IMAGE     COMMAND   CREATED   STATUS    PORTS     NAMES
 
 @section{Install Docker-Compose in EC2 Instance}
 
-@bold{docker-compose} is a very convenient tool to work with. If you have a few Docker images, you quickly get 
-tired of entering everything via the command line. This is where docker-compose comes in. It allows you to 
-configure all the images in one place. An application consisting of multiple containers can easily be started 
+@bold{docker-compose} is a very convenient tool to work with. If you have a few Docker images, you quickly get
+tired of entering everything via the command line. This is where docker-compose comes in. It allows you to
+configure all the images in one place. An application consisting of multiple containers can easily be started
 with the command @bold{docker-compose up -d} and stopped with @bold{docker-compose down}.
 
 You can install Docker-Compose using the following commands:
@@ -95,12 +95,12 @@ You can install Docker-Compose using the following commands:
 Docker Compose version v2.2.0
 }
 
-When you've done all that, you can choose to append those commands to your user data (without sudo) as well. 
+When you've done all that, you can choose to append those commands to your user data (without sudo) as well.
 Now you've got docker-compose as a tool available inside EC2!
 
 @section{How To Pull Docker Images From Amazon ECR}
 
-You'll probably try is to pull a Docker image from Amazon ECR. If you don't configure anything, it will fail. 
+You'll probably try is to pull a Docker image from Amazon ECR. If you don't configure anything, it will fail.
 There are two things you need to fix to make that work.
 
 @itemlist[#:style 'ordered
@@ -121,8 +121,8 @@ There are two things you need to fix to make that work.
 
 @section{How To Run Flink on EC2}
 
-The next step is to run Flink on EC2. We'll use the @bold{flink-1.13.3-scala_2.12-java11} image. To deploy a Flink Session cluster with Docker, 
-you need to start a JobManager container. To enable communication between the containers, we first set a required 
+The next step is to run Flink on EC2. We'll use the @bold{flink-1.13.3-scala_2.12-java11} image. To deploy a Flink Session cluster with Docker,
+you need to start a JobManager container. To enable communication between the containers, we first set a required
 Flink configuration property and create a network:
 
 @bash-repl{
@@ -139,7 +139,7 @@ docker run \
     --network flink-network \
     --publish 8081:8081 \
     --env FLINK_PROPERTIES="${FLINK_PROPERTIES}" \
-    flink:latest jobmanager & 
+    flink:latest jobmanager &
 }
 
 and one or more TaskManager containers:
@@ -150,7 +150,7 @@ docker run \
     --name=taskmanager \
     --network flink-network \
     --env FLINK_PROPERTIES="${FLINK_PROPERTIES}" \
-    flink:latest taskmanager &   
+    flink:latest taskmanager &
 }
 
 @bash-repl{
@@ -165,5 +165,5 @@ The web interface is now available at localhost:8081.
 @image[#:scale 1/2]{img/benchmarks/flink-ui.png}
 The Flink web interface
 
-To shut down the cluster, either terminate (e.g. with CTRL-C) the JobManager and TaskManager processes, or 
+To shut down the cluster, either terminate (e.g. with CTRL-C) the JobManager and TaskManager processes, or
 use @bold{docker ps} to identify and @bold{docker stop} to terminate the containers.
