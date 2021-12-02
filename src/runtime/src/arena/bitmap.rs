@@ -19,7 +19,6 @@
 //! representation to track which data fragments in the current time-window are
 //! available, versus which are not.
 
-use crate::error::Result;
 use arrow::buffer::MutableBuffer;
 use arrow::util::bit_util;
 

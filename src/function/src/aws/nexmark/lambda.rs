@@ -113,7 +113,7 @@ fn invoke_next_functions(ctx: &ExecutionContext, batches: &mut Vec<RecordBatch>)
             let uuid = uuid_builder.get(i);
             let request = InvokeAsyncRequest {
                 function_name: next_func.clone(),
-                invoke_args:   Payload::to_bytes(&batch, uuid, Encoding::default()),
+                invoke_args:   to_bytes(&batch, uuid, Encoding::default()),
             };
 
             if let Ok(reponse) = block_on(client.invoke_async(request)) {
@@ -154,7 +154,7 @@ async fn payload_handler(
             }
         } else {
             // partition lambda 1 to n
-            let (batch, _) = Payload::to_batch(event);
+            let (batch, _, _) = to_batch(event);
             vec![batch]
         }
     };
@@ -196,7 +196,7 @@ async fn nexmark_bench_handler(ctx: &mut ExecutionContext, event: Value) -> Resu
             | StreamWindow::SlidingWindow((_window, _hop)) => {
                 unimplemented!();
             }
-            StreamWindow::None => {
+            StreamWindow::ElementWise => {
                 // data sink -- /dev/null
                 collect(ctx, event).await?;
             }

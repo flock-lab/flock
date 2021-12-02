@@ -9,12 +9,12 @@ publish = false
 
 [dependencies]
 arrow = { git = "https://github.com/flock-lab/arrow-rs", branch = "flock", features = [ "simd" ] }
+bytes = "1.1.0"
 datafusion = { git = "https://github.com/flock-lab/arrow-datafusion", branch = "flock" }
 driver = { path = "../src/driver" }
 env_logger = "^0.9"
 futures = "0.3"
 itertools = "0.10.0"
-
 lazy_static = "1.4"
 log = "0.4.14"
 runtime = { path = "../src/runtime" }

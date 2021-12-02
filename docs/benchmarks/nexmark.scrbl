@@ -111,7 +111,7 @@ build.sh*  nexmark-flink.tgz  pom.xml  src/  target/
             @item{Set @emph{jobmanager.rpc.address} to you master IP address}
             @item{Set @emph{state.checkpoints.dir} to your local file path (recommend to use SSD), e.g. @emph{file:///home/username/checkpoint}.}
             @item{Set @emph{state.backend.rocksdb.localdir} to your local file path (recommend to use SSD), e.g. @emph{/home/username/rocksdb}.}
-          ] 
+          ]
         }
 
     ]
@@ -125,14 +125,14 @@ build.sh*  nexmark-flink.tgz  pom.xml  src/  target/
 
 @subsection{Run Nexmark Benchmark}
 
-You can run the Nexmark benchmark by running @emph{nexmark/bin/run_query.sh all} on the master node. 
-It will run all the queries one by one, and collect benchmark metrics automatically. It will take 50 minutes 
-to finish the benchmark by default. At last, it will print the benchmark summary result (Cores * Time(s) 
+You can run the Nexmark benchmark by running @emph{nexmark/bin/run_query.sh all} on the master node.
+It will run all the queries one by one, and collect benchmark metrics automatically. It will take 50 minutes
+to finish the benchmark by default. At last, it will print the benchmark summary result (Cores * Time(s)
 for each query) on the console. You can also run specific queries by running the following command:
 
 @centered{nexmark/bin/run_query.sh q1,q2}
 
-You can also tune the workload of the queries by editing @emph{nexmark/conf/nexmark.yaml} with the 
+You can also tune the workload of the queries by editing @emph{nexmark/conf/nexmark.yaml} with the
 @emph{nexmark.workload.*} prefix options.
 
 @section[#:style 'unnumbered]{References}

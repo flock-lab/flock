@@ -8,8 +8,6 @@ keywords = [ "AWS", "sql", "physical-plan", "dataflow" ]
 edition = "2018"
 
 [dependencies]
-abomonation = { git = "https://github.com/TimelyDataflow/abomonation", branch = "master" }
-abomonation_derive = "0.5.0"
 arrow = { git = "https://github.com/flock-lab/arrow-rs", branch = "flock", features = [ "simd" ] }
 arrow-flight = { git = "https://github.com/flock-lab/arrow-rs", branch = "flock" }
 async-trait = "0.1.42"

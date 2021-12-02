@@ -16,17 +16,13 @@ fn main() {}
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::datasource::nexmark::event::{Auction, Bid, Date, Person};
-    use crate::datasource::nexmark::{NexMarkSource, NexMarkStream};
+    use crate::datasource::nexmark::event::{Auction, Date, Person};
+    use crate::datasource::nexmark::NexMarkSource;
     use crate::error::Result;
     use crate::executor::plan::physical_plan;
     use crate::query::StreamWindow;
-    use arrow::json;
     use datafusion::datasource::MemTable;
     use datafusion::physical_plan::collect;
-    use std::io::BufReader;
-    use std::io::Write;
     use std::sync::Arc;
 
     #[tokio::test]
@@ -35,7 +31,12 @@ mod tests {
         let seconds = 5;
         let threads = 1;
         let event_per_second = 1000;
-        let nex = NexMarkSource::new(seconds, threads, event_per_second, StreamWindow::None);
+        let nex = NexMarkSource::new(
+            seconds,
+            threads,
+            event_per_second,
+            StreamWindow::ElementWise,
+        );
 
         // data source generation
         let events = nex.generate_data()?;

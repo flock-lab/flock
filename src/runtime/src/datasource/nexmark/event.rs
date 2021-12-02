@@ -57,18 +57,7 @@ type Id = usize;
 
 /// The event's date time.
 #[derive(
-    Eq,
-    PartialEq,
-    Ord,
-    PartialOrd,
-    Clone,
-    Serialize,
-    Deserialize,
-    Debug,
-    Abomonation,
-    Hash,
-    Copy,
-    Default,
+    Eq, PartialEq, Ord, PartialOrd, Clone, Serialize, Deserialize, Debug, Hash, Copy, Default,
 )]
 pub struct Date(usize);
 
@@ -103,7 +92,7 @@ impl ::std::ops::Sub for Date {
 }
 
 /// The NexMark event with the date time.
-#[derive(Serialize, Deserialize, Abomonation, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct EventCarrier {
     /// The date time.
     pub time:  Date,
@@ -112,7 +101,7 @@ pub struct EventCarrier {
 }
 
 /// The NexMark Event, including `Person`, `Auction`, and `Bid`.
-#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug, Abomonation)]
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 pub enum Event {
     /// The Person event.
@@ -144,9 +133,7 @@ impl Event {
 
 /// Person represents a person submitting an item for auction and/or making a
 /// bid on an auction.
-#[derive(
-    Eq, PartialEq, Ord, PartialOrd, Clone, Serialize, Deserialize, Debug, Abomonation, Hash,
-)]
+#[derive(Eq, PartialEq, Ord, PartialOrd, Clone, Serialize, Deserialize, Debug, Hash)]
 pub struct Person {
     /// A person-unique integer ID.
     pub p_id:          Id,
@@ -223,9 +210,7 @@ impl Person {
 }
 
 /// Auction represents an item under auction.
-#[derive(
-    Eq, PartialEq, Ord, PartialOrd, Clone, Serialize, Deserialize, Debug, Abomonation, Hash,
-)]
+#[derive(Eq, PartialEq, Ord, PartialOrd, Clone, Serialize, Deserialize, Debug, Hash)]
 pub struct Auction {
     /// An auction-unique integer ID.
     pub a_id:        Id,
@@ -338,9 +323,7 @@ impl Auction {
 }
 
 /// Bid represents a bid for an item under auction.
-#[derive(
-    Eq, PartialEq, Ord, PartialOrd, Clone, Serialize, Deserialize, Debug, Abomonation, Hash,
-)]
+#[derive(Eq, PartialEq, Ord, PartialOrd, Clone, Serialize, Deserialize, Debug, Hash)]
 pub struct Bid {
     /// The ID of the auction this bid is for.
     pub auction:     Id,

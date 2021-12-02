@@ -15,8 +15,8 @@
 //! original available on https://github.com/Shinmera/bsc-thesis/blob/master/benchmarks/src/nexmark.rs
 
 use crate::datasource::nexmark::config::{Config, NEXMarkConfig};
-use crate::datasource::nexmark::event::{Auction, Bid, Date, Event, Person};
-use std::io::{Error, ErrorKind, Result, Write};
+use crate::datasource::nexmark::event::{Date, Event};
+use std::io::{Error, ErrorKind, Result};
 
 /// The NexMark event generator.
 #[derive(Clone)]

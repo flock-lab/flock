@@ -29,7 +29,8 @@ use crate::context::CloudFunction;
 use crate::context::ExecutionContext;
 use crate::encoding::Encoding;
 use crate::error::{FlockError, Result};
-use crate::payload::{Payload, Uuid};
+use crate::payload::Uuid;
+use crate::transform::*;
 use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
 use datafusion::physical_plan::coalesce_batches::CoalesceBatchesExec;
@@ -124,7 +125,7 @@ pub trait Executor {
         assert_eq!(1, output_partitions.len());
         assert_eq!(1, output_partitions[0].len());
 
-        Ok(Payload::to_value(
+        Ok(to_value(
             &output_partitions[0],
             Uuid::default(),
             Encoding::default(),
@@ -218,7 +219,7 @@ mod tests {
     use arrow::datatypes::{DataType, Field, Schema};
     use aws_lambda_events::event::kinesis::KinesisEvent;
     use datafusion::datasource::MemTable;
-    use datafusion::physical_plan::expressions::{col, Column};
+    use datafusion::physical_plan::expressions::col;
     use tokio::task::JoinHandle;
 
     #[tokio::test]
