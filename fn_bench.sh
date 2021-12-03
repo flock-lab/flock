@@ -1,4 +1,18 @@
 #!/bin/bash
+# Copyright (c) 2021 UMD Database Group. All Rights Reserved.
+#
+# This program is free software: you can use, redistribute, and/or modify
+# it under the terms of the GNU Affero General Public License, version 3
+# or later ("AGPL"), as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+# FITNESS FOR A PARTICULAR PURPOSE.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+
 
 ############################################################
 # Help                                                     #
@@ -6,7 +20,7 @@
 Help()
 {
    # Display Help
-   echo "Nexmark Benchmark Script for Flock" 
+   echo "Nexmark Benchmark Script for Flock"
    echo
    echo "Syntax: fn_bech [-g|h|c]"
    echo "options:"
@@ -48,7 +62,7 @@ Nexmark()
   echo "Nexmark Benchmark Script"
   cd src/function; cargo +nightly build --target x86_64-unknown-linux-gnu --release
   cd ../../bench; cargo +nightly build --target x86_64-unknown-linux-gnu --release
-  cd ../target/x86_64-unknown-linux-gnu/release; ./flock-cli -u nexmark_lambda -k nexmark 
+  cd ../target/x86_64-unknown-linux-gnu/release; ./flock-cli -u nexmark_lambda -k nexmark
   cd ../../..
   echo "Nexmark Benchmark Script Complete"
 }
