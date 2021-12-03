@@ -17,6 +17,7 @@ extern crate itertools;
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use bytes::Bytes;
+use chrono::Utc;
 use datafusion::datasource::MemTable;
 use driver::deploy::lambda;
 use lazy_static::lazy_static;
@@ -141,7 +142,8 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
                 let f = function_name.clone();
                 tokio::spawn(async move {
                     info!("[OK] Send nexmark event (time: {}, source: {}).", t, g);
-                    let u = UuidBuilder::new(&format!("q{}", q), 1).next();
+                    let u = UuidBuilder::new(&format!("q{}-00-{}", q, Utc::now().timestamp()), 1)
+                        .next();
                     let p = serde_json::to_vec(&nexmark_event_to_payload(e, t, g, q, u)?)?.into();
                     Ok(vec![invoke_lambda_function(f, Some(p)).await?])
                 })
@@ -160,7 +162,9 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
                     let mut response = vec![];
                     for t in 0..seconds {
                         info!("[OK] Send nexmark event (time: {}, source: {}).", t, g);
-                        let u = UuidBuilder::new(&format!("q{}", q), 1).next();
+                        let u =
+                            UuidBuilder::new(&format!("q{}-00-{}", q, Utc::now().timestamp()), 1)
+                                .next();
                         let p =
                             serde_json::to_vec(&nexmark_event_to_payload(e.clone(), t, g, q, u)?)?
                                 .into();
