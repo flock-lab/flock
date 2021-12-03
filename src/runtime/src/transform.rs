@@ -122,7 +122,7 @@ pub fn to_payload(batch1: &[RecordBatch], batch2: &[RecordBatch], uuid: Uuid) ->
         encoding: encoding.clone(),
         ..Default::default()
     };
-    if !payload.data2.is_empty() {
+    if !batch2.is_empty() {
         payload.data2 = dataframe(batch2);
         payload.schema2 = schema_to_bytes(batch2[0].schema());
     }
