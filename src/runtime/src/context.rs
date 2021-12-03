@@ -18,7 +18,7 @@
 use super::datasource::DataSource;
 use super::encoding::Encoding;
 use crate::error::{FlockError, Result};
-use arrow::datatypes::{Schema, SchemaRef};
+use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
 use datafusion::physical_plan::collect;
 use datafusion::physical_plan::empty::EmptyExec;

@@ -16,18 +16,14 @@ fn main() {}
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::datasource::nexmark::event::{Auction, Bid, Date, Person};
-    use crate::datasource::nexmark::{NexMarkSource, NexMarkStream};
+    use crate::datasource::nexmark::event::{Bid, Date};
+    use crate::datasource::nexmark::NexMarkSource;
     use crate::error::FlockError;
     use crate::error::Result;
     use crate::executor::plan::physical_plan;
     use crate::query::StreamWindow;
-    use arrow::json;
     use datafusion::datasource::MemTable;
     use datafusion::physical_plan::collect;
-    use std::io::BufReader;
-    use std::io::Write;
     use std::sync::Arc;
 
     #[tokio::test]

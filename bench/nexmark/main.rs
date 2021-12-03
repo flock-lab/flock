@@ -14,21 +14,21 @@
 #[macro_use]
 extern crate itertools;
 
+use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
+use bytes::Bytes;
 use datafusion::datasource::MemTable;
 use driver::deploy::lambda;
 use lazy_static::lazy_static;
 use log::info;
-use nexmark::config::Config;
 use nexmark::event::{Auction, Bid, Person};
-use nexmark::NexMarkSource;
+use nexmark::{NexMarkSource, NexMarkStream};
 use runtime::prelude::*;
 use rusoto_core::Region;
 use rusoto_lambda::{
     CreateFunctionRequest, FunctionCode, GetFunctionRequest, InvocationRequest, InvocationResponse,
     Lambda, LambdaClient, PutFunctionConcurrencyRequest, UpdateFunctionCodeRequest,
 };
-use serde_json::Value;
 use std::sync::Arc;
 use structopt::StructOpt;
 
@@ -38,14 +38,17 @@ static LAMBDA_SYNC_CALL: &str = "RequestResponse";
 static LAMBDA_ASYNC_CALL: &str = "Event";
 
 lazy_static! {
+    static ref PERSON: SchemaRef = Arc::new(Person::schema());
+    static ref AUCTION: SchemaRef = Arc::new(Auction::schema());
+    static ref BID: SchemaRef = Arc::new(Bid::schema());
     static ref LAMBDA_CLIENT: LambdaClient = LambdaClient::new(Region::default());
 }
 
 #[derive(Debug, StructOpt)]
 struct NexmarkBenchmarkOpt {
     /// Query number
-    #[structopt(short, long)]
-    query: usize,
+    #[structopt(short = "q", long = "query_number", default_value = "1")]
+    query_number: usize,
 
     /// Activate debug mode to see query results
     #[structopt(short, long)]
@@ -72,15 +75,13 @@ async fn main() -> Result<()> {
 }
 
 async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
-    println!("Running benchmarks with the following options: {:?}", opt);
-    let mut config = Config::new();
-    config.insert("threads", opt.generators.to_string());
-    config.insert("seconds", opt.seconds.to_string());
-    config.insert("events-per-second", opt.events_per_second.to_string());
-    let nexmark = NexMarkSource {
-        config,
-        ..Default::default()
-    };
+    info!("Running benchmarks with the following options: {:?}", opt);
+    let nexmark = NexMarkSource::new(
+        opt.seconds,
+        opt.generators,
+        opt.events_per_second,
+        StreamWindow::ElementWise,
+    );
 
     let mut ctx = datafusion::execution::context::ExecutionContext::new();
     {
@@ -107,23 +108,24 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
         ctx.register_table("bid", Arc::new(bid_table))?;
     }
 
-    // marshal physical plan into cloud environment
-    let sqls = query(opt.query);
+    // construct query plan into the cloud environment
+    let sqls = nexmark_query(opt.query_number);
     if sqls.len() > 1 {
         unimplemented!();
     }
     let lambda_ctx = ExecutionContext {
         plan:         physical_plan(&mut ctx, &sqls[0])?,
-        name:         format!("q{}", opt.query),
+        name:         format!("q{}", opt.query_number),
         next:         CloudFunction::None,
         datasource:   DataSource::default(),
-        query_number: Some(opt.query),
+        query_number: Some(opt.query_number),
         debug:        opt.debug,
     };
 
-    // create lambda function based on the generic lambda function code on AWS S3.
-    let func_arn = create_lambda_function(&lambda_ctx).await?;
-    info!("[OK] Create lambda function {}.", func_arn);
+    let function_name = create_lambda_function(&lambda_ctx).await?;
+    if opt.debug {
+        info!("[OK] Create lambda function: {}.", function_name);
+    }
 
     let events = Arc::new(nexmark.generate_data()?);
     info!("[OK] Generate nexmark events.");
@@ -131,50 +133,38 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
     #[allow(unused_assignments)]
     let mut tasks = vec![];
 
-    if let StreamWindow::None = nexmark.window {
+    if let StreamWindow::ElementWise = nexmark.window {
         tasks = iproduct!(0..opt.seconds, 0..opt.generators)
             .map(|(t, g)| {
-                let func_arn = func_arn.clone();
-                let events = events.clone();
+                let e = events.clone();
+                let q = opt.query_number;
+                let f = function_name.clone();
                 tokio::spawn(async move {
                     info!("[OK] Send nexmark event (time: {}, source: {}).", t, g);
-                    let response = vec![
-                        invoke_lambda_function(
-                            func_arn,
-                            serde_json::to_vec(&events.select(t, g).ok_or_else(|| {
-                                FlockError::Internal(
-                                    "Failed to select event from streaming data".to_string(),
-                                )
-                            })?)?,
-                            LAMBDA_SYNC_CALL,
-                        )
-                        .await?,
-                    ];
-                    Ok(response)
+                    let u = UuidBuilder::new(&format!("q{}", q), 1).next();
+                    let p = serde_json::to_vec(&nexmark_event_to_payload(e, t, g, q, u)?)?.into();
+                    Ok(vec![invoke_lambda_function(f, Some(p)).await?])
                 })
             })
             // this collect *is needed* so that the join below can switch between tasks.
             .collect::<Vec<tokio::task::JoinHandle<Result<Vec<InvocationResponse>>>>>();
     } else {
-        set_lambda_concurrency(func_arn.clone(), 1).await?;
+        set_lambda_concurrency(function_name.clone(), 1).await?;
         tasks = (0..opt.generators)
             .map(|g| {
-                let func_arn = func_arn.clone();
                 let seconds = opt.seconds;
-                let events = events.clone();
+                let e = events.clone();
+                let q = opt.query_number;
+                let f = function_name.clone();
                 tokio::spawn(async move {
                     let mut response = vec![];
                     for t in 0..seconds {
-                        let event = events.select(t, g).unwrap();
                         info!("[OK] Send nexmark event (time: {}, source: {}).", t, g);
-                        response.push(
-                            invoke_lambda_function(
-                                func_arn.clone(),
-                                serde_json::to_vec(&event)?,
-                                LAMBDA_ASYNC_CALL,
-                            )
-                            .await?,
-                        );
+                        let u = UuidBuilder::new(&format!("q{}", q), 1).next();
+                        let p =
+                            serde_json::to_vec(&nexmark_event_to_payload(e.clone(), t, g, q, u)?)?
+                                .into();
+                        response.push(invoke_lambda_function(f.clone(), Some(p)).await?);
                     }
                     Ok(response)
                 })
@@ -186,58 +176,67 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
     for task in tasks {
         let res_vec = task.await.expect("Lambda function execution failed.")?;
         if opt.debug {
-            let _res = res_vec
-                .into_iter()
-                .map(|response| {
-                    // The HTTP status code is in the 200 range for a successful request.
-                    // - For the RequestResponse invocation type, this status code is 200.
-                    // - For the Event invocation type, this status code is 202.
-                    // - For the DryRun invocation type, the status code is 204.
-                    match response.status_code {
-                        Some(200) => {
-                            info!(
-                                "{:?}",
-                                serde_json::from_slice::<Value>(&response.payload.ok_or_else(
-                                    || {
-                                        FlockError::Internal(
-                                            "Failed to parse the payload of the function response."
-                                                .to_string(),
-                                        )
-                                    }
-                                )?)?
-                            );
-                        }
-                        Some(202) => {
-                            info!(" [OK] Received status from async lambda function.");
-                        }
-                        _ => {
-                            panic!("Incorrect Lambda invocation!");
-                        }
-                    }
-                    Ok(())
-                })
-                .collect::<Vec<Result<()>>>();
+            res_vec.into_iter().for_each(|response| {
+                info!(
+                    "[OK] Received status from async lambda function. {:?}",
+                    response
+                );
+            });
         }
     }
 
     Ok(())
 }
 
+fn nexmark_event_to_payload(
+    events: Arc<NexMarkStream>,
+    time: usize,
+    generator: usize,
+    query_number: usize,
+    uuid: Uuid,
+) -> Result<Payload> {
+    let event = events
+        .select(time, generator)
+        .expect("Failed to select event.");
+
+    if event.persons.is_empty() && event.auctions.is_empty() && event.bids.is_empty() {
+        return Err(FlockError::Execution("No Nexmark input!".to_owned()));
+    }
+
+    match query_number {
+        0 | 1 | 2 => Ok(to_payload(
+            &NexMarkSource::to_batch(&event.bids, BID.clone()),
+            &vec![],
+            uuid,
+        )),
+        3 => Ok(to_payload(
+            &NexMarkSource::to_batch(&event.persons, PERSON.clone()),
+            &NexMarkSource::to_batch(&event.auctions, AUCTION.clone()),
+            uuid,
+        )),
+        4 => Ok(to_payload(
+            &NexMarkSource::to_batch(&event.auctions, AUCTION.clone()),
+            &NexMarkSource::to_batch(&event.bids, BID.clone()),
+            uuid,
+        )),
+        _ => unimplemented!(),
+    }
+}
+
 /// Invoke the lambda function with the nexmark events.
 async fn invoke_lambda_function(
     function_name: String,
-    events: Vec<u8>,
-    invocation_type: &str,
+    payload: Option<Bytes>,
 ) -> Result<InvocationResponse> {
-    // To invoke a function asynchronously, set InvocationType to Event.
-    let request = InvocationRequest {
-        function_name,
-        payload: Some(events.into()),
-        invocation_type: Some(invocation_type.to_string()),
-        ..Default::default()
-    };
-
-    match LAMBDA_CLIENT.invoke(request).await {
+    match LAMBDA_CLIENT
+        .invoke(InvocationRequest {
+            function_name,
+            payload,
+            invocation_type: Some(LAMBDA_ASYNC_CALL.to_string()),
+            ..Default::default()
+        })
+        .await
+    {
         Ok(response) => return Ok(response),
         Err(err) => {
             return Err(FlockError::Execution(format!(
@@ -276,7 +275,7 @@ async fn create_lambda_function(ctx: &ExecutionContext) -> Result<String> {
         .await
         .is_ok()
     {
-        match LAMBDA_CLIENT
+        let conf = LAMBDA_CLIENT
             .update_function_code(UpdateFunctionCodeRequest {
                 function_name: func_name.clone(),
                 s3_bucket: Some(s3_bucket.clone()),
@@ -284,21 +283,11 @@ async fn create_lambda_function(ctx: &ExecutionContext) -> Result<String> {
                 ..Default::default()
             })
             .await
-        {
-            Ok(config) => {
-                return config.function_name.ok_or_else(|| {
-                    FlockError::Internal("Unable to find lambda function arn.".to_string())
-                })
-            }
-            Err(err) => {
-                return Err(FlockError::Internal(format!(
-                    "Failed to update lambda function: S3 Bucket: {}. S3 Key: {}. {}",
-                    s3_bucket, s3_key, err
-                )))
-            }
-        }
+            .map_err(|e| FlockError::Internal(e.to_string()))?;
+        conf.function_name
+            .ok_or_else(|| FlockError::Internal("No function name!".to_string()))
     } else {
-        match LAMBDA_CLIENT
+        let conf = LAMBDA_CLIENT
             .create_function(CreateFunctionRequest {
                 code: FunctionCode {
                     s3_bucket: Some(s3_bucket.clone()),
@@ -309,27 +298,18 @@ async fn create_lambda_function(ctx: &ExecutionContext) -> Result<String> {
                 handler: lambda::handler(),
                 role: lambda::role().await,
                 runtime: lambda::runtime(),
+                environment: lambda::environment(&ctx),
                 ..Default::default()
             })
             .await
-        {
-            Ok(config) => {
-                return config.function_name.ok_or_else(|| {
-                    FlockError::Internal("Unable to find lambda function arn.".to_string())
-                })
-            }
-            Err(err) => {
-                return Err(FlockError::Internal(format!(
-                    "Failed to create lambda function: {}",
-                    err
-                )))
-            }
-        }
+            .map_err(|e| FlockError::Internal(e.to_string()))?;
+        conf.function_name
+            .ok_or_else(|| FlockError::Internal("No function name!".to_string()))
     }
 }
 
 /// Returns Nextmark query strings based on the query number.
-fn query(query: usize) -> Vec<String> {
+fn nexmark_query(query: usize) -> Vec<String> {
     match query {
         0 => vec!["SELECT * FROM bid"],
         1 => vec!["SELECT auction, bidder, 0.908 * price as price, b_date_time FROM bid"],

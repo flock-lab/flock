@@ -18,16 +18,13 @@
 //! of the payload for a given query at the specified time.
 
 use crate::encoding::Encoding;
-use crate::error::{FlockError, Result};
-use abomonation::{decode, encode};
-use arrow::datatypes::{Schema, SchemaRef};
+use crate::transform::*;
+use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
-use arrow_flight::utils::{flight_data_from_arrow_batch, flight_data_to_arrow_batch};
+use arrow_flight::utils::flight_data_to_arrow_batch;
 use arrow_flight::FlightData;
-use arrow_flight::SchemaAsIpc;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::sync::Arc;
 use text_io::scan;
 
@@ -91,7 +88,7 @@ impl UuidBuilder {
 
 /// The unique identifier of the payload or the data fragment in the time
 /// window.
-#[derive(Default, Debug, Clone, Abomonation, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct Uuid {
     /// The identifier of the query triggered at the specific time.
     ///
@@ -110,25 +107,28 @@ pub struct Uuid {
 
 /// `DataFrame` is a wrapper of the Arrow Flight Data format for network
 /// transmission.
-#[derive(Default, Debug, Clone, Abomonation, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct DataFrame {
     /// Arrow Flight Data's header.
     #[serde(with = "serde_bytes")]
-    header: Vec<u8>,
+    pub header: Vec<u8>,
     /// Arrow Flight Data's body.
     #[serde(with = "serde_bytes")]
-    body:   Vec<u8>,
+    pub body:   Vec<u8>,
 }
 
 /// `Payload` is the wire format of the function's payload passed between
 /// cloud functions.
-#[derive(Default, Debug, Abomonation, Deserialize, Serialize, PartialEq)]
+#[derive(Default, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Payload {
     /// The record batches are encoded in the Arrow Flight Data format.
     pub data:     Vec<DataFrame>,
     /// The schema of the record batches in binary format.
-    #[serde(with = "serde_bytes")]
     pub schema:   Vec<u8>,
+    /// The record batches for the 2nd relation.
+    pub data2:    Vec<DataFrame>,
+    /// The schema of the record batches for the 2nd relation.
+    pub schema2:  Vec<u8>,
     /// The UUID of the payload.
     pub uuid:     Uuid,
     /// The encoding and compression method.
@@ -138,28 +138,10 @@ pub struct Payload {
 }
 
 impl Payload {
-    /// Serialize the schema
-    pub fn schema_to_bytes(schema: SchemaRef) -> Vec<u8> {
-        let options = arrow::ipc::writer::IpcWriteOptions::default();
-        let flight_data: FlightData = SchemaAsIpc::new(&schema, &options).into();
-        flight_data.data_header
-    }
-
-    /// Deserialize the schema
-    pub fn schema_from_bytes(bytes: &[u8]) -> Result<Arc<Schema>> {
-        let schema = arrow::ipc::convert::schema_from_bytes(bytes).map_err(FlockError::Arrow)?;
-        Ok(Arc::new(schema))
-    }
-
     /// Convert incoming payload to record batch in Arrow.
-    pub fn to_batch(event: Value) -> (Vec<RecordBatch>, Uuid) {
-        let payload: Payload = serde_json::from_value(event).unwrap();
-        let uuid = payload.uuid.clone();
-        let schema = payload.schema.clone();
-        let data_frames = unmarshal(payload);
-        (
-            data_frames
-                .into_par_iter()
+    pub fn to_record_batch(self) -> (Vec<RecordBatch>, Vec<RecordBatch>, Uuid) {
+        let record_batch = |df: Vec<DataFrame>, schema: Arc<Schema>| -> Vec<RecordBatch> {
+            df.into_par_iter()
                 .map(|d| {
                     flight_data_to_arrow_batch(
                         &FlightData {
@@ -168,132 +150,40 @@ impl Payload {
                             app_metadata:      vec![],
                             flight_descriptor: None,
                         },
-                        Self::schema_from_bytes(&schema).unwrap(),
+                        schema.clone(),
                         &[],
                     )
                     .unwrap()
                 })
-                .collect(),
-            uuid,
-        )
-    }
-
-    /// Convert record batch to payload for network transmission.
-    pub fn to_value(batches: &[RecordBatch], uuid: Uuid, encoding: Encoding) -> Value {
-        let options = arrow::ipc::writer::IpcWriteOptions::default();
-        let data_frames = batches
-            .par_iter()
-            .map(|b| {
-                let (_, flight_data) = flight_data_from_arrow_batch(b, &options);
-                if encoding != Encoding::None {
-                    DataFrame {
-                        header: encoding.compress(&flight_data.data_header),
-                        body:   encoding.compress(&flight_data.data_body),
-                    }
-                } else {
-                    DataFrame {
-                        header: flight_data.data_header,
-                        body:   flight_data.data_body,
-                    }
-                }
-            })
-            .collect();
-
-        serde_json::to_value(&Payload {
-            data: data_frames,
-            schema: Self::schema_to_bytes(batches[0].schema()),
-            uuid,
-            encoding,
-        })
-        .unwrap()
-    }
-
-    /// Convert record batch to payload for network transmission.
-    pub fn to_vec(batches: &[RecordBatch], uuid: Uuid, encoding: Encoding) -> Vec<u8> {
-        let options = arrow::ipc::writer::IpcWriteOptions::default();
-        let data_frames = batches
-            .par_iter()
-            .map(|b| {
-                let (_, flight_data) = flight_data_from_arrow_batch(b, &options);
-                if encoding != Encoding::None {
-                    DataFrame {
-                        header: encoding.compress(&flight_data.data_header),
-                        body:   encoding.compress(&flight_data.data_body),
-                    }
-                } else {
-                    DataFrame {
-                        header: flight_data.data_header,
-                        body:   flight_data.data_body,
-                    }
-                }
-            })
-            .collect();
-
-        serde_json::to_vec(&Payload {
-            data: data_frames,
-            schema: Self::schema_to_bytes(batches[0].schema()),
-            uuid,
-            encoding,
-        })
-        .unwrap()
-    }
-
-    /// Convert record batch to bytes for network transmission.
-    pub fn to_bytes(batch: &RecordBatch, uuid: Uuid, encoding: Encoding) -> bytes::Bytes {
-        let options = arrow::ipc::writer::IpcWriteOptions::default();
-        let schema = Self::schema_to_bytes(batch.schema());
-        let (_, flight_data) = flight_data_from_arrow_batch(batch, &options);
-
-        let data_frames = {
-            if encoding != Encoding::None {
-                DataFrame {
-                    header: encoding.compress(&flight_data.data_header),
-                    body:   encoding.compress(&flight_data.data_body),
-                }
-            } else {
-                DataFrame {
-                    header: flight_data.data_header,
-                    body:   flight_data.data_body,
-                }
-            }
+                .collect()
         };
 
-        serde_json::to_vec(&Payload {
-            data: vec![data_frames],
-            schema,
-            uuid,
-            encoding,
-        })
-        .unwrap()
-        .into()
-    }
-}
-
-/// Deserialize `DataFrame` from cloud functions.
-pub fn unmarshal(payload: Payload) -> Vec<DataFrame> {
-    match payload.encoding {
-        Encoding::Snappy | Encoding::Lz4 | Encoding::Zstd => payload
-            .data
-            .par_iter()
-            .map(|d| DataFrame {
-                header: payload.encoding.decompress(&d.header),
-                body:   payload.encoding.decompress(&d.body),
-            })
-            .collect(),
-        Encoding::None => payload.data,
-        _ => unimplemented!(),
+        let mut res = (vec![], vec![], self.uuid.clone());
+        if !self.data.is_empty() {
+            let dataframe = unmarshal(self.data, self.encoding.clone());
+            let schema = schema_from_bytes(&self.schema).unwrap();
+            res.0 = record_batch(dataframe, schema);
+        }
+        if !self.data2.is_empty() {
+            let dataframe = unmarshal(self.data2, self.encoding.clone());
+            let schema = schema_from_bytes(&self.schema2).unwrap();
+            res.1 = record_batch(dataframe, schema);
+        }
+        res
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::Result;
     use crate::executor::{Executor, LambdaExecutor};
     use arrow::array::{Array, StructArray};
     use arrow::csv;
     use arrow::datatypes::{DataType, Field, Schema};
     use arrow::json;
-    use bytes::BytesMut;
+    use arrow_flight::utils::flight_data_from_arrow_batch;
+    use serde_json::Value;
     use std::sync::Arc;
     use std::time::Instant;
 
@@ -488,7 +378,7 @@ mod tests {
         let uuid = uuid_builder.next();
 
         let now = Instant::now();
-        let value = Payload::to_value(&batches, uuid.clone(), Encoding::default());
+        let value = to_value(&batches, uuid.clone(), Encoding::default());
         println!(
             "serde payload to value (with compression) - time: {} ms",
             now.elapsed().as_millis()
@@ -496,7 +386,7 @@ mod tests {
 
         let payload1: Payload = serde_json::from_value(value.clone())?;
         let now = Instant::now();
-        let (de_batches, de_uuid) = Payload::to_batch(value);
+        let (de_batches, _, de_uuid) = to_batch(value);
         println!(
             "serde value to batch (with decompression) - time: {} ms",
             now.elapsed().as_millis()
@@ -512,7 +402,7 @@ mod tests {
         }
 
         let now = Instant::now();
-        let bytes = Payload::to_vec(&batches, uuid, Encoding::default());
+        let bytes = to_vec(&batches, uuid, Encoding::default());
         println!(
             "serde payload to bytes (with compression) - time: {} ms, size: {} bytes",
             now.elapsed().as_millis(),
@@ -534,99 +424,15 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn abomonation_data_frames() -> Result<()> {
-        let options = arrow::ipc::writer::IpcWriteOptions::default();
-
-        for encoding in [
-            Encoding::Snappy,
-            Encoding::Lz4,
-            Encoding::Zstd,
-            Encoding::None,
-        ]
-        .iter()
-        {
-            println!("-----------------{:?}-----------------", encoding);
-            let batches = init_batches();
-            let schema = batches[0].schema().clone();
-
-            let now = Instant::now();
-
-            // compress
-            let data_frames = batches
-                .into_par_iter()
-                .map(|batch| {
-                    let (_, flight_data) = flight_data_from_arrow_batch(&batch, &options);
-                    DataFrame {
-                        header: flight_data.data_header,
-                        body:   flight_data.data_body,
-                    }
-                })
-                .collect::<Vec<DataFrame>>();
-
-            println!(
-                "abomonation data - raw data: {}",
-                data_frames[0].header.len() + data_frames[0].body.len(),
-            );
-
-            let uuid =
-                UuidBuilder::new("SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836", 10).next();
-
-            let payload = Payload {
-                data: data_frames,
-                schema: Payload::schema_to_bytes(schema.clone()),
-                uuid,
-                encoding: encoding.clone(),
-            };
-
-            let mut bytes = Vec::new();
-            unsafe {
-                encode(&payload, &mut bytes)?;
-            }
-            let event: bytes::Bytes = encoding.compress(&bytes).into();
-            println!(
-                "abomonation data - compression time: {} ms",
-                now.elapsed().as_millis()
-            );
-            println!(
-                "abomonation data - compressed data: {}, type: {:?}",
-                event.len(),
-                encoding
-            );
-
-            // decompress
-            let now = Instant::now();
-            let mut encoded = encoding.decompress(&event);
-            if let Some((result, remaining)) = unsafe { decode::<Payload>(&mut encoded) } {
-                println!(
-                    "abomonation data - decompression time: {} ms",
-                    now.elapsed().as_millis()
-                );
-                assert!(remaining.is_empty());
-                println!(
-                    "abomonation data - decompressed data: {}",
-                    result.data[0].header.len() + result.data[0].body.len(),
-                );
-
-                assert_eq!(payload.schema, result.schema);
-                assert_eq!(payload.data, result.data);
-                assert_eq!(payload.uuid, result.uuid);
-            }
-            println!("--------------------------------------");
-        }
-
-        Ok(())
-    }
-
-    #[tokio::test]
     async fn schema_ipc() -> Result<()> {
         let batches = init_batches();
         let schema1 = batches[0].schema();
 
         // serilization
-        let bytes = Payload::schema_to_bytes(schema1.clone());
+        let bytes = schema_to_bytes(schema1.clone());
 
         // deserialization
-        let schema2 = Payload::schema_from_bytes(&bytes)?;
+        let schema2 = schema_from_bytes(&bytes)?;
 
         assert_eq!(schema1, schema2);
 
@@ -640,9 +446,9 @@ mod tests {
         (0..10).for_each(|i| assert_eq!(uuid_builder.get(i).seq_num, i));
 
         let batches = init_batches();
-        let bytes = Payload::to_bytes(&batches[0], uuid_builder.next(), Encoding::default());
+        let bytes = to_bytes(&batches[0], uuid_builder.next(), Encoding::default());
         let value: Value = serde_json::from_slice(&bytes)?;
-        let (de_batches, _) = Payload::to_batch(value);
+        let (de_batches, _, _) = to_batch(value);
 
         assert_eq!(batches[0].schema(), de_batches[0].schema());
         assert_eq!(batches[0].columns(), de_batches[0].columns());

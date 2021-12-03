@@ -16,7 +16,8 @@
 //! the window data for stream processing.
 
 use crate::error::{FlockError, Result};
-use crate::payload::{Payload, Uuid, UuidBuilder};
+use crate::payload::Uuid;
+use crate::transform::*;
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use bitmap::Bitmap;
@@ -90,7 +91,7 @@ impl Arena {
     ///   collection is complete.
     pub fn reassemble(&mut self, event: Value) -> (bool, Uuid) {
         let mut ready = false;
-        let (fragment, uuid) = Payload::to_batch(event);
+        let (fragment, _, uuid) = to_batch(event);
         match &mut (*self).get_mut(&uuid.tid) {
             Some(window) => {
                 assert!(uuid.seq_len == window.size);
@@ -135,6 +136,7 @@ mod tests {
     use super::*;
     use crate::encoding::Encoding;
     use crate::error::Result;
+    use crate::payload::UuidBuilder;
     use arrow::csv;
     use arrow::datatypes::{DataType, Field, Schema};
 
@@ -176,7 +178,7 @@ mod tests {
 
         let mut arena = Arena::new();
         batches.into_iter().enumerate().for_each(|(i, batch)| {
-            let value = Payload::to_value(&[batch], uuids.get(i), Encoding::default());
+            let value = to_value(&[batch], uuids.get(i), Encoding::default());
             let (ready, _) = arena.reassemble(value);
             if i < 7 {
                 assert_eq!(false, ready);

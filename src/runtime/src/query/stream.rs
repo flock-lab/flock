@@ -112,12 +112,12 @@ pub enum StreamWindow {
     /// windows were used.
     StaggerWinodw,
     /// Element-wise stream processing at epoch level.
-    None,
+    ElementWise,
 }
 
 impl Default for StreamWindow {
     fn default() -> StreamWindow {
-        StreamWindow::None
+        StreamWindow::ElementWise
     }
 }
 

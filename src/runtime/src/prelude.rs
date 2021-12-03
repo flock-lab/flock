@@ -32,3 +32,4 @@ pub use crate::error::{FlockError, Result};
 pub use crate::executor::{plan::physical_plan, ExecutionStrategy, Executor, LambdaExecutor};
 pub use crate::payload::{Payload, Uuid, UuidBuilder};
 pub use crate::query::{BatchQuery, Query, Schedule, StreamQuery, StreamWindow};
+pub use crate::transform::*;

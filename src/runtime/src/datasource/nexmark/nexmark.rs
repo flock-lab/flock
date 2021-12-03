@@ -14,20 +14,18 @@
 
 //! Nexmark benchmark suite
 
-use crate::encoding::Encoding;
-use abomonation::{decode, encode};
-use arrow::datatypes::{Schema, SchemaRef};
-use arrow::json::{self, reader::infer_json_schema};
+use arrow::datatypes::SchemaRef;
+use arrow::json;
 use arrow::record_batch::RecordBatch;
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::BufReader;
 use std::sync::{Arc, Mutex};
-use std::thread::{self, JoinHandle};
+use std::thread;
 
-use crate::datasource::nexmark::config::{Config, NEXMarkConfig};
-use crate::datasource::nexmark::event::{Auction, Bid, Date, Person};
+use crate::datasource::nexmark::config::Config;
+use crate::datasource::nexmark::event::Date;
 use crate::datasource::nexmark::generator::NEXMarkGenerator;
 use crate::error::Result;
 use crate::query::StreamWindow;
@@ -51,7 +49,7 @@ pub struct NexMarkStream {
 
 /// A struct to hold events for a given epoch and source identifier, which can
 /// be serialized as cloud function's payload for transmission on cloud.
-#[derive(Debug, Default, Serialize, Deserialize, Abomonation, PartialEq, Eq)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NexMarkEvent {
     /// The encoded Person events.
     pub persons:  Vec<u8>,
@@ -125,7 +123,7 @@ impl Default for NexMarkSource {
         config.insert("threads", 100.to_string());
         config.insert("seconds", 10.to_string());
         config.insert("events-per-second", 100_1000.to_string());
-        let window = StreamWindow::None;
+        let window = StreamWindow::ElementWise;
         NexMarkSource { config, window }
     }
 }
@@ -268,6 +266,7 @@ impl NexMarkSource {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::datasource::nexmark::event::{Auction, Bid, Person};
 
     #[test]
     fn test_gen_data() -> Result<()> {
@@ -288,7 +287,12 @@ mod test {
         let seconds = 10;
         let threads = 100;
         let event_per_second = 10_000;
-        let nex = NexMarkSource::new(seconds, threads, event_per_second, StreamWindow::None);
+        let nex = NexMarkSource::new(
+            seconds,
+            threads,
+            event_per_second,
+            StreamWindow::ElementWise,
+        );
         let events = nex.generate_data()?;
         assert_eq!(events.persons.len(), 10);
         assert_eq!(events.auctions.len(), 10);

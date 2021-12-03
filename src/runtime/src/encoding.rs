@@ -19,11 +19,10 @@
 //! the cloud functions, and reduce the size of all environment variables to
 //! less than 4KB as well.
 
-use abomonation::{decode, encode};
 use serde::{Deserialize, Serialize};
 
 /// This function encodes the given data into a byte array.
-#[derive(Debug, Clone, Abomonation, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub enum Encoding {
     /// Snappy is a LZ77-type compressor with a fixed, byte-oriented encoding.
     /// It does not aim for maximum compression, or compatibility with any other
