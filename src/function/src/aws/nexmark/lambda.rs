@@ -278,6 +278,15 @@ async fn feed_two_source(
 async fn collect(ctx: &mut ExecutionContext, event: Payload) -> Result<Vec<RecordBatch>> {
     // feed the data to the dataflow graph
     let (r1, r2, _uuid) = event.to_record_batch();
+
+    if ctx.debug {
+        let formatted = arrow::util::pretty::pretty_format_batches(&r1).unwrap();
+        println!("{}", formatted);
+
+        let formatted = arrow::util::pretty::pretty_format_batches(&r2).unwrap();
+        println!("{}", formatted);
+    }
+
     if r2.is_empty() {
         feed_one_source(ctx, r1).await?;
     } else {
@@ -288,9 +297,8 @@ async fn collect(ctx: &mut ExecutionContext, event: Payload) -> Result<Vec<Recor
     let output = ctx.execute().await?;
 
     if ctx.debug {
-        // let formatted =
-        // arrow::util::pretty::pretty_format_batches(&output).unwrap();
-        // println!("{}", formatted);
+        let formatted = arrow::util::pretty::pretty_format_batches(&output).unwrap();
+        println!("{}", formatted);
         unsafe {
             INVOCATION_COUNTER_PER_INSTANCE += 1;
             println!("# invocations: {}", INVOCATION_COUNTER_PER_INSTANCE);

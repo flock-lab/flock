@@ -141,7 +141,8 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
                 let f = function_name.clone();
                 tokio::spawn(async move {
                     info!("[OK] Send nexmark event (time: {}, source: {}).", t, g);
-                    let p = serde_json::to_vec(&nexmark_event_to_payload(e, t, g, q)?)?.into();
+                    let u = UuidBuilder::new(&format!("q{}", q), 1).next();
+                    let p = serde_json::to_vec(&nexmark_event_to_payload(e, t, g, q, u)?)?.into();
                     Ok(vec![invoke_lambda_function(f, Some(p)).await?])
                 })
             })
@@ -159,8 +160,10 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
                     let mut response = vec![];
                     for t in 0..seconds {
                         info!("[OK] Send nexmark event (time: {}, source: {}).", t, g);
-                        let p = serde_json::to_vec(&nexmark_event_to_payload(e.clone(), t, g, q)?)?
-                            .into();
+                        let u = UuidBuilder::new(&format!("q{}", q), 1).next();
+                        let p =
+                            serde_json::to_vec(&nexmark_event_to_payload(e.clone(), t, g, q, u)?)?
+                                .into();
                         response.push(invoke_lambda_function(f.clone(), Some(p)).await?);
                     }
                     Ok(response)
@@ -190,6 +193,7 @@ fn nexmark_event_to_payload(
     time: usize,
     generator: usize,
     query_number: usize,
+    uuid: Uuid,
 ) -> Result<Payload> {
     let event = events
         .select(time, generator)
@@ -200,30 +204,21 @@ fn nexmark_event_to_payload(
     }
 
     match query_number {
-        0 | 1 | 2 => {
-            let uuid = UuidBuilder::new(&format!("q{}", query_number), 1).next();
-            Ok(to_payload(
-                &NexMarkSource::to_batch(&event.bids, BID.clone()),
-                &vec![],
-                uuid,
-            ))
-        }
-        3 => {
-            let uuid = UuidBuilder::new(&format!("q{}", query_number), 1).next();
-            Ok(to_payload(
-                &NexMarkSource::to_batch(&event.persons, PERSON.clone()),
-                &NexMarkSource::to_batch(&event.auctions, AUCTION.clone()),
-                uuid,
-            ))
-        }
-        4 => {
-            let uuid = UuidBuilder::new(&format!("q{}", query_number), 1).next();
-            Ok(to_payload(
-                &NexMarkSource::to_batch(&event.auctions, AUCTION.clone()),
-                &NexMarkSource::to_batch(&event.bids, BID.clone()),
-                uuid,
-            ))
-        }
+        0 | 1 | 2 => Ok(to_payload(
+            &NexMarkSource::to_batch(&event.bids, BID.clone()),
+            &vec![],
+            uuid,
+        )),
+        3 => Ok(to_payload(
+            &NexMarkSource::to_batch(&event.persons, PERSON.clone()),
+            &NexMarkSource::to_batch(&event.auctions, AUCTION.clone()),
+            uuid,
+        )),
+        4 => Ok(to_payload(
+            &NexMarkSource::to_batch(&event.auctions, AUCTION.clone()),
+            &NexMarkSource::to_batch(&event.bids, BID.clone()),
+            uuid,
+        )),
         _ => unimplemented!(),
     }
 }
@@ -280,7 +275,7 @@ async fn create_lambda_function(ctx: &ExecutionContext) -> Result<String> {
         .await
         .is_ok()
     {
-        match LAMBDA_CLIENT
+        let conf = LAMBDA_CLIENT
             .update_function_code(UpdateFunctionCodeRequest {
                 function_name: func_name.clone(),
                 s3_bucket: Some(s3_bucket.clone()),
@@ -288,21 +283,11 @@ async fn create_lambda_function(ctx: &ExecutionContext) -> Result<String> {
                 ..Default::default()
             })
             .await
-        {
-            Ok(config) => {
-                return config.function_name.ok_or_else(|| {
-                    FlockError::Internal("Unable to find lambda function arn.".to_string())
-                })
-            }
-            Err(err) => {
-                return Err(FlockError::Internal(format!(
-                    "Failed to update lambda function: S3 Bucket: {}. S3 Key: {}. {}",
-                    s3_bucket, s3_key, err
-                )))
-            }
-        }
+            .map_err(|e| FlockError::Internal(e.to_string()))?;
+        conf.function_name
+            .ok_or_else(|| FlockError::Internal("No function name!".to_string()))
     } else {
-        match LAMBDA_CLIENT
+        let conf = LAMBDA_CLIENT
             .create_function(CreateFunctionRequest {
                 code: FunctionCode {
                     s3_bucket: Some(s3_bucket.clone()),
@@ -313,22 +298,13 @@ async fn create_lambda_function(ctx: &ExecutionContext) -> Result<String> {
                 handler: lambda::handler(),
                 role: lambda::role().await,
                 runtime: lambda::runtime(),
+                environment: lambda::environment(&ctx),
                 ..Default::default()
             })
             .await
-        {
-            Ok(config) => {
-                return config.function_name.ok_or_else(|| {
-                    FlockError::Internal("Unable to find lambda function arn.".to_string())
-                })
-            }
-            Err(err) => {
-                return Err(FlockError::Internal(format!(
-                    "Failed to create lambda function: {}",
-                    err
-                )))
-            }
-        }
+            .map_err(|e| FlockError::Internal(e.to_string()))?;
+        conf.function_name
+            .ok_or_else(|| FlockError::Internal("No function name!".to_string()))
     }
 }
 

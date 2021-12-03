@@ -32,14 +32,14 @@ tokio = { version = "1.2", features = [ "macros", "io-util", "sync", "rt-multi-t
 driver = { path = "../driver" }
 test_utils = { path = "../test" }
 
-[[bin]]
-name = "aws_lambda"
-path = "src/aws/lambda.rs"
+# [[bin]]
+# name = "aws_lambda"
+# path = "src/aws/lambda.rs"
 
 [[bin]]
 name = "nexmark_lambda"
 path = "src/aws/nexmark/lambda.rs"
 
-[[bin]]
-name = "hello"
-path = "src/aws/hello.rs"
+# [[bin]]
+# name = "hello"
+# path = "src/aws/hello.rs"
