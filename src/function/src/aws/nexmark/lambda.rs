@@ -21,7 +21,6 @@ use lambda_runtime::{handler_fn, Context};
 use lazy_static::lazy_static;
 use log::warn;
 use nexmark::event::{Auction, Bid, Person};
-use nexmark::{NexMarkEvent, NexMarkSource};
 use rayon::prelude::*;
 use runtime::prelude::*;
 use rusoto_core::Region;
@@ -184,9 +183,8 @@ async fn payload_handler(
     Ok(serde_json::to_value(&ctx.name)?)
 }
 
-async fn nexmark_bench_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Value> {
-    let event: NexMarkEvent = serde_json::from_value(event)?;
-    let (epoch, source) = (event.epoch, event.source);
+async fn nexmark_bench_handler(ctx: &mut ExecutionContext, event: Payload) -> Result<Value> {
+    let tid = event.uuid.tid.clone();
     if let DataSource::NexMarkEvent(source) = &ctx.datasource {
         match source.window {
             StreamWindow::TumblingWindow(Schedule::Seconds(_sec)) => {
@@ -197,21 +195,22 @@ async fn nexmark_bench_handler(ctx: &mut ExecutionContext, event: Value) -> Resu
                 unimplemented!();
             }
             StreamWindow::ElementWise => {
-                // data sink -- /dev/null
+                assert_eq!(event.uuid.seq_len, 1);
                 collect(ctx, event).await?;
             }
             _ => unimplemented!(),
         }
     }
 
-    Ok(json!({"name": &ctx.name, "epoch": epoch, "source": source}))
+    Ok(json!({"name": &ctx.name, "tid": tid}))
 }
 
-async fn handler(event: Value, _: Context) -> Result<Value> {
-    let (mut ctx, mut arena) = init_exec_context!();
+async fn handler(event: Payload, _: Context) -> Result<Value> {
+    let (mut ctx, mut _arena) = init_exec_context!();
 
     match &ctx.datasource {
-        DataSource::Payload => payload_handler(&mut ctx, &mut arena, event).await,
+        // TODO(gangliao): support other data sources.
+        // DataSource::Payload => payload_handler(&mut ctx, &mut arena, event).await,
         DataSource::NexMarkEvent(_) => nexmark_bench_handler(&mut ctx, event).await,
         _ => unimplemented!(),
     }
@@ -276,45 +275,29 @@ async fn feed_two_source(
     Ok(())
 }
 
-async fn collect(ctx: &mut ExecutionContext, event: NexMarkEvent) -> Result<Vec<RecordBatch>> {
-    if event.persons.is_empty() && event.auctions.is_empty() && event.bids.is_empty() {
-        return Err(FlockError::Execution("No Nexmark input!".to_owned()));
-    }
-
-    match ctx.query_number {
-        Some(0) | Some(1) | Some(2) => {
-            let bids = NexMarkSource::to_batch(&event.bids, BID_SCHEMA.clone());
-            feed_one_source(ctx, bids).await?;
-        }
-        Some(3) => {
-            let persons = NexMarkSource::to_batch(&event.persons, PERSON_SCHEMA.clone());
-            let auctions = NexMarkSource::to_batch(&event.auctions, AUCTION_SCHEMA.clone());
-            feed_two_source(ctx, persons, auctions).await?;
-        }
-        Some(4) => {
-            let auctions = NexMarkSource::to_batch(&event.auctions, AUCTION_SCHEMA.clone());
-            let bids = NexMarkSource::to_batch(&event.bids, BID_SCHEMA.clone());
-            feed_two_source(ctx, auctions, bids).await?;
-        }
-        _ => unimplemented!(),
+async fn collect(ctx: &mut ExecutionContext, event: Payload) -> Result<Vec<RecordBatch>> {
+    // feed the data to the dataflow graph
+    let (r1, r2, _uuid) = event.to_record_batch();
+    if r2.is_empty() {
+        feed_one_source(ctx, r1).await?;
+    } else {
+        feed_two_source(ctx, r1, r2).await?;
     }
 
     // query execution
-    let output_partitions = ctx.execute().await?;
+    let output = ctx.execute().await?;
 
     if ctx.debug {
-        // show output
         // let formatted =
-        // arrow::util::pretty::pretty_format_batches(&output_partitions).unwrap();
+        // arrow::util::pretty::pretty_format_batches(&output).unwrap();
         // println!("{}", formatted);
-
         unsafe {
             INVOCATION_COUNTER_PER_INSTANCE += 1;
             println!("# invocations: {}", INVOCATION_COUNTER_PER_INSTANCE);
         }
     }
 
-    Ok(output_partitions)
+    Ok(output)
 }
 
 #[tokio::main]

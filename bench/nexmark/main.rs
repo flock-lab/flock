@@ -175,7 +175,7 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
         if opt.debug {
             res_vec.into_iter().for_each(|response| {
                 info!(
-                    "OK] Received status from async lambda function. {:?}",
+                    "[OK] Received status from async lambda function. {:?}",
                     response
                 );
             });
