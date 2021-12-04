@@ -164,9 +164,9 @@ impl QueryFlow {
                         next: {
                             let name = ctx.get(&parent).unwrap().name.clone();
                             if dag.get_node(parent).unwrap().concurrency == 1 {
-                                CloudFunction::Chorus((name, CONCURRENCY_8))
+                                CloudFunction::Group((name, CONCURRENCY_8))
                             } else {
-                                CloudFunction::Solo(name)
+                                CloudFunction::Lambda(name)
                             }
                         },
                         datasource: {
@@ -285,7 +285,7 @@ mod tests {
         assert!(matches!(next_function(&functions, 0)?, CloudFunction::None));
         assert!(matches!(
             next_function(&functions, 1)?,
-            CloudFunction::Solo(..)
+            CloudFunction::Lambda(..)
         ));
 
         let dag = &mut functions.dag;
@@ -322,11 +322,11 @@ mod tests {
         assert!(matches!(next_function(&functions, 0)?, CloudFunction::None));
         assert!(matches!(
             next_function(&functions, 1)?,
-            CloudFunction::Chorus(..)
+            CloudFunction::Group(..)
         ));
         assert!(matches!(
             next_function(&functions, 2)?,
-            CloudFunction::Solo(..)
+            CloudFunction::Lambda(..)
         ));
 
         let dag = &mut functions.dag;

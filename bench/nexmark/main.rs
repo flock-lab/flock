@@ -11,19 +11,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-#[macro_use]
-extern crate itertools;
-
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use bytes::Bytes;
 use chrono::Utc;
 use datafusion::datasource::MemTable;
+use datafusion::execution::context::ExecutionContext as DataFusionExecutionContext;
 use driver::deploy::lambda;
 use lazy_static::lazy_static;
 use log::info;
 use nexmark::event::{Auction, Bid, Person};
-use nexmark::{NexMarkSource, NexMarkStream};
+use nexmark::NexMarkSource;
 use runtime::prelude::*;
 use rusoto_core::Region;
 use rusoto_lambda::{
@@ -32,6 +30,7 @@ use rusoto_lambda::{
 };
 use std::sync::Arc;
 use structopt::StructOpt;
+use tokio::task::JoinHandle;
 
 #[allow(dead_code)]
 static LAMBDA_SYNC_CALL: &str = "RequestResponse";
@@ -75,156 +74,154 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
-    info!("Running benchmarks with the following options: {:?}", opt);
-    let nexmark = NexMarkSource::new(
-        opt.seconds,
-        opt.generators,
-        opt.events_per_second,
-        StreamWindow::ElementWise,
-    );
+async fn register_nexmark_tables() -> Result<DataFusionExecutionContext> {
+    let mut ctx = DataFusionExecutionContext::new();
+    let person_schema = Arc::new(Person::schema());
+    let person_table = MemTable::try_new(
+        person_schema.clone(),
+        vec![vec![RecordBatch::new_empty(person_schema)]],
+    )?;
+    ctx.register_table("person", Arc::new(person_table))?;
 
-    let mut ctx = datafusion::execution::context::ExecutionContext::new();
-    {
-        // register tables
-        let person_schema = Arc::new(Person::schema());
-        let person_table = MemTable::try_new(
-            person_schema.clone(),
-            vec![vec![RecordBatch::new_empty(person_schema)]],
-        )?;
-        ctx.register_table("person", Arc::new(person_table))?;
+    let auction_schema = Arc::new(Auction::schema());
+    let auction_table = MemTable::try_new(
+        auction_schema.clone(),
+        vec![vec![RecordBatch::new_empty(auction_schema)]],
+    )?;
+    ctx.register_table("auction", Arc::new(auction_table))?;
 
-        let auction_schema = Arc::new(Auction::schema());
-        let auction_table = MemTable::try_new(
-            auction_schema.clone(),
-            vec![vec![RecordBatch::new_empty(auction_schema)]],
-        )?;
-        ctx.register_table("auction", Arc::new(auction_table))?;
+    let bid_schema = Arc::new(Bid::schema());
+    let bid_table = MemTable::try_new(
+        bid_schema.clone(),
+        vec![vec![RecordBatch::new_empty(bid_schema)]],
+    )?;
+    ctx.register_table("bid", Arc::new(bid_table))?;
 
-        let bid_schema = Arc::new(Bid::schema());
-        let bid_table = MemTable::try_new(
-            bid_schema.clone(),
-            vec![vec![RecordBatch::new_empty(bid_schema)]],
-        )?;
-        ctx.register_table("bid", Arc::new(bid_table))?;
-    }
-
-    // construct query plan into the cloud environment
-    let sqls = nexmark_query(opt.query_number);
-    if sqls.len() > 1 {
-        unimplemented!();
-    }
-    let lambda_ctx = ExecutionContext {
-        plan:         physical_plan(&mut ctx, &sqls[0])?,
-        name:         format!("q{}", opt.query_number),
-        next:         CloudFunction::None,
-        datasource:   DataSource::default(),
-        query_number: Some(opt.query_number),
-        debug:        opt.debug,
-    };
-
-    let function_name = create_lambda_function(&lambda_ctx).await?;
-    if opt.debug {
-        info!("[OK] Create lambda function: {}.", function_name);
-    }
-
-    let events = Arc::new(nexmark.generate_data()?);
-    info!("[OK] Generate nexmark events.");
-
-    #[allow(unused_assignments)]
-    let mut tasks = vec![];
-
-    if let StreamWindow::ElementWise = nexmark.window {
-        tasks = iproduct!(0..opt.seconds, 0..opt.generators)
-            .map(|(t, g)| {
-                let e = events.clone();
-                let q = opt.query_number;
-                let f = function_name.clone();
-                tokio::spawn(async move {
-                    info!("[OK] Send nexmark event (time: {}, source: {}).", t, g);
-                    let u = UuidBuilder::new(&format!("q{}-00-{}", q, Utc::now().timestamp()), 1)
-                        .next();
-                    let p = serde_json::to_vec(&nexmark_event_to_payload(e, t, g, q, u)?)?.into();
-                    Ok(vec![invoke_lambda_function(f, Some(p)).await?])
-                })
-            })
-            // this collect *is needed* so that the join below can switch between tasks.
-            .collect::<Vec<tokio::task::JoinHandle<Result<Vec<InvocationResponse>>>>>();
-    } else {
-        set_lambda_concurrency(function_name.clone(), 1).await?;
-        tasks = (0..opt.generators)
-            .map(|g| {
-                let seconds = opt.seconds;
-                let e = events.clone();
-                let q = opt.query_number;
-                let f = function_name.clone();
-                tokio::spawn(async move {
-                    let mut response = vec![];
-                    for t in 0..seconds {
-                        info!("[OK] Send nexmark event (time: {}, source: {}).", t, g);
-                        let u =
-                            UuidBuilder::new(&format!("q{}-00-{}", q, Utc::now().timestamp()), 1)
-                                .next();
-                        let p =
-                            serde_json::to_vec(&nexmark_event_to_payload(e.clone(), t, g, q, u)?)?
-                                .into();
-                        response.push(invoke_lambda_function(f.clone(), Some(p)).await?);
-                    }
-                    Ok(response)
-                })
-            })
-            // this collect *is needed* so that the join below can switch between tasks.
-            .collect::<Vec<tokio::task::JoinHandle<Result<Vec<InvocationResponse>>>>>();
-    }
-
-    for task in tasks {
-        let res_vec = task.await.expect("Lambda function execution failed.")?;
-        if opt.debug {
-            res_vec.into_iter().for_each(|response| {
-                info!(
-                    "[OK] Received status from async lambda function. {:?}",
-                    response
-                );
-            });
-        }
-    }
-
-    Ok(())
+    Ok(ctx)
 }
 
-fn nexmark_event_to_payload(
-    events: Arc<NexMarkStream>,
-    time: usize,
-    generator: usize,
-    query_number: usize,
-    uuid: Uuid,
-) -> Result<Payload> {
-    let event = events
-        .select(time, generator)
-        .expect("Failed to select event.");
+fn create_nexmark_source(opt: &NexmarkBenchmarkOpt) -> NexMarkSource {
+    let window = match opt.query_number {
+        0 | 1 | 2 | 3 | 4 | 6 | 9 | 13 => StreamWindow::ElementWise,
+        5 => StreamWindow::HoppingWindow((10, 5)),
+        7..=8 => StreamWindow::TumblingWindow(Schedule::Seconds(10)),
+        _ => unreachable!(),
+    };
+    NexMarkSource::new(opt.events_per_second, opt.generators, opt.seconds, window)
+}
 
-    if event.persons.is_empty() && event.auctions.is_empty() && event.bids.is_empty() {
-        return Err(FlockError::Execution("No Nexmark input!".to_owned()));
+async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
+    info!("Running benchmarks with the following options: {:?}", opt);
+
+    let mut ctx = register_nexmark_tables().await?;
+    let plan = physical_plan(&mut ctx, &nexmark_query(opt.query_number)[0])?;
+
+    let nexmark_conf = create_nexmark_source(&opt);
+    let source_func_name = format!("nexmark_datasource");
+    let worker_func_name = format!("q{}-00-{}", opt.query_number, Utc::now().timestamp());
+    {
+        let nexmark_source_ctx = ExecutionContext {
+            plan:         plan.clone(),
+            name:         source_func_name.clone(),
+            next:         CloudFunction::Lambda(worker_func_name.clone()),
+            datasource:   DataSource::NexMarkEvent(NexMarkSource::default()),
+            query_number: Some(opt.query_number),
+            debug:        opt.debug,
+        };
+
+        let nexmark_worker_ctx = ExecutionContext {
+            plan:         plan,
+            name:         worker_func_name.clone(),
+            next:         CloudFunction::None,
+            datasource:   DataSource::Payload,
+            query_number: Some(opt.query_number),
+            debug:        opt.debug,
+        };
+
+        create_lambda_function(&nexmark_source_ctx).await?;
+        create_lambda_function(&nexmark_worker_ctx).await?;
+        set_lambda_concurrency(worker_func_name.clone(), 1).await?;
+
+        info!(
+            "[OK] Create lambda functions: {}, {}.",
+            source_func_name, worker_func_name
+        );
     }
 
-    match query_number {
-        0 | 1 | 2 => Ok(to_payload(
-            &NexMarkSource::to_batch(&event.bids, BID.clone()),
-            &vec![],
-            uuid,
-        )),
-        3 => Ok(to_payload(
-            &NexMarkSource::to_batch(&event.persons, PERSON.clone()),
-            &NexMarkSource::to_batch(&event.auctions, AUCTION.clone()),
-            uuid,
-        )),
-        4 => Ok(to_payload(
-            &NexMarkSource::to_batch(&event.auctions, AUCTION.clone()),
-            &NexMarkSource::to_batch(&event.bids, BID.clone()),
-            uuid,
-        )),
-        _ => unimplemented!(),
+    let tasks = (0..opt.generators)
+        .into_iter()
+        .map(|i| {
+            let f = source_func_name.clone();
+            let s = nexmark_conf.clone();
+            tokio::spawn(async move {
+                info!("[OK] Invoke function: {} {}", f, i);
+                let p = serde_json::to_vec(&Payload {
+                    datasource: Some(DataSource::NexMarkEvent(s)),
+                    ..Default::default()
+                })?
+                .into();
+                Ok(invoke_lambda_function(f, Some(p)).await?)
+            })
+        })
+        // this collect *is needed* so that the join below can switch between tasks.
+        .collect::<Vec<JoinHandle<Result<InvocationResponse>>>>();
+
+    for task in tasks {
+        let response = task.await.expect("Lambda function execution failed.")?;
+        info!("[OK] Received status from function. {:?}", response);
     }
+
+    // let events = Arc::new(nexmark.generate_data()?);
+    // info!("[OK] Generate nexmark events.");
+
+    // #[allow(unused_assignments)]
+    // let mut tasks = vec![];
+
+    // if let StreamWindow::ElementWise = nexmark.window {
+    //     tasks = iproduct!(0..opt.seconds, 0..opt.generators)
+    //         .map(|(t, g)| {
+    //             let e = events.clone();
+    //             let q = opt.query_number;
+    //             let f = function_name.clone();
+    //             tokio::spawn(async move {
+    //                 info!("[OK] Send nexmark event (time: {}, source: {}).", t,
+    // g);                 let u = UuidBuilder::new(&format!("q{}-00-{}", q,
+    // Utc::now().timestamp()), 1)                     .next();
+    //                 let p = serde_json::to_vec(&nexmark_event_to_payload(e, t, g,
+    // q, u)?)?.into();                 Ok(vec![invoke_lambda_function(f,
+    // Some(p)).await?])             })
+    //         })
+    //         // this collect *is needed* so that the join below can switch between
+    // tasks.         .collect::<Vec<tokio::task::
+    // JoinHandle<Result<Vec<InvocationResponse>>>>>(); } else {
+    //     set_lambda_concurrency(function_name.clone(), 1).await?;
+    //     tasks = (0..opt.generators)
+    //         .map(|g| {
+    //             let seconds = opt.seconds;
+    //             let e = events.clone();
+    //             let q = opt.query_number;
+    //             let f = function_name.clone();
+    //             tokio::spawn(async move {
+    //                 let mut response = vec![];
+    //                 for t in 0..seconds {
+    //                     info!("[OK] Send nexmark event (time: {}, source: {}).",
+    // t, g);                     let u =
+    //                         UuidBuilder::new(&format!("q{}-00-{}", q,
+    // Utc::now().timestamp()), 1)                             .next();
+    //                     let p =
+    //
+    // serde_json::to_vec(&nexmark_event_to_payload(e.clone(), t, g, q, u)?)?
+    //                             .into();
+    //                     response.push(invoke_lambda_function(f.clone(),
+    // Some(p)).await?);                 }
+    //                 Ok(response)
+    //             })
+    //         })
+    //         // this collect *is needed* so that the join below can switch between
+    // tasks.         .collect::<Vec<tokio::task::
+    // JoinHandle<Result<Vec<InvocationResponse>>>>>(); }
+
+    Ok(())
 }
 
 /// Invoke the lambda function with the nexmark events.

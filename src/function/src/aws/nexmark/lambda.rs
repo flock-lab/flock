@@ -15,16 +15,21 @@
 //! The generic lambda function for sub-plan execution on AWS Lambda.
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
+use arrow::util::pretty::pretty_format_batches;
+use bytes::Bytes;
 use datafusion::physical_plan::Partitioning;
 use futures::executor::block_on;
 use lambda_runtime::{handler_fn, Context};
 use lazy_static::lazy_static;
-use log::warn;
+use log::{info, warn};
 use nexmark::event::{Auction, Bid, Person};
+use nexmark::{NexMarkSource, NexMarkStream};
 use rayon::prelude::*;
 use runtime::prelude::*;
 use rusoto_core::Region;
-use rusoto_lambda::{InvokeAsyncRequest, Lambda, LambdaClient};
+use rusoto_lambda::{
+    InvocationRequest, InvocationResponse, InvokeAsyncRequest, Lambda, LambdaClient,
+};
 use serde_json::json;
 use serde_json::Value;
 use std::cell::Cell;
@@ -45,6 +50,12 @@ static INIT: Once = Once::new();
 /// The function invocation counter per lambda instance.
 static mut INVOCATION_COUNTER_PER_INSTANCE: u32 = 0;
 
+#[allow(dead_code)]
+static LAMBDA_SYNC_CALL: &str = "RequestResponse";
+
+#[allow(dead_code)]
+static LAMBDA_ASYNC_CALL: &str = "Event";
+
 thread_local! {
     /// Is in the testing environment.
     static IS_TESTING: Cell<bool> = Cell::new(false);
@@ -56,6 +67,7 @@ lazy_static! {
     static ref BID_SCHEMA: SchemaRef = Arc::new(Bid::schema());
     static ref PARALLELISM: usize = globals["lambda"]["parallelism"].parse::<usize>().unwrap();
     static ref CONTEXT_NAME: String = globals["lambda"]["name"].to_string();
+    static ref LAMBDA_CLIENT: LambdaClient = LambdaClient::new(Region::default());
 }
 
 /// A wrapper to allow the declaration of the execution context of the lambda
@@ -132,17 +144,76 @@ fn invoke_next_functions(ctx: &ExecutionContext, batches: &mut Vec<RecordBatch>)
     Ok(())
 }
 
+fn nexmark_event_to_payload(
+    events: Arc<NexMarkStream>,
+    time: usize,
+    generator: usize,
+    query_number: usize,
+    uuid: Uuid,
+) -> Result<Payload> {
+    let event = events
+        .select(time, generator)
+        .expect("Failed to select event.");
+
+    if event.persons.is_empty() && event.auctions.is_empty() && event.bids.is_empty() {
+        return Err(FlockError::Execution("No Nexmark input!".to_owned()));
+    }
+
+    match query_number {
+        0 | 1 | 2 => Ok(to_payload(
+            &NexMarkSource::to_batch(&event.bids, BID_SCHEMA.clone()),
+            &vec![],
+            uuid,
+        )),
+        3 => Ok(to_payload(
+            &NexMarkSource::to_batch(&event.persons, PERSON_SCHEMA.clone()),
+            &NexMarkSource::to_batch(&event.auctions, AUCTION_SCHEMA.clone()),
+            uuid,
+        )),
+        4 => Ok(to_payload(
+            &NexMarkSource::to_batch(&event.auctions, AUCTION_SCHEMA.clone()),
+            &NexMarkSource::to_batch(&event.bids, BID_SCHEMA.clone()),
+            uuid,
+        )),
+        _ => unimplemented!(),
+    }
+}
+
+async fn invoke_lambda_function(
+    function_name: String,
+    payload: Option<Bytes>,
+) -> Result<InvocationResponse> {
+    match LAMBDA_CLIENT
+        .invoke(InvocationRequest {
+            function_name,
+            payload,
+            invocation_type: Some(format!("Event")),
+            ..Default::default()
+        })
+        .await
+    {
+        Ok(response) => return Ok(response),
+        Err(err) => {
+            return Err(FlockError::Execution(format!(
+                "Lambda function execution failure: {}",
+                err
+            )))
+        }
+    }
+}
+
 async fn payload_handler(
     ctx: &mut ExecutionContext,
     arena: &mut Arena,
-    event: Value,
+    event: Payload,
 ) -> Result<Value> {
+    let tid = event.uuid.tid.clone();
     let input_partitions = {
         if match &ctx.next {
-            CloudFunction::None | CloudFunction::Solo(..) => true,
-            CloudFunction::Chorus(..) => false,
+            CloudFunction::None | CloudFunction::Lambda(..) => true,
+            CloudFunction::Group(..) => false,
         } {
-            // ressemble lambda n to 1
+            // ressemble data packets to a single window.
             let (ready, uuid) = arena.reassemble(event);
             if ready {
                 arena.batches(uuid.tid)
@@ -152,23 +223,21 @@ async fn payload_handler(
                 ));
             }
         } else {
-            // partition lambda 1 to n
-            let (batch, _, _) = to_batch(event);
-            vec![batch]
+            // data packet is an individual event for the current function.
+            let (r1_records, r2_records, _) = event.to_record_batch();
+            (vec![r1_records], vec![r2_records])
         }
     };
 
-    if input_partitions.is_empty() || input_partitions[0].is_empty() {
+    if input_partitions.0.is_empty() || input_partitions.0[0].is_empty() {
         return Err(FlockError::Execution("payload data is empty.".to_string()));
     }
 
-    // TODO(gangliao): repartition input batches to speedup the operations.
-    ctx.feed_one_source(&input_partitions);
-    let output_partitions = ctx.execute().await?;
+    let output = collect(ctx, input_partitions).await?;
 
     if ctx.next != CloudFunction::None {
         let mut batches = LambdaExecutor::coalesce_batches(
-            vec![output_partitions],
+            vec![output],
             globals["lambda"]["payload_batch_size"]
                 .parse::<usize>()
                 .unwrap(),
@@ -180,128 +249,98 @@ async fn payload_handler(
     }
 
     // TODO(gangliao): sink results to other cloud services.
-    Ok(serde_json::to_value(&ctx.name)?)
-}
-
-async fn nexmark_bench_handler(ctx: &mut ExecutionContext, event: Payload) -> Result<Value> {
-    let tid = event.uuid.tid.clone();
-    if let DataSource::NexMarkEvent(source) = &ctx.datasource {
-        match source.window {
-            StreamWindow::TumblingWindow(Schedule::Seconds(_sec)) => {
-                unimplemented!();
-            }
-            StreamWindow::HoppingWindow((_window, _hop))
-            | StreamWindow::SlidingWindow((_window, _hop)) => {
-                unimplemented!();
-            }
-            StreamWindow::ElementWise => {
-                assert_eq!(event.uuid.seq_len, 1);
-                collect(ctx, event).await?;
-            }
-            _ => unimplemented!(),
-        }
-    }
-
     Ok(json!({"name": &ctx.name, "tid": tid}))
 }
 
+async fn nexmark_bench_handler(ctx: &ExecutionContext, payload: Payload) -> Result<Value> {
+    // Copy data source from the payload.
+    let mut source = match payload.datasource {
+        Some(DataSource::NexMarkEvent(source)) => source,
+        _ => unreachable!(),
+    };
+
+    // Each source function is a data generator.
+    let gen = source.config.get_as_or("threads", 1);
+    let sec = source.config.get_as_or("seconds", 10);
+    let eps = source.config.get_as_or("events_per_second", 1000);
+    assert!(eps / gen > 0);
+    source.config.insert("threads", format!("{}", 1));
+    source
+        .config
+        .insert("events_per_second", format!("{}", eps / gen));
+
+    let events = Arc::new(source.generate_data()?);
+    info!("[OK] Generate nexmark events.");
+
+    let tasks = match source.window {
+        StreamWindow::TumblingWindow(Schedule::Seconds(_sec)) => {
+            unimplemented!();
+        }
+        StreamWindow::HoppingWindow((_window, _hop))
+        | StreamWindow::SlidingWindow((_window, _hop)) => {
+            unimplemented!();
+        }
+        StreamWindow::ElementWise => (0..sec).map(|t| {
+            let e = events.clone();
+            let q = ctx.query_number.expect("query number is not set.");
+            let f = match &ctx.next {
+                CloudFunction::Lambda(name) => name.clone(),
+                _ => unreachable!(),
+            };
+            tokio::spawn(async move {
+                info!("[OK] Send nexmark event (epoch: {}).", t);
+                let u = UuidBuilder::new(&f, 1).next();
+                let p = serde_json::to_vec(&nexmark_event_to_payload(e, t, 0, q, u)?)?.into();
+                Ok(vec![invoke_lambda_function(f, Some(p)).await?])
+            })
+        }),
+        _ => unimplemented!(),
+    }
+    // this collect *is needed* so that the join below can switch between tasks.
+    .collect::<Vec<tokio::task::JoinHandle<Result<Vec<InvocationResponse>>>>>();
+
+    for task in tasks {
+        let res_vec = task.await.expect("Lambda function execution failed.")?;
+        res_vec.into_iter().for_each(|response| {
+            info!(
+                "[OK] Received status from async lambda function. {:?}",
+                response
+            );
+        });
+    }
+
+    Ok(json!({"name": &ctx.name, "type": format!("nexmark_bench")}))
+}
+
 async fn handler(event: Payload, _: Context) -> Result<Value> {
-    let (mut ctx, mut _arena) = init_exec_context!();
+    let (mut ctx, mut arena) = init_exec_context!();
 
     match &ctx.datasource {
         // TODO(gangliao): support other data sources.
-        // DataSource::Payload => payload_handler(&mut ctx, &mut arena, event).await,
-        DataSource::NexMarkEvent(_) => nexmark_bench_handler(&mut ctx, event).await,
+        DataSource::Payload => payload_handler(&mut ctx, &mut arena, event).await,
+        DataSource::NexMarkEvent(_) => nexmark_bench_handler(&ctx, event).await,
         _ => unimplemented!(),
     }
 }
 
-async fn feed_one_source(ctx: &mut ExecutionContext, batches: Vec<RecordBatch>) -> Result<()> {
-    let num_batches = batches.len();
-    let parallelism = globals["lambda"]["parallelism"].parse::<usize>().unwrap();
-
-    if num_batches > parallelism {
-        ctx.feed_one_source(
-            &LambdaExecutor::repartition(vec![batches], Partitioning::RoundRobinBatch(parallelism))
-                .await?,
-        );
-    } else if num_batches > 1 {
-        ctx.feed_one_source(
-            &LambdaExecutor::repartition(vec![batches], Partitioning::RoundRobinBatch(num_batches))
-                .await?,
-        );
-    } else {
-        // only one batch exists
-        assert!(num_batches == 1);
-        ctx.feed_one_source(&vec![batches]);
-    }
-
-    Ok(())
-}
-
-async fn feed_two_source(
+async fn collect(
     ctx: &mut ExecutionContext,
-    left: Vec<RecordBatch>,
-    right: Vec<RecordBatch>,
-) -> Result<()> {
-    let partitions = |n| {
-        if n > *PARALLELISM {
-            *PARALLELISM
-        } else if n > 1 {
-            n
-        } else {
-            1
-        }
-    };
-
-    let n_left = partitions(left.len());
-    let n_right = partitions(right.len());
-
-    // repartition the batches in the left.
-    let left = if n_left == 1 {
-        vec![left]
-    } else {
-        LambdaExecutor::repartition(vec![left], Partitioning::RoundRobinBatch(n_left)).await?
-    };
-
-    // repartition the batches in the right.
-    let right = if n_right == 1 {
-        vec![right]
-    } else {
-        LambdaExecutor::repartition(vec![right], Partitioning::RoundRobinBatch(n_right)).await?
-    };
-
-    ctx.feed_two_source(&left, &right);
-    Ok(())
-}
-
-async fn collect(ctx: &mut ExecutionContext, event: Payload) -> Result<Vec<RecordBatch>> {
+    partitions: (Vec<Vec<RecordBatch>>, Vec<Vec<RecordBatch>>),
+) -> Result<Vec<RecordBatch>> {
+    let r1 = LambdaExecutor::repartition(partitions.0, Partitioning::RoundRobinBatch(*PARALLELISM))
+        .await?;
+    let r2 = LambdaExecutor::repartition(partitions.1, Partitioning::RoundRobinBatch(*PARALLELISM))
+        .await?;
     // feed the data to the dataflow graph
-    let (r1, r2, _uuid) = event.to_record_batch();
-
-    if ctx.debug {
-        let formatted = arrow::util::pretty::pretty_format_batches(&r1).unwrap();
-        println!("{}", formatted);
-
-        let formatted = arrow::util::pretty::pretty_format_batches(&r2).unwrap();
-        println!("{}", formatted);
-    }
-
-    if r2.is_empty() {
-        feed_one_source(ctx, r1).await?;
-    } else {
-        feed_two_source(ctx, r1, r2).await?;
-    }
-
+    ctx.feed_two_source(&r1, &r2);
     // query execution
     let output = ctx.execute().await?;
 
     if ctx.debug {
-        let formatted = arrow::util::pretty::pretty_format_batches(&output).unwrap();
-        println!("{}", formatted);
+        println!("{}", pretty_format_batches(&output).unwrap());
         unsafe {
             INVOCATION_COUNTER_PER_INSTANCE += 1;
-            println!("# invocations: {}", INVOCATION_COUNTER_PER_INSTANCE);
+            info!("# invocations: {}", INVOCATION_COUNTER_PER_INSTANCE);
         }
     }
 

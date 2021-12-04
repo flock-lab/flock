@@ -211,8 +211,8 @@ async fn payload_handler(
 ) -> Result<Value> {
     let input_partitions = {
         if match &ctx.next {
-            CloudFunction::None | CloudFunction::Solo(..) => true,
-            CloudFunction::Chorus(..) => false,
+            CloudFunction::None | CloudFunction::Lambda(..) => true,
+            CloudFunction::Group(..) => false,
         } {
             // ressemble lambda n to 1
             let (ready, uuid) = arena.reassemble(event);
@@ -283,7 +283,7 @@ mod tests {
         let plan = include_str!("../../../test/data/plan/simple_select.json");
         let name = "hello".to_owned();
         let next =
-            CloudFunction::Solo("SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836Z".to_owned());
+            CloudFunction::Lambda("SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836Z".to_owned());
         let datasource = DataSource::Json;
 
         let plan: Arc<dyn ExecutionPlan> = serde_json::from_str(&plan).unwrap();

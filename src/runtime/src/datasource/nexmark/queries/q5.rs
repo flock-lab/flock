@@ -101,6 +101,7 @@ mod tests {
                 bids_batches.push(NexMarkSource::to_batch(&bids, bid_schema.clone()));
             }
 
+            let old_batches = bids_batches.clone();
             // register the memory tables
             let mut ctx = datafusion::execution::context::ExecutionContext::new();
             let bid_table = MemTable::try_new(bid_schema.clone(), bids_batches)?;
@@ -128,6 +129,12 @@ mod tests {
                 .unwrap()
                 .batches();
             }
+
+            // check input data exists after the query plan is executed
+            assert_eq!(old_batches.len(), bids_batches.len());
+            (0..old_batches.len()).for_each(|i| {
+                assert_eq!(old_batches[i], bids_batches[i]);
+            });
         }
 
         Ok(())
