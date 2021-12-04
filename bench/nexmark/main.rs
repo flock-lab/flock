@@ -140,7 +140,10 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
 
         create_lambda_function(&nexmark_source_ctx).await?;
         create_lambda_function(&nexmark_worker_ctx).await?;
-        set_lambda_concurrency(worker_func_name.clone(), 1).await?;
+
+        if nexmark_conf.window != StreamWindow::ElementWise {
+            set_lambda_concurrency(worker_func_name.clone(), 1).await?;
+        }
 
         info!(
             "[OK] Create lambda functions: {}, {}.",

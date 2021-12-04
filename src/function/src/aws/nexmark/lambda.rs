@@ -235,6 +235,10 @@ async fn payload_handler(
 
     let output = collect(ctx, input_partitions).await?;
 
+    if ctx.debug {
+        println!("{}", pretty_format_batches(&output)?);
+    }
+
     if ctx.next != CloudFunction::None {
         let mut batches = LambdaExecutor::coalesce_batches(
             vec![output],
