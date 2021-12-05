@@ -159,7 +159,6 @@ fn nexmark_event_to_payload(
     if event.persons.is_empty() && event.auctions.is_empty() && event.bids.is_empty() {
         return Err(FlockError::Execution("No Nexmark input!".to_owned()));
     }
-    println!("##### {}", event.bids.len());
 
     match query_number {
         0 | 1 | 2 => Ok(to_payload(
@@ -274,6 +273,7 @@ async fn nexmark_bench_handler(ctx: &ExecutionContext, payload: Payload) -> Resu
     source
         .config
         .insert("events-per-second", format!("{}", eps / gen));
+    assert!(eps / gen > 0);
 
     let events = Arc::new(source.generate_data()?);
 
