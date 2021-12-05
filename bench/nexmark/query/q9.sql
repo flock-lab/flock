@@ -11,4 +11,4 @@ FROM   bid
              WHERE  b_date_time BETWEEN a_date_time AND expires
              GROUP  BY a_id)
          ON auction = id
-            AND price = final; 
+            AND price = final;

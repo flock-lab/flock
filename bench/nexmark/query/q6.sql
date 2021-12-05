@@ -19,4 +19,4 @@ ORDER  BY seller;
 SELECT seller,
        Avg(final)
 FROM   q
-GROUP  BY seller; 
+GROUP  BY seller;

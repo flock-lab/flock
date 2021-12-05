@@ -1,4 +1,4 @@
-// Copyright (c) 2020 UMD Database Group. All Rights Reserved.
+// Copyright (c) 2020-present, UMD Database Group.
 //
 // This program is free software: you can use, redistribute, and/or modify
 // it under the terms of the GNU Affero General Public License, version 3
@@ -10,7 +10,6 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
-// Only bring in dependencies for the repl when the cli feature is enabled.
 
 //! QueryFlow contains all the context information of the current query
 //! plan. It is responsible for deploying lambda functions and execution

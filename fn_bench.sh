@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021 UMD Database Group. All Rights Reserved.
+# Copyright (c) 2020-present, UMD Database Group.
 #
 # This program is free software: you can use, redistribute, and/or modify
 # it under the terms of the GNU Affero General Public License, version 3
@@ -38,7 +38,7 @@ AGPLV3()
   # Display GPL license
   echo "Nexmark Benchmark Script for Flock"
   echo
-  echo "Copyright (c) 2020-Present UMD Database Group."
+  echo "Copyright (c) 2020-present, UMD Database Group."
   echo
   echo "This program is free software: you can redistribute it and/or modify"
   echo "it under the terms of the GNU Affero General Public License, version 3"

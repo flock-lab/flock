@@ -97,7 +97,7 @@ For example, you can use `flock-cli` in response to the uploading, updating, or 
 
 Flock: Serverless SQL Query Engine for Real-Time and Batch Analytics (https://github.com/flock-lab/flock)
 
-Copyright (c) 2020-2021, UMD Data System Group. All rights reserved.
+Copyright (c) 2020-present, UMD Data System Group.
 
 ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒
 
@@ -216,5 +216,5 @@ AWS gives you a personalized view of the status of the query execution (`q3`).
 
 ## License
 
-Copyright 2020 UMD Database Group. All Rights Reserved.
+Copyright 2020 UMD Database Group.
 The library, examples, and all source code are released under [AGPL-3.0 License](LICENSE).
