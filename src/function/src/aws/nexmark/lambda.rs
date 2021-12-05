@@ -13,6 +13,7 @@
 // Only bring in dependencies for the repl when the cli feature is enabled.
 
 //! The generic lambda function for sub-plan execution on AWS Lambda.
+use chrono::Utc;
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use arrow::util::pretty::pretty_format_batches;
@@ -158,6 +159,7 @@ fn nexmark_event_to_payload(
     if event.persons.is_empty() && event.auctions.is_empty() && event.bids.is_empty() {
         return Err(FlockError::Execution("No Nexmark input!".to_owned()));
     }
+    println!("##### {}", event.bids.len());
 
     match query_number {
         0 | 1 | 2 => Ok(to_payload(
@@ -266,15 +268,19 @@ async fn nexmark_bench_handler(ctx: &ExecutionContext, payload: Payload) -> Resu
     // Each source function is a data generator.
     let gen = source.config.get_as_or("threads", 1);
     let sec = source.config.get_as_or("seconds", 10);
-    let eps = source.config.get_as_or("events_per_second", 1000);
-    assert!(eps / gen > 0);
+    let eps = source.config.get_as_or("events-per-second", 1000);
+
     source.config.insert("threads", format!("{}", 1));
     source
         .config
-        .insert("events_per_second", format!("{}", eps / gen));
+        .insert("events-per-second", format!("{}", eps / gen));
 
     let events = Arc::new(source.generate_data()?);
-    info!("[OK] Generate nexmark events.");
+
+    if ctx.debug {
+        println!("{:?}", source);
+        println!("[OK] Generate nexmark events.");
+    }
 
     let tasks = match source.window {
         StreamWindow::TumblingWindow(Schedule::Seconds(_sec)) => {
@@ -285,6 +291,9 @@ async fn nexmark_bench_handler(ctx: &ExecutionContext, payload: Payload) -> Resu
             unimplemented!();
         }
         StreamWindow::ElementWise => (0..sec).map(|t| {
+            if ctx.debug {
+                println!("[OK] Send nexmark event (epoch: {}).", t);
+            }
             let e = events.clone();
             let q = ctx.query_number.expect("query number is not set.");
             let f = match &ctx.next {
@@ -292,8 +301,7 @@ async fn nexmark_bench_handler(ctx: &ExecutionContext, payload: Payload) -> Resu
                 _ => unreachable!(),
             };
             tokio::spawn(async move {
-                info!("[OK] Send nexmark event (epoch: {}).", t);
-                let u = UuidBuilder::new(&f, 1).next();
+                let u = UuidBuilder::new_with_ts(&f, Utc::now().timestamp(), 1).next();
                 let p = serde_json::to_vec(&nexmark_event_to_payload(e, t, 0, q, u)?)?.into();
                 Ok(vec![invoke_lambda_function(f, Some(p)).await?])
             })

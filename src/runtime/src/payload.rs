@@ -44,9 +44,21 @@ impl UuidBuilder {
     /// Returns a new UuidBuilder.
     pub fn new(function_name: &str, len: usize) -> Self {
         let query_code: String;
-        let plan_inedx: String;
+        let plan_index: String;
         let timestamp: String;
-        scan!(function_name.bytes() => "{}-{}-{}", query_code, plan_inedx, timestamp);
+        scan!(function_name.bytes() => "{}-{}-{}", query_code, plan_index, timestamp);
+        Self {
+            tid: format!("{}-{}", query_code, timestamp),
+            pos: 0,
+            len,
+        }
+    }
+
+    /// Returns a new UuidBuilder.
+    pub fn new_with_ts(function_name: &str, timestamp: i64, len: usize) -> Self {
+        let query_code: String;
+        let plan_index: String;
+        scan!(function_name.bytes() => "{}-{}", query_code, plan_index);
         Self {
             tid: format!("{}-{}", query_code, timestamp),
             pos: 0,

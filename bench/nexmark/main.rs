@@ -14,7 +14,6 @@
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use bytes::Bytes;
-use chrono::Utc;
 use datafusion::datasource::MemTable;
 use datafusion::execution::context::ExecutionContext as DataFusionExecutionContext;
 use driver::deploy::lambda;
@@ -106,8 +105,8 @@ fn create_nexmark_source(opt: &NexmarkBenchmarkOpt) -> NexMarkSource {
         5 => StreamWindow::HoppingWindow((10, 5)),
         7..=8 => StreamWindow::TumblingWindow(Schedule::Seconds(10)),
         _ => unreachable!(),
-    };
-    NexMarkSource::new(opt.events_per_second, opt.generators, opt.seconds, window)
+        };
+    NexMarkSource::new(opt.seconds, opt.generators, opt.events_per_second, window)
 }
 
 async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
@@ -118,7 +117,7 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
 
     let nexmark_conf = create_nexmark_source(&opt);
     let source_func_name = format!("nexmark_datasource");
-    let worker_func_name = format!("q{}-00-{}", opt.query_number, Utc::now().timestamp());
+    let worker_func_name = format!("q{}-00", opt.query_number);
     {
         let nexmark_source_ctx = ExecutionContext {
             plan:         plan.clone(),
