@@ -20,6 +20,7 @@ use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::cmp::{max, min};
+use std::collections::HashMap;
 
 const MIN_STRING_LENGTH: usize = 3;
 
@@ -162,15 +163,20 @@ impl Person {
 
     /// Returns `Person`'s schema.
     pub fn schema() -> Schema {
-        Schema::new(vec![
-            Field::new("p_id", DataType::Int32, false),
-            Field::new("name", DataType::Utf8, false),
-            Field::new("email_address", DataType::Utf8, false),
-            Field::new("credit_card", DataType::Utf8, false),
-            Field::new("city", DataType::Utf8, false),
-            Field::new("state", DataType::Utf8, false),
-            Field::new("p_date_time", DataType::Date64, false),
-        ])
+        let mut metadata = HashMap::new();
+        metadata.insert("name".to_string(), "auction".to_string());
+        Schema::new_with_metadata(
+            vec![
+                Field::new("p_id", DataType::Int32, false),
+                Field::new("name", DataType::Utf8, false),
+                Field::new("email_address", DataType::Utf8, false),
+                Field::new("credit_card", DataType::Utf8, false),
+                Field::new("city", DataType::Utf8, false),
+                Field::new("state", DataType::Utf8, false),
+                Field::new("p_date_time", DataType::Date64, false),
+            ],
+            metadata,
+        )
     }
 
     /// Creates a new `Person` event.
@@ -243,17 +249,22 @@ impl Auction {
 
     /// Returns `Auction`'s schema.
     pub fn schema() -> Schema {
-        Schema::new(vec![
-            Field::new("a_id", DataType::Int32, false),
-            Field::new("item_name", DataType::Utf8, false),
-            Field::new("description", DataType::Utf8, false),
-            Field::new("initial_bid", DataType::Int32, false),
-            Field::new("reserve", DataType::Int32, false),
-            Field::new("a_date_time", DataType::Date64, false),
-            Field::new("expires", DataType::Date64, false),
-            Field::new("seller", DataType::Int32, false),
-            Field::new("category", DataType::Int32, false),
-        ])
+        let mut metadata = HashMap::new();
+        metadata.insert("name".to_string(), "auction".to_string());
+        Schema::new_with_metadata(
+            vec![
+                Field::new("a_id", DataType::Int32, false),
+                Field::new("item_name", DataType::Utf8, false),
+                Field::new("description", DataType::Utf8, false),
+                Field::new("initial_bid", DataType::Int32, false),
+                Field::new("reserve", DataType::Int32, false),
+                Field::new("a_date_time", DataType::Date64, false),
+                Field::new("expires", DataType::Date64, false),
+                Field::new("seller", DataType::Int32, false),
+                Field::new("category", DataType::Int32, false),
+            ],
+            metadata,
+        )
     }
 
     fn new(
@@ -346,12 +357,17 @@ impl Bid {
 
     /// Returns `Auction`'s schema.
     pub fn schema() -> Schema {
-        Schema::new(vec![
-            Field::new("auction", DataType::Int32, false),
-            Field::new("bidder", DataType::Int32, false),
-            Field::new("price", DataType::Int32, false),
-            Field::new("b_date_time", DataType::Date64, false),
-        ])
+        let mut metadata = HashMap::new();
+        metadata.insert("name".to_string(), "bid".to_string());
+        Schema::new_with_metadata(
+            vec![
+                Field::new("auction", DataType::Int32, false),
+                Field::new("bidder", DataType::Int32, false),
+                Field::new("price", DataType::Int32, false),
+                Field::new("b_date_time", DataType::Date64, false),
+            ],
+            metadata,
+        )
     }
 
     fn new(id: usize, time: Date, rng: &mut SmallRng, nex: &NEXMarkConfig) -> Self {

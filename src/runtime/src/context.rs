@@ -18,18 +18,19 @@
 use super::datasource::DataSource;
 use super::encoding::Encoding;
 use crate::error::{FlockError, Result};
-use arrow::datatypes::Schema;
+use arrow::datatypes::{Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
 use datafusion::physical_plan::collect;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::ExecutionPlan;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::collections::VecDeque;
 use std::sync::Arc;
 
 type CloudFunctionName = String;
-type GroupSize = u8;
+type GroupSize = usize;
 
 /// Cloud environment context is a wrapper to support compression and
 /// serialization.
@@ -230,9 +231,8 @@ impl ExecutionContext {
         while !queue.is_empty() {
             let mut p = queue.pop_front().unwrap();
             if p.children().is_empty() {
-                // Schema comparsion
                 for partition in &[&left, &right] {
-                    if p.schema() == partition[0][0].schema() {
+                    if compare_schema(p.schema(), partition[0][0].schema()) {
                         unsafe {
                             Arc::get_mut_unchecked(&mut p)
                                 .as_mut_any()
@@ -251,6 +251,54 @@ impl ExecutionContext {
                 .for_each(|(i, _)| queue.push_back(p.children()[i].clone()));
         }
     }
+
+    /// Feeds all data sources to the execution plan.
+    pub fn feed_data_sources(&mut self, sources: &Vec<Vec<Vec<RecordBatch>>>) {
+        // Breadth-first search
+        let mut queue = VecDeque::new();
+        queue.push_front(self.plan().clone());
+
+        while !queue.is_empty() {
+            let mut p = queue.pop_front().unwrap();
+            if p.children().is_empty() {
+                for partition in sources {
+                    if compare_schema(p.schema(), partition[0][0].schema()) {
+                        unsafe {
+                            Arc::get_mut_unchecked(&mut p)
+                                .as_mut_any()
+                                .downcast_mut::<MemoryExec>()
+                                .unwrap()
+                                .set_partitions(partition);
+                        }
+                        break;
+                    }
+                }
+            }
+
+            p.children()
+                .iter()
+                .enumerate()
+                .for_each(|(i, _)| queue.push_back(p.children()[i].clone()));
+        }
+    }
+}
+
+/// Compare two execution plans' schemas.
+/// Returns true if they are belong to the same plan npde.
+fn compare_schema(schema1: SchemaRef, schema2: SchemaRef) -> bool {
+    let (superset, subset) = if schema1.fields().len() >= schema2.fields().len() {
+        (schema1, schema2)
+    } else {
+        (schema2, schema1)
+    };
+
+    let fields = superset
+        .fields()
+        .iter()
+        .map(|f| f.name())
+        .collect::<HashSet<_>>();
+
+    subset.fields().iter().all(|f| fields.contains(&f.name()))
 }
 
 #[cfg(test)]
