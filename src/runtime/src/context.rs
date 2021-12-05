@@ -284,7 +284,7 @@ impl ExecutionContext {
 }
 
 /// Compare two execution plans' schemas.
-/// Returns true if they are belong to the same plan npde.
+/// Returns true if they are belong to the same plan node.
 fn compare_schema(schema1: SchemaRef, schema2: SchemaRef) -> bool {
     let (superset, subset) = if schema1.fields().len() >= schema2.fields().len() {
         (schema1, schema2)
