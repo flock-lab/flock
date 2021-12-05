@@ -36,5 +36,5 @@ path = "src/lib.rs"
 crate-type = [ "lib" ]
 
 [[bin]]
-name = "test_nextmark"
-path = "src/nextmark.rs"
+name = "test_nexmark"
+path = "src/nexmark.rs"
