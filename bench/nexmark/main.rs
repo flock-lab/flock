@@ -16,6 +16,7 @@ use arrow::record_batch::RecordBatch;
 use bytes::Bytes;
 use datafusion::datasource::MemTable;
 use datafusion::execution::context::ExecutionContext as DataFusionExecutionContext;
+use datafusion::physical_plan::ExecutionPlan;
 use driver::deploy::lambda;
 use lazy_static::lazy_static;
 use log::info;
@@ -35,15 +36,17 @@ use tokio::task::JoinHandle;
 static LAMBDA_SYNC_CALL: &str = "RequestResponse";
 #[allow(dead_code)]
 static LAMBDA_ASYNC_CALL: &str = "Event";
+static NEXMARK_SOURCE_FUNCTION_NAME: &str = "nexmark_datasource";
 
 lazy_static! {
     static ref PERSON: SchemaRef = Arc::new(Person::schema());
     static ref AUCTION: SchemaRef = Arc::new(Auction::schema());
     static ref BID: SchemaRef = Arc::new(Bid::schema());
     static ref LAMBDA_CLIENT: LambdaClient = LambdaClient::new(Region::default());
+    static ref PARALLELISM: usize = globals["lambda"]["parallelism"].parse::<usize>().unwrap();
 }
 
-#[derive(Debug, StructOpt)]
+#[derive(Default, Clone, Debug, StructOpt)]
 struct NexmarkBenchmarkOpt {
     /// Query number
     #[structopt(short = "q", long = "query_number", default_value = "1")]
@@ -109,51 +112,73 @@ fn create_nexmark_source(opt: &NexmarkBenchmarkOpt) -> NexMarkSource {
     NexMarkSource::new(opt.seconds, opt.generators, opt.events_per_second, window)
 }
 
+async fn create_nexmark_functions(
+    opt: NexmarkBenchmarkOpt,
+    nexmark_conf: NexMarkSource,
+    physcial_plan: Arc<dyn ExecutionPlan>,
+) -> Result<()> {
+    let worker_func_name = format!("q{}-00", opt.query_number);
+
+    let mut next_func_name = CloudFunction::Lambda(worker_func_name.clone());
+    if nexmark_conf.window != StreamWindow::ElementWise {
+        next_func_name = CloudFunction::Group((worker_func_name.clone(), *PARALLELISM));
+    };
+
+    let nexmark_source_ctx = ExecutionContext {
+        plan:         physcial_plan.clone(),
+        name:         NEXMARK_SOURCE_FUNCTION_NAME.to_string(),
+        next:         next_func_name.clone(),
+        datasource:   DataSource::NexMarkEvent(NexMarkSource::default()),
+        query_number: Some(opt.query_number),
+        debug:        opt.debug,
+    };
+
+    let mut nexmark_worker_ctx = ExecutionContext {
+        plan:         physcial_plan,
+        name:         worker_func_name.clone(),
+        next:         CloudFunction::None,
+        datasource:   DataSource::Payload,
+        query_number: Some(opt.query_number),
+        debug:        opt.debug,
+    };
+
+    // Create the function for the nexmark source generator.
+    info!("Creating lambda function: {}", NEXMARK_SOURCE_FUNCTION_NAME);
+    create_lambda_function(&nexmark_source_ctx).await?;
+
+    // Create the function for the nexmark worker.
+    if nexmark_conf.window == StreamWindow::ElementWise {
+        info!("Creating lambda function: {}", nexmark_worker_ctx.name);
+        create_lambda_function(&nexmark_worker_ctx).await?;
+    } else {
+        info!(
+            "Creating lambda function group: {:?}",
+            nexmark_source_ctx.next
+        );
+        for i in 0..*PARALLELISM {
+            let group_member_name = format!("{}-{:02}", worker_func_name.clone(), i);
+            info!("Creating function member: {}", group_member_name);
+            nexmark_worker_ctx.name = group_member_name;
+            create_lambda_function(&nexmark_worker_ctx).await?;
+            set_lambda_concurrency(nexmark_worker_ctx.name, 1).await?;
+        }
+    }
+
+    Ok(())
+}
+
 async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
     info!("Running benchmarks with the following options: {:?}", opt);
+    let nexmark_conf = create_nexmark_source(&opt);
 
     let mut ctx = register_nexmark_tables().await?;
     let plan = physical_plan(&mut ctx, &nexmark_query(opt.query_number)[0])?;
-
-    let nexmark_conf = create_nexmark_source(&opt);
-    let source_func_name = format!("nexmark_datasource");
-    let worker_func_name = format!("q{}-00", opt.query_number);
-    {
-        let nexmark_source_ctx = ExecutionContext {
-            plan:         plan.clone(),
-            name:         source_func_name.clone(),
-            next:         CloudFunction::Lambda(worker_func_name.clone()),
-            datasource:   DataSource::NexMarkEvent(NexMarkSource::default()),
-            query_number: Some(opt.query_number),
-            debug:        opt.debug,
-        };
-
-        let nexmark_worker_ctx = ExecutionContext {
-            plan:         plan,
-            name:         worker_func_name.clone(),
-            next:         CloudFunction::None,
-            datasource:   DataSource::Payload,
-            query_number: Some(opt.query_number),
-            debug:        opt.debug,
-        };
-
-        create_lambda_function(&nexmark_source_ctx).await?;
-        create_lambda_function(&nexmark_worker_ctx).await?;
-
-        if nexmark_conf.window != StreamWindow::ElementWise {
-            set_lambda_concurrency(worker_func_name.clone(), 1).await?;
-        }
-
-        info!(
-            "[OK] Create lambda functions: {}, {}.",
-            source_func_name, worker_func_name
-        );
-    }
+    create_nexmark_functions(opt.clone(), nexmark_conf.clone(), plan).await?;
 
     let tasks = (0..opt.generators)
         .into_iter()
         .map(|i| {
-            let f = source_func_name.clone();
+            let f = NEXMARK_SOURCE_FUNCTION_NAME.to_string();
             let s = nexmark_conf.clone();
             tokio::spawn(async move {
                 info!("[OK] Invoke function: {} {}", f, i);
@@ -262,102 +287,73 @@ async fn create_lambda_function(ctx: &ExecutionContext) -> Result<String> {
 }
 
 /// Returns Nextmark query strings based on the query number.
-fn nexmark_query(query: usize) -> Vec<String> {
-    match query {
-        0 => vec!["SELECT * FROM bid"],
-        1 => vec!["SELECT auction, bidder, 0.908 * price as price, b_date_time FROM bid"],
-        2 => vec!["SELECT auction, price FROM bid WHERE auction % 123 = 0"],
-        3 => vec![concat!(
-            "SELECT ",
-            "    name, city, state, a_id ",
-            "FROM ",
-            "    auction INNER JOIN person on seller = p_id ",
-            "WHERE ",
-            "    category = 10 and (state = 'or' OR state = 'id' OR state = 'ca');"
-        )],
-        4 => vec![concat!(
-            "SELECT ",
-            "    category, ",
-            "    AVG(final) ",
-            "FROM ( ",
-            "    SELECT MAX(price) AS final, category ",
-            "    FROM auction INNER JOIN bid on a_id = auction ",
-            "    WHERE b_date_time BETWEEN a_date_time AND expires ",
-            "    GROUP BY a_id, category ",
-            ") as Q ",
-            "GROUP BY category;"
-        )],
-        5 => vec![concat!(
-            "SELECT auction, num ",
-            "FROM ( ",
-            "  SELECT ",
-            "    auction, ",
-            "    count(*) AS num ",
-            "  FROM bid ",
-            "  GROUP BY auction ",
-            ") AS AuctionBids ",
-            "INNER JOIN ( ",
-            "  SELECT ",
-            "    max(num) AS maxn ",
-            "  FROM ( ",
-            "    SELECT ",
-            "      auction, ",
-            "      count(*) AS num ",
-            "    FROM bid ",
-            "    GROUP BY ",
-            "      auction ",
-            "    ) AS CountBids ",
-            ") AS MaxBids ",
-            "ON num = maxn;"
-        )],
-        6 => vec![
-            concat!(
-                "SELECT COUNT(DISTINCT seller) ",
-                "FROM auction INNER JOIN bid ON a_id = auction ",
-                "WHERE b_date_time between a_date_time and expires ",
-            ),
-            concat!(
-                "SELECT seller, MAX(price) AS final ",
-                "FROM auction INNER JOIN bid ON a_id = auction ",
-                "WHERE b_date_time between a_date_time and expires ",
-                "GROUP BY a_id, seller ORDER by seller"
-            ),
-            "SELECT seller, AVG(final) FROM Q GROUP BY seller",
-        ],
-        7 => vec![concat!(
-            "SELECT auction, price, bidder, b_date_time ",
-            "FROM bid ",
-            "JOIN ( ",
-            "    SELECT MAX(price) AS maxprice ",
-            "    FROM bid ",
-            ") AS B1 ",
-            "ON price = maxprice;"
-        )],
-        8 => vec![concat!(
-            "SELECT p_id, name ",
-            "FROM ( ",
-            "  SELECT p_id, name FROM person ",
-            "  GROUP BY p_id, name ",
-            ") AS P ",
-            "JOIN ( ",
-            "  SELECT seller FROM auction ",
-            "  GROUP BY seller ",
-            ") AS A ",
-            "ON p_id = seller; "
-        )],
-        9 => vec![concat!(
-            "SELECT auction, bidder, price, b_date_time ",
-            "FROM bid ",
-            "JOIN ( ",
-            "  SELECT a_id as id, MAX(price) AS final ",
-            "  FROM auction INNER JOIN bid on a_id = auction ",
-            "  WHERE b_date_time BETWEEN a_date_time AND expires ",
-            "  GROUP BY a_id ",
-            ") ON auction = id and price = final;"
-        )],
+fn nexmark_query(query_number: usize) -> Vec<String> {
+    match query_number {
+        0 => vec![include_str!("query/q0.sql")],
+        1 => vec![include_str!("query/q1.sql")],
+        2 => vec![include_str!("query/q2.sql")],
+        3 => vec![include_str!("query/q3.sql")],
+        4 => vec![include_str!("query/q4.sql")],
+        5 => vec![include_str!("query/q5.sql")],
+        6 => include_str!("query/q6.sql")
+            .split(";")
+            .map(|s| s.trim())
+            .collect(),
+        7 => vec![include_str!("query/q7.sql")],
+        8 => vec![include_str!("query/q8.sql")],
+        9 => vec![include_str!("query/q9.sql")],
         _ => unreachable!(),
     }
     .into_iter()
     .map(String::from)
     .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use arrow::util::pretty::pretty_format_batches;
+
+    #[tokio::test]
+    async fn nexmark_sql_queries() -> Result<()> {
+        let opt = NexmarkBenchmarkOpt {
+            generators: 1,
+            seconds: 5,
+            events_per_second: 10_000,
+            ..Default::default()
+        };
+        let conf = create_nexmark_source(&opt);
+        let event = Arc::new(conf.generate_data()?)
+            .select(1, 0)
+            .expect("Failed to select event.");
+
+        let sqls = vec![
+            nexmark_query(2),
+            nexmark_query(3),
+            nexmark_query(4),
+            nexmark_query(5),
+            nexmark_query(6),
+            nexmark_query(7),
+            nexmark_query(8),
+            nexmark_query(9),
+        ];
+        let mut ctx = register_nexmark_tables().await?;
+        for sql in sqls {
+            let plan = physical_plan(&mut ctx, &sql[0])?;
+            let mut flock_ctx = ExecutionContext {
+                plan,
+                ..Default::default()
+            };
+
+            flock_ctx.feed_data_sources(&vec![
+                vec![NexMarkSource::to_batch(&event.bids, BID.clone())],
+                vec![NexMarkSource::to_batch(&event.persons, PERSON.clone())],
+                vec![NexMarkSource::to_batch(&event.auctions, AUCTION.clone())],
+            ]);
+
+            let output = flock_ctx.execute().await?;
+            println!("{}", pretty_format_batches(&output)?);
+        }
+        Ok(())
+    }
 }

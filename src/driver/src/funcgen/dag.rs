@@ -34,9 +34,9 @@ use std::sync::Arc;
 /// while a request is still being processed, another instance is allocated,
 /// which increases the function's concurrency.
 /// cloud function with concurrency = 1
-pub const CONCURRENCY_1: u8 = 1;
+pub const CONCURRENCY_1: usize = 1;
 /// cloud function with concurrency = 8
-pub const CONCURRENCY_8: u8 = 8;
+pub const CONCURRENCY_8: usize = 8;
 
 type DagEdge = ();
 type DagPlan = Dag<DagNode, DagEdge>;
@@ -47,7 +47,7 @@ pub struct DagNode {
     /// Subplan of the query statement.
     pub plan:        Arc<dyn ExecutionPlan>,
     /// Function concurrency in cloud environment.
-    pub concurrency: u8,
+    pub concurrency: usize,
 }
 
 impl DagNode {
@@ -196,7 +196,7 @@ impl QueryDag {
     }
 
     /// Add a new node to the `QueryDag`.
-    fn insert(&mut self, parent: NodeIndex, node: Value, concurrency: u8) -> Result<NodeIndex> {
+    fn insert(&mut self, parent: NodeIndex, node: Value, concurrency: usize) -> Result<NodeIndex> {
         if parent == NodeIndex::end() {
             Ok(self.add_node(DagNode {
                 plan: serde_json::from_value(node)?,
