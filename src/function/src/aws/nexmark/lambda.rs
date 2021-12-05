@@ -13,11 +13,11 @@
 // Only bring in dependencies for the repl when the cli feature is enabled.
 
 //! The generic lambda function for sub-plan execution on AWS Lambda.
-use chrono::Utc;
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use arrow::util::pretty::pretty_format_batches;
 use bytes::Bytes;
+use chrono::Utc;
 use datafusion::physical_plan::Partitioning;
 use futures::executor::block_on;
 use lambda_runtime::{handler_fn, Context};
@@ -236,10 +236,6 @@ async fn payload_handler(
 
     let output = collect(ctx, input_partitions).await?;
 
-    if ctx.debug {
-        println!("{}", pretty_format_batches(&output)?);
-    }
-
     if ctx.next != CloudFunction::None {
         let mut batches = LambdaExecutor::coalesce_batches(
             vec![output],
@@ -341,15 +337,22 @@ async fn collect(
 ) -> Result<Vec<RecordBatch>> {
     let r1 = LambdaExecutor::repartition(partitions.0, Partitioning::RoundRobinBatch(*PARALLELISM))
         .await?;
-    let r2 = LambdaExecutor::repartition(partitions.1, Partitioning::RoundRobinBatch(*PARALLELISM))
-        .await?;
-    // feed the data to the dataflow graph
-    ctx.feed_two_source(&r1, &r2);
+
+    // check partitions.1 is empty
+    if partitions.1.iter().map(|v| v.len()).sum::<usize>() == 0 {
+        ctx.feed_one_source(&r1);
+    } else {
+        let r2 =
+            LambdaExecutor::repartition(partitions.1, Partitioning::RoundRobinBatch(*PARALLELISM))
+                .await?;
+        ctx.feed_two_source(&r1, &r2);
+    }
+
     // query execution
     let output = ctx.execute().await?;
 
     if ctx.debug {
-        println!("{}", pretty_format_batches(&output).unwrap());
+        println!("{}", pretty_format_batches(&output)?);
         unsafe {
             INVOCATION_COUNTER_PER_INSTANCE += 1;
             info!("# invocations: {}", INVOCATION_COUNTER_PER_INSTANCE);
