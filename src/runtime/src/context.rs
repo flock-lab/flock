@@ -50,9 +50,9 @@ pub enum CloudFunction {
     /// Function type: parititioned computation
     /// The next function name with concurrency > 1.
     ///
-    /// If the next call type is `Solo`, then the name it contains is the lambda
-    /// function.
-    Solo(CloudFunctionName),
+    /// If the next call type is `Lambda`, then the name it contains is the
+    /// lambda function.
+    Lambda(CloudFunctionName),
     /// Function type: aggregate computation
     /// The next function name with concurrency = 1. To cope with the speed
     /// and volume of data processed, the system creates a function group that
@@ -60,14 +60,14 @@ pub enum CloudFunction {
     /// traffic increases dramatically, each query can call a function with
     /// the same code/binary but with different names to avoid delays.
     ///
-    /// If the next call type is `Chorus`, then the current function will pick
+    /// If the next call type is `Group`, then the current function will pick
     /// one of function names from the group as the next call according to a
     /// certain filtering strategy.
     ///
     /// The naming rule is:
     /// If the system picks `i` from the collection [0..`GroupSize`], then the
     /// next call is `CloudFunctionName`-`i`.
-    Chorus((CloudFunctionName, GroupSize)),
+    Group((CloudFunctionName, GroupSize)),
     /// There is no subsequent call to the cloud function at the end.
     /// TODO(gangliao): This function must include data sink operation.
     None,
@@ -273,7 +273,7 @@ mod tests {
         let plan = r#"{"execution_plan":"coalesce_batches_exec","input":{"execution_plan":"memory_exec","schema":{"fields":[{"name":"c1","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c2","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c3","data_type":"Utf8","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"projection":null},"target_batch_size":16384}"#;
         let name = "hello".to_owned();
         let next =
-            CloudFunction::Solo("SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836Z".to_owned());
+            CloudFunction::Lambda("SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836Z".to_owned());
         let datasource = DataSource::Payload;
 
         let plan: Arc<dyn ExecutionPlan> = serde_json::from_str(&plan)?;

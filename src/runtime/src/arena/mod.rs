@@ -16,13 +16,11 @@
 //! the window data for stream processing.
 
 use crate::error::{FlockError, Result};
-use crate::payload::Uuid;
-use crate::transform::*;
+use crate::payload::{Payload, Uuid};
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use bitmap::Bitmap;
 use dashmap::DashMap;
-use serde_json::Value;
 use std::ops::{Deref, DerefMut};
 
 /// `DashMap` is a thread-safe hash map inside the lambda function that is used
@@ -42,25 +40,33 @@ pub struct Arena(DashMap<String, WindowSession>);
 /// contained in temporal windows is a common pattern in stream processing.
 #[derive(Debug)]
 pub struct WindowSession {
-    /// The number of data fragments in the payload.
+    /// The number of data fragments in the window.
     /// [`WindowSession::size`] equals to [`Uuid::seq_len`].
-    pub size:    usize,
-    /// Reassembled record batches in the temporal window.
-    pub batches: Vec<Vec<RecordBatch>>,
-    /// Bitmap indicating the existence of data fragments in the temporal
-    /// window.
-    pub bitmap:  Bitmap,
+    pub size:       usize,
+    /// Aggregate record batches for the first relation.
+    pub r1_records: Vec<Vec<RecordBatch>>,
+    /// Aggregate record batches for the second relation.
+    pub r2_records: Vec<Vec<RecordBatch>>,
+    /// Bitmap indicating the data existence in the window.
+    pub bitmap:     Bitmap,
 }
 
 impl WindowSession {
     /// Return the schema of data fragments in the temporal window.
-    pub fn schema(&self) -> Result<SchemaRef> {
-        if self.batches.is_empty() || self.batches[0].is_empty() {
+    pub fn schema(&self) -> Result<(SchemaRef, Option<SchemaRef>)> {
+        if self.r1_records.is_empty() || self.r1_records[0].is_empty() {
             return Err(FlockError::Internal(
                 "Record batches are empty.".to_string(),
             ));
         }
-        Ok(self.batches[0][0].schema())
+        if !self.r2_records.is_empty() && !self.r2_records[0].is_empty() {
+            Ok((self.r1_records[0][0].schema(), None))
+        } else {
+            Ok((
+                self.r1_records[0][0].schema(),
+                Some(self.r2_records[0][0].schema()),
+            ))
+        }
     }
 }
 
@@ -71,11 +77,11 @@ impl Arena {
     }
 
     /// Get the data fragments in the temporal window via the key.
-    pub fn batches(&mut self, tid: String) -> Vec<Vec<RecordBatch>> {
-        if let Some((_, v)) = (*self).remove(&tid) {
-            v.batches
+    pub fn batches(&mut self, tid: String) -> (Vec<Vec<RecordBatch>>, Vec<Vec<RecordBatch>>) {
+        if let Some((_, window)) = (*self).remove(&tid) {
+            (window.r1_records, window.r2_records)
         } else {
-            vec![]
+            (vec![], vec![])
         }
     }
 
@@ -89,27 +95,30 @@ impl Arena {
     /// * Return true if the window data collection is complete, otherwise
     ///   return false. Uuid is also returned no matter whether the window data
     ///   collection is complete.
-    pub fn reassemble(&mut self, event: Value) -> (bool, Uuid) {
+    pub fn reassemble(&mut self, event: Payload) -> (bool, Uuid) {
         let mut ready = false;
-        let (fragment, _, uuid) = to_batch(event);
+        let (r1, r2, uuid) = event.to_record_batch();
         match &mut (*self).get_mut(&uuid.tid) {
             Some(window) => {
                 assert!(uuid.seq_len == window.size);
                 if !window.bitmap.is_set(uuid.seq_num) {
-                    window.batches.push(fragment);
+                    window.r1_records.push(r1);
+                    window.r2_records.push(r2);
+                    assert!(window.r1_records.len() == window.r2_records.len());
                     window.bitmap.set(uuid.seq_num);
-                    ready = window.size == window.batches.len();
+                    ready = window.size == window.r1_records.len();
                 }
             }
             None => {
                 let mut window = WindowSession {
-                    size:    uuid.seq_len,
-                    batches: vec![fragment],
-                    bitmap:  Bitmap::new(uuid.seq_len),
+                    size:       uuid.seq_len,
+                    r1_records: vec![r1],
+                    r2_records: vec![r2],
+                    bitmap:     Bitmap::new(uuid.seq_len),
                 };
-
-                ready = window.size == 1;
+                // SEQ_NUM is used to indicate the data existence in the window via bitmap.
                 window.bitmap.set(uuid.seq_num);
+                ready = window.size == 1;
                 (*self).insert(uuid.tid.clone(), window);
             }
         }
@@ -134,9 +143,9 @@ impl DerefMut for Arena {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::encoding::Encoding;
     use crate::error::Result;
     use crate::payload::UuidBuilder;
+    use crate::transform::to_payload;
     use arrow::csv;
     use arrow::datatypes::{DataType, Field, Schema};
 
@@ -178,8 +187,8 @@ mod tests {
 
         let mut arena = Arena::new();
         batches.into_iter().enumerate().for_each(|(i, batch)| {
-            let value = to_value(&[batch], uuids.get(i), Encoding::default());
-            let (ready, _) = arena.reassemble(value);
+            let payload = to_payload(&[batch], &vec![], uuids.get(i));
+            let (ready, _) = arena.reassemble(payload);
             if i < 7 {
                 assert_eq!(false, ready);
             } else {
@@ -192,12 +201,12 @@ mod tests {
 
         if let Some(window) = (*arena).get(&tid) {
             assert_eq!(8, window.size);
-            assert_eq!(8, window.batches.len());
+            assert_eq!(8, window.r1_records.len());
             (0..8).for_each(|i| assert_eq!(true, window.bitmap.is_set(i)));
         }
 
-        assert_eq!(8, arena.batches(tid).len());
-        assert_eq!(0, arena.batches("no exists".to_string()).len());
+        assert_eq!(8, arena.batches(tid).0.len());
+        assert_eq!(0, arena.batches("no exists".to_string()).0.len());
 
         Ok(())
     }

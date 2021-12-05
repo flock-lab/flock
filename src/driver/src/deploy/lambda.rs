@@ -136,6 +136,10 @@ pub fn environment(ctx: &ExecutionContext) -> Option<Environment> {
         (&globals["lambda"]["name"]).to_owned(),
         ctx.marshal(Encoding::Zstd),
     );
+    // Enable crate `env_logger`
+    // https://docs.rs/env_logger/latest/env_logger/
+    map.insert("RUST_LOG".to_owned(), "info".to_owned());
+    map.insert("RUST_BACKTRACE".to_owned(), "1".to_owned());
     Some(Environment {
         variables: Some(map),
     })
@@ -153,15 +157,15 @@ pub fn environment(ctx: &ExecutionContext) -> Option<Environment> {
 /// specify only the function name, it is limited to 64 characters in length.
 ///
 /// - If the next call is `CloudFunction::None`, then the current lambda
-///   function's concurrency = 1 and its type is `CloudFunction::Chorus((name,
+///   function's concurrency = 1 and its type is `CloudFunction::Group((name,
 ///   group_size))`.
 ///
-/// - If the next call is `CloudFunction::Chorus(..)`, then the current lambda
+/// - If the next call is `CloudFunction::Group(..)`, then the current lambda
 ///   function's concurrency > 1 (default = 8) and its type is
-///   `CloudFunction::Solo(name)`.
+///   `CloudFunction::Lambda(name)`.
 ///
-/// - If the next call is `CloudFunction::Solo(..)`, then the current lambda
-///   function's concurrency = 1 and its type is `CloudFunction::Chorus((name,
+/// - If the next call is `CloudFunction::Lambda(..)`, then the current lambda
+///   function's concurrency = 1 and its type is `CloudFunction::Group((name,
 ///   group_size))`.
 pub fn function_name(ctx: &ExecutionContext) -> Vec<String> {
     if ctx.datasource != DataSource::Payload {
@@ -172,8 +176,8 @@ pub fn function_name(ctx: &ExecutionContext) -> Vec<String> {
         CloudFunction::None => (0..CONCURRENCY_8)
             .map(|idx| format!("{}-{}", ctx.name, idx))
             .collect(),
-        CloudFunction::Chorus(..) => vec![ctx.name.to_owned()],
-        CloudFunction::Solo(..) => (0..CONCURRENCY_8)
+        CloudFunction::Group(..) => vec![ctx.name.to_owned()],
+        CloudFunction::Lambda(..) => (0..CONCURRENCY_8)
             .map(|idx| format!("{}-{}", ctx.name, idx))
             .collect(),
     }

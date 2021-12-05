@@ -17,6 +17,7 @@
 //! passed to the next cloud function. [`Uuid`] represents a unique identifier
 //! of the payload for a given query at the specified time.
 
+use crate::datasource::DataSource;
 use crate::encoding::Encoding;
 use crate::transform::*;
 use arrow::datatypes::Schema;
@@ -43,9 +44,21 @@ impl UuidBuilder {
     /// Returns a new UuidBuilder.
     pub fn new(function_name: &str, len: usize) -> Self {
         let query_code: String;
-        let plan_inedx: String;
+        let plan_index: String;
         let timestamp: String;
-        scan!(function_name.bytes() => "{}-{}-{}", query_code, plan_inedx, timestamp);
+        scan!(function_name.bytes() => "{}-{}-{}", query_code, plan_index, timestamp);
+        Self {
+            tid: format!("{}-{}", query_code, timestamp),
+            pos: 0,
+            len,
+        }
+    }
+
+    /// Returns a new UuidBuilder.
+    pub fn new_with_ts(function_name: &str, timestamp: i64, len: usize) -> Self {
+        let query_code: String;
+        let plan_index: String;
+        scan!(function_name.bytes() => "{}-{}", query_code, plan_index);
         Self {
             tid: format!("{}-{}", query_code, timestamp),
             pos: 0,
@@ -122,19 +135,21 @@ pub struct DataFrame {
 #[derive(Default, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Payload {
     /// The record batches are encoded in the Arrow Flight Data format.
-    pub data:     Vec<DataFrame>,
+    pub data:       Vec<DataFrame>,
     /// The schema of the record batches in binary format.
-    pub schema:   Vec<u8>,
+    pub schema:     Vec<u8>,
     /// The record batches for the 2nd relation.
-    pub data2:    Vec<DataFrame>,
+    pub data2:      Vec<DataFrame>,
     /// The schema of the record batches for the 2nd relation.
-    pub schema2:  Vec<u8>,
+    pub schema2:    Vec<u8>,
     /// The UUID of the payload.
-    pub uuid:     Uuid,
+    pub uuid:       Uuid,
     /// The encoding and compression method.
     /// Note: using this value to guarantee the total size of payload doesn't
     /// exceed 256 KB due to the limitation of AWS Lambda's async invocation.
-    pub encoding: Encoding,
+    pub encoding:   Encoding,
+    /// Only used for the benchmarking purpose.
+    pub datasource: Option<DataSource>,
 }
 
 impl Payload {

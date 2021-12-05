@@ -187,10 +187,10 @@ impl LambdaExecutor {
     pub fn next_function(ctx: &ExecutionContext) -> Result<String> {
         let mut lambdas = match &ctx.next {
             CloudFunction::None => vec![],
-            CloudFunction::Chorus((name, num)) => {
+            CloudFunction::Group((name, num)) => {
                 (0..*num).map(|i| format!("{}-{}", name, i)).collect()
             }
-            CloudFunction::Solo(name) => vec![name.to_owned()],
+            CloudFunction::Lambda(name) => vec![name.to_owned()],
         };
 
         if lambdas.is_empty() {
@@ -404,7 +404,7 @@ mod tests {
         ctx = ExecutionContext {
             plan: plan.clone(),
             name: "test".to_string(),
-            next: CloudFunction::Solo("solo".to_string()),
+            next: CloudFunction::Lambda("solo".to_string()),
             datasource: DataSource::UnknownEvent,
             query_number: None,
             ..Default::default()
@@ -414,7 +414,7 @@ mod tests {
         ctx = ExecutionContext {
             plan: plan.clone(),
             name: "test".to_string(),
-            next: CloudFunction::Chorus(("chorus".to_string(), 24)),
+            next: CloudFunction::Group(("chorus".to_string(), 24)),
             datasource: DataSource::UnknownEvent,
             query_number: None,
             ..Default::default()
