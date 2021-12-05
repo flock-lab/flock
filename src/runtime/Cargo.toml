@@ -11,7 +11,7 @@ edition = "2018"
 arrow = { git = "https://github.com/flock-lab/arrow-rs", branch = "flock", features = [ "simd" ] }
 arrow-flight = { git = "https://github.com/flock-lab/arrow-rs", branch = "flock" }
 async-trait = "0.1.42"
-aws_lambda_events = "0.4"
+aws_lambda_events = "0.5"
 base64 = "0.13.0"
 blake2 = "0.9"
 bytes = "1.0.1"
