@@ -105,7 +105,7 @@ fn create_nexmark_source(opt: &NexmarkBenchmarkOpt) -> NexMarkSource {
         5 => StreamWindow::HoppingWindow((10, 5)),
         7..=8 => StreamWindow::TumblingWindow(Schedule::Seconds(10)),
         _ => unreachable!(),
-        };
+    };
     NexMarkSource::new(opt.seconds, opt.generators, opt.events_per_second, window)
 }
 
@@ -172,56 +172,6 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
         let response = task.await.expect("Lambda function execution failed.")?;
         info!("[OK] Received status from function. {:?}", response);
     }
-
-    // let events = Arc::new(nexmark.generate_data()?);
-    // info!("[OK] Generate nexmark events.");
-
-    // #[allow(unused_assignments)]
-    // let mut tasks = vec![];
-
-    // if let StreamWindow::ElementWise = nexmark.window {
-    //     tasks = iproduct!(0..opt.seconds, 0..opt.generators)
-    //         .map(|(t, g)| {
-    //             let e = events.clone();
-    //             let q = opt.query_number;
-    //             let f = function_name.clone();
-    //             tokio::spawn(async move {
-    //                 info!("[OK] Send nexmark event (time: {}, source: {}).", t,
-    // g);                 let u = UuidBuilder::new(&format!("q{}-00-{}", q,
-    // Utc::now().timestamp()), 1)                     .next();
-    //                 let p = serde_json::to_vec(&nexmark_event_to_payload(e, t, g,
-    // q, u)?)?.into();                 Ok(vec![invoke_lambda_function(f,
-    // Some(p)).await?])             })
-    //         })
-    //         // this collect *is needed* so that the join below can switch between
-    // tasks.         .collect::<Vec<tokio::task::
-    // JoinHandle<Result<Vec<InvocationResponse>>>>>(); } else {
-    //     set_lambda_concurrency(function_name.clone(), 1).await?;
-    //     tasks = (0..opt.generators)
-    //         .map(|g| {
-    //             let seconds = opt.seconds;
-    //             let e = events.clone();
-    //             let q = opt.query_number;
-    //             let f = function_name.clone();
-    //             tokio::spawn(async move {
-    //                 let mut response = vec![];
-    //                 for t in 0..seconds {
-    //                     info!("[OK] Send nexmark event (time: {}, source: {}).",
-    // t, g);                     let u =
-    //                         UuidBuilder::new(&format!("q{}-00-{}", q,
-    // Utc::now().timestamp()), 1)                             .next();
-    //                     let p =
-    //
-    // serde_json::to_vec(&nexmark_event_to_payload(e.clone(), t, g, q, u)?)?
-    //                             .into();
-    //                     response.push(invoke_lambda_function(f.clone(),
-    // Some(p)).await?);                 }
-    //                 Ok(response)
-    //             })
-    //         })
-    //         // this collect *is needed* so that the join below can switch between
-    // tasks.         .collect::<Vec<tokio::task::
-    // JoinHandle<Result<Vec<InvocationResponse>>>>>(); }
 
     Ok(())
 }
