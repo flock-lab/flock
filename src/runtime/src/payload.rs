@@ -131,7 +131,7 @@ pub struct DataFrame {
 
 /// `Payload` is the wire format of the function's payload passed between
 /// cloud functions.
-#[derive(Default, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Default, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Payload {
     /// The record batches are encoded in the Arrow Flight Data format.
     pub data:       Vec<DataFrame>,
