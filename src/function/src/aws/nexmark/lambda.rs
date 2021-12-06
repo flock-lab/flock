@@ -163,17 +163,17 @@ fn nexmark_event_to_payload(
     }
 
     match query_number {
-        0 | 1 | 2 => Ok(to_payload(
+        0 | 1 | 2 | 5 | 7 => Ok(to_payload(
             &NexMarkSource::to_batch(&event.bids, BID_SCHEMA.clone()),
             &vec![],
             uuid,
         )),
-        3 => Ok(to_payload(
+        3 | 8 => Ok(to_payload(
             &NexMarkSource::to_batch(&event.persons, PERSON_SCHEMA.clone()),
             &NexMarkSource::to_batch(&event.auctions, AUCTION_SCHEMA.clone()),
             uuid,
         )),
-        4 => Ok(to_payload(
+        4 | 6 | 9 => Ok(to_payload(
             &NexMarkSource::to_batch(&event.auctions, AUCTION_SCHEMA.clone()),
             &NexMarkSource::to_batch(&event.bids, BID_SCHEMA.clone()),
             uuid,
