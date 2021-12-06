@@ -210,7 +210,11 @@ async fn payload_handler(
     arena: &mut Arena,
     event: Payload,
 ) -> Result<Value> {
+    if ctx.debug {
+        println!("Receiving a data packet: {:?}", event.uuid);
+    }
     let tid = event.uuid.tid.clone();
+
     let input_partitions = {
         if match &ctx.next {
             CloudFunction::None | CloudFunction::Lambda(..) => true,
@@ -219,6 +223,9 @@ async fn payload_handler(
             // ressemble data packets to a single window.
             let (ready, uuid) = arena.reassemble(event);
             if ready {
+                if ctx.debug {
+                    println!("Received all data packets for the window: {:?}", uuid.tid);
+                }
                 arena.batches(uuid.tid)
             } else {
                 return Err(FlockError::Execution(
