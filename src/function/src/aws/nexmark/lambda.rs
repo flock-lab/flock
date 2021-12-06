@@ -12,6 +12,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 //! The generic lambda function for sub-plan execution on AWS Lambda.
+#![feature(get_mut_unchecked)]
+
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use arrow::util::pretty::pretty_format_batches;
@@ -19,6 +21,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use datafusion::physical_plan::Partitioning;
 use futures::executor::block_on;
+use hashring::HashRing;
 use lambda_runtime::{handler_fn, Context};
 use lazy_static::lazy_static;
 use log::{info, warn};
@@ -277,34 +280,112 @@ async fn nexmark_bench_handler(ctx: &ExecutionContext, payload: Payload) -> Resu
         println!("[OK] Generate nexmark events.");
     }
 
+    let next_function = match &ctx.next {
+        CloudFunction::Lambda(name) => (name.clone(), 1),
+        CloudFunction::Group((name, group_size)) => (name.clone(), group_size.clone()),
+        _ => unreachable!(),
+    };
+
     let tasks = match source.window {
         StreamWindow::TumblingWindow(Schedule::Seconds(_sec)) => {
             unimplemented!();
         }
-        StreamWindow::HoppingWindow((_window, _hop))
-        | StreamWindow::SlidingWindow((_window, _hop)) => {
+        StreamWindow::HoppingWindow((window_size, hop_size)) => {
+            assert!(sec >= window_size);
+
+            let mut tasks = vec![];
+            let mut window: Arc<Vec<Payload>> = Arc::new(vec![]);
+            let query_number = ctx.query_number.expect("query number is not set.");
+
+            for time in (0..sec).step_by(hop_size) {
+                if time + window_size > sec {
+                    break;
+                }
+
+                // Move the hopping window forward.
+                let mut start_pos = 0;
+                if !window.is_empty() {
+                    unsafe {
+                        window = Arc::new(
+                            Arc::get_mut_unchecked(&mut window)
+                                .drain(hop_size..)
+                                .collect(),
+                        );
+                    }
+                    start_pos = window_size - hop_size;
+                }
+
+                // Update the hopping window, and generate the next batch of data.
+                let mut uuid =
+                    UuidBuilder::new_with_ts(&next_function.0, Utc::now().timestamp(), window_size);
+                for t in time + start_pos..time + window_size {
+                    unsafe {
+                        Arc::get_mut_unchecked(&mut window).push(nexmark_event_to_payload(
+                            events.clone(),
+                            t,
+                            0, // generator id
+                            query_number,
+                            uuid.next(),
+                        )?);
+                    }
+                }
+
+                // Consistent hashing to distribute different window data to different
+                // functions.
+                let mut ring: HashRing<String> = HashRing::new();
+                for i in 0..next_function.1 {
+                    ring.add(format!("{}-{:02}", next_function.0, i));
+                }
+                let events = window.clone();
+
+                // Call the next stage of the dataflow graph.
+                if ctx.debug {
+                    println!(
+                        "[OK] Send nexmark events from a window (epoch: {}-{}).",
+                        time,
+                        time + window_size
+                    );
+                }
+                tasks.push(tokio::spawn(async move {
+                    let mut response = vec![];
+                    for t in time..time + window_size {
+                        response.push(
+                            invoke_lambda_function(
+                                ring.get(&uuid.tid).expect("hash ring failure.").to_string(),
+                                Some(serde_json::to_vec(&events[t - time])?.into()),
+                            )
+                            .await?,
+                        );
+                    }
+                    Ok(response)
+                }));
+            }
+            tasks
+        }
+        StreamWindow::SlidingWindow((_window, _hop)) => {
             unimplemented!();
         }
-        StreamWindow::ElementWise => (0..sec).map(|t| {
-            if ctx.debug {
-                println!("[OK] Send nexmark event (epoch: {}).", t);
-            }
-            let e = events.clone();
-            let q = ctx.query_number.expect("query number is not set.");
-            let f = match &ctx.next {
-                CloudFunction::Lambda(name) => name.clone(),
-                _ => unreachable!(),
-            };
-            tokio::spawn(async move {
-                let u = UuidBuilder::new_with_ts(&f, Utc::now().timestamp(), 1).next();
-                let p = serde_json::to_vec(&nexmark_event_to_payload(e, t, 0, q, u)?)?.into();
-                Ok(vec![invoke_lambda_function(f, Some(p)).await?])
+        StreamWindow::ElementWise => (0..sec)
+            .map(|t| {
+                if ctx.debug {
+                    println!("[OK] Send nexmark event (epoch: {}).", t);
+                }
+                let e = events.clone();
+                let q = ctx.query_number.expect("query number is not set.");
+                let f = match &ctx.next {
+                    CloudFunction::Lambda(name) => name.clone(),
+                    _ => unreachable!(),
+                };
+                tokio::spawn(async move {
+                    let u = UuidBuilder::new_with_ts(&f, Utc::now().timestamp(), 1).next();
+                    let p = serde_json::to_vec(&nexmark_event_to_payload(e, t, 0, q, u)?)?.into();
+                    Ok(vec![invoke_lambda_function(f, Some(p)).await?])
+                })
             })
-        }),
+            // this collect *is needed* so that the join below can switch between tasks.
+            .collect::<Vec<tokio::task::JoinHandle<Result<Vec<InvocationResponse>>>>>(),
         _ => unimplemented!(),
-    }
-    // this collect *is needed* so that the join below can switch between tasks.
-    .collect::<Vec<tokio::task::JoinHandle<Result<Vec<InvocationResponse>>>>>();
+    };
 
     for task in tasks {
         let res_vec = task.await.expect("Lambda function execution failed.")?;
