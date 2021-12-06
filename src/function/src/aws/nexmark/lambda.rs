@@ -331,18 +331,19 @@ async fn nexmark_bench_handler(ctx: &ExecutionContext, payload: Payload) -> Resu
                     )?);
                 }
 
-                // Call the next stage of the dataflow graph.
-                if ctx.debug {
-                    println!(
-                        "[OK] Send nexmark events from a window (epoch: {}-{}).",
-                        time,
-                        time + window_size
-                    );
-                }
-
                 // Distribute the window data to a single function execution environment.
                 let function_name = ring.get(&uuid.tid).expect("hash ring failure.").to_string();
                 let events = window.clone();
+
+                // Call the next stage of the dataflow graph.
+                if ctx.debug {
+                    println!(
+                        "[OK] Send nexmark events from a window (epoch: {}-{}) to function: {}.",
+                        time,
+                        time + window_size,
+                        function_name
+                    );
+                }
 
                 tasks.push(tokio::spawn(async move {
                     let mut response = vec![];
