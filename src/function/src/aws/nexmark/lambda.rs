@@ -163,17 +163,17 @@ fn nexmark_event_to_payload(
     }
 
     match query_number {
-        0 | 1 | 2 => Ok(to_payload(
+        0 | 1 | 2 | 5 | 7 => Ok(to_payload(
             &NexMarkSource::to_batch(&event.bids, BID_SCHEMA.clone()),
             &vec![],
             uuid,
         )),
-        3 => Ok(to_payload(
+        3 | 8 => Ok(to_payload(
             &NexMarkSource::to_batch(&event.persons, PERSON_SCHEMA.clone()),
             &NexMarkSource::to_batch(&event.auctions, AUCTION_SCHEMA.clone()),
             uuid,
         )),
-        4 => Ok(to_payload(
+        4 | 6 | 9 => Ok(to_payload(
             &NexMarkSource::to_batch(&event.auctions, AUCTION_SCHEMA.clone()),
             &NexMarkSource::to_batch(&event.bids, BID_SCHEMA.clone()),
             uuid,
@@ -210,7 +210,11 @@ async fn payload_handler(
     arena: &mut Arena,
     event: Payload,
 ) -> Result<Value> {
+    if ctx.debug {
+        println!("Receiving a data packet: {:?}", event.uuid);
+    }
     let tid = event.uuid.tid.clone();
+
     let input_partitions = {
         if match &ctx.next {
             CloudFunction::None | CloudFunction::Lambda(..) => true,
@@ -219,11 +223,16 @@ async fn payload_handler(
             // ressemble data packets to a single window.
             let (ready, uuid) = arena.reassemble(event);
             if ready {
+                if ctx.debug {
+                    println!("Received all data packets for the window: {:?}", uuid.tid);
+                }
                 arena.batches(uuid.tid)
             } else {
-                return Err(FlockError::Execution(
-                    "window data collection has not been completed.".to_string(),
-                ));
+                let response = format!("Window data collection has not been completed.");
+                if ctx.debug {
+                    println!("{}", response);
+                }
+                return Ok(json!({ "response": response }));
             }
         } else {
             // data packet is an individual event for the current function.
@@ -232,11 +241,7 @@ async fn payload_handler(
         }
     };
 
-    if input_partitions.0.is_empty() || input_partitions.0[0].is_empty() {
-        return Err(FlockError::Execution("payload data is empty.".to_string()));
-    }
-
-    let output = collect(ctx, input_partitions).await?;
+    let output = collect(ctx, input_partitions.0, input_partitions.1).await?;
 
     if ctx.next != CloudFunction::None {
         let mut batches = LambdaExecutor::coalesce_batches(
@@ -331,18 +336,19 @@ async fn nexmark_bench_handler(ctx: &ExecutionContext, payload: Payload) -> Resu
                     )?);
                 }
 
-                // Call the next stage of the dataflow graph.
-                if ctx.debug {
-                    println!(
-                        "[OK] Send nexmark events from a window (epoch: {}-{}).",
-                        time,
-                        time + window_size
-                    );
-                }
-
                 // Distribute the window data to a single function execution environment.
                 let function_name = ring.get(&uuid.tid).expect("hash ring failure.").to_string();
                 let events = window.clone();
+
+                // Call the next stage of the dataflow graph.
+                if ctx.debug {
+                    println!(
+                        "[OK] Send nexmark events from a window (epoch: {}-{}) to function: {}.",
+                        time,
+                        time + window_size,
+                        function_name
+                    );
+                }
 
                 tasks.push(tokio::spawn(async move {
                     let mut response = vec![];
@@ -419,33 +425,37 @@ async fn handler(event: Payload, _: Context) -> Result<Value> {
 
 async fn collect(
     ctx: &mut ExecutionContext,
-    partitions: (Vec<Vec<RecordBatch>>, Vec<Vec<RecordBatch>>),
+    r1_records: Vec<Vec<RecordBatch>>,
+    r2_records: Vec<Vec<RecordBatch>>,
 ) -> Result<Vec<RecordBatch>> {
-    let r1 = LambdaExecutor::repartition(partitions.0, Partitioning::RoundRobinBatch(*PARALLELISM))
-        .await?;
+    let mut inputs = vec![];
+    if !(r1_records.is_empty() || r1_records.iter().all(|r| r.is_empty())) {
+        inputs.push(
+            LambdaExecutor::repartition(r1_records, Partitioning::RoundRobinBatch(*PARALLELISM))
+                .await?,
+        );
+    }
+    if !(r2_records.is_empty() || r2_records.iter().all(|r| r.is_empty())) {
+        inputs.push(
+            LambdaExecutor::repartition(r2_records, Partitioning::RoundRobinBatch(*PARALLELISM))
+                .await?,
+        );
+    }
 
-    // check partitions.1 is empty
-    if partitions.1.iter().map(|v| v.len()).sum::<usize>() == 0 {
-        ctx.feed_one_source(&r1);
+    if inputs.is_empty() {
+        return Ok(vec![]);
     } else {
-        let r2 =
-            LambdaExecutor::repartition(partitions.1, Partitioning::RoundRobinBatch(*PARALLELISM))
-                .await?;
-        ctx.feed_two_source(&r1, &r2);
-    }
-
-    // query execution
-    let output = ctx.execute().await?;
-
-    if ctx.debug {
-        println!("{}", pretty_format_batches(&output)?);
-        unsafe {
-            INVOCATION_COUNTER_PER_INSTANCE += 1;
-            info!("# invocations: {}", INVOCATION_COUNTER_PER_INSTANCE);
+        ctx.feed_data_sources(&inputs);
+        let output = ctx.execute().await?;
+        if ctx.debug {
+            println!("{}", pretty_format_batches(&output)?);
+            unsafe {
+                INVOCATION_COUNTER_PER_INSTANCE += 1;
+                info!("# invocations: {}", INVOCATION_COUNTER_PER_INSTANCE);
+            }
         }
+        Ok(output)
     }
-
-    Ok(output)
 }
 
 #[tokio::main]
