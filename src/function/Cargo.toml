@@ -18,6 +18,8 @@ chrono = "0.4.19"
 datafusion = { git = "https://github.com/flock-lab/arrow-datafusion", branch = "flock" }
 env_logger = "^0.9"
 futures = "0.3.12"
+hashring = "0.2.0"
+
 itertools = "0.10.0"
 lambda_runtime = { git = "https://github.com/awslabs/aws-lambda-rust-runtime/", branch = "master" }
 lazy_static = "1.4"
@@ -30,7 +32,6 @@ rusoto_lambda = "0.47.0"
 serde_json = "1.0"
 snmalloc-rs = { version = "0.2", optional = true, features = [ "cache-friendly" ] }
 tokio = { version = "1.2", features = [ "macros", "io-util", "sync", "rt-multi-thread" ] }
-hashring = "0.2.0"
 
 [dev-dependencies]
 driver = { path = "../driver" }
@@ -42,7 +43,7 @@ test_utils = { path = "../test" }
 
 [[bin]]
 name = "nexmark_lambda"
-path = "src/aws/nexmark/lambda.rs"
+path = "src/aws/nexmark/main.rs"
 
 # [[bin]]
 # name = "hello"
