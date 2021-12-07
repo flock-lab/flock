@@ -19,7 +19,7 @@ Help() {
   # Display Help
   echo "Nexmark Benchmark Script for Flock"
   echo
-  echo "Syntax: fn_bech [-g|h|c]"
+  echo "Syntax: fn_bech [-g|h|c|r] [-q <query_id>] [-s <number_of_seconds>] [-e <events_per_second>] [-w <number_of_parallel_streams>]"
   echo "options:"
   echo "g     Print the GPL license notification."
   echo "h     Print this Help."
@@ -28,7 +28,7 @@ Help() {
   echo "q     NexMark Query Number [0-9]."
   echo "w     Number of NexMark Generators."
   echo "s     Seconds to run the benchmark."
-  echo "eps   Number of events per second."
+  echo "e     Number of events per second."
   echo
 }
 
