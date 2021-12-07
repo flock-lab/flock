@@ -117,6 +117,22 @@ while getopts "hgcrq:w:s:e:" option; do
   esac
 done
 
+# TODO(gangliao): millions of events on multiple timelines
+# We have not yet supported event fragmentation for each epoch.
+# The current epoch granularity is one second, but if the epoch
+# contains more than 3000 events, it will exceed the upper limit
+# of the Lambda function's payload. Therefore, we will support
+# epoch internal data fragmentation as soon as possible.
+if [ $events_per_second -gt 3000 ]; then
+  events_per_second=3000
+fi
+
+# Set the upper limit of the number of seconds to run the benchmark
+# to save cloud budget.
+if [ $seconds -gt 60 ]; then
+  seconds=60
+fi
+
 if [ "$run" = "true" ]; then
   echo "============================================================"
   echo "                  Running the benchmark                     "
