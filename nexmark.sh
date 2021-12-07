@@ -19,16 +19,16 @@ Help() {
   # Display Help
   echo "Nexmark Benchmark Script for Flock"
   echo
-  echo "Syntax: fn_bech [-g|h|c]"
+  echo "Syntax: fn_bech [-g|h|c|r] [-q <query_id>] [-s <number_of_seconds>] [-e <events_per_second>] [-p <number_of_parallel_streams>]"
   echo "options:"
   echo "g     Print the GPL license notification."
   echo "h     Print this Help."
   echo "c     Compile and deploy the benchmark."
   echo "r     Run the benchmark."
   echo "q     NexMark Query Number [0-9]."
-  echo "w     Number of NexMark Generators."
+  echo "p     Number of NexMark Generators."
   echo "s     Seconds to run the benchmark."
-  echo "eps   Number of events per second."
+  echo "e     Number of events per second."
   echo
 }
 
@@ -99,7 +99,7 @@ while getopts "hgcrq:w:s:e:" option; do
   q) # set the query number
     query=$OPTARG
     ;;
-  w) # set the number of generators
+  p) # set the number of generators
     generators=$OPTARG
     ;;
   s) # set the number of seconds to run the benchmark
