@@ -84,7 +84,7 @@ macro_rules! init_exec_context {
                         CloudFunction::Group((name, group_size)) => {
                             (name.clone(), group_size.clone())
                         }
-                        _ => unreachable!(),
+                        CloudFunction::None => (String::new(), 0),
                     };
 
                     // The *consistent hash* technique distributes the data packets in a time window
@@ -92,9 +92,9 @@ macro_rules! init_exec_context {
                     // function group has a concurrency of *1*, all data packets from the same query
                     // can be routed to the same function execution environment.
                     let mut ring: HashRing<String> = HashRing::new();
-                    if (next_function.1 as usize) == 1 {
+                    if next_function.1 == 1 {
                         ring.add(next_function.0.clone());
-                    } else {
+                    } else if next_function.1 > 1 {
                         for i in 0..next_function.1 {
                             ring.add(format!("{}-{:02}", next_function.0, i));
                         }

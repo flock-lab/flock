@@ -156,7 +156,6 @@ fn rgb(freq: f64, spread: f64, i: f64) -> (u8, u8, u8) {
 
 /// Puts a lambda function code to AWS S3.
 pub fn put_object_to_s3(bucket: &str, key: &str, obj_path: &str) -> Result<(), Error> {
-    rainbow_println("[UPLOAD] ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒... ... ... ...");
     // compress lambda function code to bootstrap.zip
     let fname = Path::new(obj_path).parent().unwrap().join("bootstrap.zip");
     let w = std::fs::File::create(&fname)?;

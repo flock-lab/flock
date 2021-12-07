@@ -95,7 +95,7 @@ For example, you can use `flock-cli` in response to the uploading, updating, or 
         `--.``-/:`  
             .:-`  
 
-Flock: Serverless SQL Query Engine for Real-Time and Batch Analytics (https://github.com/flock-lab/flock)
+Flock: A Practical Serverless Streaming SQL Query Engine (https://github.com/flock-lab/flock)
 
 Copyright (c) 2020-present, UMD Data System Group.
 
@@ -105,8 +105,6 @@ Copyright (c) 2020-present, UMD Data System Group.
          Upload function code to S3  
 ============================================
 
-
-[UPLOAD] ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒... ... ... ...
 [OK] Upload Succeed.
 ```
 </details>
