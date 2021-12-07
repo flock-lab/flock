@@ -12,14 +12,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+source scripts/rainbow.sh
+
 ############################################################
 # Help                                                     #
 ############################################################
 Help() {
   # Display Help
-  echo "Nexmark Benchmark Script for Flock"
+  echo $(echogreen "Nexmark Benchmark Script for Flock")
   echo
-  echo "Syntax: fn_bech [-g|h|c|r] [-q <query_id>] [-s <number_of_seconds>] [-e <events_per_second>] [-p <number_of_parallel_streams>]"
+  echo "Syntax: nexmark [-g|-h|-c|-r -q <query_id>] [-s <number_of_seconds>] [-e <events_per_second>] [-p <number_of_parallel_streams>]"
   echo "options:"
   echo "g     Print the GPL license notification."
   echo "h     Print this Help."
@@ -59,7 +61,10 @@ AGPLV3() {
 ############################################################
 Nexmark() {
   # Compile and Deploy
-  echo "Nexmark Benchmark Script"
+  echo $(echogreen "============================================================")
+  echo $(echogreen "         Compiling and Deploying Nexmark Benchmark          ")
+  echo $(echogreen "============================================================")
+  echo
   cd src/function
   cargo +nightly build --target x86_64-unknown-linux-gnu --release
   cd ../../bench
@@ -67,7 +72,10 @@ Nexmark() {
   cd ../target/x86_64-unknown-linux-gnu/release
   ./flock-cli -u nexmark_lambda -k nexmark
   cd ../../..
-  echo "Nexmark Benchmark Script Complete"
+  echo $(echoblue "-------------------------------------------------------------")
+  echo
+  echo $(echogreen "Nexmark Benchmark Script Complete")
+  echo
 }
 
 ############################################################
@@ -78,6 +86,7 @@ generators=1
 events_per_second=1000
 seconds=10
 query=5
+flock=$(<src/bin/cli/src/flock.txt)
 # Get the options
 while getopts "hgcrq:w:s:e:" option; do
   case $option in
@@ -109,7 +118,7 @@ while getopts "hgcrq:w:s:e:" option; do
     events_per_second=$OPTARG
     ;;
   \?) # Invalid option
-    echo "Error: Invalid option"
+    echo $(echored "Error: Invalid option")
     echo
     Help
     exit
@@ -130,44 +139,53 @@ fi
 # Set the upper limit of the number of seconds to run the benchmark
 # to save cloud budget.
 if [ $seconds -gt 60 ]; then
+  echo $(echopurple "Warning: '-s $seconds' seconds is too long, set to 60 seconds automatically.")
+  echo
   seconds=60
 fi
 
+if [ $query -gt 9 ]; then
+  echo $(echored "Error: Query number must be between 0 and 9.")
+  exit
+fi
+
 if [ "$run" = "true" ]; then
-  echo "============================================================"
-  echo "                  Running the benchmark                     "
-  echo "============================================================"
+  echo "$flock"
+  echo
+  echo $(echogreen "============================================================")
+  echo $(echogreen "                  Running the benchmark                     ")
+  echo $(echogreen "============================================================")
   echo "Nexmark Query Number: $query"
   echo "Nexmark Generators: $generators"
   echo "Nexmark Events Per Second: $events_per_second"
   echo "Nexmark Seconds to Run: $seconds"
-  echo "============================================================"
+  echo $(echogreen "============================================================")
   echo
-  echo "Nexmark Benchmark Starting"
+  echo $(echogreen "Nexmark Benchmark Starting")
   echo
 
   # delete the old nexmark_datasource function to make sure we have a clean slate
   aws lambda delete-function --function-name nexmark_datasource
 
   # dry run to warm up the lambda functions.
-  echo "[1] Warming up the lambda functions"
+  echo $(echogreen "[1] Warming up the lambda functions")
   echo
   RUST_LOG=info ./target/x86_64-unknown-linux-gnu/release/nexmark_bench \
     -q $query -g $generators -s $seconds --events_per_second $events_per_second --debug
-  echo "-------------------------------------------------------------"
+  echo $(echoblue "-------------------------------------------------------------")
   echo
   sleep 5
 
   # run the benchmark
-  echo "[2] Running the benchmark"
+  echo $(echogreen "[2] Running the benchmark")
   echo
   RUST_LOG=info ./target/x86_64-unknown-linux-gnu/release/nexmark_bench \
     -q $query -g $generators -s $seconds --events_per_second $events_per_second --debug
-  echo "-------------------------------------------------------------"
+  echo $(echoblue "-------------------------------------------------------------")
   echo
-  echo "Nexmark Benchmark Complete"
+  echo $(echogreen "Nexmark Benchmark Complete")
 elif [ "$run" = "false" ]; then
-  echo "Error: Incomplete Command Line Arguments"
   echo
-  Help
+  echo $(echored "Error: incomplete command line arguments, please use '-h' for help.")
+  echo
 fi
