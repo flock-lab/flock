@@ -27,7 +27,7 @@ mod tests {
     use std::sync::Arc;
 
     #[tokio::test]
-    async fn local_query_6_1() -> Result<()> {
+    async fn local_query_6_v2() -> Result<()> {
         // benchmark configuration
         let seconds = 2;
         let threads = 1;
