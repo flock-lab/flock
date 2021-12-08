@@ -23,6 +23,7 @@ mod tests {
     use crate::query::StreamWindow;
     use datafusion::datasource::MemTable;
     use datafusion::physical_plan::collect;
+    use indoc::indoc;
     use std::sync::Arc;
 
     #[tokio::test]
@@ -41,18 +42,19 @@ mod tests {
         // data source generation
         let events = nex.generate_data()?;
 
-        let sql = concat!(
-            "SELECT ",
-            "    category, ",
-            "    AVG(final) ",
-            "FROM ( ",
-            "    SELECT MAX(price) AS final, category ",
-            "    FROM auction INNER JOIN bid on a_id = auction ",
-            "    WHERE b_date_time BETWEEN a_date_time AND expires ",
-            "    GROUP BY a_id, category ",
-            ") as Q ",
-            "GROUP BY category;"
-        );
+        let sql = indoc! {"
+            SELECT  category,
+                    Avg(final)
+            FROM   (SELECT Max(price) AS final,
+                            category
+                    FROM   auction
+                            INNER JOIN bid
+                                    ON a_id = auction
+                    WHERE  b_date_time BETWEEN a_date_time AND expires
+                    GROUP  BY a_id,
+                            category) AS Q
+            GROUP  BY category;
+        "};
 
         let auction_schema = Arc::new(Auction::schema());
         let bid_schema = Arc::new(Bid::schema());

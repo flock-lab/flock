@@ -23,6 +23,7 @@ mod tests {
     use crate::query::{Schedule, StreamWindow};
     use datafusion::datasource::MemTable;
     use datafusion::physical_plan::collect;
+    use indoc::indoc;
     use std::sync::Arc;
 
     #[tokio::test]
@@ -41,18 +42,19 @@ mod tests {
         // data source generation
         let events = nex.generate_data()?;
 
-        let sql = concat!(
-            "SELECT p_id, name ",
-            "FROM ( ",
-            "  SELECT p_id, name FROM person ",
-            "  GROUP BY p_id, name ",
-            ") AS P ",
-            "JOIN ( ",
-            "  SELECT seller FROM auction ",
-            "  GROUP BY seller ",
-            ") AS A ",
-            "ON p_id = seller; "
-        );
+        let sql = indoc! {"
+            SELECT  p_id,
+                    name
+            FROM   (SELECT p_id,
+                           name
+                    FROM   person
+                    GROUP  BY p_id,
+                              name) AS P
+                    JOIN (SELECT seller
+                          FROM   auction
+                          GROUP  BY seller) AS A
+                      ON p_id = seller;
+        "};
 
         let auction_schema = Arc::new(Auction::schema());
         let person_schema = Arc::new(Person::schema());

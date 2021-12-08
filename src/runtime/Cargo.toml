@@ -18,6 +18,8 @@ bytes = "1.0.1"
 dashmap = "4.0.2"
 datafusion = { git = "https://github.com/flock-lab/arrow-datafusion", branch = "flock" }
 futures = "0.3.12"
+indoc = "1.0.3"
+
 json = "0.12.4"
 lazy_static = "1.4"
 log = "0.4.14"

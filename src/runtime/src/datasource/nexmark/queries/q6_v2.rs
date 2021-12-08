@@ -27,7 +27,7 @@ mod tests {
     use std::sync::Arc;
 
     #[tokio::test]
-    async fn local_query_9() -> Result<()> {
+    async fn local_query_6_1() -> Result<()> {
         // benchmark configuration
         let seconds = 2;
         let threads = 1;
@@ -43,20 +43,25 @@ mod tests {
         let events = nex.generate_data()?;
 
         let sql = indoc! {"
-        SELECT  auction,
-                bidder,
-                price,
-                b_date_time
-        FROM    bid
-                JOIN (SELECT a_id       AS id,
-                             Max(price) AS final
-                      FROM   auction
-                             INNER JOIN bid
-                                     ON a_id = auction
-                      WHERE  b_date_time BETWEEN a_date_time AND expires
-                      GROUP  BY a_id)
-                  ON auction = id
-                    AND price = final;
+            SELECT seller,
+                   Avg(final)
+            FROM   (SELECT ROW_NUMBER()
+                            OVER (
+                                PARTITION BY seller
+                                ORDER BY date_time DESC) AS row,
+                            seller,
+                            final
+                    FROM   (SELECT  seller,
+                                    Max(price)       AS final,
+                                    Max(b_date_time) AS date_time
+                            FROM    auction
+                                    INNER JOIN bid
+                                            ON a_id = auction
+                            WHERE  b_date_time BETWEEN a_date_time AND expires
+                            GROUP  BY a_id,
+                                    seller) AS Q) AS R
+            WHERE  row <= 10
+            GROUP  BY seller;
         "};
 
         let auction_schema = Arc::new(Auction::schema());
@@ -82,11 +87,11 @@ mod tests {
             ctx.register_table("bid", Arc::new(bid_table))?;
 
             // optimize query plan and execute it
-            let physical_plan = physical_plan(&mut ctx, &sql)?;
-            let batches = collect(physical_plan).await?;
+            let plan = physical_plan(&mut ctx, &sql)?;
+            let output_partitions = collect(plan).await?;
 
             // show output
-            let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
+            let formatted = arrow::util::pretty::pretty_format_batches(&output_partitions).unwrap();
             println!("{}", formatted);
         }
 

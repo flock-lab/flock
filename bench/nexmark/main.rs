@@ -172,7 +172,7 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
     let nexmark_conf = create_nexmark_source(&opt);
 
     let mut ctx = register_nexmark_tables().await?;
-    let plan = physical_plan(&mut ctx, &nexmark_query(opt.query_number)[0])?;
+    let plan = physical_plan(&mut ctx, &nexmark_query(opt.query_number))?;
     create_nexmark_functions(opt.clone(), nexmark_conf.clone(), plan).await?;
 
     let tasks = (0..opt.generators)
@@ -287,26 +287,21 @@ async fn create_lambda_function(ctx: &ExecutionContext) -> Result<String> {
 }
 
 /// Returns Nextmark query strings based on the query number.
-fn nexmark_query(query_number: usize) -> Vec<String> {
+fn nexmark_query(query_number: usize) -> String {
     match query_number {
-        0 => vec![include_str!("query/q0.sql")],
-        1 => vec![include_str!("query/q1.sql")],
-        2 => vec![include_str!("query/q2.sql")],
-        3 => vec![include_str!("query/q3.sql")],
-        4 => vec![include_str!("query/q4.sql")],
-        5 => vec![include_str!("query/q5.sql")],
-        6 => include_str!("query/q6.sql")
-            .split(";")
-            .map(|s| s.trim())
-            .collect(),
-        7 => vec![include_str!("query/q7.sql")],
-        8 => vec![include_str!("query/q8.sql")],
-        9 => vec![include_str!("query/q9.sql")],
+        0 => include_str!("query/q0.sql"),
+        1 => include_str!("query/q1.sql"),
+        2 => include_str!("query/q2.sql"),
+        3 => include_str!("query/q3.sql"),
+        4 => include_str!("query/q4.sql"),
+        5 => include_str!("query/q5.sql"),
+        6 => include_str!("query/q6.sql"),
+        7 => include_str!("query/q7.sql"),
+        8 => include_str!("query/q8.sql"),
+        9 => include_str!("query/q9.sql"),
         _ => unreachable!(),
     }
-    .into_iter()
-    .map(String::from)
-    .collect()
+    .to_string()
 }
 
 #[cfg(test)]
@@ -339,7 +334,7 @@ mod tests {
         ];
         let mut ctx = register_nexmark_tables().await?;
         for sql in sqls {
-            let plan = physical_plan(&mut ctx, &sql[0])?;
+            let plan = physical_plan(&mut ctx, &sql)?;
             let mut flock_ctx = ExecutionContext {
                 plan,
                 ..Default::default()
