@@ -14,7 +14,7 @@
 //! The NexMark events: `Person`, `Auction`, and `Bid`.
 
 use crate::datasource::nexmark::config::NEXMarkConfig;
-use arrow::datatypes::{DataType, Field, Schema};
+use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
@@ -173,7 +173,11 @@ impl Person {
                 Field::new("credit_card", DataType::Utf8, false),
                 Field::new("city", DataType::Utf8, false),
                 Field::new("state", DataType::Utf8, false),
-                Field::new("p_date_time", DataType::Date64, false),
+                Field::new(
+                    "p_date_time",
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    false,
+                ),
             ],
             metadata,
         )
@@ -258,8 +262,16 @@ impl Auction {
                 Field::new("description", DataType::Utf8, false),
                 Field::new("initial_bid", DataType::Int32, false),
                 Field::new("reserve", DataType::Int32, false),
-                Field::new("a_date_time", DataType::Date64, false),
-                Field::new("expires", DataType::Date64, false),
+                Field::new(
+                    "a_date_time",
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    false,
+                ),
+                Field::new(
+                    "expires",
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    false,
+                ),
                 Field::new("seller", DataType::Int32, false),
                 Field::new("category", DataType::Int32, false),
             ],
@@ -364,7 +376,11 @@ impl Bid {
                 Field::new("auction", DataType::Int32, false),
                 Field::new("bidder", DataType::Int32, false),
                 Field::new("price", DataType::Int32, false),
-                Field::new("b_date_time", DataType::Date64, false),
+                Field::new(
+                    "b_date_time",
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    false,
+                ),
             ],
             metadata,
         )
