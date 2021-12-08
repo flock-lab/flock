@@ -23,6 +23,7 @@ mod tests {
     use crate::query::{Schedule, StreamWindow};
     use datafusion::datasource::MemTable;
     use datafusion::physical_plan::collect;
+    use indoc::indoc;
     use std::sync::Arc;
 
     #[tokio::test]
@@ -41,15 +42,16 @@ mod tests {
         // data source generation
         let events = nex.generate_data()?;
 
-        let sql = concat!(
-            "SELECT auction, price, bidder, b_date_time ",
-            "FROM bid ",
-            "JOIN ( ",
-            "    SELECT MAX(price) AS maxprice ",
-            "    FROM bid ",
-            ") AS B1 ",
-            "ON price = maxprice;"
-        );
+        let sql = indoc! {"
+            SELECT  auction,
+                    price,
+                    bidder,
+                    b_date_time
+            FROM    bid
+                    JOIN (SELECT Max(price) AS maxprice
+                          FROM   bid) AS B1
+                      ON price = maxprice;
+        "};
 
         let schema = Arc::new(Bid::schema());
         let window_size = match nex.window {

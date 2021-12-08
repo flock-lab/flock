@@ -21,16 +21,16 @@ Help() {
   # Display Help
   echo $(echogreen "Nexmark Benchmark Script for Flock")
   echo
-  echo "Syntax: nexmark [-g|-h|-c|-r -q <query_id>] [-s <number_of_seconds>] [-e <events_per_second>] [-p <number_of_parallel_streams>]"
+  echo "Syntax: nexmark [-g|-h|-c|-r [-q <query_id>] [-s <number_of_seconds>] [-e <events_per_second>] [-p <number_of_parallel_streams>]]"
   echo "options:"
   echo "g     Print the GPL license notification."
   echo "h     Print this Help."
   echo "c     Compile and deploy the benchmark."
   echo "r     Run the benchmark."
-  echo "q     NexMark Query Number [0-9]."
-  echo "p     Number of NexMark Generators."
-  echo "s     Seconds to run the benchmark."
-  echo "e     Number of events per second."
+  echo "q     NexMark Query Number [0-9]. Default: 5"
+  echo "p     Number of NexMark Generators. Default: 1"
+  echo "s     Seconds to run the benchmark. Default: 10"
+  echo "e     Number of events per second. Default: 1000"
   echo
 }
 
@@ -165,7 +165,7 @@ if [ "$run" = "true" ]; then
   echo
 
   # delete the old nexmark_datasource function to make sure we have a clean slate
-  aws lambda delete-function --function-name nexmark_datasource
+  aws lambda delete-function --function-name nexmark_datasource || true
 
   # dry run to warm up the lambda functions.
   echo $(echogreen "[1] Warming up the lambda functions")

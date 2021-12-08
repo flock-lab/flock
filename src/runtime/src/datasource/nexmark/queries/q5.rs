@@ -24,6 +24,7 @@ mod tests {
     use crate::query::StreamWindow;
     use datafusion::datasource::MemTable;
     use datafusion::physical_plan::collect;
+    use indoc::indoc;
     use std::sync::Arc;
 
     #[tokio::test]
@@ -46,29 +47,20 @@ mod tests {
         // data source generation
         let events = nex.generate_data()?;
 
-        let sql = concat!(
-            "SELECT auction, num ",
-            "FROM ( ",
-            "  SELECT ",
-            "    auction, ",
-            "    count(*) AS num ",
-            "  FROM bid ",
-            "  GROUP BY auction ",
-            ") AS AuctionBids ",
-            "INNER JOIN ( ",
-            "  SELECT ",
-            "    max(num) AS maxn ",
-            "  FROM ( ",
-            "    SELECT ",
-            "      auction, ",
-            "      count(*) AS num ",
-            "    FROM bid ",
-            "    GROUP BY ",
-            "      auction ",
-            "    ) AS CountBids ",
-            ") AS MaxBids ",
-            "ON num = maxn;"
-        );
+        let sql = indoc! {"
+            SELECT auction,
+                   num
+            FROM   (SELECT auction,
+                           Count(*) AS num
+                    FROM   bid
+                    GROUP  BY auction) AS AuctionBids
+                INNER JOIN (SELECT Max(num) AS maxn
+                            FROM   (SELECT auction,
+                                           Count(*) AS num
+                                    FROM   bid
+                                    GROUP  BY auction) AS CountBids) AS MaxBids
+                        ON num = maxn;
+        "};
 
         // let _sql = concat!(
         //     "SELECT auction, count(*) ",
