@@ -167,6 +167,7 @@ impl ExecutionContext {
         match self.plan.as_any().downcast_ref::<EmptyExec>() {
             Some(_) => {
                 if self.plan_s3_idx.is_some() {
+                    println!("Loading plan from S3 {:?}", self.plan_s3_idx);
                     let (bucket, key) = self.plan_s3_idx.as_ref().unwrap();
                     let s3 = S3Client::new(Region::default());
 
