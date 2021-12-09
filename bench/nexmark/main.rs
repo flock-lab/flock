@@ -117,7 +117,6 @@ fn create_nexmark_source(opt: &NexmarkBenchmarkOpt) -> NexMarkSource {
     };
     NexMarkSource::new(opt.seconds, opt.generators, opt.events_per_second, window)
 }
- 
 async fn plan_placement(
     query_number: usize,
     physcial_plan: Arc<dyn ExecutionPlan>,
@@ -135,8 +134,7 @@ async fn plan_placement(
                 .map_err(|e| FlockError::Internal(e.to_string()))?
                 .key_count
             {
-                Some(_) => {}
-                None => {
+                Some(0) => {
                     S3_CLIENT
                         .put_object(PutObjectRequest {
                             bucket: S3_NEXMARK_BUCKET.clone(),
@@ -147,6 +145,7 @@ async fn plan_placement(
                         .await
                         .map_err(|e| FlockError::Internal(e.to_string()))?;
                 }
+                _ => {}
             }
             Ok((
                 Arc::new(EmptyExec::new(false, Arc::new(Schema::empty()))),
