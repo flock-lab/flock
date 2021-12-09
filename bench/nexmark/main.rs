@@ -387,11 +387,13 @@ mod tests {
                 ..Default::default()
             };
 
-            flock_ctx.feed_data_sources(&vec![
-                vec![NexMarkSource::to_batch(&event.bids, BID.clone())],
-                vec![NexMarkSource::to_batch(&event.persons, PERSON.clone())],
-                vec![NexMarkSource::to_batch(&event.auctions, AUCTION.clone())],
-            ]);
+            flock_ctx
+                .feed_data_sources(&vec![
+                    vec![NexMarkSource::to_batch(&event.bids, BID.clone())],
+                    vec![NexMarkSource::to_batch(&event.persons, PERSON.clone())],
+                    vec![NexMarkSource::to_batch(&event.auctions, AUCTION.clone())],
+                ])
+                .await?;
 
             let output = flock_ctx.execute().await?;
             println!("{}", pretty_format_batches(&output)?);

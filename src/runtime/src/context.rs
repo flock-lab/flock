@@ -23,7 +23,6 @@ use datafusion::physical_plan::collect;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::ExecutionPlan;
-use futures::executor::block_on;
 use rusoto_core::Region;
 use rusoto_s3::GetObjectRequest;
 use rusoto_s3::{S3Client, S3};
@@ -132,13 +131,13 @@ pub struct ExecutionContext {
 impl Default for ExecutionContext {
     fn default() -> ExecutionContext {
         let ctx = ExecutionContext {
-            plan: Arc::new(EmptyExec::new(false, Arc::new(Schema::empty()))),
-            plan_s3_idx: None,
-            name: "".to_string(),
-            next: CloudFunction::None,
-            datasource: DataSource::default(),
+            plan:         Arc::new(EmptyExec::new(false, Arc::new(Schema::empty()))),
+            plan_s3_idx:  None,
+            name:         "".to_string(),
+            next:         CloudFunction::None,
+            datasource:   DataSource::default(),
             query_number: None,
-            debug: false,
+            debug:        false,
         };
         ctx
     }
@@ -243,11 +242,10 @@ impl ExecutionContext {
     }
 
     /// Feed one data source to the execution plan.
-    pub fn feed_one_source(&mut self, partitions: &Vec<Vec<RecordBatch>>) {
+    pub async fn feed_one_source(&mut self, partitions: &Vec<Vec<RecordBatch>>) -> Result<()> {
         // Breadth-first search
         let mut queue = VecDeque::new();
-        let plan = block_on(self.plan()).unwrap();
-        queue.push_front(plan.clone());
+        queue.push_front(self.plan().await?.clone());
 
         while !queue.is_empty() {
             let mut p = queue.pop_front().unwrap();
@@ -267,14 +265,19 @@ impl ExecutionContext {
                 .enumerate()
                 .for_each(|(i, _)| queue.push_back(p.children()[i].clone()));
         }
+
+        Ok(())
     }
 
     /// Feed two data sources to the execution plan like join two tables.
-    pub fn feed_two_source(&mut self, left: &Vec<Vec<RecordBatch>>, right: &Vec<Vec<RecordBatch>>) {
+    pub async fn feed_two_source(
+        &mut self,
+        left: &Vec<Vec<RecordBatch>>,
+        right: &Vec<Vec<RecordBatch>>,
+    ) -> Result<()> {
         // Breadth-first search
         let mut queue = VecDeque::new();
-        let plan = block_on(self.plan()).unwrap();
-        queue.push_front(plan.clone());
+        queue.push_front(self.plan().await?.clone());
 
         while !queue.is_empty() {
             let mut p = queue.pop_front().unwrap();
@@ -298,14 +301,15 @@ impl ExecutionContext {
                 .enumerate()
                 .for_each(|(i, _)| queue.push_back(p.children()[i].clone()));
         }
+
+        Ok(())
     }
 
     /// Feeds all data sources to the execution plan.
-    pub fn feed_data_sources(&mut self, sources: &Vec<Vec<Vec<RecordBatch>>>) {
+    pub async fn feed_data_sources(&mut self, sources: &Vec<Vec<Vec<RecordBatch>>>) -> Result<()> {
         // Breadth-first search
         let mut queue = VecDeque::new();
-        let plan = block_on(self.plan()).unwrap();
-        queue.push_front(plan.clone());
+        queue.push_front(self.plan().await?.clone());
 
         while !queue.is_empty() {
             let mut p = queue.pop_front().unwrap();
@@ -329,6 +333,8 @@ impl ExecutionContext {
                 .enumerate()
                 .for_each(|(i, _)| queue.push_back(p.children()[i].clone()));
         }
+
+        Ok(())
     }
 }
 
@@ -421,7 +427,7 @@ mod tests {
             query_number: None,
             ..Default::default()
         };
-        ctx.feed_one_source(&partitions);
+        ctx.feed_one_source(&partitions).await?;
 
         let batches = collect(ctx.plan.clone()).await?;
 
@@ -503,7 +509,7 @@ mod tests {
             query_number: None,
             ..Default::default()
         };
-        ctx.feed_two_source(&partitions1, &partitions2);
+        ctx.feed_two_source(&partitions1, &partitions2).await?;
 
         let batches = collect(ctx.plan.clone()).await?;
 

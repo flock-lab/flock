@@ -77,7 +77,7 @@ mod tests {
                                     price DESC)
                     WHERE   price_rank = 1)
             WHERE   time_rank <= 10
-            GROUP   BY seller 
+            GROUP   BY seller
         "};
 
         let auction_schema = Arc::new(Auction::schema());

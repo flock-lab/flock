@@ -62,7 +62,7 @@ pub async fn collect(
     if inputs.is_empty() {
         return Ok(vec![]);
     } else {
-        ctx.feed_data_sources(&inputs);
+        ctx.feed_data_sources(&inputs).await?;
         let output = ctx.execute().await?;
         if ctx.debug {
             println!("{}", pretty_format_batches(&output)?);
