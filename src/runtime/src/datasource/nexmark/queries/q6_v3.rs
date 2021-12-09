@@ -21,16 +21,9 @@ mod tests {
     use crate::error::Result;
     use crate::executor::plan::physical_plan;
     use crate::query::StreamWindow;
-    use arrow::array::UInt64Array;
-    use arrow::record_batch::RecordBatch;
     use datafusion::datasource::MemTable;
-    use datafusion::physical_plan::expressions::Column;
-    use datafusion::physical_plan::limit::truncate_batch;
-    use datafusion::physical_plan::memory::MemoryExec;
-    use datafusion::physical_plan::repartition::RepartitionExec;
-    use datafusion::physical_plan::{collect, collect_partitioned};
-    use datafusion::physical_plan::{ExecutionPlan, Partitioning};
-    use futures::stream::StreamExt;
+    use datafusion::physical_plan::collect;
+    use indoc::indoc;
     use std::sync::Arc;
 
     #[tokio::test]
@@ -49,35 +42,43 @@ mod tests {
         // data source generation
         let events = nex.generate_data()?;
 
-        /*
-        let sql = indoc! {"
-            SELECT seller, Avg(final)
-            FROM   (SELECT ROW_NUMBER() OVER ( PARTITION BY seller ORDER BY date_time DESC) AS row, seller, final
-                    FROM   (SELECT  seller, Max(price) AS final, Max(b_date_time) AS date_time
-                            FROM auction INNER JOIN bid ON a_id = auction
-                            WHERE  b_date_time BETWEEN a_date_time AND expires
-                            GROUP  BY a_id,
-                                    seller) AS Q) AS R
-            WHERE  row <= 10
-            GROUP  BY seller;
-        "};*/
+        // https://stackoverflow.com/questions/7747327/sql-rank-versus-row-number
 
-        let sql = concat!(
-            "select seller, avg(price) ",
-            "from ( ",
-                "select seller, price, b_date_time, rank() over (partition by seller order by b_date_time DESC) time_rank ",
-                "from ( ",
-                    "SELECT seller, a_id, price, b_date_time, rank() over (partition by a_id order by price DESC) price_rank ",
-                    "FROM auction INNER JOIN bid ON a_id = auction ",
-                    "WHERE b_date_time between a_date_time and expires ",
-                    "ORDER by a_id, price DESC ",
-                ") ",
-                "where price_rank = 1 ",
-            ") ",
-            "where time_rank <= 10 ",
-            "group by seller ",
-            "order by seller"
-        );
+        // ROW_NUMBER : Returns a unique number for each row starting with 1. For rows
+        // that have duplicate values, numbers are arbitarily assigned.
+
+        // Rank : Assigns a unique number for each row starting with 1, except for rows
+        // that have duplicate values, in which case the same ranking is assigned and a
+        // gap appears in the sequence for each duplicate ranking.
+
+        let sql = indoc! {"
+            SELECT  seller,
+                    Avg(price)
+            FROM   (SELECT  seller,
+                            price,
+                            b_date_time,
+                            ROW_NUMBER()
+                            OVER (
+                                partition BY seller
+                                ORDER BY b_date_time DESC) time_rank
+                    FROM   (SELECT  seller,
+                                    a_id,
+                                    price,
+                                    b_date_time,
+                                    ROW_NUMBER()
+                                    OVER (
+                                        partition BY a_id
+                                        ORDER BY price DESC) price_rank
+                            FROM    auction
+                                    INNER JOIN bid
+                                            ON a_id = auction
+                            WHERE   b_date_time BETWEEN a_date_time AND expires
+                            ORDER   BY a_id,
+                                    price DESC)
+                    WHERE   price_rank = 1)
+            WHERE   time_rank <= 10
+            GROUP   BY seller 
+        "};
 
         let auction_schema = Arc::new(Auction::schema());
         let bid_schema = Arc::new(Bid::schema());
