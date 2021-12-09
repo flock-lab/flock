@@ -31,7 +31,7 @@ rusoto_core = "0.47.0"
 rusoto_lambda = "0.47.0"
 serde_json = "1.0"
 snmalloc-rs = { version = "0.2", optional = true, features = [ "cache-friendly" ] }
-tokio = { version = "1.2", features = [ "macros", "io-util", "sync", "rt-multi-thread" ] }
+tokio = { version = "1.4", features = [ "macros", "io-util", "sync", "rt-multi-thread" ] }
 
 [dev-dependencies]
 driver = { path = "../driver" }

@@ -231,6 +231,7 @@ async fn nexmark_bench_handler(ctx: &ExecutionContext, payload: Payload) -> Resu
     let events = Arc::new(source.generate_data()?);
 
     if ctx.debug {
+        println!("Nexmark Benchmark: Query {:?}", ctx.query_number);
         println!("{:?}", source);
         println!("[OK] Generate nexmark events.");
     }

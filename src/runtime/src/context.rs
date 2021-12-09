@@ -23,13 +23,19 @@ use datafusion::physical_plan::collect;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::ExecutionPlan;
+use rusoto_core::Region;
+use rusoto_s3::GetObjectRequest;
+use rusoto_s3::{S3Client, S3};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::collections::VecDeque;
+use std::io::Read;
 use std::sync::Arc;
 
 type CloudFunctionName = String;
 type GroupSize = usize;
+type S3BUCKET = String;
+type S3KEY = String;
 
 /// Cloud environment context is a wrapper to support compression and
 /// serialization.
@@ -82,8 +88,12 @@ impl Default for CloudFunction {
 /// Lambda execution context.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ExecutionContext {
-    /// The physical sub-plan.
+    /// The execution plan of the lambda function.
     pub plan:         Arc<dyn ExecutionPlan>,
+    /// The S3 URL of the physical plan. If the plan is too large to be
+    /// serialized and stored in the environment variable, the system will
+    /// store the plan in S3.
+    pub plan_s3_idx:  Option<(S3BUCKET, S3KEY)>,
     /// Cloud Function name in the current execution context.
     ///
     /// |      Cloud Function Naming Convention       |
@@ -120,23 +130,27 @@ pub struct ExecutionContext {
 
 impl Default for ExecutionContext {
     fn default() -> ExecutionContext {
-        ExecutionContext {
+        let ctx = ExecutionContext {
             plan:         Arc::new(EmptyExec::new(false, Arc::new(Schema::empty()))),
-            name:         String::new(),
-            next:         CloudFunction::default(),
+            plan_s3_idx:  None,
+            name:         "".to_string(),
+            next:         CloudFunction::None,
             datasource:   DataSource::default(),
-            query_number: Some(0),
+            query_number: None,
             debug:        false,
-        }
+        };
+        ctx
     }
 }
 
 impl PartialEq for ExecutionContext {
     fn eq(&self, other: &ExecutionContext) -> bool {
-        self.name == other.name
+        self.plan_s3_idx == other.plan_s3_idx
+            && self.name == other.name
             && self.next == other.next
             && self.datasource == other.datasource
             && self.query_number == other.query_number
+            && self.debug == other.debug
             && serde_json::to_string(&self.plan).unwrap()
                 == serde_json::to_string(&other.plan).unwrap()
     }
@@ -144,15 +158,51 @@ impl PartialEq for ExecutionContext {
 
 impl ExecutionContext {
     /// Returns `plan` as a mutable reference.
-    pub fn plan(&mut self) -> &mut Arc<dyn ExecutionPlan> {
-        &mut self.plan
+    ///
+    /// if `self` is `EmptyExec`, the plan is not stored in the environment
+    /// variable. In this case, we need to load the plan from S3. If the
+    /// plan is already loaded, then we don't need to load it again.
+    pub async fn plan(&mut self) -> Result<&mut Arc<dyn ExecutionPlan>> {
+        match self.plan.as_any().downcast_ref::<EmptyExec>() {
+            Some(_) => {
+                if self.plan_s3_idx.is_some() {
+                    println!("Loading plan from S3 {:?}", self.plan_s3_idx);
+                    let (bucket, key) = self.plan_s3_idx.as_ref().unwrap();
+                    let s3 = S3Client::new(Region::default());
+                    let body = s3
+                        .get_object(GetObjectRequest {
+                            bucket: bucket.clone(),
+                            key: key.clone(),
+                            ..Default::default()
+                        })
+                        .await
+                        .map_err(|e| FlockError::Internal(e.to_string()))?
+                        .body
+                        .take()
+                        .expect("body is empty");
+
+                    self.plan = tokio::task::spawn_blocking(move || {
+                        let mut buf = Vec::new();
+                        body.into_blocking_read().read_to_end(&mut buf).unwrap();
+                        serde_json::from_slice(&buf).unwrap()
+                    })
+                    .await
+                    .expect("failed to load plan from S3");
+
+                    Ok(&mut self.plan)
+                } else {
+                    panic!("The query plan is not stored in the environment variable and S3.");
+                }
+            }
+            None => Ok(&mut self.plan),
+        }
     }
 
     /// Executes the physical plan.
     /// `execute` must be called after the execution of `feed_one_source` or
     /// `feed_two_source`.
     pub async fn execute(&mut self) -> Result<Vec<RecordBatch>> {
-        match collect(self.plan().clone()).await {
+        match collect(self.plan().await?.clone()).await {
             Ok(b) => Ok(b),
             Err(e) => Err(FlockError::Plan(format!(
                 "{}. Failed to execute the plan '{:?}'",
@@ -196,10 +246,10 @@ impl ExecutionContext {
     }
 
     /// Feed one data source to the execution plan.
-    pub fn feed_one_source(&mut self, partitions: &Vec<Vec<RecordBatch>>) {
+    pub async fn feed_one_source(&mut self, partitions: &Vec<Vec<RecordBatch>>) -> Result<()> {
         // Breadth-first search
         let mut queue = VecDeque::new();
-        queue.push_front(self.plan().clone());
+        queue.push_front(self.plan().await?.clone());
 
         while !queue.is_empty() {
             let mut p = queue.pop_front().unwrap();
@@ -219,13 +269,19 @@ impl ExecutionContext {
                 .enumerate()
                 .for_each(|(i, _)| queue.push_back(p.children()[i].clone()));
         }
+
+        Ok(())
     }
 
     /// Feed two data sources to the execution plan like join two tables.
-    pub fn feed_two_source(&mut self, left: &Vec<Vec<RecordBatch>>, right: &Vec<Vec<RecordBatch>>) {
+    pub async fn feed_two_source(
+        &mut self,
+        left: &Vec<Vec<RecordBatch>>,
+        right: &Vec<Vec<RecordBatch>>,
+    ) -> Result<()> {
         // Breadth-first search
         let mut queue = VecDeque::new();
-        queue.push_front(self.plan().clone());
+        queue.push_front(self.plan().await?.clone());
 
         while !queue.is_empty() {
             let mut p = queue.pop_front().unwrap();
@@ -249,13 +305,15 @@ impl ExecutionContext {
                 .enumerate()
                 .for_each(|(i, _)| queue.push_back(p.children()[i].clone()));
         }
+
+        Ok(())
     }
 
     /// Feeds all data sources to the execution plan.
-    pub fn feed_data_sources(&mut self, sources: &Vec<Vec<Vec<RecordBatch>>>) {
+    pub async fn feed_data_sources(&mut self, sources: &Vec<Vec<Vec<RecordBatch>>>) -> Result<()> {
         // Breadth-first search
         let mut queue = VecDeque::new();
-        queue.push_front(self.plan().clone());
+        queue.push_front(self.plan().await?.clone());
 
         while !queue.is_empty() {
             let mut p = queue.pop_front().unwrap();
@@ -279,6 +337,8 @@ impl ExecutionContext {
                 .enumerate()
                 .for_each(|(i, _)| queue.push_back(p.children()[i].clone()));
         }
+
+        Ok(())
     }
 }
 
@@ -371,7 +431,7 @@ mod tests {
             query_number: None,
             ..Default::default()
         };
-        ctx.feed_one_source(&partitions);
+        ctx.feed_one_source(&partitions).await?;
 
         let batches = collect(ctx.plan.clone()).await?;
 
@@ -453,7 +513,7 @@ mod tests {
             query_number: None,
             ..Default::default()
         };
-        ctx.feed_two_source(&partitions1, &partitions2);
+        ctx.feed_two_source(&partitions1, &partitions2).await?;
 
         let batches = collect(ctx.plan.clone()).await?;
 

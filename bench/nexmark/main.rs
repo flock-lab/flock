@@ -11,11 +11,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use arrow::datatypes::SchemaRef;
+use arrow::datatypes::{Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
 use bytes::Bytes;
 use datafusion::datasource::MemTable;
 use datafusion::execution::context::ExecutionContext as DataFusionExecutionContext;
+use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::ExecutionPlan;
 use driver::deploy::lambda;
 use lazy_static::lazy_static;
@@ -23,11 +24,12 @@ use log::info;
 use nexmark::event::{Auction, Bid, Person};
 use nexmark::NexMarkSource;
 use runtime::prelude::*;
-use rusoto_core::Region;
+use rusoto_core::{ByteStream, Region};
 use rusoto_lambda::{
     CreateFunctionRequest, FunctionCode, GetFunctionRequest, InvocationRequest, InvocationResponse,
     Lambda, LambdaClient, PutFunctionConcurrencyRequest, UpdateFunctionCodeRequest,
 };
+use rusoto_s3::{ListObjectsV2Request, PutObjectRequest, S3Client, S3};
 use std::sync::Arc;
 use structopt::StructOpt;
 use tokio::task::JoinHandle;
@@ -43,7 +45,11 @@ lazy_static! {
     static ref AUCTION: SchemaRef = Arc::new(Auction::schema());
     static ref BID: SchemaRef = Arc::new(Bid::schema());
     static ref LAMBDA_CLIENT: LambdaClient = LambdaClient::new(Region::default());
+    static ref S3_CLIENT: S3Client = S3Client::new(Region::default());
     static ref PARALLELISM: usize = globals["lambda"]["parallelism"].parse::<usize>().unwrap();
+    static ref S3_NEXMARK_BUCKET: String = globals["lambda"]["s3_bucket"].to_string();
+    static ref S3_NEXMARK_Q6_PLAN_KEY: String =
+        globals["lambda"]["s3_nexmark_q6_plan_key"].to_string();
 }
 
 #[derive(Default, Clone, Debug, StructOpt)]
@@ -111,6 +117,44 @@ fn create_nexmark_source(opt: &NexmarkBenchmarkOpt) -> NexMarkSource {
     };
     NexMarkSource::new(opt.seconds, opt.generators, opt.events_per_second, window)
 }
+async fn plan_placement(
+    query_number: usize,
+    physcial_plan: Arc<dyn ExecutionPlan>,
+) -> Result<(Arc<dyn ExecutionPlan>, Option<(String, String)>)> {
+    match query_number {
+        6 => {
+            match S3_CLIENT
+                .list_objects_v2(ListObjectsV2Request {
+                    bucket: S3_NEXMARK_BUCKET.clone(),
+                    prefix: Some(S3_NEXMARK_Q6_PLAN_KEY.clone()),
+                    max_keys: Some(1),
+                    ..Default::default()
+                })
+                .await
+                .map_err(|e| FlockError::Internal(e.to_string()))?
+                .key_count
+            {
+                Some(0) => {
+                    S3_CLIENT
+                        .put_object(PutObjectRequest {
+                            bucket: S3_NEXMARK_BUCKET.clone(),
+                            key: S3_NEXMARK_Q6_PLAN_KEY.clone(),
+                            body: Some(ByteStream::from(serde_json::to_vec(&physcial_plan)?)),
+                            ..Default::default()
+                        })
+                        .await
+                        .map_err(|e| FlockError::Internal(e.to_string()))?;
+                }
+                _ => {}
+            }
+            Ok((
+                Arc::new(EmptyExec::new(false, Arc::new(Schema::empty()))),
+                Some((S3_NEXMARK_BUCKET.clone(), S3_NEXMARK_Q6_PLAN_KEY.clone())),
+            ))
+        }
+        _ => Ok((physcial_plan, None)),
+    }
+}
 
 async fn create_nexmark_functions(
     opt: NexmarkBenchmarkOpt,
@@ -124,8 +168,10 @@ async fn create_nexmark_functions(
         next_func_name = CloudFunction::Group((worker_func_name.clone(), *PARALLELISM));
     };
 
+    let (plan, s3) = plan_placement(opt.query_number, physcial_plan).await?;
     let nexmark_source_ctx = ExecutionContext {
-        plan:         physcial_plan.clone(),
+        plan:         plan.clone(),
+        plan_s3_idx:  s3.clone(),
         name:         NEXMARK_SOURCE_FUNCTION_NAME.to_string(),
         next:         next_func_name.clone(),
         datasource:   DataSource::NexMarkEvent(NexMarkSource::default()),
@@ -134,7 +180,8 @@ async fn create_nexmark_functions(
     };
 
     let mut nexmark_worker_ctx = ExecutionContext {
-        plan:         physcial_plan,
+        plan:         plan,
+        plan_s3_idx:  s3.clone(),
         name:         worker_func_name.clone(),
         next:         CloudFunction::None,
         datasource:   DataSource::Payload,
@@ -340,11 +387,13 @@ mod tests {
                 ..Default::default()
             };
 
-            flock_ctx.feed_data_sources(&vec![
-                vec![NexMarkSource::to_batch(&event.bids, BID.clone())],
-                vec![NexMarkSource::to_batch(&event.persons, PERSON.clone())],
-                vec![NexMarkSource::to_batch(&event.auctions, AUCTION.clone())],
-            ]);
+            flock_ctx
+                .feed_data_sources(&vec![
+                    vec![NexMarkSource::to_batch(&event.bids, BID.clone())],
+                    vec![NexMarkSource::to_batch(&event.persons, PERSON.clone())],
+                    vec![NexMarkSource::to_batch(&event.auctions, AUCTION.clone())],
+                ])
+                .await?;
 
             let output = flock_ctx.execute().await?;
             println!("{}", pretty_format_batches(&output)?);

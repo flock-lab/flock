@@ -166,7 +166,8 @@ async fn source_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Valu
                         Partitioning::RoundRobinBatch(parallelism),
                     )
                     .await?,
-                );
+                )
+                .await?;
             } else if num_batches > 1 {
                 ctx.feed_one_source(
                     &LambdaExecutor::repartition(
@@ -174,11 +175,12 @@ async fn source_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Valu
                         Partitioning::RoundRobinBatch(num_batches),
                     )
                     .await?,
-                );
+                )
+                .await?;
             } else {
                 // only one batch exists
                 assert!(num_batches == 1);
-                ctx.feed_one_source(&output_partitions);
+                ctx.feed_one_source(&output_partitions).await?;
             }
 
             // query execution
@@ -234,7 +236,7 @@ async fn payload_handler(
     }
 
     // TODO(gangliao): repartition input batches to speedup the operations.
-    ctx.feed_one_source(&input_partitions);
+    ctx.feed_one_source(&input_partitions).await?;
     let output_partitions = ctx.execute().await?;
 
     if ctx.next != CloudFunction::None {
