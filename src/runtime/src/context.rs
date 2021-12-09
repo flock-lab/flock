@@ -131,10 +131,16 @@ pub struct ExecutionContext {
 
 impl Default for ExecutionContext {
     fn default() -> ExecutionContext {
-        ExecutionContext {
+        let ctx = ExecutionContext {
             plan: Arc::new(EmptyExec::new(false, Arc::new(Schema::empty()))),
-            ..Default::default()
-        }
+            plan_s3_idx: None,
+            name: "".to_string(),
+            next: CloudFunction::None,
+            datasource: DataSource::default(),
+            query_number: None,
+            debug: false,
+        };
+        ctx
     }
 }
 
