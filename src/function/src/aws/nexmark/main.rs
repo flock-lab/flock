@@ -245,7 +245,7 @@ async fn nexmark_bench_handler(ctx: &ExecutionContext, payload: Payload) -> Resu
         }
     };
 
-    let tasks = match source.window {
+    match source.window {
         StreamWindow::TumblingWindow(Schedule::Seconds(window_size)) => {
             tumbling_window_tasks(
                 &ctx,
@@ -255,7 +255,7 @@ async fn nexmark_bench_handler(ctx: &ExecutionContext, payload: Payload) -> Resu
                 &mut ring,
                 group_name.clone(),
             )
-            .await?
+            .await?;
         }
         StreamWindow::HoppingWindow((window_size, hop_size)) => {
             hopping_window_tasks(
@@ -267,26 +267,16 @@ async fn nexmark_bench_handler(ctx: &ExecutionContext, payload: Payload) -> Resu
                 &mut ring,
                 group_name.clone(),
             )
-            .await?
+            .await?;
         }
         StreamWindow::SlidingWindow((_window, _hop)) => {
             unimplemented!();
         }
         StreamWindow::ElementWise => {
-            elementwise_tasks(&ctx, events, sec, group_name.clone()).await?
+            elementwise_tasks(&ctx, events, sec, group_name.clone()).await?;
         }
         _ => unimplemented!(),
     };
-
-    for task in tasks {
-        let res_vec = task.await.expect("Lambda function execution failed.")?;
-        res_vec.into_iter().for_each(|response| {
-            println!(
-                "[OK] Received status from async lambda function. {:?}",
-                response
-            );
-        });
-    }
 
     Ok(json!({"name": &ctx.name, "type": format!("nexmark_bench")}))
 }

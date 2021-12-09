@@ -16,7 +16,6 @@ use chrono::Utc;
 use hashring::HashRing;
 use nexmark::NexMarkStream;
 use runtime::prelude::*;
-use rusoto_lambda::InvocationResponse;
 use std::sync::Arc;
 
 /// Generate tumble windows workloads for the nexmark benchmark on cloud
@@ -40,9 +39,9 @@ pub async fn tumbling_window_tasks(
     window_size: usize,
     ring: &mut HashRing<String>,
     group_name: String,
-) -> Result<Vec<tokio::task::JoinHandle<Result<Vec<InvocationResponse>>>>> {
+) -> Result<()> {
     assert!(seconds >= window_size);
-    let mut tasks = Vec::with_capacity(seconds / window_size);
+
     let mut window: Box<Vec<Payload>> = Box::new(vec![]);
     let query_number = ctx.query_number.expect("query number is not set.");
 
@@ -74,21 +73,22 @@ pub async fn tumbling_window_tasks(
             );
         }
 
-        tasks.push(tokio::spawn(async move {
-            let mut response = vec![];
-            for i in 0..window_size {
-                response.push(
-                    invoke_lambda_function(
-                        function_name.clone(),
-                        Some(serde_json::to_vec(&events[i])?.into()),
-                    )
-                    .await?,
+        for i in 0..window_size {
+            let resp = invoke_lambda_function(
+                function_name.clone(),
+                Some(serde_json::to_vec(&events[i])?.into()),
+            )
+            .await?;
+            if ctx.debug {
+                println!(
+                    "[OK] Received status from async lambda function. {:?}",
+                    resp
                 );
             }
-            Ok(response)
-        }));
+        }
     }
-    Ok(tasks)
+
+    Ok(())
 }
 
 /// Generate hopping windows workloads for the nexmark benchmark on cloud
@@ -114,10 +114,9 @@ pub async fn hopping_window_tasks(
     hop_size: usize,
     ring: &mut HashRing<String>,
     group_name: String,
-) -> Result<Vec<tokio::task::JoinHandle<Result<Vec<InvocationResponse>>>>> {
+) -> Result<()> {
     assert!(seconds >= window_size);
 
-    let mut tasks = vec![];
     let mut window: Box<Vec<Payload>> = Box::new(vec![]);
     let query_number = ctx.query_number.expect("query number is not set.");
 
@@ -159,22 +158,23 @@ pub async fn hopping_window_tasks(
             );
         }
 
-        tasks.push(tokio::spawn(async move {
-            let mut response = vec![];
-            for t in time..time + window_size {
-                let offset = t - time;
-                response.push(
-                    invoke_lambda_function(
-                        function_name.clone(),
-                        Some(serde_json::to_vec(&events[offset])?.into()),
-                    )
-                    .await?,
+        for t in time..time + window_size {
+            let offset = t - time;
+            let resp = invoke_lambda_function(
+                function_name.clone(),
+                Some(serde_json::to_vec(&events[offset])?.into()),
+            )
+            .await?;
+            if ctx.debug {
+                println!(
+                    "[OK] Received status from async lambda function. {:?}",
+                    resp
                 );
             }
-            Ok(response)
-        }));
+        }
     }
-    Ok(tasks)
+
+    Ok(())
 }
 
 /// Generate normal elementwose workloads for the nexmark benchmark on cloud
@@ -194,31 +194,31 @@ pub async fn elementwise_tasks(
     source: Arc<NexMarkStream>,
     seconds: usize,
     group_name: String,
-) -> Result<Vec<tokio::task::JoinHandle<Result<Vec<InvocationResponse>>>>> {
-    Ok((0..seconds)
-        .map(|epoch| {
-            if ctx.debug {
-                println!("[OK] Send nexmark event (epoch: {}).", epoch);
-            }
-            let events = source.clone();
-            let query_number = ctx.query_number.expect("query number is not set.");
-            let function_name = group_name.clone();
-            tokio::spawn(async move {
-                let uuid =
-                    UuidBuilder::new_with_ts(&function_name, Utc::now().timestamp(), 1).next();
-                let payload = serde_json::to_vec(&nexmark_event_to_payload(
-                    events,
-                    epoch,
-                    0,
-                    query_number,
-                    uuid,
-                )?)?
-                .into();
-                Ok(vec![
-                    invoke_lambda_function(function_name, Some(payload)).await?,
-                ])
-            })
-        })
-        // this collect *is needed* so that the join below can switch between tasks.
-        .collect::<Vec<tokio::task::JoinHandle<Result<Vec<InvocationResponse>>>>>())
+) -> Result<()> {
+    for epoch in 0..seconds {
+        if ctx.debug {
+            println!("[OK] Send nexmark event (epoch: {}).", epoch);
+        }
+        let events = source.clone();
+        let query_number = ctx.query_number.expect("query number is not set.");
+        let function_name = group_name.clone();
+        let uuid = UuidBuilder::new_with_ts(&function_name, Utc::now().timestamp(), 1).next();
+        let payload = serde_json::to_vec(&nexmark_event_to_payload(
+            events,
+            epoch,
+            0,
+            query_number,
+            uuid,
+        )?)?
+        .into();
+        let resp = invoke_lambda_function(function_name, Some(payload)).await?;
+        if ctx.debug {
+            println!(
+                "[OK] Received status from async lambda function. {:?}",
+                resp
+            );
+        }
+    }
+
+    Ok(())
 }
