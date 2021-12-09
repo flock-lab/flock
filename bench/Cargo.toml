@@ -23,7 +23,7 @@ rusoto_lambda = "0.47.0"
 rusoto_s3 = "0.47.0"
 serde_json = "1.0"
 structopt = { version = "0.3", default-features = false }
-tokio = { version = "1.2", features = [ "macros", "io-util", "sync", "rt-multi-thread" ] }
+tokio = { version = "1.4", features = [ "macros", "io-util", "sync", "rt-multi-thread" ] }
 
 [[bin]]
 name = "nexmark_bench"

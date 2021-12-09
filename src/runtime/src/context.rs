@@ -169,22 +169,26 @@ impl ExecutionContext {
                     println!("Loading plan from S3 {:?}", self.plan_s3_idx);
                     let (bucket, key) = self.plan_s3_idx.as_ref().unwrap();
                     let s3 = S3Client::new(Region::default());
+                    let body = s3
+                        .get_object(GetObjectRequest {
+                            bucket: bucket.clone(),
+                            key: key.clone(),
+                            ..Default::default()
+                        })
+                        .await
+                        .map_err(|e| FlockError::Internal(e.to_string()))?
+                        .body
+                        .take()
+                        .expect("body is empty");
 
-                    let mut object = vec![];
-                    s3.get_object(GetObjectRequest {
-                        bucket: bucket.clone(),
-                        key: key.clone(),
-                        ..Default::default()
+                    self.plan = tokio::task::spawn_blocking(move || {
+                        let mut buf = Vec::new();
+                        body.into_blocking_read().read_to_end(&mut buf).unwrap();
+                        serde_json::from_slice(&buf).unwrap()
                     })
                     .await
-                    .map_err(|e| FlockError::Internal(e.to_string()))?
-                    .body
-                    .take()
-                    .expect("body is empty")
-                    .into_blocking_read()
-                    .read_to_end(&mut object)?;
+                    .expect("failed to load plan from S3");
 
-                    self.plan = serde_json::from_slice(&object)?;
                     Ok(&mut self.plan)
                 } else {
                     panic!("The query plan is not stored in the environment variable and S3.");

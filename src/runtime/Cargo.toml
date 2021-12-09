@@ -19,7 +19,7 @@ dashmap = "4.0.2"
 datafusion = { git = "https://github.com/flock-lab/arrow-datafusion", branch = "flock" }
 futures = "0.3.12"
 indoc = "1.0.3"
-
+tokio = { version = "1.4", features = [ "macros", "io-util", "sync", "rt-multi-thread" ] }
 json = "0.12.4"
 lazy_static = "1.4"
 log = "0.4.14"
@@ -42,7 +42,6 @@ zstd = "0.9.0+zstd.1.5.0"
 
 [dev-dependencies]
 test_utils = { path = "../test" }
-tokio = { version = "1.2", features = [ "macros", "io-util", "sync", "rt-multi-thread" ] }
 
 [lib]
 name = "runtime"
