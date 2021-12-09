@@ -11,11 +11,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use arrow::datatypes::SchemaRef;
+use arrow::datatypes::{Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
 use bytes::Bytes;
 use datafusion::datasource::MemTable;
 use datafusion::execution::context::ExecutionContext as DataFusionExecutionContext;
+use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::ExecutionPlan;
 use driver::deploy::lambda;
 use lazy_static::lazy_static;
@@ -44,6 +45,8 @@ lazy_static! {
     static ref BID: SchemaRef = Arc::new(Bid::schema());
     static ref LAMBDA_CLIENT: LambdaClient = LambdaClient::new(Region::default());
     static ref PARALLELISM: usize = globals["lambda"]["parallelism"].parse::<usize>().unwrap();
+    static ref S3_NEXMARK_BUCKET: String = globals["s3"]["bucket"].to_string();
+    static ref S3_NEXMARK_Q6_PLAN_KEY: String = globals["s3"]["s3_nexmark_q6_plan_key"].to_string();
 }
 
 #[derive(Default, Clone, Debug, StructOpt)]
@@ -112,6 +115,19 @@ fn create_nexmark_source(opt: &NexmarkBenchmarkOpt) -> NexMarkSource {
     NexMarkSource::new(opt.seconds, opt.generators, opt.events_per_second, window)
 }
 
+fn plan_placement(
+    query_number: usize,
+    physcial_plan: Arc<dyn ExecutionPlan>,
+) -> (Arc<dyn ExecutionPlan>, Option<(String, String)>) {
+    match query_number {
+        6 => (physcial_plan, None),
+        _ => (
+            Arc::new(EmptyExec::new(false, Arc::new(Schema::empty()))),
+            Some((S3_NEXMARK_BUCKET.clone(), S3_NEXMARK_Q6_PLAN_KEY.clone())),
+        ),
+    }
+}
+
 async fn create_nexmark_functions(
     opt: NexmarkBenchmarkOpt,
     nexmark_conf: NexMarkSource,
@@ -124,8 +140,10 @@ async fn create_nexmark_functions(
         next_func_name = CloudFunction::Group((worker_func_name.clone(), *PARALLELISM));
     };
 
+    let (plan, s3) = plan_placement(opt.query_number, physcial_plan);
     let nexmark_source_ctx = ExecutionContext {
-        plan:         physcial_plan.clone(),
+        plan:         plan.clone(),
+        plan_s3_idx:  s3.clone(),
         name:         NEXMARK_SOURCE_FUNCTION_NAME.to_string(),
         next:         next_func_name.clone(),
         datasource:   DataSource::NexMarkEvent(NexMarkSource::default()),
@@ -134,7 +152,8 @@ async fn create_nexmark_functions(
     };
 
     let mut nexmark_worker_ctx = ExecutionContext {
-        plan:         physcial_plan,
+        plan:         plan,
+        plan_s3_idx:  s3.clone(),
         name:         worker_func_name.clone(),
         next:         CloudFunction::None,
         datasource:   DataSource::Payload,
