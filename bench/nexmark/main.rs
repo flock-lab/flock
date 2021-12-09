@@ -120,11 +120,11 @@ fn plan_placement(
     physcial_plan: Arc<dyn ExecutionPlan>,
 ) -> (Arc<dyn ExecutionPlan>, Option<(String, String)>) {
     match query_number {
-        6 => (physcial_plan, None),
-        _ => (
+        6 => (
             Arc::new(EmptyExec::new(false, Arc::new(Schema::empty()))),
             Some((S3_NEXMARK_BUCKET.clone(), S3_NEXMARK_Q6_PLAN_KEY.clone())),
         ),
+        _ => (physcial_plan, None),
     }
 }
 
