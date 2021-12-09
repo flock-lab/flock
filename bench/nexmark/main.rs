@@ -45,8 +45,8 @@ lazy_static! {
     static ref BID: SchemaRef = Arc::new(Bid::schema());
     static ref LAMBDA_CLIENT: LambdaClient = LambdaClient::new(Region::default());
     static ref PARALLELISM: usize = globals["lambda"]["parallelism"].parse::<usize>().unwrap();
-    static ref S3_NEXMARK_BUCKET: String = globals["s3"]["bucket"].to_string();
-    static ref S3_NEXMARK_Q6_PLAN_KEY: String = globals["s3"]["s3_nexmark_q6_plan_key"].to_string();
+    static ref S3_NEXMARK_BUCKET: String = globals["lambda"]["s3_bucket"].to_string();
+    static ref S3_NEXMARK_Q6_PLAN_KEY: String = globals["lambda"]["s3_nexmark_q6_plan_key"].to_string();
 }
 
 #[derive(Default, Clone, Debug, StructOpt)]
