@@ -21,12 +21,14 @@ use runtime::prelude::*;
 use rusoto_core::Region;
 use rusoto_lambda::{InvocationRequest, InvocationResponse, Lambda, LambdaClient};
 use std::sync::Arc;
+use crate::config::FLOCK_CONF;
 
 lazy_static! {
     static ref PERSON_SCHEMA: SchemaRef = Arc::new(Person::schema());
     static ref AUCTION_SCHEMA: SchemaRef = Arc::new(Auction::schema());
     static ref BID_SCHEMA: SchemaRef = Arc::new(Bid::schema());
     static ref LAMBDA_CLIENT: LambdaClient = LambdaClient::new(Region::default());
+    static ref BATCH_SIZE: usize = FLOCK_CONF["lambda"]["granule"].parse::<usize>().unwrap();
 }
 
 #[allow(dead_code)]
@@ -77,13 +79,18 @@ pub fn nexmark_event_to_payload(
     query_number: usize,
     uuid: Uuid,
 ) -> Result<Payload> {
-    let event = events
+    let (event, (persons_num, auctions_num, bids_num)) = events
         .select(time, generator)
         .expect("Failed to select event.");
 
     if event.persons.is_empty() && event.auctions.is_empty() && event.bids.is_empty() {
         return Err(FlockError::Execution("No Nexmark input!".to_owned()));
     }
+
+    println!(
+        "Generator {}: {} persons, {} auctions, {} bids.",
+        generator, persons_num, auctions_num, bids_num
+    );
 
     match query_number {
         0 | 1 | 2 | 5 | 7 => Ok(to_payload(
@@ -121,7 +128,7 @@ pub fn nexmark_event_to_batches(
     generator: usize,
     query_number: usize,
 ) -> Result<(Vec<Vec<RecordBatch>>, Vec<Vec<RecordBatch>>)> {
-    let event = events
+    let (event, (persons_num, auctions_num, bids_num)) = events
         .select(time, generator)
         .expect("Failed to select event.");
 
@@ -129,35 +136,46 @@ pub fn nexmark_event_to_batches(
         return Err(FlockError::Execution("No Nexmark input!".to_owned()));
     }
 
+    println!(
+        "Generator {}: {} persons, {} auctions, {} bids.",
+        generator, persons_num, auctions_num, bids_num
+    );
+
     let (r1, r2) = match query_number {
         0 | 1 | 2 | 5 | 7 => (
-            NexMarkSource::to_batch(&event.bids, BID_SCHEMA.clone()),
+            NexMarkSource::to_batch_v2(&event.bids, BID_SCHEMA.clone(), *BATCH_SIZE * 2),
             vec![],
         ),
         3 | 8 => (
-            NexMarkSource::to_batch(&event.persons, PERSON_SCHEMA.clone()),
-            NexMarkSource::to_batch(&event.auctions, AUCTION_SCHEMA.clone()),
+            NexMarkSource::to_batch_v2(&event.persons, PERSON_SCHEMA.clone(), *BATCH_SIZE / 2),
+            NexMarkSource::to_batch_v2(&event.auctions, AUCTION_SCHEMA.clone(), *BATCH_SIZE / 2),
         ),
         4 | 6 | 9 => (
-            NexMarkSource::to_batch(&event.auctions, AUCTION_SCHEMA.clone()),
-            NexMarkSource::to_batch(&event.bids, BID_SCHEMA.clone()),
+            NexMarkSource::to_batch_v2(&event.auctions, AUCTION_SCHEMA.clone(), *BATCH_SIZE / 2),
+            NexMarkSource::to_batch_v2(&event.bids, BID_SCHEMA.clone(), *BATCH_SIZE / 2),
         ),
         _ => unimplemented!(),
     };
 
     let step = if r2.is_empty() { 2 } else { 1 };
 
-    let r1 = (0..r1.len())
-        .step_by(step)
-        .map(|start| {
-            let end = if start + step > r1.len() {
-                r1.len()
-            } else {
-                start + step
-            };
-            r1[start..end].to_vec()
-        })
-        .collect::<Vec<_>>();
+    let batch_partition = |batch: Vec<RecordBatch>| {
+        (0..batch.len())
+            .step_by(step)
+            .map(|start| {
+                let end = if start + step > batch.len() {
+                    batch.len()
+                } else {
+                    start + step
+                };
+                batch[start..end].to_vec()
+            })
+            .collect::<Vec<_>>()
+    };
 
-    Ok((r1, vec![r2]))
+    if r2.is_empty() {
+        Ok((batch_partition(r1), vec![]))
+    } else {
+        Ok((batch_partition(r1), batch_partition(r2)))
+    }
 }

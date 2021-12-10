@@ -243,9 +243,12 @@ pub async fn elementwise_tasks(
             for i in 0..size {
                 let batch1 = if i < r1.len() { r1[i].clone() } else { vec![] };
                 let batch2 = if i < r2.len() { r2[i].clone() } else { vec![] };
-                let payload =
-                    serde_json::to_vec(&to_payload(&batch1, &batch2, uuid.next()))?.into();
-                let resp = invoke_lambda_function(function_name.clone(), Some(payload)).await?;
+                let payload = serde_json::to_vec(&to_payload(&batch1, &batch2, uuid.next()))?;
+                if ctx.debug {
+                    println!("[{}]: function payload bytes: {}", i, payload.len());
+                }
+                let resp =
+                    invoke_lambda_function(function_name.clone(), Some(payload.into())).await?;
                 if ctx.debug {
                     println!(
                         "[OK] Received status from async lambda function. {:?}",

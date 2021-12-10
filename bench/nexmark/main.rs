@@ -167,10 +167,12 @@ async fn create_nexmark_functions(
 ) -> Result<()> {
     let worker_func_name = format!("q{}-00", opt.query_number);
 
-    let mut next_func_name = CloudFunction::Lambda(worker_func_name.clone());
-    if nexmark_conf.window != StreamWindow::ElementWise || opt.events_per_second > *GRANULE_SIZE * 2
+    let next_func_name = if nexmark_conf.window != StreamWindow::ElementWise
+        || opt.events_per_second > *GRANULE_SIZE * 2
     {
-        next_func_name = CloudFunction::Group((worker_func_name.clone(), *PARALLELISM));
+        CloudFunction::Group((worker_func_name.clone(), *PARALLELISM))
+    } else {
+        CloudFunction::Lambda(worker_func_name.clone())
     };
 
     let (plan, s3) = plan_placement(opt.query_number, physcial_plan).await?;
@@ -199,21 +201,25 @@ async fn create_nexmark_functions(
     create_lambda_function(&nexmark_source_ctx).await?;
 
     // Create the function for the nexmark worker.
-    if nexmark_conf.window == StreamWindow::ElementWise {
-        info!("Creating lambda function: {}", nexmark_worker_ctx.name);
-        create_lambda_function(&nexmark_worker_ctx).await?;
-    } else {
-        info!(
-            "Creating lambda function group: {:?}",
-            nexmark_source_ctx.next
-        );
-        for i in 0..*PARALLELISM {
-            let group_member_name = format!("{}-{:02}", worker_func_name.clone(), i);
-            info!("Creating function member: {}", group_member_name);
-            nexmark_worker_ctx.name = group_member_name;
+    match next_func_name {
+        CloudFunction::Lambda(name) => {
+            info!("Creating lambda function: {}", name);
             create_lambda_function(&nexmark_worker_ctx).await?;
-            set_lambda_concurrency(nexmark_worker_ctx.name, 1).await?;
         }
+        CloudFunction::Group((name, parallelism)) => {
+            info!(
+                "Creating lambda function group: {:?}",
+                nexmark_source_ctx.next
+            );
+            for i in 0..parallelism {
+                let group_member_name = format!("{}-{:02}", name.clone(), i);
+                info!("Creating function member: {}", group_member_name);
+                nexmark_worker_ctx.name = group_member_name;
+                create_lambda_function(&nexmark_worker_ctx).await?;
+                set_lambda_concurrency(nexmark_worker_ctx.name, 1).await?;
+            }
+        }
+        CloudFunction::None => unreachable!(),
     }
 
     Ok(())
@@ -371,7 +377,7 @@ mod tests {
             ..Default::default()
         };
         let conf = create_nexmark_source(&opt);
-        let event = Arc::new(conf.generate_data()?)
+        let (event, _) = Arc::new(conf.generate_data()?)
             .select(1, 0)
             .expect("Failed to select event.");
 
