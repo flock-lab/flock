@@ -324,6 +324,7 @@ async fn create_lambda_function(ctx: &ExecutionContext) -> Result<String> {
                 role: lambda::role().await,
                 runtime: lambda::runtime(),
                 environment: lambda::environment(&ctx),
+                timeout: Some(900),
                 ..Default::default()
             })
             .await
