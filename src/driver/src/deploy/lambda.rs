@@ -132,7 +132,7 @@ pub fn nexmark_function_code() -> FunctionCode {
 pub fn environment(ctx: &ExecutionContext) -> Option<Environment> {
     let mut map = HashMap::new();
     map.insert(
-        (&globals["lambda"]["name"]).to_owned(),
+        (&FLOCK_CONF["lambda"]["name"]).to_owned(),
         ctx.marshal(Encoding::Zstd),
     );
     // Enable crate `env_logger`

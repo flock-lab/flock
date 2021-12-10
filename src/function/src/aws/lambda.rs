@@ -59,7 +59,7 @@ macro_rules! init_exec_context {
     () => {{
         unsafe {
             // Init query executor from the cloud evironment.
-            let init_context = || match std::env::var(&globals["lambda"]["name"]) {
+            let init_context = || match std::env::var(&FLOCK_CONF["lambda"]["name"]) {
                 Ok(s) => {
                     EXECUTION_CONTEXT = CloudFunctionContext::Lambda((
                         Box::new(ExecutionContext::unmarshal(&s)),
@@ -150,14 +150,16 @@ async fn source_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Valu
             // feed data into the physical plan
             let output_partitions = LambdaExecutor::coalesce_batches(
                 vec![batch],
-                globals["lambda"]["target_batch_size"]
+                FLOCK_CONF["lambda"]["target_batch_size"]
                     .parse::<usize>()
                     .unwrap(),
             )
             .await?;
 
             let num_batches = output_partitions[0].len();
-            let parallelism = globals["lambda"]["parallelism"].parse::<usize>().unwrap();
+            let parallelism = FLOCK_CONF["lambda"]["parallelism"]
+                .parse::<usize>()
+                .unwrap();
 
             if num_batches > parallelism {
                 ctx.feed_one_source(
@@ -192,7 +194,7 @@ async fn source_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Valu
         ExecutionStrategy::Distributed => {
             let mut batches = LambdaExecutor::coalesce_batches(
                 vec![batch],
-                globals["lambda"]["payload_batch_size"]
+                FLOCK_CONF["lambda"]["payload_batch_size"]
                     .parse::<usize>()
                     .unwrap(),
             )
@@ -242,7 +244,7 @@ async fn payload_handler(
     if ctx.next != CloudFunction::None {
         let mut batches = LambdaExecutor::coalesce_batches(
             vec![output_partitions],
-            globals["lambda"]["payload_batch_size"]
+            FLOCK_CONF["lambda"]["payload_batch_size"]
                 .parse::<usize>()
                 .unwrap(),
         )
@@ -300,7 +302,7 @@ mod tests {
         let encoded = lambda_context.marshal(Encoding::default());
 
         // Configures the cloud environment
-        std::env::set_var(&globals["lambda"]["name"], encoded);
+        std::env::set_var(&FLOCK_CONF["lambda"]["name"], encoded);
 
         // First lambda call
         let event = json!({

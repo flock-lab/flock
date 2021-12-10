@@ -130,7 +130,7 @@ pub struct ExecutionContext {
 
 impl Default for ExecutionContext {
     fn default() -> ExecutionContext {
-        let ctx = ExecutionContext {
+        ExecutionContext {
             plan:         Arc::new(EmptyExec::new(false, Arc::new(Schema::empty()))),
             plan_s3_idx:  None,
             name:         "".to_string(),
@@ -138,8 +138,7 @@ impl Default for ExecutionContext {
             datasource:   DataSource::default(),
             query_number: None,
             debug:        false,
-        };
-        ctx
+        }
     }
 }
 

@@ -60,7 +60,7 @@ mod tests {
             ..Default::default()
         };
         let events = nex.generate_data()?;
-        let events = events.select(0, 1).unwrap();
+        let (events, _) = events.select(0, 1).unwrap();
 
         let ret_events = handler(events, Context::default()).await?;
 
@@ -94,7 +94,7 @@ mod tests {
             ..Default::default()
         };
         let events = nex.generate_data()?;
-        let events = events.select(0, 1).unwrap();
+        let (events, _) = events.select(0, 1).unwrap();
 
         // serialization and compression
         let en_events = serde_json::to_vec(&events).unwrap();

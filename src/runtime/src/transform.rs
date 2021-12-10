@@ -115,12 +115,14 @@ pub fn to_payload(batch1: &[RecordBatch], batch2: &[RecordBatch], uuid: Uuid) ->
     };
 
     let mut payload = Payload {
-        data: dataframe(batch1),
-        schema: schema_to_bytes(batch1[0].schema()),
         uuid,
         encoding: encoding.clone(),
         ..Default::default()
     };
+    if !batch1.is_empty() {
+        payload.data = dataframe(batch1);
+        payload.schema = schema_to_bytes(batch1[0].schema());
+    }
     if !batch2.is_empty() {
         payload.data2 = dataframe(batch2);
         payload.schema2 = schema_to_bytes(batch2[0].schema());

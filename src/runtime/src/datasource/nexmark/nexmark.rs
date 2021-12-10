@@ -13,6 +13,7 @@
 
 //! Nexmark benchmark suite
 
+use crate::config::FLOCK_CONF;
 use arrow::datatypes::SchemaRef;
 use arrow::json;
 use arrow::record_batch::RecordBatch;
@@ -73,7 +74,11 @@ impl NexMarkStream {
     }
 
     /// Fetches all events belong to the given epoch and source identifier.
-    pub fn select(&self, time: usize, source: usize) -> Option<NexMarkEvent> {
+    pub fn select(
+        &self,
+        time: usize,
+        source: usize,
+    ) -> Option<(NexMarkEvent, (usize, usize, usize))> {
         let mut event = NexMarkEvent {
             epoch: time,
             source,
@@ -81,21 +86,27 @@ impl NexMarkStream {
         };
         let epoch = Epoch::new(time);
 
+        let mut persons_num = 0;
         if let Some(map) = self.persons.get(&epoch) {
-            if let Some((persons, _)) = map.get(&source) {
+            if let Some((persons, num)) = map.get(&source) {
                 event.persons = persons.clone();
+                persons_num = *num;
             }
         }
 
+        let mut auctions_num = 0;
         if let Some(map) = self.auctions.get(&epoch) {
-            if let Some((auctions, _)) = map.get(&source) {
+            if let Some((auctions, num)) = map.get(&source) {
                 event.auctions = auctions.clone();
+                auctions_num = *num;
             }
         }
 
+        let mut bids_num = 0;
         if let Some(map) = self.bids.get(&epoch) {
-            if let Some((bids, _)) = map.get(&source) {
+            if let Some((bids, num)) = map.get(&source) {
                 event.bids = bids.clone();
+                bids_num = *num;
             }
         }
 
@@ -103,7 +114,7 @@ impl NexMarkStream {
             return None;
         }
 
-        Some(event)
+        Some((event, (persons_num, auctions_num, bids_num)))
     }
 }
 
@@ -222,9 +233,19 @@ impl NexMarkSource {
 
     /// Converts NexMarkSource events to record batches in Arrow.
     pub fn to_batch(events: &[u8], schema: SchemaRef) -> Vec<RecordBatch> {
-        let batch_size = 1024;
+        let batch_size = FLOCK_CONF["lambda"]["granule"].parse::<usize>().unwrap();
         let mut reader = json::Reader::new(BufReader::new(events), schema, batch_size, None);
 
+        let mut batches = vec![];
+        while let Some(batch) = reader.next().unwrap() {
+            batches.push(batch);
+        }
+        batches
+    }
+
+    /// Converts NexMarkSource events to record batches in Arrow.
+    pub fn to_batch_v2(events: &[u8], schema: SchemaRef, batch_size: usize) -> Vec<RecordBatch> {
+        let mut reader = json::Reader::new(BufReader::new(events), schema, batch_size, None);
         let mut batches = vec![];
         while let Some(batch) = reader.next().unwrap() {
             batches.push(batch);
@@ -312,7 +333,7 @@ mod test {
             ..Default::default()
         };
         let events = nex.generate_data()?;
-        let events = events.select(0, 1).unwrap();
+        let (events, _) = events.select(0, 1).unwrap();
 
         // serialization and compression
         let values = serde_json::to_value(events).unwrap();

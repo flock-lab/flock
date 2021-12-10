@@ -18,7 +18,7 @@ use lazy_static::lazy_static;
 
 lazy_static! {
     /// Global settings.
-    pub static ref GLOBALS: Ini = Ini::load_from_str(include_str!("config/flock.toml")).unwrap();
+    pub static ref FLOCK_CONF: Ini = Ini::load_from_str(include_str!("config/flock.toml")).unwrap();
 }
 
 #[cfg(test)]
