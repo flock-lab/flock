@@ -13,6 +13,7 @@
 
 //! Nexmark benchmark suite
 
+use crate::config::FLOCK_CONF;
 use arrow::datatypes::SchemaRef;
 use arrow::json;
 use arrow::record_batch::RecordBatch;
@@ -222,7 +223,7 @@ impl NexMarkSource {
 
     /// Converts NexMarkSource events to record batches in Arrow.
     pub fn to_batch(events: &[u8], schema: SchemaRef) -> Vec<RecordBatch> {
-        let batch_size = 1024;
+        let batch_size = FLOCK_CONF["lambda"]["granule"].parse::<usize>().unwrap();
         let mut reader = json::Reader::new(BufReader::new(events), schema, batch_size, None);
 
         let mut batches = vec![];

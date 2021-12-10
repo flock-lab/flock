@@ -11,7 +11,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use crate::utils::{invoke_lambda_function, nexmark_event_to_payload};
+use crate::utils::*;
 use chrono::Utc;
 use hashring::HashRing;
 use nexmark::NexMarkStream;
@@ -184,7 +184,8 @@ pub async fn hopping_window_tasks(
 /// - `ctx`: the Flock runtime context.
 /// - `source`: the source stream of nexmark events.
 /// - `seconds`: the total number of seconds to generate workloads.
-/// - `window_size`: the size of the window in seconds.
+/// - `ring`: the consistent hashing ring to forward the windowed events to the
+///   same function execution environment.
 /// - `group_name`: the name of the group of the function.
 ///
 /// # Returns
@@ -193,30 +194,65 @@ pub async fn elementwise_tasks(
     ctx: &ExecutionContext,
     source: Arc<NexMarkStream>,
     seconds: usize,
+    ring: &mut HashRing<String>,
     group_name: String,
 ) -> Result<()> {
     for epoch in 0..seconds {
         if ctx.debug {
             println!("[OK] Send nexmark event (epoch: {}).", epoch);
         }
+
         let events = source.clone();
         let query_number = ctx.query_number.expect("query number is not set.");
-        let function_name = group_name.clone();
-        let uuid = UuidBuilder::new_with_ts(&function_name, Utc::now().timestamp(), 1).next();
-        let payload = serde_json::to_vec(&nexmark_event_to_payload(
-            events,
-            epoch,
-            0,
-            query_number,
-            uuid,
-        )?)?
-        .into();
-        let resp = invoke_lambda_function(function_name, Some(payload)).await?;
-        if ctx.debug {
-            println!(
-                "[OK] Received status from async lambda function. {:?}",
-                resp
-            );
+
+        if ring.len() == 1 {
+            // lambda default concurrency
+            let function_name = group_name.clone();
+            let uuid = UuidBuilder::new_with_ts(&function_name, Utc::now().timestamp(), 1).next();
+            let payload = serde_json::to_vec(&nexmark_event_to_payload(
+                events,
+                epoch,
+                0,
+                query_number,
+                uuid,
+            )?)?
+            .into();
+            let resp = invoke_lambda_function(function_name, Some(payload)).await?;
+            if ctx.debug {
+                println!(
+                    "[OK] Received status from async lambda function. {:?}",
+                    resp
+                );
+            }
+        } else {
+            // consistent hashing ring
+            let (r1, r2) = nexmark_event_to_batches(
+                events,
+                epoch,
+                0, // generator id
+                query_number,
+            )?;
+            let size = if r1.len() > r2.len() {
+                r1.len()
+            } else {
+                r2.len()
+            };
+            let mut uuid = UuidBuilder::new_with_ts(&group_name, Utc::now().timestamp(), size);
+            // Distribute the epoch data to a single function execution environment.
+            let function_name = ring.get(&uuid.tid).expect("hash ring failure.").to_string();
+            for i in 0..size {
+                let batch1 = if i < r1.len() { r1[i].clone() } else { vec![] };
+                let batch2 = if i < r2.len() { r2[i].clone() } else { vec![] };
+                let payload =
+                    serde_json::to_vec(&to_payload(&batch1, &batch2, uuid.next()))?.into();
+                let resp = invoke_lambda_function(function_name.clone(), Some(payload)).await?;
+                if ctx.debug {
+                    println!(
+                        "[OK] Received status from async lambda function. {:?}",
+                        resp
+                    );
+                }
+            }
         }
     }
 

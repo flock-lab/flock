@@ -12,6 +12,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use arrow::datatypes::SchemaRef;
+use arrow::record_batch::RecordBatch;
 use bytes::Bytes;
 use lazy_static::lazy_static;
 use nexmark::event::{Auction, Bid, Person};
@@ -102,4 +103,61 @@ pub fn nexmark_event_to_payload(
         )),
         _ => unimplemented!(),
     }
+}
+
+/// Converts a NexMark stream into record batches for Arrow.
+///
+/// ## Arguments
+/// - `events`: A stream of NexMark events.
+/// - `time`: The time of the event.
+/// - `generator`: The name of the generator.
+/// - `query number`: The id of the nexmark query.
+///
+/// ## Returns
+/// A Flock's Payload.
+pub fn nexmark_event_to_batches(
+    events: Arc<NexMarkStream>,
+    time: usize,
+    generator: usize,
+    query_number: usize,
+) -> Result<(Vec<Vec<RecordBatch>>, Vec<Vec<RecordBatch>>)> {
+    let event = events
+        .select(time, generator)
+        .expect("Failed to select event.");
+
+    if event.persons.is_empty() && event.auctions.is_empty() && event.bids.is_empty() {
+        return Err(FlockError::Execution("No Nexmark input!".to_owned()));
+    }
+
+    let (r1, r2) = match query_number {
+        0 | 1 | 2 | 5 | 7 => (
+            NexMarkSource::to_batch(&event.bids, BID_SCHEMA.clone()),
+            vec![],
+        ),
+        3 | 8 => (
+            NexMarkSource::to_batch(&event.persons, PERSON_SCHEMA.clone()),
+            NexMarkSource::to_batch(&event.auctions, AUCTION_SCHEMA.clone()),
+        ),
+        4 | 6 | 9 => (
+            NexMarkSource::to_batch(&event.auctions, AUCTION_SCHEMA.clone()),
+            NexMarkSource::to_batch(&event.bids, BID_SCHEMA.clone()),
+        ),
+        _ => unimplemented!(),
+    };
+
+    let step = if r2.is_empty() { 2 } else { 1 };
+
+    let r1 = (0..r1.len())
+        .step_by(step)
+        .map(|start| {
+            let end = if start + step > r1.len() {
+                r1.len()
+            } else {
+                start + step
+            };
+            r1[start..end].to_vec()
+        })
+        .collect::<Vec<_>>();
+
+    Ok((r1, vec![r2]))
 }

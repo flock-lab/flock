@@ -19,7 +19,9 @@ use log::info;
 use runtime::prelude::*;
 
 lazy_static! {
-    static ref PARALLELISM: usize = globals["lambda"]["parallelism"].parse::<usize>().unwrap();
+    static ref PARALLELISM: usize = FLOCK_CONF["lambda"]["parallelism"]
+        .parse::<usize>()
+        .unwrap();
 }
 
 /// The function invocation counter per lambda instance.

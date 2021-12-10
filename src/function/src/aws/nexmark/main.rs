@@ -51,7 +51,7 @@ thread_local! {
 }
 
 lazy_static! {
-    static ref CONTEXT_NAME: String = globals["lambda"]["name"].to_string();
+    static ref CONTEXT_NAME: String = FLOCK_CONF["lambda"]["name"].to_string();
 }
 
 /// A wrapper to allow the declaration of the execution context of the lambda
@@ -196,7 +196,7 @@ async fn payload_handler(
     if ctx.next != CloudFunction::None {
         let mut batches = LambdaExecutor::coalesce_batches(
             vec![output],
-            globals["lambda"]["payload_batch_size"]
+            FLOCK_CONF["lambda"]["payload_batch_size"]
                 .parse::<usize>()
                 .unwrap(),
         )
@@ -273,7 +273,7 @@ async fn nexmark_bench_handler(ctx: &ExecutionContext, payload: Payload) -> Resu
             unimplemented!();
         }
         StreamWindow::ElementWise => {
-            elementwise_tasks(&ctx, events, sec, group_name.clone()).await?;
+            elementwise_tasks(&ctx, events, sec, &mut ring, group_name.clone()).await?;
         }
         _ => unimplemented!(),
     };

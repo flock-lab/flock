@@ -46,10 +46,13 @@ lazy_static! {
     static ref BID: SchemaRef = Arc::new(Bid::schema());
     static ref LAMBDA_CLIENT: LambdaClient = LambdaClient::new(Region::default());
     static ref S3_CLIENT: S3Client = S3Client::new(Region::default());
-    static ref PARALLELISM: usize = globals["lambda"]["parallelism"].parse::<usize>().unwrap();
-    static ref S3_NEXMARK_BUCKET: String = globals["lambda"]["s3_bucket"].to_string();
+    static ref S3_NEXMARK_BUCKET: String = FLOCK_CONF["lambda"]["s3_bucket"].to_string();
     static ref S3_NEXMARK_Q6_PLAN_KEY: String =
-        globals["lambda"]["s3_nexmark_q6_plan_key"].to_string();
+        FLOCK_CONF["lambda"]["s3_nexmark_q6_plan_key"].to_string();
+    static ref PARALLELISM: usize = FLOCK_CONF["lambda"]["parallelism"]
+        .parse::<usize>()
+        .unwrap();
+    static ref GRANULE_SIZE: usize = FLOCK_CONF["lambda"]["granule"].parse::<usize>().unwrap();
 }
 
 #[derive(Default, Clone, Debug, StructOpt)]
@@ -117,6 +120,7 @@ fn create_nexmark_source(opt: &NexmarkBenchmarkOpt) -> NexMarkSource {
     };
     NexMarkSource::new(opt.seconds, opt.generators, opt.events_per_second, window)
 }
+
 async fn plan_placement(
     query_number: usize,
     physcial_plan: Arc<dyn ExecutionPlan>,
@@ -164,7 +168,8 @@ async fn create_nexmark_functions(
     let worker_func_name = format!("q{}-00", opt.query_number);
 
     let mut next_func_name = CloudFunction::Lambda(worker_func_name.clone());
-    if nexmark_conf.window != StreamWindow::ElementWise {
+    if nexmark_conf.window != StreamWindow::ElementWise || opt.events_per_second > *GRANULE_SIZE * 2
+    {
         next_func_name = CloudFunction::Group((worker_func_name.clone(), *PARALLELISM));
     };
 
@@ -289,8 +294,8 @@ async fn set_lambda_concurrency(function_name: String, concurrency: i64) -> Resu
 
 /// Creates a single lambda function using bootstrap.zip in Amazon S3.
 async fn create_lambda_function(ctx: &ExecutionContext) -> Result<String> {
-    let s3_bucket = globals["lambda"]["s3_bucket"].to_string();
-    let s3_key = globals["lambda"]["s3_nexmark_key"].to_string();
+    let s3_bucket = FLOCK_CONF["lambda"]["s3_bucket"].to_string();
+    let s3_key = FLOCK_CONF["lambda"]["s3_nexmark_key"].to_string();
     let func_name = ctx.name.clone();
     if LAMBDA_CLIENT
         .get_function(GetFunctionRequest {

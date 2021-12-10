@@ -23,7 +23,7 @@
 
 pub use crate::arena::{Arena, WindowSession};
 pub use crate::config;
-pub use crate::config::GLOBALS as globals;
+pub use crate::config::FLOCK_CONF;
 pub use crate::context::{CloudFunction, ExecutionContext};
 pub use crate::datasource::{kafka, kinesis, nexmark, DataSource};
 pub use crate::encoding::Encoding;

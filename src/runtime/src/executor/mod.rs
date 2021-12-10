@@ -23,7 +23,7 @@
 //! work on other cloud functions that then together execute the query in a
 //! distributed dataflow model.
 
-use crate::config::GLOBALS as globals;
+use crate::config::FLOCK_CONF;
 use crate::context::CloudFunction;
 use crate::context::ExecutionContext;
 use crate::encoding::Encoding;
@@ -153,7 +153,7 @@ impl LambdaExecutor {
             .sum();
         if contain_join(&ctx.plan) {
             if size
-                < globals["lambda"]["join_threshold"]
+                < FLOCK_CONF["lambda"]["join_threshold"]
                     .parse::<usize>()
                     .unwrap()
             {
@@ -163,7 +163,7 @@ impl LambdaExecutor {
             }
         } else if contain_aggregate(&ctx.plan) {
             if size
-                < globals["lambda"]["aggregate_threshold"]
+                < FLOCK_CONF["lambda"]["aggregate_threshold"]
                     .parse::<usize>()
                     .unwrap()
             {
@@ -172,7 +172,7 @@ impl LambdaExecutor {
                 ExecutionStrategy::Distributed
             }
         } else if size
-            < globals["lambda"]["regular_threshold"]
+            < FLOCK_CONF["lambda"]["regular_threshold"]
                 .parse::<usize>()
                 .unwrap()
         {

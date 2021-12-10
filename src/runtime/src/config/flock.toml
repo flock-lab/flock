@@ -27,3 +27,6 @@ s3_bucket = "umd-flock"
 s3_key = "flock"
 s3_nexmark_key = "nexmark"
 s3_nexmark_q6_plan_key = "nexmark_q6_plan"
+
+# the granularity of each type of data in the payload
+granule = 1024
