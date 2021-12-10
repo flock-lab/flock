@@ -134,6 +134,9 @@ pub async fn hopping_window_tasks(
 
         // Update the hopping window, and generate the next batch of data.
         let mut uuid = UuidBuilder::new_with_ts(&group_name, Utc::now().timestamp(), window_size);
+        for t in 0..start_pos {
+            window[t].uuid = uuid.next();
+        }
         for t in time + start_pos..time + window_size {
             window.push(nexmark_event_to_payload(
                 source.clone(),
