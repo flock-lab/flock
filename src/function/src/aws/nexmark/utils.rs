@@ -11,6 +11,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use crate::config::FLOCK_CONF;
 use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use bytes::Bytes;
@@ -21,7 +22,6 @@ use runtime::prelude::*;
 use rusoto_core::Region;
 use rusoto_lambda::{InvocationRequest, InvocationResponse, Lambda, LambdaClient};
 use std::sync::Arc;
-use crate::config::FLOCK_CONF;
 
 lazy_static! {
     static ref PERSON_SCHEMA: SchemaRef = Arc::new(Person::schema());
@@ -64,11 +64,11 @@ pub async fn invoke_lambda_function(
 /// Converts a NexMark stream into the Flock's Payload.
 ///
 /// ## Arguments
-/// - `events`: A stream of NexMark events.
-/// - `time`: The time of the event.
-/// - `generator`: The name of the generator.
-/// - `query number`: The id of the nexmark query.
-/// - `uuid`: The uuid of the produced payload.
+/// * `events` - A stream of NexMark events.
+/// * `time` - The time of the event.
+/// * `generator` - The name of the generator.
+/// * `query number` - The id of the nexmark query.
+/// * `uuid` - The uuid of the produced payload.
 ///
 /// ## Returns
 /// A Flock's Payload.
@@ -115,10 +115,10 @@ pub fn nexmark_event_to_payload(
 /// Converts a NexMark stream into record batches for Arrow.
 ///
 /// ## Arguments
-/// - `events`: A stream of NexMark events.
-/// - `time`: The time of the event.
-/// - `generator`: The name of the generator.
-/// - `query number`: The id of the nexmark query.
+/// * `events` - A stream of NexMark events.
+/// * `time` - The time of the event.
+/// * `generator` - The name of the generator.
+/// * `query number` - The id of the nexmark query.
 ///
 /// ## Returns
 /// A Flock's Payload.

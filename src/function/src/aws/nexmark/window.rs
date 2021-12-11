@@ -12,6 +12,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use crate::utils::*;
+use arrow::record_batch::RecordBatch;
 use chrono::Utc;
 use hashring::HashRing;
 use nexmark::NexMarkStream;
@@ -22,13 +23,13 @@ use std::sync::Arc;
 /// function services.
 ///
 /// # Arguments
-/// - `ctx`: the Flock runtime context.
-/// - `source`: the source stream of nexmark events.
-/// - `seconds`: the total number of seconds to generate workloads.
-/// - `window_size`: the size of the window in seconds.
-/// - `ring`: the consistent hashing ring to forward the windowed events to the
+/// * `ctx` - the Flock runtime context.
+/// * `source` - the source stream of nexmark events.
+/// * `seconds` - the total number of seconds to generate workloads.
+/// * `window_size` - the size of the window in seconds.
+/// * `ring` - the consistent hashing ring to forward the windowed events to the
 ///   same function execution environment.
-/// - `group_name`: the name of the group of the function.
+/// * `group_name` - the name of the group of the function.
 ///
 /// # Returns
 /// The task join handles of the generated workloads.
@@ -42,48 +43,69 @@ pub async fn tumbling_window_tasks(
 ) -> Result<()> {
     assert!(seconds >= window_size);
 
-    let mut window: Box<Vec<Payload>> = Box::new(vec![]);
+    let mut window: Box<Vec<(Vec<Vec<RecordBatch>>, Vec<Vec<RecordBatch>>)>> = Box::new(vec![]);
     let query_number = ctx.query_number.expect("query number is not set.");
 
     for time in 0..seconds / window_size {
         let start = time * window_size;
         let end = start + window_size;
-        let mut uuid = UuidBuilder::new_with_ts(&group_name, Utc::now().timestamp(), window_size);
 
+        // Update the tumbling window, and generate the next batch of data.
         window.drain(..);
         for t in start..end {
-            window.push(nexmark_event_to_payload(
+            window.push(nexmark_event_to_batches(
                 source.clone(),
                 t,
                 0, // generator id
                 query_number,
-                uuid.next(),
             )?);
         }
 
+        // Calculate the total data packets to be sent.
+        let size = window
+            .iter()
+            .map(|(a, b)| if a.len() > b.len() { a.len() } else { b.len() })
+            .sum::<usize>();
+
+        let mut uuid = UuidBuilder::new_with_ts(&group_name, Utc::now().timestamp(), size);
+
         // Distribute the window data to a single function execution environment.
         let function_name = ring.get(&uuid.tid).expect("hash ring failure.").to_string();
-        let events = window.clone();
 
         // Call the next stage of the dataflow graph.
         if ctx.debug {
             println!(
-                "[OK] Send nexmark events from a window (epoch: {}-{}) to function: {}.",
-                start, end, function_name
+                "[OK] Send {} NexMark events from a window (epoch: {}-{}) to function: {}.",
+                size,
+                time,
+                time + window_size,
+                function_name
             );
         }
 
-        for i in 0..window_size {
-            let resp = invoke_lambda_function(
-                function_name.clone(),
-                Some(serde_json::to_vec(&events[i])?.into()),
-            )
-            .await?;
-            if ctx.debug {
-                println!(
-                    "[OK] Received status from async lambda function. {:?}",
-                    resp
-                );
+        let mut eid = 0;
+        for (a, b) in window.iter() {
+            let num = if a.len() > b.len() { a.len() } else { b.len() };
+            for i in 0..num {
+                let r1 = if i < a.len() { a[i].clone() } else { vec![] };
+                let r2 = if i < b.len() { b[i].clone() } else { vec![] };
+                let payload = serde_json::to_vec(&to_payload(&r1, &r2, uuid.next()))?;
+                if ctx.debug {
+                    println!(
+                        "[OK] Event {} - function payload bytes: {}",
+                        eid,
+                        payload.len()
+                    );
+                }
+                let resp =
+                    invoke_lambda_function(function_name.clone(), Some(payload.into())).await?;
+                if ctx.debug {
+                    println!(
+                        "[OK] Received status from async lambda function. {:?}",
+                        resp
+                    );
+                }
+                eid += 1;
             }
         }
     }
@@ -95,14 +117,14 @@ pub async fn tumbling_window_tasks(
 /// function services.
 ///
 /// # Arguments
-/// - `ctx`: the Flock runtime context.
-/// - `source`: the source stream of nexmark events.
-/// - `seconds`: the total number of seconds to generate workloads.
-/// - `window_size`: the size of the window in seconds.
-/// - `hop_size`: the size of the hop in seconds.
-/// - `ring`: the consistent hashing ring to forward the windowed events to the
+/// * `ctx` - the Flock runtime context.
+/// * `source` - the source stream of nexmark events.
+/// * `seconds` - the total number of seconds to generate workloads.
+/// * `window_size` - the size of the window in seconds.
+/// * `hop_size` - the size of the hop in seconds.
+/// * `ring` - the consistent hashing ring to forward the windowed events to the
 ///   same function execution environment.
-/// - `group_name`: the name of the group of the function.
+/// * `group_name` - the name of the group of the function.
 ///
 /// # Returns
 /// The task join handles of the generated workloads.
@@ -117,7 +139,7 @@ pub async fn hopping_window_tasks(
 ) -> Result<()> {
     assert!(seconds >= window_size);
 
-    let mut window: Box<Vec<Payload>> = Box::new(vec![]);
+    let mut window: Box<Vec<(Vec<Vec<RecordBatch>>, Vec<Vec<RecordBatch>>)>> = Box::new(vec![]);
     let query_number = ctx.query_number.expect("query number is not set.");
 
     for time in (0..seconds).step_by(hop_size) {
@@ -133,46 +155,60 @@ pub async fn hopping_window_tasks(
         }
 
         // Update the hopping window, and generate the next batch of data.
-        let mut uuid = UuidBuilder::new_with_ts(&group_name, Utc::now().timestamp(), window_size);
-        for t in 0..start_pos {
-            window[t].uuid = uuid.next();
-        }
         for t in time + start_pos..time + window_size {
-            window.push(nexmark_event_to_payload(
+            window.push(nexmark_event_to_batches(
                 source.clone(),
                 t,
                 0, // generator id
                 query_number,
-                uuid.next(),
             )?);
         }
 
+        // Calculate the total data packets to be sent.
+        let size = window
+            .iter()
+            .map(|(a, b)| if a.len() > b.len() { a.len() } else { b.len() })
+            .sum::<usize>();
+
+        let mut uuid = UuidBuilder::new_with_ts(&group_name, Utc::now().timestamp(), size);
+
         // Distribute the window data to a single function execution environment.
         let function_name = ring.get(&uuid.tid).expect("hash ring failure.").to_string();
-        let events = window.clone();
 
         // Call the next stage of the dataflow graph.
         if ctx.debug {
             println!(
-                "[OK] Send nexmark events from a window (epoch: {}-{}) to function: {}.",
+                "[OK] Send {} NexMark events from a window (epoch: {}-{}) to function: {}.",
+                size,
                 time,
                 time + window_size,
                 function_name
             );
         }
 
-        for t in time..time + window_size {
-            let offset = t - time;
-            let resp = invoke_lambda_function(
-                function_name.clone(),
-                Some(serde_json::to_vec(&events[offset])?.into()),
-            )
-            .await?;
-            if ctx.debug {
-                println!(
-                    "[OK] Received status from async lambda function. {:?}",
-                    resp
-                );
+        let mut eid = 0;
+        for (a, b) in window.iter() {
+            let num = if a.len() > b.len() { a.len() } else { b.len() };
+            for i in 0..num {
+                let r1 = if i < a.len() { a[i].clone() } else { vec![] };
+                let r2 = if i < b.len() { b[i].clone() } else { vec![] };
+                let payload = serde_json::to_vec(&to_payload(&r1, &r2, uuid.next()))?;
+                if ctx.debug {
+                    println!(
+                        "[OK] Event {} - function payload bytes: {}",
+                        eid,
+                        payload.len()
+                    );
+                }
+                let resp =
+                    invoke_lambda_function(function_name.clone(), Some(payload.into())).await?;
+                if ctx.debug {
+                    println!(
+                        "[OK] Received status from async lambda function. {:?}",
+                        resp
+                    );
+                }
+                eid += 1;
             }
         }
     }
@@ -184,12 +220,12 @@ pub async fn hopping_window_tasks(
 /// function services.
 ///
 /// # Arguments
-/// - `ctx`: the Flock runtime context.
-/// - `source`: the source stream of nexmark events.
-/// - `seconds`: the total number of seconds to generate workloads.
-/// - `ring`: the consistent hashing ring to forward the windowed events to the
+/// * `ctx` - the Flock runtime context.
+/// * `source` - the source stream of nexmark events.
+/// * `seconds` - the total number of seconds to generate workloads.
+/// * `ring` - the consistent hashing ring to forward the windowed events to the
 ///   same function execution environment.
-/// - `group_name`: the name of the group of the function.
+/// * `group_name` - the name of the group of the function.
 ///
 /// # Returns
 /// The task join handles of the generated workloads.
@@ -202,7 +238,7 @@ pub async fn elementwise_tasks(
 ) -> Result<()> {
     for epoch in 0..seconds {
         if ctx.debug {
-            println!("[OK] Send nexmark event (epoch: {}).", epoch);
+            println!("[OK] Send NexMark events (epoch: {}).", epoch);
         }
 
         let events = source.clone();
@@ -228,27 +264,38 @@ pub async fn elementwise_tasks(
                 );
             }
         } else {
-            // consistent hashing ring
-            let (r1, r2) = nexmark_event_to_batches(
+            // Calculate the total data packets to be sent.
+            let (a, b) = nexmark_event_to_batches(
                 events,
                 epoch,
                 0, // generator id
                 query_number,
             )?;
-            let size = if r1.len() > r2.len() {
-                r1.len()
-            } else {
-                r2.len()
-            };
+            let size = if a.len() > b.len() { a.len() } else { b.len() };
+
             let mut uuid = UuidBuilder::new_with_ts(&group_name, Utc::now().timestamp(), size);
+
             // Distribute the epoch data to a single function execution environment.
             let function_name = ring.get(&uuid.tid).expect("hash ring failure.").to_string();
+
+            // Call the next stage of the dataflow graph.
+            if ctx.debug {
+                println!(
+                    "[OK] Send {} NexMark events from epoch {} to function: {}.",
+                    size, epoch, function_name
+                );
+            }
+
             for i in 0..size {
-                let batch1 = if i < r1.len() { r1[i].clone() } else { vec![] };
-                let batch2 = if i < r2.len() { r2[i].clone() } else { vec![] };
-                let payload = serde_json::to_vec(&to_payload(&batch1, &batch2, uuid.next()))?;
+                let r1 = if i < a.len() { a[i].clone() } else { vec![] };
+                let r2 = if i < b.len() { b[i].clone() } else { vec![] };
+                let payload = serde_json::to_vec(&to_payload(&r1, &r2, uuid.next()))?;
                 if ctx.debug {
-                    println!("[{}]: function payload bytes: {}", i, payload.len());
+                    println!(
+                        "[OK] Event {} - function payload bytes: {}",
+                        i,
+                        payload.len()
+                    );
                 }
                 let resp =
                     invoke_lambda_function(function_name.clone(), Some(payload.into())).await?;

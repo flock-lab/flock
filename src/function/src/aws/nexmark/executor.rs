@@ -36,9 +36,9 @@ static mut INVOCATION_COUNTER_PER_INSTANCE: u32 = 0;
 /// Arrow RecordBatch.
 ///
 /// ## Arguments
-/// `ctx`: The Flock runtime context.
-/// `r1_records`: The input record batches for the first relation.
-/// `r2_records`: The input record batches for the second relation.
+/// * `ctx` - The Flock runtime context.
+/// * `r1_records` - The input record batches for the first relation.
+/// * `r2_records` - The input record batches for the second relation.
 ///
 /// ## Returns
 /// A vector of Arrow RecordBatch.
