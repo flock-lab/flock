@@ -65,16 +65,25 @@ Nexmark() {
   echo $(echogreen "         Compiling and Deploying Nexmark Benchmark          ")
   echo $(echogreen "============================================================")
   echo
+  echo $(echogreen "[1] Compiling Nexmark Benchmark Lambda Function...")
   cd src/function
   cargo +nightly build --target x86_64-unknown-linux-gnu --release
+  echo
+  echo $(echogreen "[2] Compiling Nexmark Benchmark Client ...")
   cd ../../bench
   cargo +nightly build --target x86_64-unknown-linux-gnu --release
+  echo
+  echo $(echogreen "[3] Compiling Flock CLI...")
+  cd src/bin/cli
+  cargo +nightly build --target x86_64-unknown-linux-gnu --release
+  echo
+  echo $(echogreen "[4] Deploying Nexmark Benchmark Lambda Function...")
   cd ../target/x86_64-unknown-linux-gnu/release
   ./flock-cli -u nexmark_lambda -k nexmark
   cd ../../..
   echo $(echoblue "-------------------------------------------------------------")
   echo
-  echo $(echogreen "Nexmark Benchmark Script Complete")
+  echo $(echogreen "[OK] Nexmark Benchmark Script Complete")
   echo
 }
 
@@ -152,11 +161,8 @@ if [ "$run" = "true" ]; then
   echo "Nexmark Seconds to Run: $seconds"
   echo $(echogreen "============================================================")
   echo
-  echo $(echogreen "Nexmark Benchmark Starting")
+  echo $(echogreen "[OK] Nexmark Benchmark Starting")
   echo
-
-  # delete the old nexmark_datasource function to make sure we have a clean slate
-  aws lambda delete-function --function-name nexmark_datasource || true
 
   # dry run to warm up the lambda functions.
   echo $(echogreen "[1] Warming up the lambda functions")
@@ -174,7 +180,7 @@ if [ "$run" = "true" ]; then
     -q $query -g $generators -s $seconds --events_per_second $events_per_second --debug
   echo $(echoblue "-------------------------------------------------------------")
   echo
-  echo $(echogreen "Nexmark Benchmark Complete")
+  echo $(echogreen "[OK] Nexmark Benchmark Complete")
 elif [ "$run" = "false" ]; then
   echo
   echo $(echored "Error: incomplete command line arguments, please use '-h' for help.")
