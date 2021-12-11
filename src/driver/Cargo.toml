@@ -24,6 +24,10 @@ rusoto_core = "0.47.0"
 rusoto_iam = "0.47.0"
 rusoto_kinesis = "0.47.0"
 rusoto_lambda = "0.47.0"
+rusoto_logs = "0.47.0"
+log = "0.4.14"
+env_logger = "^0.9"
+tokio = { version = "1.4", features = [ "macros", "io-util", "sync", "rt-multi-thread" ] }
 
 # A list of all of the optional dependencies, some of which are included in the
 # above `features`. They can be opted into by apps.

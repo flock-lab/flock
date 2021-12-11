@@ -164,6 +164,9 @@ if [ "$run" = "true" ]; then
   echo $(echogreen "[OK] Nexmark Benchmark Starting")
   echo
 
+  # delete the old nexmark_datasource function to make sure we have a clean slate
+  aws lambda delete-function --function-name nexmark_datasource || true
+
   # dry run to warm up the lambda functions.
   echo $(echogreen "[1] Warming up the lambda functions")
   echo
@@ -171,7 +174,7 @@ if [ "$run" = "true" ]; then
     -q $query -g $generators -s $seconds --events_per_second $events_per_second --debug
   echo $(echoblue "-------------------------------------------------------------")
   echo
-  sleep 5
+  sleep 2
 
   # run the benchmark
   echo $(echogreen "[2] Running the benchmark")

@@ -19,6 +19,8 @@ use datafusion::execution::context::ExecutionContext as DataFusionExecutionConte
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::ExecutionPlan;
 use driver::deploy::lambda;
+use driver::logwatch::tail;
+use humantime::parse_duration;
 use lazy_static::lazy_static;
 use log::info;
 use nexmark::event::{Auction, Bid, Person};
@@ -29,6 +31,7 @@ use rusoto_lambda::{
     CreateFunctionRequest, FunctionCode, GetFunctionRequest, InvocationRequest, InvocationResponse,
     Lambda, LambdaClient, PutFunctionConcurrencyRequest, UpdateFunctionCodeRequest,
 };
+use rusoto_logs::CloudWatchLogsClient;
 use rusoto_s3::{ListObjectsV2Request, PutObjectRequest, S3Client, S3};
 use std::sync::Arc;
 use structopt::StructOpt;
@@ -41,14 +44,21 @@ static LAMBDA_ASYNC_CALL: &str = "Event";
 static NEXMARK_SOURCE_FUNCTION_NAME: &str = "nexmark_datasource";
 
 lazy_static! {
+    // The NexMark Table Schema
     static ref PERSON: SchemaRef = Arc::new(Person::schema());
     static ref AUCTION: SchemaRef = Arc::new(Auction::schema());
     static ref BID: SchemaRef = Arc::new(Bid::schema());
+
+    // AWS Service Clients
     static ref LAMBDA_CLIENT: LambdaClient = LambdaClient::new(Region::default());
     static ref S3_CLIENT: S3Client = S3Client::new(Region::default());
+    static ref WATCHLOGS_CLIENT: CloudWatchLogsClient = CloudWatchLogsClient::new(Region::default());
+
+    // Flock-specific constants
     static ref S3_NEXMARK_BUCKET: String = FLOCK_CONF["lambda"]["s3_bucket"].to_string();
-    static ref S3_NEXMARK_Q6_PLAN_KEY: String =
-        FLOCK_CONF["lambda"]["s3_nexmark_q6_plan_key"].to_string();
+    static ref S3_NEXMARK_Q6_PLAN_KEY: String = FLOCK_CONF["lambda"]["s3_nexmark_q6_plan_key"].to_string();
+    static ref NEXMARK_SOURCE_LOG_GROUP: String = format!("/aws/lambda/{}", NEXMARK_SOURCE_FUNCTION_NAME);
+
     static ref PARALLELISM: usize = FLOCK_CONF["lambda"]["parallelism"]
         .parse::<usize>()
         .unwrap();
@@ -254,6 +264,39 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
     for task in tasks {
         let response = task.await.expect("Lambda function execution failed.")?;
         info!("[OK] Received status from function. {:?}", response);
+    }
+
+    fetch_watchlogs(&NEXMARK_SOURCE_LOG_GROUP, parse_duration("5min").unwrap()).await?;
+
+    Ok(())
+}
+
+async fn fetch_watchlogs(group: &String, mtime: std::time::Duration) -> Result<()> {
+    let timeout = parse_duration("1min").unwrap();
+    let sleep_for = parse_duration("5s").ok();
+    let mut token: Option<String> = None;
+    let mut req = tail::create_filter_request(&group, mtime, None, token);
+    loop {
+        match tail::fetch_logs(&WATCHLOGS_CLIENT, req, timeout)
+            .await
+            .map_err(|e| FlockError::Internal(e.to_string()))?
+        {
+            tail::AWSResponse::Token(x) => {
+                info!("Got a Token response");
+                token = Some(x);
+                req = tail::create_filter_request(&group, mtime, None, token);
+            }
+            tail::AWSResponse::LastLog(t) => match sleep_for {
+                Some(x) => {
+                    info!("Got a lastlog response");
+                    token = None;
+                    req = tail::create_filter_from_timestamp(&group, t, None, token);
+                    info!("Waiting {:?} before requesting logs again...", x);
+                    tokio::time::sleep(x).await;
+                }
+                None => break,
+            },
+        };
     }
 
     Ok(())
