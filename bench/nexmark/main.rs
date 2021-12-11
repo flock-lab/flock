@@ -273,7 +273,7 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
 
 async fn fetch_watchlogs(group: &String, mtime: std::time::Duration) -> Result<()> {
     let timeout = parse_duration("1min").unwrap();
-    let sleep_for = parse_duration("1s").ok();
+    let sleep_for = parse_duration("5s").ok();
     let mut token: Option<String> = None;
     let mut req = tail::create_filter_request(&group, mtime, None, token);
     loop {

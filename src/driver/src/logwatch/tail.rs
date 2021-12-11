@@ -95,12 +95,12 @@ pub async fn fetch_logs(
         .map_err(|e| FlockError::Internal(format!("Error fetching logs: {}", e)))?
     {
         Ok(response) => {
-            info!("Got response {:?}", &response);
+            info!("[OK] Got response from AWS CloudWatch Logs.");
             let mut events = response.events.unwrap();
             events.sort_by_key(|x| x.timestamp.map_or(-1, |x| x));
             for event in &events {
                 let message = event.message.as_ref().map_or("".into(), |x| x.clone());
-                println!("{} {}", print_date(event.timestamp), message,);
+                print!("{} {}", print_date(event.timestamp), message);
             }
             let last = events.last().map(|x| x.timestamp);
             match response.next_token {
