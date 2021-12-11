@@ -89,11 +89,11 @@ impl Default for CloudFunction {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ExecutionContext {
     /// The execution plan of the lambda function.
-    pub plan:         Arc<dyn ExecutionPlan>,
+    pub plan:        Arc<dyn ExecutionPlan>,
     /// The S3 URL of the physical plan. If the plan is too large to be
     /// serialized and stored in the environment variable, the system will
     /// store the plan in S3.
-    pub plan_s3_idx:  Option<(S3BUCKET, S3KEY)>,
+    pub plan_s3_idx: Option<(S3BUCKET, S3KEY)>,
     /// Cloud Function name in the current execution context.
     ///
     /// |      Cloud Function Naming Convention       |
@@ -115,24 +115,24 @@ pub struct ExecutionContext {
     /// at a certain moment.
     ///
     /// SX72HzqFz1Qij4bP-00-00
-    pub name:         CloudFunctionName,
+    pub name:        CloudFunctionName,
     /// Lambda function name(s) for next invocation(s).
-    pub next:         CloudFunction,
+    pub next:        CloudFunction,
     /// Data source where data that is being used originates from.
-    pub datasource:   DataSource,
+    pub datasource:  DataSource,
     /// Print the debug information in the lambda instance.
-    pub debug:        bool,
+    pub debug:       bool,
 }
 
 impl Default for ExecutionContext {
     fn default() -> ExecutionContext {
         ExecutionContext {
-            plan:         Arc::new(EmptyExec::new(false, Arc::new(Schema::empty()))),
-            plan_s3_idx:  None,
-            name:         "".to_string(),
-            next:         CloudFunction::None,
-            datasource:   DataSource::default(),
-            debug:        false,
+            plan:        Arc::new(EmptyExec::new(false, Arc::new(Schema::empty()))),
+            plan_s3_idx: None,
+            name:        "".to_string(),
+            next:        CloudFunction::None,
+            datasource:  DataSource::default(),
+            debug:       false,
         }
     }
 }

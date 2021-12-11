@@ -134,21 +134,21 @@ pub struct DataFrame {
 #[derive(Clone, Default, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Payload {
     /// The record batches are encoded in the Arrow Flight Data format.
-    pub data:       Vec<DataFrame>,
+    pub data:         Vec<DataFrame>,
     /// The schema of the record batches in binary format.
-    pub schema:     Vec<u8>,
+    pub schema:       Vec<u8>,
     /// The record batches for the 2nd relation.
-    pub data2:      Vec<DataFrame>,
+    pub data2:        Vec<DataFrame>,
     /// The schema of the record batches for the 2nd relation.
-    pub schema2:    Vec<u8>,
+    pub schema2:      Vec<u8>,
     /// The UUID of the payload.
-    pub uuid:       Uuid,
+    pub uuid:         Uuid,
     /// The encoding and compression method.
     /// Note: using this value to guarantee the total size of payload doesn't
     /// exceed 256 KB due to the limitation of AWS Lambda's async invocation.
-    pub encoding:   Encoding,
+    pub encoding:     Encoding,
     /// Only used for the benchmarking purpose.
-    pub datasource: Option<DataSource>,
+    pub datasource:   Option<DataSource>,
     /// The Nexmark query number for the benchmarking purposes.
     pub query_number: Option<usize>,
 }

@@ -13,3 +13,5 @@
 
 //! This crate collects execution logs and helps users analyze lambda functions
 //! for further adaptive query optimization.
+
+pub mod tail;

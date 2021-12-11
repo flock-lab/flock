@@ -22,7 +22,7 @@ use futures::executor::block_on;
 use hashring::HashRing;
 use lambda_runtime::{handler_fn, Context};
 use lazy_static::lazy_static;
-use log::warn;
+use log::{info, warn};
 use rayon::prelude::*;
 use runtime::prelude::*;
 use rusoto_core::Region;
@@ -160,9 +160,7 @@ async fn payload_handler(
     arena: &mut Arena,
     event: Payload,
 ) -> Result<Value> {
-    if ctx.debug {
-        println!("Receiving a data packet: {:?}", event.uuid);
-    }
+    info!("Receiving a data packet: {:?}", event.uuid);
     let tid = event.uuid.tid.clone();
 
     let input_partitions = {
@@ -173,15 +171,11 @@ async fn payload_handler(
             // ressemble data packets to a single window.
             let (ready, uuid) = arena.reassemble(event);
             if ready {
-                if ctx.debug {
-                    println!("Received all data packets for the window: {:?}", uuid.tid);
-                }
+                info!("Received all data packets for the window: {:?}", uuid.tid);
                 arena.batches(uuid.tid)
             } else {
                 let response = format!("Window data collection has not been completed.");
-                if ctx.debug {
-                    println!("{}", response);
-                }
+                info!("{}", response);
                 return Ok(json!({ "response": response }));
             }
         } else {
@@ -305,6 +299,7 @@ async fn handler(event: Payload, _: Context) -> Result<Value> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    env_logger::init();
     lambda_runtime::run(handler_fn(handler)).await?;
     Ok(())
 }
