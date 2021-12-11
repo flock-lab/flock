@@ -74,7 +74,7 @@ Nexmark() {
   cargo +nightly build --target x86_64-unknown-linux-gnu --release
   echo
   echo $(echogreen "[3] Compiling Flock CLI...")
-  cd src/bin/cli
+  cd ../src/bin/cli
   cargo +nightly build --target x86_64-unknown-linux-gnu --release
   echo
   echo $(echogreen "[4] Deploying Nexmark Benchmark Lambda Function...")
