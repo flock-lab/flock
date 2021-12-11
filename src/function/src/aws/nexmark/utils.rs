@@ -88,8 +88,8 @@ pub fn nexmark_event_to_payload(
     }
 
     println!(
-        "Generator {}: {} persons, {} auctions, {} bids.",
-        generator, persons_num, auctions_num, bids_num
+        "Epoch {}: {} persons, {} auctions, {} bids.",
+        time, persons_num, auctions_num, bids_num
     );
 
     match query_number {
@@ -137,8 +137,8 @@ pub fn nexmark_event_to_batches(
     }
 
     println!(
-        "Generator {}: {} persons, {} auctions, {} bids.",
-        generator, persons_num, auctions_num, bids_num
+        "Epoch {}: {} persons, {} auctions, {} bids.",
+        time, persons_num, auctions_num, bids_num
     );
 
     let (r1, r2) = match query_number {

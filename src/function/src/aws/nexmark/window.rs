@@ -35,6 +35,7 @@ use std::sync::Arc;
 /// The task join handles of the generated workloads.
 pub async fn tumbling_window_tasks(
     ctx: &ExecutionContext,
+    query_number: usize,
     source: Arc<NexMarkStream>,
     seconds: usize,
     window_size: usize,
@@ -44,7 +45,6 @@ pub async fn tumbling_window_tasks(
     assert!(seconds >= window_size);
 
     let mut window: Box<Vec<(Vec<Vec<RecordBatch>>, Vec<Vec<RecordBatch>>)>> = Box::new(vec![]);
-    let query_number = ctx.query_number.expect("query number is not set.");
 
     for time in 0..seconds / window_size {
         let start = time * window_size;
@@ -130,6 +130,7 @@ pub async fn tumbling_window_tasks(
 /// The task join handles of the generated workloads.
 pub async fn hopping_window_tasks(
     ctx: &ExecutionContext,
+    query_number: usize,
     source: Arc<NexMarkStream>,
     seconds: usize,
     window_size: usize,
@@ -140,7 +141,6 @@ pub async fn hopping_window_tasks(
     assert!(seconds >= window_size);
 
     let mut window: Box<Vec<(Vec<Vec<RecordBatch>>, Vec<Vec<RecordBatch>>)>> = Box::new(vec![]);
-    let query_number = ctx.query_number.expect("query number is not set.");
 
     for time in (0..seconds).step_by(hop_size) {
         if time + window_size > seconds {
@@ -231,6 +231,7 @@ pub async fn hopping_window_tasks(
 /// The task join handles of the generated workloads.
 pub async fn elementwise_tasks(
     ctx: &ExecutionContext,
+    query_number: usize,
     source: Arc<NexMarkStream>,
     seconds: usize,
     ring: &mut HashRing<String>,
@@ -242,7 +243,6 @@ pub async fn elementwise_tasks(
         }
 
         let events = source.clone();
-        let query_number = ctx.query_number.expect("query number is not set.");
 
         if ring.len() == 1 {
             // lambda default concurrency
