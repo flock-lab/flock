@@ -141,7 +141,6 @@ impl QueryFlow {
                 name: QueryFlow::function_name(&query_code, &root, &timestamp),
                 next: CloudFunction::None, // the last function
                 datasource: DataSource::Payload,
-                query_number: None,
                 ..Default::default()
             },
         );
@@ -175,7 +174,6 @@ impl QueryFlow {
                                 DataSource::Payload
                             }
                         },
-                        query_number: None,
                         ..Default::default()
                     },
                 );

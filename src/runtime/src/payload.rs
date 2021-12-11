@@ -149,6 +149,8 @@ pub struct Payload {
     pub encoding:   Encoding,
     /// Only used for the benchmarking purpose.
     pub datasource: Option<DataSource>,
+    /// The Nexmark query number for the benchmarking purposes.
+    pub query_number: Option<usize>,
 }
 
 impl Payload {

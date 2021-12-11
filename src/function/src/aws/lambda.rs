@@ -295,7 +295,6 @@ mod tests {
             name,
             next,
             datasource,
-            query_number: None,
             ..Default::default()
         };
 

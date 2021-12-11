@@ -395,7 +395,6 @@ mod tests {
             name: "test".to_string(),
             next: CloudFunction::None,
             datasource: DataSource::UnknownEvent,
-            query_number: None,
             ..Default::default()
         };
         LambdaExecutor::next_function(&ctx).expect_err("No distributed execution plan");
@@ -405,7 +404,6 @@ mod tests {
             name: "test".to_string(),
             next: CloudFunction::Lambda("solo".to_string()),
             datasource: DataSource::UnknownEvent,
-            query_number: None,
             ..Default::default()
         };
         assert_eq!("solo", LambdaExecutor::next_function(&ctx)?);
@@ -415,7 +413,6 @@ mod tests {
             name: "test".to_string(),
             next: CloudFunction::Group(("chorus".to_string(), 24)),
             datasource: DataSource::UnknownEvent,
-            query_number: None,
             ..Default::default()
         };
 

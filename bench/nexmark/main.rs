@@ -177,23 +177,21 @@ async fn create_nexmark_functions(
 
     let (plan, s3) = plan_placement(opt.query_number, physcial_plan).await?;
     let nexmark_source_ctx = ExecutionContext {
-        plan:         plan.clone(),
-        plan_s3_idx:  s3.clone(),
-        name:         NEXMARK_SOURCE_FUNCTION_NAME.to_string(),
-        next:         next_func_name.clone(),
-        datasource:   DataSource::NexMarkEvent(NexMarkSource::default()),
-        query_number: Some(opt.query_number),
-        debug:        opt.debug,
+        plan:        plan.clone(),
+        plan_s3_idx: s3.clone(),
+        name:        NEXMARK_SOURCE_FUNCTION_NAME.to_string(),
+        next:        next_func_name.clone(),
+        datasource:  DataSource::NexMarkEvent(NexMarkSource::default()),
+        debug:       opt.debug,
     };
 
     let mut nexmark_worker_ctx = ExecutionContext {
-        plan:         plan,
-        plan_s3_idx:  s3.clone(),
-        name:         worker_func_name.clone(),
-        next:         CloudFunction::None,
-        datasource:   DataSource::Payload,
-        query_number: Some(opt.query_number),
-        debug:        opt.debug,
+        plan:        plan,
+        plan_s3_idx: s3.clone(),
+        name:        worker_func_name.clone(),
+        next:        CloudFunction::None,
+        datasource:  DataSource::Payload,
+        debug:       opt.debug,
     };
 
     // Create the function for the nexmark source generator.
@@ -228,9 +226,10 @@ async fn create_nexmark_functions(
 async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
     info!("Running benchmarks with the following options: {:?}", opt);
     let nexmark_conf = create_nexmark_source(&opt);
+    let query_number = opt.query_number;
 
     let mut ctx = register_nexmark_tables().await?;
-    let plan = physical_plan(&mut ctx, &nexmark_query(opt.query_number))?;
+    let plan = physical_plan(&mut ctx, &nexmark_query(query_number))?;
     create_nexmark_functions(opt.clone(), nexmark_conf.clone(), plan).await?;
 
     let tasks = (0..opt.generators)
@@ -242,6 +241,7 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
                 info!("[OK] Invoke function: {} {}", f, i);
                 let p = serde_json::to_vec(&Payload {
                     datasource: Some(DataSource::NexMarkEvent(s)),
+                    query_number: Some(query_number),
                     ..Default::default()
                 })?
                 .into();
