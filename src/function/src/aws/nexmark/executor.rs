@@ -66,12 +66,10 @@ pub async fn collect(
     } else {
         ctx.feed_data_sources(&inputs).await?;
         let output = ctx.execute().await?;
-        if ctx.debug {
-            println!("{}", pretty_format_batches(&output)?);
-            unsafe {
-                INVOCATION_COUNTER_PER_INSTANCE += 1;
-                info!("# invocations: {}", INVOCATION_COUNTER_PER_INSTANCE);
-            }
+        info!("{}", pretty_format_batches(&output)?);
+        unsafe {
+            INVOCATION_COUNTER_PER_INSTANCE += 1;
+            info!("# invocations: {}", INVOCATION_COUNTER_PER_INSTANCE);
         }
         Ok(output)
     }

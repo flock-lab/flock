@@ -16,6 +16,7 @@ use arrow::datatypes::SchemaRef;
 use arrow::record_batch::RecordBatch;
 use bytes::Bytes;
 use lazy_static::lazy_static;
+use log::info;
 use nexmark::event::{Auction, Bid, Person};
 use nexmark::{NexMarkSource, NexMarkStream};
 use runtime::prelude::*;
@@ -87,7 +88,7 @@ pub fn nexmark_event_to_payload(
         return Err(FlockError::Execution("No Nexmark input!".to_owned()));
     }
 
-    println!(
+    info!(
         "Epoch {}: {} persons, {} auctions, {} bids.",
         time, persons_num, auctions_num, bids_num
     );
@@ -136,7 +137,7 @@ pub fn nexmark_event_to_batches(
         return Err(FlockError::Execution("No Nexmark input!".to_owned()));
     }
 
-    println!(
+    info!(
         "Epoch {}: {} persons, {} auctions, {} bids.",
         time, persons_num, auctions_num, bids_num
     );

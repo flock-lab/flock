@@ -77,7 +77,7 @@ impl ExecutionEnvironment {
                     client
                         .create_function(CreateFunctionRequest {
                             code: lambda::function_code(),
-                            environment: lambda::environment(&ctx),
+                            environment: lambda::environment(&ctx, true),
                             function_name: name.to_owned(),
                             handler: lambda::handler(),
                             memory_size: lambda::memory_size(&ctx),

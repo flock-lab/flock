@@ -225,12 +225,9 @@ async fn nexmark_bench_handler(ctx: &ExecutionContext, payload: Payload) -> Resu
     let events = Arc::new(source.generate_data()?);
     let query_number = payload.query_number.expect("Query number is missing.");
 
-    if ctx.debug {
-        println!("Nexmark Benchmark: Query {:?}", query_number);
-        println!("{:?}", source);
-        println!("[OK] Generate nexmark events.");
-    }
-
+    info!("Nexmark Benchmark: Query {:?}", query_number);
+    info!("{:?}", source);
+    info!("[OK] Generate nexmark events.");
     let (mut ring, group_name) = unsafe {
         match &mut CONSISTENT_HASH_CONTEXT {
             ConsistentHashContext::Lambda((ring, group_name)) => (ring, group_name),
@@ -243,7 +240,6 @@ async fn nexmark_bench_handler(ctx: &ExecutionContext, payload: Payload) -> Resu
     match source.window {
         StreamWindow::TumblingWindow(Schedule::Seconds(window_size)) => {
             tumbling_window_tasks(
-                &ctx,
                 query_number,
                 events,
                 sec,
@@ -255,7 +251,6 @@ async fn nexmark_bench_handler(ctx: &ExecutionContext, payload: Payload) -> Resu
         }
         StreamWindow::HoppingWindow((window_size, hop_size)) => {
             hopping_window_tasks(
-                &ctx,
                 query_number,
                 events,
                 sec,
@@ -270,15 +265,7 @@ async fn nexmark_bench_handler(ctx: &ExecutionContext, payload: Payload) -> Resu
             unimplemented!();
         }
         StreamWindow::ElementWise => {
-            elementwise_tasks(
-                &ctx,
-                query_number,
-                events,
-                sec,
-                &mut ring,
-                group_name.clone(),
-            )
-            .await?;
+            elementwise_tasks(query_number, events, sec, &mut ring, group_name.clone()).await?;
         }
         _ => unimplemented!(),
     };
