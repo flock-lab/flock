@@ -120,8 +120,6 @@ pub struct ExecutionContext {
     pub next:        CloudFunction,
     /// Data source where data that is being used originates from.
     pub datasource:  DataSource,
-    /// Print the debug information in the lambda instance.
-    pub debug:       bool,
 }
 
 impl Default for ExecutionContext {
@@ -132,7 +130,6 @@ impl Default for ExecutionContext {
             name:        "".to_string(),
             next:        CloudFunction::None,
             datasource:  DataSource::default(),
-            debug:       false,
         }
     }
 }
@@ -143,7 +140,6 @@ impl PartialEq for ExecutionContext {
             && self.name == other.name
             && self.next == other.next
             && self.datasource == other.datasource
-            && self.debug == other.debug
             && serde_json::to_string(&self.plan).unwrap()
                 == serde_json::to_string(&other.plan).unwrap()
     }

@@ -192,7 +192,6 @@ async fn create_nexmark_functions(
         name:        NEXMARK_SOURCE_FUNCTION_NAME.to_string(),
         next:        next_func_name.clone(),
         datasource:  DataSource::NexMarkEvent(NexMarkSource::default()),
-        debug:       opt.debug,
     };
 
     let mut nexmark_worker_ctx = ExecutionContext {
@@ -201,12 +200,11 @@ async fn create_nexmark_functions(
         name:        worker_func_name.clone(),
         next:        CloudFunction::None,
         datasource:  DataSource::Payload,
-        debug:       opt.debug,
     };
 
     // Create the function for the nexmark source generator.
     info!("Creating lambda function: {}", NEXMARK_SOURCE_FUNCTION_NAME);
-    create_lambda_function(&nexmark_source_ctx).await?;
+    create_lambda_function(&nexmark_source_ctx, opt.debug).await?;
 
     // Create the function for the nexmark worker.
     match next_func_name {
@@ -342,7 +340,7 @@ async fn set_lambda_concurrency(function_name: String, concurrency: i64) -> Resu
 }
 
 /// Creates a single lambda function using bootstrap.zip in Amazon S3.
-async fn create_lambda_function(ctx: &ExecutionContext) -> Result<String> {
+async fn create_lambda_function(ctx: &ExecutionContext, debug: bool) -> Result<String> {
     let s3_bucket = FLOCK_CONF["lambda"]["s3_bucket"].to_string();
     let s3_key = FLOCK_CONF["lambda"]["s3_nexmark_key"].to_string();
     let func_name = ctx.name.clone();
@@ -377,7 +375,7 @@ async fn create_lambda_function(ctx: &ExecutionContext) -> Result<String> {
                 handler: lambda::handler(),
                 role: lambda::role().await,
                 runtime: lambda::runtime(),
-                environment: lambda::environment(&ctx),
+                environment: lambda::environment(&ctx, debug),
                 timeout: Some(900),
                 ..Default::default()
             })

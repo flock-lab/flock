@@ -129,7 +129,7 @@ pub fn nexmark_function_code() -> FunctionCode {
 
 /// Environment variables that are accessible from function code during
 /// execution.
-pub fn environment(ctx: &ExecutionContext) -> Option<Environment> {
+pub fn environment(ctx: &ExecutionContext, debug: bool) -> Option<Environment> {
     let mut map = HashMap::new();
     map.insert(
         (&FLOCK_CONF["lambda"]["name"]).to_owned(),
@@ -137,7 +137,12 @@ pub fn environment(ctx: &ExecutionContext) -> Option<Environment> {
     );
     // Enable crate `env_logger`
     // https://docs.rs/env_logger/latest/env_logger/
-    map.insert("RUST_LOG".to_owned(), "info".to_owned());
+    if debug {
+        map.insert(
+            "RUST_LOG".to_owned(),
+            "info".to_owned(),
+        );
+    }
     map.insert("RUST_BACKTRACE".to_owned(), "1".to_owned());
     Some(Environment {
         variables: Some(map),

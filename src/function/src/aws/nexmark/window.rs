@@ -15,6 +15,7 @@ use crate::utils::*;
 use arrow::record_batch::RecordBatch;
 use chrono::Utc;
 use hashring::HashRing;
+use log::info;
 use nexmark::NexMarkStream;
 use runtime::prelude::*;
 use std::sync::Arc;
@@ -34,7 +35,6 @@ use std::sync::Arc;
 /// # Returns
 /// The task join handles of the generated workloads.
 pub async fn tumbling_window_tasks(
-    ctx: &ExecutionContext,
     query_number: usize,
     source: Arc<NexMarkStream>,
     seconds: usize,
@@ -73,15 +73,13 @@ pub async fn tumbling_window_tasks(
         let function_name = ring.get(&uuid.tid).expect("hash ring failure.").to_string();
 
         // Call the next stage of the dataflow graph.
-        if ctx.debug {
-            println!(
-                "[OK] Send {} NexMark events from a window (epoch: {}-{}) to function: {}.",
-                size,
-                time,
-                time + window_size,
-                function_name
-            );
-        }
+        info!(
+            "[OK] Send {} NexMark events from a window (epoch: {}-{}) to function: {}.",
+            size,
+            time,
+            time + window_size,
+            function_name
+        );
 
         let mut eid = 0;
         for (a, b) in window.iter() {
@@ -90,21 +88,15 @@ pub async fn tumbling_window_tasks(
                 let r1 = if i < a.len() { a[i].clone() } else { vec![] };
                 let r2 = if i < b.len() { b[i].clone() } else { vec![] };
                 let payload = serde_json::to_vec(&to_payload(&r1, &r2, uuid.next()))?;
-                if ctx.debug {
-                    println!(
-                        "[OK] Event {} - function payload bytes: {}",
-                        eid,
-                        payload.len()
-                    );
-                }
-                let resp =
-                    invoke_lambda_function(function_name.clone(), Some(payload.into())).await?;
-                if ctx.debug {
-                    println!(
-                        "[OK] Received status from async lambda function. {:?}",
-                        resp
-                    );
-                }
+                info!(
+                    "[OK] Event {} - function payload bytes: {}",
+                    eid,
+                    payload.len()
+                );
+                info!(
+                    "[OK] Received status from async lambda function. {:?}",
+                    invoke_lambda_function(function_name.clone(), Some(payload.into())).await?
+                );
                 eid += 1;
             }
         }
@@ -129,7 +121,6 @@ pub async fn tumbling_window_tasks(
 /// # Returns
 /// The task join handles of the generated workloads.
 pub async fn hopping_window_tasks(
-    ctx: &ExecutionContext,
     query_number: usize,
     source: Arc<NexMarkStream>,
     seconds: usize,
@@ -176,15 +167,13 @@ pub async fn hopping_window_tasks(
         let function_name = ring.get(&uuid.tid).expect("hash ring failure.").to_string();
 
         // Call the next stage of the dataflow graph.
-        if ctx.debug {
-            println!(
-                "[OK] Send {} NexMark events from a window (epoch: {}-{}) to function: {}.",
-                size,
-                time,
-                time + window_size,
-                function_name
-            );
-        }
+        info!(
+            "[OK] Send {} NexMark events from a window (epoch: {}-{}) to function: {}.",
+            size,
+            time,
+            time + window_size,
+            function_name
+        );
 
         let mut eid = 0;
         for (a, b) in window.iter() {
@@ -193,21 +182,15 @@ pub async fn hopping_window_tasks(
                 let r1 = if i < a.len() { a[i].clone() } else { vec![] };
                 let r2 = if i < b.len() { b[i].clone() } else { vec![] };
                 let payload = serde_json::to_vec(&to_payload(&r1, &r2, uuid.next()))?;
-                if ctx.debug {
-                    println!(
-                        "[OK] Event {} - function payload bytes: {}",
-                        eid,
-                        payload.len()
-                    );
-                }
-                let resp =
-                    invoke_lambda_function(function_name.clone(), Some(payload.into())).await?;
-                if ctx.debug {
-                    println!(
-                        "[OK] Received status from async lambda function. {:?}",
-                        resp
-                    );
-                }
+                info!(
+                    "[OK] Event {} - function payload bytes: {}",
+                    eid,
+                    payload.len()
+                );
+                info!(
+                    "[OK] Received status from async lambda function. {:?}",
+                    invoke_lambda_function(function_name.clone(), Some(payload.into())).await?
+                );
                 eid += 1;
             }
         }
@@ -230,7 +213,6 @@ pub async fn hopping_window_tasks(
 /// # Returns
 /// The task join handles of the generated workloads.
 pub async fn elementwise_tasks(
-    ctx: &ExecutionContext,
     query_number: usize,
     source: Arc<NexMarkStream>,
     seconds: usize,
@@ -238,10 +220,7 @@ pub async fn elementwise_tasks(
     group_name: String,
 ) -> Result<()> {
     for epoch in 0..seconds {
-        if ctx.debug {
-            println!("[OK] Send NexMark events (epoch: {}).", epoch);
-        }
-
+        info!("[OK] Send NexMark events (epoch: {}).", epoch);
         let events = source.clone();
 
         if ring.len() == 1 {
@@ -256,13 +235,10 @@ pub async fn elementwise_tasks(
                 uuid,
             )?)?
             .into();
-            let resp = invoke_lambda_function(function_name, Some(payload)).await?;
-            if ctx.debug {
-                println!(
-                    "[OK] Received status from async lambda function. {:?}",
-                    resp
-                );
-            }
+            info!(
+                "[OK] Received status from async lambda function. {:?}",
+                invoke_lambda_function(function_name, Some(payload)).await?
+            );
         } else {
             // Calculate the total data packets to be sent.
             let (a, b) = nexmark_event_to_batches(
@@ -279,32 +255,24 @@ pub async fn elementwise_tasks(
             let function_name = ring.get(&uuid.tid).expect("hash ring failure.").to_string();
 
             // Call the next stage of the dataflow graph.
-            if ctx.debug {
-                println!(
-                    "[OK] Send {} NexMark events from epoch {} to function: {}.",
-                    size, epoch, function_name
-                );
-            }
+            info!(
+                "[OK] Send {} NexMark events from epoch {} to function: {}.",
+                size, epoch, function_name
+            );
 
             for i in 0..size {
                 let r1 = if i < a.len() { a[i].clone() } else { vec![] };
                 let r2 = if i < b.len() { b[i].clone() } else { vec![] };
                 let payload = serde_json::to_vec(&to_payload(&r1, &r2, uuid.next()))?;
-                if ctx.debug {
-                    println!(
-                        "[OK] Event {} - function payload bytes: {}",
-                        i,
-                        payload.len()
-                    );
-                }
-                let resp =
-                    invoke_lambda_function(function_name.clone(), Some(payload.into())).await?;
-                if ctx.debug {
-                    println!(
-                        "[OK] Received status from async lambda function. {:?}",
-                        resp
-                    );
-                }
+                info!(
+                    "[OK] Event {} - function payload bytes: {}",
+                    i,
+                    payload.len()
+                );
+                info!(
+                    "[OK] Received status from async lambda function. {:?}",
+                    invoke_lambda_function(function_name.clone(), Some(payload.into())).await?
+                );
             }
         }
     }
