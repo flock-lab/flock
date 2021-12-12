@@ -33,6 +33,7 @@ use rusoto_lambda::{
 };
 use rusoto_logs::CloudWatchLogsClient;
 use rusoto_s3::{ListObjectsV2Request, PutObjectRequest, S3Client, S3};
+use std::collections::HashMap;
 use std::sync::Arc;
 use structopt::StructOpt;
 use tokio::task::JoinHandle;
@@ -170,24 +171,26 @@ async fn plan_placement(
     }
 }
 
+/// Create lambda functions for a given NexMark query.
+/// The returned function is the worker group as a whole which will be executed
+/// by the NexmarkBenchmark data generator function.
 async fn create_nexmark_functions(
     opt: NexmarkBenchmarkOpt,
-    nexmark_conf: NexMarkSource,
+    window: StreamWindow,
     physcial_plan: Arc<dyn ExecutionPlan>,
-) -> Result<()> {
+) -> Result<CloudFunction> {
     let worker_func_name = format!("q{}-00", opt.query_number);
 
-    let next_func_name = if nexmark_conf.window != StreamWindow::ElementWise
-        || opt.events_per_second > *GRANULE_SIZE * 2
-    {
-        CloudFunction::Group((worker_func_name.clone(), *PARALLELISM))
-    } else {
-        CloudFunction::Lambda(worker_func_name.clone())
-    };
+    let next_func_name =
+        if window != StreamWindow::ElementWise || opt.events_per_second > *GRANULE_SIZE * 2 {
+            CloudFunction::Group((worker_func_name.clone(), *PARALLELISM))
+        } else {
+            CloudFunction::Lambda(worker_func_name.clone())
+        };
 
     let (plan, s3) = plan_placement(opt.query_number, physcial_plan).await?;
     let nexmark_source_ctx = ExecutionContext {
-        plan:        plan.clone(),
+        plan:        Arc::new(EmptyExec::new(false, Arc::new(Schema::empty()))),
         plan_s3_idx: s3.clone(),
         name:        NEXMARK_SOURCE_FUNCTION_NAME.to_string(),
         next:        next_func_name.clone(),
@@ -207,7 +210,7 @@ async fn create_nexmark_functions(
     create_lambda_function(&nexmark_source_ctx, opt.debug).await?;
 
     // Create the function for the nexmark worker.
-    match next_func_name {
+    match &next_func_name {
         CloudFunction::Lambda(name) => {
             info!("Creating lambda function: {}", name);
             create_lambda_function(&nexmark_worker_ctx, opt.debug).await?;
@@ -217,7 +220,7 @@ async fn create_nexmark_functions(
                 "Creating lambda function group: {:?}",
                 nexmark_source_ctx.next
             );
-            for i in 0..parallelism {
+            for i in 0..*parallelism {
                 let group_member_name = format!("{}-{:02}", name.clone(), i);
                 info!("Creating function member: {}", group_member_name);
                 nexmark_worker_ctx.name = group_member_name;
@@ -228,7 +231,7 @@ async fn create_nexmark_functions(
         CloudFunction::None => unreachable!(),
     }
 
-    Ok(())
+    Ok(next_func_name)
 }
 
 async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
@@ -238,18 +241,28 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
 
     let mut ctx = register_nexmark_tables().await?;
     let plan = physical_plan(&mut ctx, &nexmark_query(query_number))?;
-    create_nexmark_functions(opt.clone(), nexmark_conf.clone(), plan).await?;
+    let root_actor =
+        create_nexmark_functions(opt.clone(), nexmark_conf.window.clone(), plan).await?;
+
+    // The source generator function needs the metadata to determine the type of the
+    // workers such as single function or a group. We don't want to keep this info
+    // in the environment as part of the source function. Otherwise, we have to
+    // *delete* and **recreate** the source function every time we change the query.
+    let mut metadata = HashMap::new();
+    metadata.insert(format!("workers"), serde_json::to_string(&root_actor)?);
 
     let tasks = (0..opt.generators)
         .into_iter()
         .map(|i| {
             let f = NEXMARK_SOURCE_FUNCTION_NAME.to_string();
             let s = nexmark_conf.clone();
+            let m = metadata.clone();
             tokio::spawn(async move {
                 info!("[OK] Invoke function: {} {}", f, i);
                 let p = serde_json::to_vec(&Payload {
                     datasource: Some(DataSource::NexMarkEvent(s)),
                     query_number: Some(query_number),
+                    metadata: Some(m),
                     ..Default::default()
                 })?
                 .into();

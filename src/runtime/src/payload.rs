@@ -25,6 +25,7 @@ use arrow_flight::utils::flight_data_to_arrow_batch;
 use arrow_flight::FlightData;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 use text_io::scan;
 
@@ -151,6 +152,8 @@ pub struct Payload {
     pub datasource:   Option<DataSource>,
     /// The Nexmark query number for the benchmarking purposes.
     pub query_number: Option<usize>,
+    /// The extra metadata for the payload.
+    pub metadata:     Option<HashMap<String, String>>,
 }
 
 impl Payload {

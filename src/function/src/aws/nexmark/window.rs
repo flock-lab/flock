@@ -24,7 +24,7 @@ use std::sync::Arc;
 /// function services.
 ///
 /// # Arguments
-/// * `ctx` - the Flock runtime context.
+/// * `ctx` - the runtime context of the function.
 /// * `source` - the source stream of nexmark events.
 /// * `seconds` - the total number of seconds to generate workloads.
 /// * `window_size` - the size of the window in seconds.
@@ -109,7 +109,7 @@ pub async fn tumbling_window_tasks(
 /// function services.
 ///
 /// # Arguments
-/// * `ctx` - the Flock runtime context.
+/// * `ctx` - the runtime context of the function.
 /// * `source` - the source stream of nexmark events.
 /// * `seconds` - the total number of seconds to generate workloads.
 /// * `window_size` - the size of the window in seconds.
@@ -203,7 +203,7 @@ pub async fn hopping_window_tasks(
 /// function services.
 ///
 /// # Arguments
-/// * `ctx` - the Flock runtime context.
+/// * `ctx` - the runtime context of the function.
 /// * `source` - the source stream of nexmark events.
 /// * `seconds` - the total number of seconds to generate workloads.
 /// * `ring` - the consistent hashing ring to forward the windowed events to the
