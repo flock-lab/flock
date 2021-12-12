@@ -210,7 +210,7 @@ async fn create_nexmark_functions(
     match next_func_name {
         CloudFunction::Lambda(name) => {
             info!("Creating lambda function: {}", name);
-            create_lambda_function(&nexmark_worker_ctx).await?;
+            create_lambda_function(&nexmark_worker_ctx, opt.debug).await?;
         }
         CloudFunction::Group((name, parallelism)) => {
             info!(
@@ -221,7 +221,7 @@ async fn create_nexmark_functions(
                 let group_member_name = format!("{}-{:02}", name.clone(), i);
                 info!("Creating function member: {}", group_member_name);
                 nexmark_worker_ctx.name = group_member_name;
-                create_lambda_function(&nexmark_worker_ctx).await?;
+                create_lambda_function(&nexmark_worker_ctx, opt.debug).await?;
                 set_lambda_concurrency(nexmark_worker_ctx.name, 1).await?;
             }
         }
