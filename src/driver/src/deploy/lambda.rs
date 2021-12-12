@@ -138,10 +138,7 @@ pub fn environment(ctx: &ExecutionContext, debug: bool) -> Option<Environment> {
     // Enable crate `env_logger`
     // https://docs.rs/env_logger/latest/env_logger/
     if debug {
-        map.insert(
-            "RUST_LOG".to_owned(),
-            "info".to_owned(),
-        );
+        map.insert("RUST_LOG".to_owned(), "info".to_owned());
     }
     map.insert("RUST_BACKTRACE".to_owned(), "1".to_owned());
     Some(Environment {
