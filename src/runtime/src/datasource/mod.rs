@@ -75,6 +75,8 @@ impl DataSource {
     }
 }
 
+pub mod config;
 pub mod kafka;
 pub mod kinesis;
 pub mod nexmark;
+pub mod ysb;

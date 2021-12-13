@@ -14,7 +14,8 @@
 //! The NexMark data generator is based on the data generator by Nicolas Hafner,
 //! original available on https://github.com/Shinmera/bsc-thesis/blob/master/benchmarks/src/nexmark.rs
 
-use crate::datasource::nexmark::config::{Config, NEXMarkConfig};
+use crate::datasource::config::Config;
+use crate::datasource::nexmark::config::NEXMarkConfig;
 use crate::datasource::nexmark::event::{Date, Event};
 use std::io::{Error, ErrorKind, Result};
 

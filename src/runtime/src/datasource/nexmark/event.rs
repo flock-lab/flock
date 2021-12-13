@@ -409,7 +409,7 @@ impl Bid {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::datasource::nexmark::config::Config;
+    use crate::datasource::config::Config;
 
     #[test]
     fn test_nexmark_rng() {

@@ -24,7 +24,7 @@ use std::io::BufReader;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use crate::datasource::nexmark::config::Config;
+use crate::datasource::config::Config;
 use crate::datasource::nexmark::event::Date;
 use crate::datasource::nexmark::generator::NEXMarkGenerator;
 use crate::error::Result;

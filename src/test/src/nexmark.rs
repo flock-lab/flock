@@ -45,7 +45,7 @@ async fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use nexmark::config::Config;
+    use runtime::datasource::config::Config;
     use rusoto_core::Region;
     use rusoto_lambda::{InvocationRequest, Lambda, LambdaClient};
 
