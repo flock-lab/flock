@@ -20,7 +20,7 @@
 //!
 //! The dataflow used in the benchmark is illustrated as following.
 //!
-//!     --> Map --> Filter --> Map --> Map --> Window --> Reduce
+//!       Map -- Filter -- Map -- Map -- Window -- Reduce
 //!
 //!
 //! Its purpose is to count ad hits for each ad campaign. Events arrive from
