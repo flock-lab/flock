@@ -24,13 +24,13 @@ use std::io::BufReader;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use crate::datasource::nexmark::config::Config;
-use crate::datasource::nexmark::event::Date;
+use crate::datasource::config::Config;
+use crate::datasource::date::DateTime;
 use crate::datasource::nexmark::generator::NEXMarkGenerator;
 use crate::error::Result;
 use crate::query::StreamWindow;
 
-type Epoch = Date;
+type Epoch = DateTime;
 type SourceId = usize;
 type Partition = usize;
 type NumEvents = usize;
@@ -263,19 +263,25 @@ impl NexMarkSource {
                     .map(|s| {
                         events
                             .persons
-                            .get(&Date::new(s))
+                            .get(&DateTime::new(s))
                             .unwrap()
                             .get(&p)
                             .unwrap()
                             .1
                             + events
                                 .auctions
-                                .get(&Date::new(s))
+                                .get(&DateTime::new(s))
                                 .unwrap()
                                 .get(&p)
                                 .unwrap()
                                 .1
-                            + events.bids.get(&Date::new(s)).unwrap().get(&p).unwrap().1
+                            + events
+                                .bids
+                                .get(&DateTime::new(s))
+                                .unwrap()
+                                .get(&p)
+                                .unwrap()
+                                .1
                     })
                     .sum::<usize>()
             })

@@ -16,7 +16,8 @@ fn main() {}
 
 #[cfg(test)]
 mod tests {
-    use crate::datasource::nexmark::event::{Auction, Bid, Date};
+    use crate::datasource::date::DateTime;
+    use crate::datasource::nexmark::event::{Auction, Bid};
     use crate::datasource::nexmark::NexMarkSource;
     use crate::error::Result;
     use crate::executor::plan::physical_plan;
@@ -92,11 +93,11 @@ mod tests {
         // sequential processing
         for i in 0..seconds {
             // events to record batches
-            let am = events.auctions.get(&Date::new(i)).unwrap();
+            let am = events.auctions.get(&DateTime::new(i)).unwrap();
             let (auctions, _) = am.get(&0).unwrap();
             let auctions_batches = NexMarkSource::to_batch(&auctions, auction_schema.clone());
 
-            let bm = events.bids.get(&Date::new(i)).unwrap();
+            let bm = events.bids.get(&DateTime::new(i)).unwrap();
             let (bids, _) = bm.get(&0).unwrap();
             let bids_batches = NexMarkSource::to_batch(&bids, bid_schema.clone());
 
