@@ -63,8 +63,50 @@ impl YSBGenerator {
         }
     }
 
+    /// Produces the next epoch's events.
+    pub fn next_epoch(&mut self) -> Result<(DateTime, (Vec<u8>, usize))> {
+        let ad_types = vec!["banner", "modal", "sponsored-search", "mail", "mobile"]
+            .into_iter()
+            .map(String::from)
+            .collect::<Vec<_>>();
+        let event_types = vec!["view", "click", "purchase"]
+            .into_iter()
+            .map(String::from)
+            .collect::<Vec<_>>();
+
+        let mut rng = rand::rngs::StdRng::seed_from_u64(0xDEAD); // Predictable RNG clutch
+        let mut data = Vec::with_capacity((1000.0 / self.timestep) as usize);
+        let epoch = self.time as usize / 1000;
+
+        let mut num = 0;
+        while self.time < ((epoch + 1) * 1000) as f64 && self.time < self.max_time as f64 {
+            let event = Event {
+                user_id:    format!("{}", Uuid::new_v4()),
+                page_id:    format!("{}", Uuid::new_v4()),
+                ad_id:      self
+                    .map
+                    .keys()
+                    .nth(rng.gen_range(0..self.map.len()))
+                    .unwrap()
+                    .clone(),
+                ad_type:    ad_types.choose(&mut rng).unwrap().to_string(),
+                event_type: event_types.choose(&mut rng).unwrap().to_string(),
+                event_time: DateTime(self.time as usize),
+                ip_address: String::from("0.0.0.0"),
+            };
+
+            data.extend(serde_json::to_vec(&event).unwrap());
+            data.extend(vec![10]);
+            num += 1;
+
+            self.time += self.timestep;
+        }
+
+        Ok((DateTime(epoch), (data, num)))
+    }
+
     /// Produces the events in the next epoch.
-    pub fn next(&mut self) -> Result<(usize, Vec<Event>)> {
+    pub fn next(&mut self) -> Result<(DateTime, Vec<Event>)> {
         let ad_types = vec!["banner", "modal", "sponsored-search", "mail", "mobile"]
             .into_iter()
             .map(String::from)
@@ -99,7 +141,7 @@ impl YSBGenerator {
         if data.is_empty() {
             Err(Error::new(ErrorKind::Other, "out of data"))
         } else {
-            Ok((epoch, data))
+            Ok((DateTime(epoch), data))
         }
     }
 }
