@@ -16,7 +16,8 @@ fn main() {}
 
 #[cfg(test)]
 mod tests {
-    use crate::datasource::nexmark::event::{Bid, Date};
+    use crate::datasource::date::DateTime;
+    use crate::datasource::nexmark::event::Bid;
     use crate::datasource::nexmark::NexMarkSource;
     use crate::error::Result;
     use crate::executor::plan::physical_plan;
@@ -65,7 +66,7 @@ mod tests {
             let d = j * window_size;
             // moves the tumbling window
             for i in d..d + window_size {
-                let bm = events.bids.get(&Date::new(i)).unwrap();
+                let bm = events.bids.get(&DateTime::new(i)).unwrap();
                 let (bids, _) = bm.get(&0).unwrap();
                 batches.push(NexMarkSource::to_batch(&bids, schema.clone()));
             }

@@ -15,8 +15,9 @@
 //! original available on https://github.com/Shinmera/bsc-thesis/blob/master/benchmarks/src/nexmark.rs
 
 use crate::datasource::config::Config;
+use crate::datasource::date::DateTime;
 use crate::datasource::nexmark::config::NEXMarkConfig;
-use crate::datasource::nexmark::event::{Date, Event};
+use crate::datasource::nexmark::event::Event;
 use std::io::{Error, ErrorKind, Result};
 
 /// The NexMark event generator.
@@ -44,7 +45,10 @@ impl NEXMarkGenerator {
     pub fn next_epoch(
         &mut self,
         p: usize,
-    ) -> Result<(Date, ((Vec<u8>, usize), (Vec<u8>, usize), (Vec<u8>, usize)))> {
+    ) -> Result<(
+        DateTime,
+        ((Vec<u8>, usize), (Vec<u8>, usize), (Vec<u8>, usize)),
+    )> {
         let epoch = (self
             .config
             .event_timestamp(self.events + self.config.first_event_id)
@@ -95,13 +99,13 @@ impl NEXMarkGenerator {
         }
 
         Ok((
-            Date::new(epoch),
+            DateTime::new(epoch),
             ((p_buf, p_num), (a_buf, a_num), (b_buf, b_num)),
         ))
     }
 
     /// Produces the events in the next epoch (for testing).
-    pub fn next(&mut self, p: usize) -> Result<(Date, Vec<Event>)> {
+    pub fn next(&mut self, p: usize) -> Result<(DateTime, Vec<Event>)> {
         let mut data = Vec::with_capacity((1000.0 / self.config.inter_event_delays[0]) as usize);
         let epoch = (self
             .config
@@ -127,7 +131,7 @@ impl NEXMarkGenerator {
         if data.is_empty() {
             Err(Error::new(ErrorKind::Other, "out of data"))
         } else {
-            Ok((Date::new(epoch), data))
+            Ok((DateTime::new(epoch), data))
         }
     }
 }

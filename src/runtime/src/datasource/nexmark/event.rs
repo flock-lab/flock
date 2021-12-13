@@ -13,6 +13,7 @@
 
 //! The NexMark events: `Person`, `Auction`, and `Bid`.
 
+use crate::datasource::date::DateTime;
 use crate::datasource::nexmark::config::NEXMarkConfig;
 use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
 use rand::rngs::SmallRng;
@@ -56,47 +57,11 @@ impl NEXMarkRng for SmallRng {
 
 type Id = usize;
 
-/// The event's date time.
-#[derive(
-    Eq, PartialEq, Ord, PartialOrd, Clone, Serialize, Deserialize, Debug, Hash, Copy, Default,
-)]
-pub struct Date(usize);
-
-impl Date {
-    /// Creates a new date time.
-    pub fn new(date_time: usize) -> Date {
-        Date(date_time)
-    }
-}
-
-impl ::std::ops::Deref for Date {
-    type Target = usize;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl ::std::ops::Add for Date {
-    type Output = Self;
-
-    fn add(self, other: Self) -> Self {
-        Date(self.0 + other.0)
-    }
-}
-
-impl ::std::ops::Sub for Date {
-    type Output = Self;
-
-    fn sub(self, other: Self) -> Self {
-        Date(self.0 - other.0)
-    }
-}
-
 /// The NexMark event with the date time.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct EventCarrier {
     /// The date time.
-    pub time:  Date,
+    pub time:  DateTime,
     /// The NexMark event.
     pub event: Event,
 }
@@ -117,7 +82,7 @@ impl Event {
     /// Creates a new event randomly.
     pub fn new(events_so_far: usize, sub_idx: usize, nex: &mut NEXMarkConfig) -> Self {
         let rem = nex.next_adjusted_event(events_so_far) % nex.proportion_denominator;
-        let timestamp = Date(nex.event_timestamp(nex.next_adjusted_event(events_so_far)));
+        let timestamp = DateTime(nex.event_timestamp(nex.next_adjusted_event(events_so_far)));
         let id = nex.first_event_id
             + nex.next_adjusted_event(events_so_far)
             + (100_000 / nex.num_event_generators) * sub_idx;
@@ -149,7 +114,7 @@ pub struct Person {
     /// One of several US states as a two-letter string.
     pub state:         String,
     /// A millisecond timestamp for the event origin.
-    pub p_date_time:   Date,
+    pub p_date_time:   DateTime,
 }
 
 impl Person {
@@ -184,7 +149,7 @@ impl Person {
     }
 
     /// Creates a new `Person` event.
-    fn new(id: usize, time: Date, rng: &mut SmallRng, nex: &NEXMarkConfig) -> Self {
+    fn new(id: usize, time: DateTime, rng: &mut SmallRng, nex: &NEXMarkConfig) -> Self {
         Person {
             p_id:          Self::last_id(id, nex) + nex.first_person_id,
             name:          format!(
@@ -233,9 +198,9 @@ pub struct Auction {
     /// The minimum price for the auction to succeed.
     pub reserve:     usize,
     /// A millisecond timestamp for the event origin.
-    pub a_date_time: Date,
+    pub a_date_time: DateTime,
     /// A UNIX epoch timestamp for the expiration date of the auction.
-    pub expires:     Date,
+    pub expires:     DateTime,
     /// The ID of the person that created this auction.
     pub seller:      Id,
     /// The ID of the category this auction belongs to.
@@ -282,7 +247,7 @@ impl Auction {
     fn new(
         events_so_far: usize,
         id: usize,
-        time: Date,
+        time: DateTime,
         rng: &mut SmallRng,
         nex: &NEXMarkConfig,
     ) -> Self {
@@ -332,16 +297,16 @@ impl Auction {
     fn next_length(
         events_so_far: usize,
         rng: &mut SmallRng,
-        time: Date,
+        time: DateTime,
         nex: &NEXMarkConfig,
-    ) -> Date {
+    ) -> DateTime {
         let current_event = nex.next_adjusted_event(events_so_far);
         let events_for_auctions =
             (nex.in_flight_auctions * nex.proportion_denominator) / nex.auction_proportion;
         let future_auction = nex.event_timestamp(current_event + events_for_auctions);
 
         let horizon = future_auction - time.0;
-        Date(1 + rng.gen_range(0..max(horizon * 2, 1)))
+        DateTime(1 + rng.gen_range(0..max(horizon * 2, 1)))
     }
 }
 
@@ -355,7 +320,7 @@ pub struct Bid {
     /// The price in cents that the person bid for.
     pub price:       usize,
     /// A millisecond timestamp for the event origin.
-    pub b_date_time: Date,
+    pub b_date_time: DateTime,
 }
 
 impl Bid {
@@ -386,7 +351,7 @@ impl Bid {
         )
     }
 
-    fn new(id: usize, time: Date, rng: &mut SmallRng, nex: &NEXMarkConfig) -> Self {
+    fn new(id: usize, time: DateTime, rng: &mut SmallRng, nex: &NEXMarkConfig) -> Self {
         let auction = if 0 < rng.gen_range(0..nex.hot_auction_ratio) {
             (Auction::last_id(id, nex) / nex.hot_auction_ratio_2) * nex.hot_auction_ratio_2
         } else {
@@ -425,8 +390,8 @@ mod tests {
 
     #[test]
     fn test_date_time() {
-        let date_1 = Date::new(1);
-        let date_2 = Date::new(2);
+        let date_1 = DateTime::new(1);
+        let date_2 = DateTime::new(2);
 
         assert_eq!(*date_1, 1);
         assert_eq!(*date_2, 2);
