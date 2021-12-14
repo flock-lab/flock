@@ -15,7 +15,7 @@
 
 use crate::datasource::config::Config;
 use crate::datasource::date::DateTime;
-use crate::datasource::ysb::event::Event;
+use crate::datasource::ysb::event::AdEvent;
 use rand::prelude::SliceRandom;
 use rand::{self, Rng, SeedableRng};
 use std::collections::HashMap;
@@ -80,7 +80,7 @@ impl YSBGenerator {
 
         let mut num = 0;
         while self.time < ((epoch + 1) * 1000) as f64 && self.time < self.max_time as f64 {
-            let event = Event {
+            let event = AdEvent {
                 user_id:    format!("{}", Uuid::new_v4()),
                 page_id:    format!("{}", Uuid::new_v4()),
                 ad_id:      self
@@ -106,7 +106,7 @@ impl YSBGenerator {
     }
 
     /// Produces the events in the next epoch.
-    pub fn next(&mut self) -> Result<(DateTime, Vec<Event>)> {
+    pub fn next(&mut self) -> Result<(DateTime, Vec<AdEvent>)> {
         let ad_types = vec!["banner", "modal", "sponsored-search", "mail", "mobile"]
             .into_iter()
             .map(String::from)
@@ -121,7 +121,7 @@ impl YSBGenerator {
         let epoch = self.time as usize / 1000;
 
         while self.time < ((epoch + 1) * 1000) as f64 && self.time < self.max_time as f64 {
-            data.push(Event {
+            data.push(AdEvent {
                 user_id:    format!("{}", Uuid::new_v4()),
                 page_id:    format!("{}", Uuid::new_v4()),
                 ad_id:      self

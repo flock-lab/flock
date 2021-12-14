@@ -43,7 +43,7 @@
 //! into an internal object. Irrelevant events are then filtered out, and only
 //! ones with an `event_type` of "view" are retained. Next, all fields except
 //! for `ad_id` and `event_time` are dropped. Then, a lookup in a table mapping
-//! `ad_ids` to `campaign_ids` is done to retrieve the relevant `campaign_id`.
+//! `ad_id` to `campaign_id` is done to retrieve the relevant `campaign_id`.
 //! Yahoo describes this step as a **join**, as one end of this `join` is
 //! streamed, whereas the other is present as a table stored in Redis.
 //! Next the events are put through a **ten seconds** large hopping window. The
@@ -65,4 +65,5 @@
 
 pub mod event;
 pub mod generator;
+pub mod query;
 pub mod ysb;
