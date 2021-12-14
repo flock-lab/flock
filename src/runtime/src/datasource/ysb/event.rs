@@ -20,7 +20,7 @@ use std::collections::HashMap;
 
 /// Advertising event types.
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub struct Event {
+pub struct AdEvent {
     /// A UUID identifying the user that caused the event.
     pub user_id:    String,
     /// A UUID identifying the page on which the event occurred.
@@ -38,11 +38,11 @@ pub struct Event {
     pub ip_address: String,
 }
 
-impl Event {
+impl AdEvent {
     /// Returns the schema of the event.
     pub fn schema() -> Schema {
         let mut metadata = HashMap::new();
-        metadata.insert("name".to_string(), "ysb".to_string());
+        metadata.insert("name".to_string(), "ysb_ad_events".to_string());
         Schema::new_with_metadata(
             vec![
                 Field::new("user_id", DataType::Utf8, false),
@@ -56,6 +56,30 @@ impl Event {
                     false,
                 ),
                 Field::new("ip_address", DataType::Utf8, false),
+            ],
+            metadata,
+        )
+    }
+}
+
+/// Campaigns map from ad_id to campaign_id.
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub struct Campaign {
+    /// A UUID for the specific advertisement that was interacted with.
+    pub c_ad_id:     String,
+    /// A UUID for the campaign that the ad belongs to.
+    pub campaign_id: String,
+}
+
+impl Campaign {
+    /// Returns the schema of the event.
+    pub fn schema() -> Schema {
+        let mut metadata = HashMap::new();
+        metadata.insert("name".to_string(), "ysb_campaigns".to_string());
+        Schema::new_with_metadata(
+            vec![
+                Field::new("c_ad_id", DataType::Utf8, false),
+                Field::new("campaign_id", DataType::Utf8, false),
             ],
             metadata,
         )

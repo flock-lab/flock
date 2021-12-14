@@ -14,6 +14,7 @@
 //! Yahoo Streaming Benchmark Suite.
 
 use crate::config::FLOCK_CONF;
+use crate::datasource::ysb::event::Campaign;
 use arrow::datatypes::SchemaRef;
 use arrow::json;
 use arrow::record_batch::RecordBatch;
@@ -28,7 +29,7 @@ use crate::datasource::config::Config;
 use crate::datasource::date::DateTime;
 use crate::datasource::ysb::generator::YSBGenerator;
 use crate::error::Result;
-use crate::query::StreamWindow;
+use crate::query::{Schedule, StreamWindow};
 
 type Epoch = DateTime;
 type SourceId = usize;
@@ -39,7 +40,9 @@ type NumEvents = usize;
 #[derive(Debug, Default)]
 pub struct YSBStream {
     /// The events in different epochs and partitions.
-    pub events: HashMap<Epoch, HashMap<SourceId, (Vec<u8>, NumEvents)>>,
+    pub events:    HashMap<Epoch, HashMap<SourceId, (Vec<u8>, NumEvents)>>,
+    /// The map from ad_id to campaign_id.
+    pub campaigns: (Vec<u8>, usize),
 }
 
 /// A struct to hold events for a given epoch and source identifier, which can
@@ -58,7 +61,8 @@ impl YSBStream {
     /// Creates a new YSBStream.
     pub fn new() -> Self {
         YSBStream {
-            events: HashMap::new(),
+            events:    HashMap::new(),
+            campaigns: (Vec::new(), 0),
         }
     }
 
@@ -102,7 +106,7 @@ impl Default for YSBSource {
         config.insert("threads", 16.to_string());
         config.insert("seconds", 10.to_string());
         config.insert("events-per-second", 1000.to_string());
-        let window = StreamWindow::HoppingWindow((10, 5));
+        let window = StreamWindow::TumblingWindow(Schedule::Seconds(10));
         YSBSource { config, window }
     }
 }
@@ -167,8 +171,26 @@ impl YSBSource {
             t.join().unwrap();
         }
 
-        let mut events = events_handle.lock().unwrap();
-        Ok(std::mem::take(&mut events))
+        let mut stream = events_handle.lock().unwrap();
+        let size = generator.map.len();
+        let mut campaigns = vec![];
+        generator
+            .map
+            .into_iter()
+            .for_each(|(c_ad_id, campaign_id)| {
+                campaigns.extend(
+                    serde_json::to_vec(&Campaign {
+                        c_ad_id:     c_ad_id,
+                        campaign_id: campaign_id,
+                    })
+                    .unwrap(),
+                );
+                campaigns.extend(vec![10]);
+            });
+
+        stream.campaigns = (campaigns, size);
+
+        Ok(std::mem::take(&mut stream))
     }
 
     /// Converts YSBSource events to record batches in Arrow.
@@ -218,7 +240,7 @@ impl YSBSource {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::datasource::ysb::event::Event;
+    use crate::datasource::ysb::event::AdEvent;
 
     #[test]
     fn test_gen_ysb_data() -> Result<()> {
@@ -269,7 +291,7 @@ mod test {
         // decompression and deserialization
         let de_events: YSBEvent = serde_json::from_value(values).unwrap();
 
-        let ad_event_schema = Arc::new(Event::schema());
+        let ad_event_schema = Arc::new(AdEvent::schema());
         let batches = YSBSource::to_batch(&de_events.ad_events, ad_event_schema);
         let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
         println!("{}", formatted);
