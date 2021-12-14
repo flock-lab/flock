@@ -11,24 +11,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use crate::fsql::fsql;
+use crate::rainbow::rainbow_println;
+use crate::s3;
+use anyhow::{bail, Result};
 use clap::{crate_version, App, Arg};
-use futures::executor::block_on;
-use rusoto_core::Region;
-use rusoto_s3::PutObjectRequest;
-use rusoto_s3::{S3Client, S3};
-use rustyline::Editor;
 use std::env;
-use std::f64::consts::PI;
-use std::fs;
-use std::io::Write;
-use std::path::Path;
 
-type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
 pub static S3_BUCKET: &str = "umd-flock";
 
 #[tokio::main]
-pub async fn main() {
-    // Command line arg parsing for scqsql itself
+pub async fn main() -> Result<()> {
+    // Command line arg parsing and configuration.
     let matches = App::new("Flock")
         .version(crate_version!())
         .about("Command Line Interactive Contoller for Flock")
@@ -56,142 +50,26 @@ pub async fn main() {
         )
         .get_matches();
 
-    rainbow_println(include_str!("./flock.txt"));
+    rainbow_println(include_str!("./flock"));
 
     match matches.value_of("function_code") {
         Some(bin_path) => {
-            rainbow_println("============================================");
-            rainbow_println("         Upload function code to S3         ");
-            rainbow_println("============================================\n\n");
+            rainbow_println("============================================================");
+            rainbow_println("                Upload function code to S3                  ");
+            rainbow_println("============================================================");
+            println!();
+            println!();
             if !std::path::Path::new(bin_path).exists() {
-                rainbow_println(&format!(
-                    "[ERROR]: function code '{}' doesn't exist!",
-                    bin_path
-                ));
-                rainbow_println("[EXIT]: ..............");
-                std::process::exit(-1);
+                bail!("The function code ({}) doesn't exist.", bin_path);
             }
-
-            if let Some(key) = matches.value_of("function_key") {
-                put_object_to_s3(S3_BUCKET, key, bin_path).unwrap();
-            } else {
-                rainbow_println("[ERROR]: AWS S3 key is missing!");
-                rainbow_println("[EXIT]: ..............");
-                std::process::exit(-1);
-            }
+            let key = matches
+                .value_of("function_key")
+                .expect("function_key is required.");
+            s3::put_function_object(S3_BUCKET, key, bin_path).await?;
         }
         None => {
-            cli().await;
+            fsql().await;
         }
-    }
-}
-
-async fn cli() {
-    let mut rl = Editor::<()>::new();
-    rl.load_history(".history").ok();
-
-    let mut query = "".to_owned();
-    loop {
-        let readline = rl.readline("> ");
-        match readline {
-            Ok(ref line) if is_exit_command(line) && query.is_empty() => {
-                break;
-            }
-            Ok(ref line) if line.trim_end().ends_with(';') => {
-                query.push_str(line.trim_end());
-                rl.add_history_entry(query.clone());
-                match exec_and_print(query).await {
-                    Ok(_) => {}
-                    Err(err) => println!("{:?}", err),
-                }
-                query = "".to_owned();
-            }
-            Ok(ref line) => {
-                query.push_str(line);
-                query.push(' ');
-            }
-            Err(_) => {
-                break;
-            }
-        }
-    }
-
-    rl.save_history(".history").ok();
-}
-
-fn is_exit_command(line: &str) -> bool {
-    let line = line.trim_end().to_lowercase();
-    line == "quit" || line == "exit"
-}
-
-async fn exec_and_print(_: String) -> Result<(), Error> {
-    rainbow_println("CLI is under construction. Please try Flock API directly.");
-    Ok(())
-}
-
-/// Prints the text in the rainbow fansion.
-pub fn rainbow_println(line: &str) {
-    let frequency: f64 = 0.1;
-    let spread: f64 = 3.0;
-    for (i, c) in line.char_indices() {
-        let (r, g, b) = rgb(frequency, spread, i as f64);
-        if c == ' ' {
-            print!("{}", c);
-        } else {
-            print!("\x1b[38;2;{};{};{}m{}\x1b[0m", r, g, b, c);
-        }
-    }
-    println!();
-}
-
-/// Generates RGB for rainbow print.
-fn rgb(freq: f64, spread: f64, i: f64) -> (u8, u8, u8) {
-    let j = i / spread;
-    let red = (freq * j + 0.0).sin() * 127.0 + 128.0;
-    let green = (freq * j + 2.0 * PI / 3.0).sin() * 127.0 + 128.0;
-    let blue = (freq * j + 4.0 * PI / 3.0).sin() * 127.0 + 128.0;
-
-    (red as u8, green as u8, blue as u8)
-}
-
-/// Puts a lambda function code to AWS S3.
-pub fn put_object_to_s3(bucket: &str, key: &str, obj_path: &str) -> Result<(), Error> {
-    // compress lambda function code to bootstrap.zip
-    let fname = Path::new(obj_path).parent().unwrap().join("bootstrap.zip");
-    let w = std::fs::File::create(&fname)?;
-    let mut zip = zip::ZipWriter::new(w);
-    let options = zip::write::FileOptions::default()
-        .compression_method(zip::CompressionMethod::Bzip2)
-        .unix_permissions(777);
-    zip.start_file("bootstrap", options)?;
-    zip.write_all(&fs::read(&obj_path)?)?;
-    zip.finish()?;
-
-    if !fname.exists() {
-        rainbow_println(&format!(
-            "[ERROR]: failed to rename the binary {} to {:?}!",
-            obj_path, fname
-        ));
-        rainbow_println("[EXIT]: ..............");
-        std::process::exit(-1);
-    }
-
-    // uploads bootstrap.zip to AWS S3
-    if let Ok(bytes) = fs::read(&fname) {
-        let put_obj_req = PutObjectRequest {
-            bucket: String::from(bucket),
-            key: String::from(key),
-            body: Some(bytes.into()),
-            ..Default::default()
-        };
-
-        let client = S3Client::new(Region::default());
-        block_on(client.put_object(put_obj_req))?;
-        rainbow_println("[OK] Upload Succeed.");
-    } else {
-        rainbow_println(&format!("[ERROR]: failed to read {:?}!", fname));
-        rainbow_println("[EXIT]: ..............");
-        std::process::exit(-1);
     }
 
     Ok(())
@@ -203,7 +81,7 @@ mod tests {
 
     #[test]
     fn test_rainbow_print() {
-        let text = include_str!("./flock.txt");
+        let text = include_str!("./flock");
         rainbow_println(text);
     }
 }

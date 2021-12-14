@@ -28,7 +28,7 @@ use std::sync::Arc;
 /// Deserialize `DataFrame` from cloud functions.
 pub fn unmarshal(data: Vec<DataFrame>, encoding: Encoding) -> Vec<DataFrame> {
     match encoding {
-        Encoding::Snappy | Encoding::Lz4 | Encoding::Zstd => data
+        Encoding::Snappy | Encoding::Lz4 => data
             .par_iter()
             .map(|d| DataFrame {
                 header: encoding.decompress(&d.header),
