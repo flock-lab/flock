@@ -297,7 +297,10 @@ pub fn physical_plan(schema: &SchemaRef, sql: &str, table_name: &str) -> Arc<dyn
 /// * `idx`: the node index of DAG in the `qflow`.
 pub fn set_env_context(qflow: &QueryFlow, idx: usize) {
     let ctx = &qflow.ctx[&NodeIndex::new(idx)];
-    std::env::set_var(&FLOCK_CONF["lambda"]["name"], ctx.marshal(Encoding::Zstd));
+    std::env::set_var(
+        &FLOCK_CONF["lambda"]["name"],
+        ctx.marshal(Encoding::default()),
+    );
 }
 
 #[cfg(test)]

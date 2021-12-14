@@ -95,7 +95,7 @@ generators=1
 events_per_second=1000
 seconds=10
 query=5
-flock=$(<src/bin/cli/src/flock.txt)
+flock=$(<src/bin/cli/src/flock)
 # Get the options
 while getopts "hgcrq:w:s:e:" option; do
   case $option in

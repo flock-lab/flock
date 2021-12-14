@@ -203,7 +203,7 @@ impl ExecutionContext {
     /// Serializes `ExecutionContext` from client-side.
     pub fn marshal(&self, encoding: Encoding) -> String {
         match encoding {
-            Encoding::Snappy | Encoding::Lz4 | Encoding::Zstd => {
+            Encoding::Snappy | Encoding::Lz4 => {
                 let encoded: Vec<u8> = serde_json::to_vec(&self).unwrap();
                 serde_json::to_string(&CloudEnvironment {
                     context: encoding.compress(&encoded),
@@ -225,7 +225,7 @@ impl ExecutionContext {
         let env: CloudEnvironment = serde_json::from_str(s).unwrap();
 
         match env.encoding {
-            Encoding::Snappy | Encoding::Lz4 | Encoding::Zstd => {
+            Encoding::Snappy | Encoding::Lz4 => {
                 let encoded = env.encoding.decompress(&env.context);
                 serde_json::from_slice(&encoded).unwrap()
             }

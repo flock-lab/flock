@@ -11,10 +11,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+mod fsql;
+mod rainbow;
 #[cfg(feature = "cli")]
 mod repl;
+mod s3;
 
-pub fn main() {
+use anyhow::Result;
+
+pub fn main() -> Result<()> {
     #[cfg(feature = "cli")]
     repl::main()
 }
