@@ -18,7 +18,7 @@ use lazy_static::lazy_static;
 
 lazy_static! {
     /// Global settings.
-    pub static ref FLOCK_CONF: Ini = Ini::load_from_str(include_str!("config/flock.toml")).unwrap();
+    pub static ref FLOCK_CONF: Ini = Ini::load_from_str(include_str!("../../../flock.toml")).unwrap();
 }
 
 #[cfg(test)]
@@ -28,7 +28,7 @@ mod tests {
 
     #[tokio::test]
     async fn setting_shows() -> Result<()> {
-        let conf = Ini::load_from_str(include_str!("config/flock.toml")).unwrap();
+        let conf = Ini::load_from_str(include_str!("../../../flock.toml")).unwrap();
 
         for (sec, prop) in &conf {
             println!("Section: {:?}", sec);

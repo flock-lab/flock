@@ -1,6 +1,6 @@
 [package]
 name = "runtime"
-version = "0.1.0"
+version = "0.2.0"
 description = "A utility module to simplify the initialization of lambda functions."
 authors = [ "Gang Liao <gangliao@cs.umd.edu>", "Zejun Liu <zliu1238@cs.umd.edu>" ]
 license = "Apache-2.0"

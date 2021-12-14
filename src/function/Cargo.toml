@@ -1,6 +1,6 @@
 [package]
 name = "function"
-version = "0.1.0"
+version = "0.2.0"
 description = "The generic cloud functions for serverless computation."
 authors = [ "Gang Liao <gangliao@cs.umd.edu>" ]
 license = "Apache-2.0"
