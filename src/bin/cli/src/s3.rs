@@ -29,7 +29,15 @@ use std::path::Path;
 /// * `key` - The S3 key to put the code in.
 /// * `code_path` - The path to the code to put.
 pub async fn put_function_object(bucket: &str, key: &str, code_path: &str) -> Result<()> {
-    rainbow_println("Packaging code and uploading to S3...");
+    rainbow_println("============================================================");
+    rainbow_println("                Upload function code to S3                  ");
+    rainbow_println("============================================================");
+    rainbow_println("\n\nPackaging code and uploading to S3...");
+
+    if !std::path::Path::new(code_path).exists() {
+        bail!("The function code ({}) doesn't exist.", code_path);
+    }
+
     // Package the lambda function code into a zip file.
     let fname = Path::new(code_path).parent().unwrap().join("bootstrap.zip");
     let zip_file = std::fs::File::create(&fname)?;

@@ -12,13 +12,20 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use crate::fsql::fsql;
+use crate::nexmark;
 use crate::rainbow::rainbow_println;
 use crate::s3;
-use anyhow::{bail, Result};
-use clap::{crate_version, App, Arg};
+use anyhow::Result;
+use clap::{crate_version, App, AppSettings, Arg, SubCommand};
+use ini::Ini;
+use lazy_static::lazy_static;
 use std::env;
 
-pub static S3_BUCKET: &str = "umd-flock";
+lazy_static! {
+    /// Global settings.
+    pub static ref FLOCK_CONF: Ini = Ini::load_from_str(include_str!("../../../../flock.toml")).unwrap();
+    pub static ref FLOCK_S3_BUCKET: String = FLOCK_CONF["lambda"]["s3_bucket"].to_string();
+}
 
 #[tokio::main]
 pub async fn main() -> Result<()> {
@@ -26,49 +33,80 @@ pub async fn main() -> Result<()> {
     let matches = App::new("Flock")
         .version(crate_version!())
         .about("Command Line Interactive Contoller for Flock")
+        .version(crate_version!())
+        .author("UMD Database Group")
         .arg(
-            Arg::with_name("function_code")
-                .short("u")
-                .long("upload")
+            Arg::with_name("config")
+                .short("c")
+                .long("config")
                 .value_name("FILE")
-                .help("Upload lambda execution code to S3.")
+                .help("Sets a custom config file")
                 .takes_value(true),
         )
-        .arg(
-            Arg::with_name("function_key")
-                .short("k")
-                .long("key")
-                .value_name("STRING")
-                .help("AWS S3 key for this function code.")
-                .takes_value(true),
+        .subcommand(
+            SubCommand::with_name("nexmark")
+                .about("The NEXMark Benchmark Tool")
+                .setting(AppSettings::DisableVersion)
+                .arg(
+                    Arg::with_name("run")
+                        .short("r")
+                        .long("run")
+                        .help("Runs the nexmark lambda function"),
+                ),
         )
-        .arg(
-            Arg::with_name("v")
-                .short("v")
-                .multiple(true)
-                .help("Sets the level of verbosity"),
+        .subcommand(
+            SubCommand::with_name("upload")
+                .about("Uploads a function code to AWS S3")
+                .setting(AppSettings::DisableVersion)
+                .arg(
+                    Arg::with_name("code path")
+                        .short("p")
+                        .long("path")
+                        .value_name("FILE")
+                        .help("Sets the path to the function code")
+                        .takes_value(true),
+                )
+                .arg(
+                    Arg::with_name("s3 key")
+                        .short("k")
+                        .long("key")
+                        .value_name("S3_KEY")
+                        .help("Sets the S3 key to upload the function code to")
+                        .takes_value(true),
+                ),
+        )
+        .subcommand(
+            SubCommand::with_name("fsql")
+                .about("The terminal-based front-end to Flock")
+                .setting(AppSettings::DisableVersion),
         )
         .get_matches();
 
     rainbow_println(include_str!("./flock"));
 
-    match matches.value_of("function_code") {
-        Some(bin_path) => {
-            rainbow_println("============================================================");
-            rainbow_println("                Upload function code to S3                  ");
-            rainbow_println("============================================================");
-            println!();
-            println!();
-            if !std::path::Path::new(bin_path).exists() {
-                bail!("The function code ({}) doesn't exist.", bin_path);
+    match matches.subcommand() {
+        ("nexmark", Some(nexmark_matches)) => {
+            if nexmark_matches.is_present("run") {
+                nexmark::run()?;
             }
-            let key = matches
-                .value_of("function_key")
-                .expect("function_key is required.");
-            s3::put_function_object(S3_BUCKET, key, bin_path).await?;
         }
-        None => {
-            fsql().await;
+        ("upload", Some(upload_matches)) => {
+            s3::put_function_object(
+                &FLOCK_S3_BUCKET,
+                upload_matches
+                    .value_of("s3 key")
+                    .expect("No function s3 key provided"),
+                upload_matches
+                    .value_of("code path")
+                    .expect("No function code path provided"),
+            )
+            .await?;
+        }
+        ("fsql", Some(_)) => {
+            fsql().await?;
+        }
+        _ => {
+            println!("{}", matches.usage());
         }
     }
 

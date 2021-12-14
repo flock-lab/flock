@@ -14,11 +14,11 @@
 //! fsql is a terminal-based front-end to Flock.
 
 use crate::rainbow::rainbow_println;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use rustyline::Editor;
 
 /// The main entry point for fsql.
-pub async fn fsql() {
+pub async fn fsql() -> Result<()> {
     let mut rl = Editor::<()>::new();
     rl.load_history(".history").ok();
 
@@ -48,7 +48,7 @@ pub async fn fsql() {
         }
     }
 
-    rl.save_history(".history").ok();
+    rl.save_history(".history").map_err(|err| anyhow!(err))
 }
 
 fn is_exit_command(line: &str) -> bool {
