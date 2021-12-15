@@ -70,7 +70,7 @@ macro_rules! init_exec_context {
             // Init query executor from the cloud evironment.
             let init_context = || match std::env::var(&**CONTEXT_NAME) {
                 Ok(s) => {
-                    let ctx = ExecutionContext::unmarshal(&s);
+                    let ctx = ExecutionContext::unmarshal(&s).unwrap();
                     let next_function = match &ctx.next {
                         CloudFunction::Lambda(name) => (name.clone(), 1),
                         CloudFunction::Group((name, group_size)) => {

@@ -53,7 +53,7 @@ mod tests {
                    INNER JOIN campaigns
                            ON ad_id = c_ad_id
             WHERE  event_type = 'view'
-            GROUP  BY campaign_id 
+            GROUP  BY campaign_id
         "};
 
         let ad_event_schema = Arc::new(AdEvent::schema());

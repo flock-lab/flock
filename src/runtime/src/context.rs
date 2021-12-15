@@ -201,37 +201,37 @@ impl ExecutionContext {
     }
 
     /// Serializes `ExecutionContext` from client-side.
-    pub fn marshal(&self, encoding: Encoding) -> String {
-        match encoding {
-            Encoding::Snappy | Encoding::Lz4 => {
-                let encoded: Vec<u8> = serde_json::to_vec(&self).unwrap();
+    pub fn marshal(&self, encoding: Encoding) -> Result<String> {
+        Ok(match encoding {
+            Encoding::Snappy | Encoding::Lz4 | Encoding::Zstd => {
+                let encoded: Vec<u8> = serde_json::to_vec(&self)?;
                 serde_json::to_string(&CloudEnvironment {
-                    context: encoding.compress(&encoded),
+                    context: encoding.compress(&encoded)?,
                     encoding,
-                })
-                .unwrap()
+                })?
             }
             Encoding::None => serde_json::to_string(&CloudEnvironment {
-                context: serde_json::to_vec(&self).unwrap(),
+                context: serde_json::to_vec(&self)?,
                 encoding,
-            })
-            .unwrap(),
+            })?,
             _ => unimplemented!(),
-        }
+        })
     }
 
     /// Deserializes `ExecutionContext` from cloud-side.
-    pub fn unmarshal(s: &str) -> ExecutionContext {
-        let env: CloudEnvironment = serde_json::from_str(s).unwrap();
+    pub fn unmarshal(s: &str) -> Result<ExecutionContext> {
+        let env: CloudEnvironment = serde_json::from_str(s)?;
 
-        match env.encoding {
-            Encoding::Snappy | Encoding::Lz4 => {
-                let encoded = env.encoding.decompress(&env.context);
-                serde_json::from_slice(&encoded).unwrap()
+        Ok(match env.encoding {
+            Encoding::Snappy | Encoding::Lz4 | Encoding::Zstd => {
+                let encoded = env.encoding.decompress(&env.context)?;
+                serde_json::from_slice(&encoded).map_err(FlockError::SerdeJson)?
             }
-            Encoding::None => serde_json::from_slice(&env.context).unwrap(),
+            Encoding::None => {
+                serde_json::from_slice(&env.context).map_err(FlockError::SerdeJson)?
+            }
             _ => unimplemented!(),
-        }
+        })
     }
 
     /// Feed one data source to the execution plan.
@@ -381,8 +381,8 @@ mod tests {
             ..Default::default()
         };
 
-        let json = lambda_context.marshal(Encoding::default());
-        let de_json = ExecutionContext::unmarshal(&json);
+        let json = lambda_context.marshal(Encoding::default())?;
+        let de_json = ExecutionContext::unmarshal(&json)?;
         assert_eq!(lambda_context, de_json);
 
         Ok(())

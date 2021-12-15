@@ -18,6 +18,8 @@
 //! the cloud functions, and reduce the size of all environment variables to
 //! less than 4KB as well.
 
+use crate::error::{FlockError, Result};
+use lz4::block::CompressionMode;
 use serde::{Deserialize, Serialize};
 
 /// This function encodes the given data into a byte array.
@@ -48,37 +50,52 @@ pub enum Encoding {
 
 impl Default for Encoding {
     fn default() -> Encoding {
-        Encoding::Lz4
+        Encoding::Zstd
     }
 }
 
 impl Encoding {
     /// Compress the given data using the encoding type.
-    pub fn compress(&self, s: &[u8]) -> Vec<u8> {
-        match *self {
+    pub fn compress(&self, s: &[u8]) -> Result<Vec<u8>> {
+        Ok(match *self {
             Encoding::Snappy => {
                 let mut encoder = snap::raw::Encoder::new();
-                encoder.compress_vec(s).unwrap()
+                encoder
+                    .compress_vec(s)
+                    .map_err(|e| FlockError::Execution(e.to_string()))?
             }
-            Encoding::Lz4 => lz4::block::compress(s, None, true).unwrap(),
+            Encoding::Lz4 => {
+                // TODO(gangliao): more flexible way to set the compression level
+                lz4::block::compress(s, Some(CompressionMode::HIGHCOMPRESSION(6)), true)
+                    .map_err(|e| FlockError::Execution(e.to_string()))?
+            }
+            Encoding::Zstd => {
+                zstd::block::compress(s, 3).map_err(|e| FlockError::Execution(e.to_string()))?
+            }
             Encoding::None => s.into(),
             _ => unimplemented!(),
-        }
+        })
     }
 
     /// Decompress the given data using the encoding type.
-    pub fn decompress(&self, s: &[u8]) -> Vec<u8> {
-        match *self {
+    pub fn decompress(&self, s: &[u8]) -> Result<Vec<u8>> {
+        Ok(match *self {
             Encoding::Snappy => {
                 let mut decoder = snap::raw::Decoder::new();
-                decoder.decompress_vec(s).unwrap()
+                decoder
+                    .decompress_vec(s)
+                    .map_err(|e| FlockError::Execution(e.to_string()))?
             }
-            Encoding::Lz4 => lz4::block::decompress(s, None).unwrap(),
+            Encoding::Lz4 => {
+                lz4::block::decompress(s, None).map_err(|e| FlockError::Execution(e.to_string()))?
+            }
+            Encoding::Zstd => zstd::block::decompress(s, 10485760)
+                .map_err(|e| FlockError::Execution(e.to_string()))?,
             Encoding::None => s.into(),
             _ => {
                 unimplemented!();
             }
-        }
+        })
     }
 }
 
@@ -143,15 +160,15 @@ mod tests {
         let plan = ctx.optimize(&plan)?;
         let plan = ctx.create_physical_plan(&plan)?;
 
-        for en in [Encoding::Snappy, Encoding::Lz4].iter() {
+        for en in [Encoding::Snappy, Encoding::Lz4, Encoding::Zstd].iter() {
             let json = serde_json::to_string(&plan).unwrap();
 
             let now = Instant::now();
-            let en_json = en.compress(json.as_bytes());
+            let en_json = en.compress(json.as_bytes())?;
             println!("Compression time: {} μs", now.elapsed().as_micros());
 
             let now = Instant::now();
-            let de_json = en.decompress(&en_json);
+            let de_json = en.decompress(&en_json)?;
             println!("Decompression time: {} μs", now.elapsed().as_micros());
 
             println!(

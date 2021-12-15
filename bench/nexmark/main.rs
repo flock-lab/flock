@@ -57,8 +57,11 @@ lazy_static! {
 
     // Flock-specific constants
     static ref S3_NEXMARK_BUCKET: String = FLOCK_CONF["lambda"]["s3_bucket"].to_string();
+    static ref S3_NEXMARK_Q4_PLAN_KEY: String = FLOCK_CONF["lambda"]["s3_nexmark_q4_plan_key"].to_string();
     static ref S3_NEXMARK_Q6_PLAN_KEY: String = FLOCK_CONF["lambda"]["s3_nexmark_q6_plan_key"].to_string();
     static ref NEXMARK_SOURCE_LOG_GROUP: String = format!("/aws/lambda/{}", NEXMARK_SOURCE_FUNCTION_NAME);
+
+    static ref EMPTY_EXEC_PLAN: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(false, Arc::new(Schema::empty())));
 
     static ref PARALLELISM: usize = FLOCK_CONF["lambda"]["parallelism"]
         .parse::<usize>()
@@ -137,11 +140,16 @@ async fn plan_placement(
     physcial_plan: Arc<dyn ExecutionPlan>,
 ) -> Result<(Arc<dyn ExecutionPlan>, Option<(String, String)>)> {
     match query_number {
-        6 => {
+        4 | 6 => {
+            let (s3_bucket, s3_key) = match query_number {
+                4 => (S3_NEXMARK_BUCKET.clone(), S3_NEXMARK_Q4_PLAN_KEY.clone()),
+                6 => (S3_NEXMARK_BUCKET.clone(), S3_NEXMARK_Q6_PLAN_KEY.clone()),
+                _ => unreachable!(),
+            };
             match S3_CLIENT
                 .list_objects_v2(ListObjectsV2Request {
-                    bucket: S3_NEXMARK_BUCKET.clone(),
-                    prefix: Some(S3_NEXMARK_Q6_PLAN_KEY.clone()),
+                    bucket: s3_bucket.clone(),
+                    prefix: Some(s3_key.clone()),
                     max_keys: Some(1),
                     ..Default::default()
                 })
@@ -152,8 +160,8 @@ async fn plan_placement(
                 Some(0) => {
                     S3_CLIENT
                         .put_object(PutObjectRequest {
-                            bucket: S3_NEXMARK_BUCKET.clone(),
-                            key: S3_NEXMARK_Q6_PLAN_KEY.clone(),
+                            bucket: s3_bucket.clone(),
+                            key: s3_key.clone(),
                             body: Some(ByteStream::from(serde_json::to_vec(&physcial_plan)?)),
                             ..Default::default()
                         })
@@ -162,10 +170,7 @@ async fn plan_placement(
                 }
                 _ => {}
             }
-            Ok((
-                Arc::new(EmptyExec::new(false, Arc::new(Schema::empty()))),
-                Some((S3_NEXMARK_BUCKET.clone(), S3_NEXMARK_Q6_PLAN_KEY.clone())),
-            ))
+            Ok((EMPTY_EXEC_PLAN.clone(), Some((s3_bucket, s3_key))))
         }
         _ => Ok((physcial_plan, None)),
     }
@@ -190,7 +195,7 @@ async fn create_nexmark_functions(
 
     let (plan, s3) = plan_placement(opt.query_number, physcial_plan).await?;
     let nexmark_source_ctx = ExecutionContext {
-        plan:        Arc::new(EmptyExec::new(false, Arc::new(Schema::empty()))),
+        plan:        EMPTY_EXEC_PLAN.clone(),
         plan_s3_idx: s3.clone(),
         name:        NEXMARK_SOURCE_FUNCTION_NAME.to_string(),
         next:        next_func_name.clone(),
