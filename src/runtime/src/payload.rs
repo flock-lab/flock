@@ -361,11 +361,11 @@ mod tests {
 
         // Option: Compress Arrow Flight data
         {
-            for en in [Encoding::Snappy, Encoding::Lz4].iter() {
+            for en in [Encoding::Snappy, Encoding::Lz4, Encoding::Zstd].iter() {
                 let now = Instant::now();
                 let (en_header, en_body) = (
-                    en.compress(&flight_data.data_header),
-                    en.compress(&flight_data.data_body),
+                    en.compress(&flight_data.data_header)?,
+                    en.compress(&flight_data.data_body)?,
                 );
                 let en_flight_data_size = en_header.len() + en_body.len();
                 println!("Compression time: {} ms", now.elapsed().as_millis());
@@ -378,7 +378,7 @@ mod tests {
                 );
 
                 let now = Instant::now();
-                let (de_header, de_body) = (en.decompress(&en_header), en.decompress(&en_body));
+                let (de_header, de_body) = (en.decompress(&en_header)?, en.decompress(&en_body)?);
                 println!("Decompression time: {} ms", now.elapsed().as_millis());
 
                 assert_eq!(flight_data.data_header, de_header);
@@ -432,7 +432,7 @@ mod tests {
         assert_eq!(payload1, payload2);
 
         let now = Instant::now();
-        let bytes = Encoding::Lz4.compress(&bytes);
+        let bytes = Encoding::Zstd.compress(&bytes)?;
         println!(
             "compress json bytes - time: {} ms, size: {} bytes",
             now.elapsed().as_millis(),

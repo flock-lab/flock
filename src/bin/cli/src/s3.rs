@@ -56,10 +56,12 @@ pub async fn put_function_object(bucket: &str, key: &str, code_path: &str) -> Re
     }
 
     // Put the zip file to S3.
-    let mut request = PutObjectRequest::default();
-    request.bucket = bucket.to_string();
-    request.key = key.to_string();
-    request.body = Some(fs::read(&fname)?.into());
+    let request = PutObjectRequest {
+        bucket: bucket.to_string(),
+        key: key.to_string(),
+        body: Some(fs::read(&fname)?.into()),
+        ..Default::default()
+    };
 
     S3Client::new(Region::default()).put_object(request).await?;
     rainbow_println("[OK] Upload Succeed.");

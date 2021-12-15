@@ -299,7 +299,7 @@ pub fn set_env_context(qflow: &QueryFlow, idx: usize) {
     let ctx = &qflow.ctx[&NodeIndex::new(idx)];
     std::env::set_var(
         &FLOCK_CONF["lambda"]["name"],
-        ctx.marshal(Encoding::default()),
+        ctx.marshal(Encoding::default()).unwrap(),
     );
 }
 

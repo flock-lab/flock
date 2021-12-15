@@ -62,7 +62,7 @@ macro_rules! init_exec_context {
             let init_context = || match std::env::var(&FLOCK_CONF["lambda"]["name"]) {
                 Ok(s) => {
                     EXECUTION_CONTEXT = CloudFunctionContext::Lambda((
-                        Box::new(ExecutionContext::unmarshal(&s)),
+                        Box::new(ExecutionContext::unmarshal(&s).unwrap()),
                         Arena::new(),
                     ));
                 }
@@ -298,7 +298,7 @@ mod tests {
             ..Default::default()
         };
 
-        let encoded = lambda_context.marshal(Encoding::default());
+        let encoded = lambda_context.marshal(Encoding::default())?;
 
         // Configures the cloud environment
         std::env::set_var(&FLOCK_CONF["lambda"]["name"], encoded);

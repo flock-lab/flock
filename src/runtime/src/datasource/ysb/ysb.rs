@@ -180,8 +180,8 @@ impl YSBSource {
             .for_each(|(c_ad_id, campaign_id)| {
                 campaigns.extend(
                     serde_json::to_vec(&Campaign {
-                        c_ad_id:     c_ad_id,
-                        campaign_id: campaign_id,
+                        c_ad_id,
+                        campaign_id,
                     })
                     .unwrap(),
                 );

@@ -28,11 +28,11 @@ use std::sync::Arc;
 /// Deserialize `DataFrame` from cloud functions.
 pub fn unmarshal(data: Vec<DataFrame>, encoding: Encoding) -> Vec<DataFrame> {
     match encoding {
-        Encoding::Snappy | Encoding::Lz4 => data
+        Encoding::Snappy | Encoding::Lz4 | Encoding::Zstd => data
             .par_iter()
             .map(|d| DataFrame {
-                header: encoding.decompress(&d.header),
-                body:   encoding.decompress(&d.body),
+                header: encoding.decompress(&d.header).unwrap(),
+                body:   encoding.decompress(&d.body).unwrap(),
             })
             .collect(),
         Encoding::None => data,
@@ -68,8 +68,8 @@ pub fn to_value(batches: &[RecordBatch], uuid: Uuid, encoding: Encoding) -> Valu
             let (_, flight_data) = flight_data_from_arrow_batch(b, &options);
             if encoding != Encoding::None {
                 DataFrame {
-                    header: encoding.compress(&flight_data.data_header),
-                    body:   encoding.compress(&flight_data.data_body),
+                    header: encoding.compress(&flight_data.data_header).unwrap(),
+                    body:   encoding.compress(&flight_data.data_body).unwrap(),
                 }
             } else {
                 DataFrame {
@@ -101,8 +101,8 @@ pub fn to_payload(batch1: &[RecordBatch], batch2: &[RecordBatch], uuid: Uuid) ->
                 let (_, flight_data) = flight_data_from_arrow_batch(b, &options);
                 if encoding != Encoding::None {
                     DataFrame {
-                        header: encoding.compress(&flight_data.data_header),
-                        body:   encoding.compress(&flight_data.data_body),
+                        header: encoding.compress(&flight_data.data_header).unwrap(),
+                        body:   encoding.compress(&flight_data.data_body).unwrap(),
                     }
                 } else {
                     DataFrame {
@@ -139,8 +139,8 @@ pub fn to_vec(batches: &[RecordBatch], uuid: Uuid, encoding: Encoding) -> Vec<u8
             let (_, flight_data) = flight_data_from_arrow_batch(b, &options);
             if encoding != Encoding::None {
                 DataFrame {
-                    header: encoding.compress(&flight_data.data_header),
-                    body:   encoding.compress(&flight_data.data_body),
+                    header: encoding.compress(&flight_data.data_header).unwrap(),
+                    body:   encoding.compress(&flight_data.data_body).unwrap(),
                 }
             } else {
                 DataFrame {
@@ -170,8 +170,8 @@ pub fn to_bytes(batch: &RecordBatch, uuid: Uuid, encoding: Encoding) -> bytes::B
     let data_frames = {
         if encoding != Encoding::None {
             DataFrame {
-                header: encoding.compress(&flight_data.data_header),
-                body:   encoding.compress(&flight_data.data_body),
+                header: encoding.compress(&flight_data.data_header).unwrap(),
+                body:   encoding.compress(&flight_data.data_body).unwrap(),
             }
         } else {
             DataFrame {

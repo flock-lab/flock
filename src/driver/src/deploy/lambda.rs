@@ -133,7 +133,7 @@ pub fn environment(ctx: &ExecutionContext, debug: bool) -> Option<Environment> {
     let mut map = HashMap::new();
     map.insert(
         (&FLOCK_CONF["lambda"]["name"]).to_owned(),
-        ctx.marshal(Encoding::default()),
+        ctx.marshal(Encoding::default()).unwrap(),
     );
     // Enable crate `env_logger`
     // https://docs.rs/env_logger/latest/env_logger/
