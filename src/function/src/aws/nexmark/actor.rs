@@ -25,7 +25,7 @@ use serde_json::json;
 use serde_json::Value;
 
 lazy_static! {
-    static ref PARALLELISM: usize = FLOCK_CONF["lambda"]["parallelism"]
+    static ref CONCURRENCY: usize = FLOCK_CONF["lambda"]["concurrency"]
         .parse::<usize>()
         .unwrap();
 }
@@ -56,13 +56,13 @@ pub async fn collect(
     let mut inputs = vec![];
     if !(r1_records.is_empty() || r1_records.iter().all(|r| r.is_empty())) {
         inputs.push(
-            LambdaExecutor::repartition(r1_records, Partitioning::RoundRobinBatch(*PARALLELISM))
+            LambdaExecutor::repartition(r1_records, Partitioning::RoundRobinBatch(*CONCURRENCY))
                 .await?,
         );
     }
     if !(r2_records.is_empty() || r2_records.iter().all(|r| r.is_empty())) {
         inputs.push(
-            LambdaExecutor::repartition(r2_records, Partitioning::RoundRobinBatch(*PARALLELISM))
+            LambdaExecutor::repartition(r2_records, Partitioning::RoundRobinBatch(*CONCURRENCY))
                 .await?,
         );
     }

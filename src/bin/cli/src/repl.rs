@@ -24,7 +24,7 @@ use std::env;
 lazy_static! {
     /// Global settings.
     pub static ref FLOCK_CONF: Ini = Ini::load_from_str(include_str!("../../../../flock.toml")).unwrap();
-    pub static ref FLOCK_S3_BUCKET: String = FLOCK_CONF["lambda"]["s3_bucket"].to_string();
+    pub static ref FLOCK_S3_BUCKET: String = FLOCK_CONF["flock"]["s3_bucket"].to_string();
 }
 
 #[tokio::main]

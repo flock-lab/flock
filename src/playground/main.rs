@@ -46,7 +46,7 @@ struct PlaygroundOpt {
 }
 
 async fn create_function(func_name: &str) -> Result<String> {
-    let s3_bucket = FLOCK_CONF["lambda"]["s3_bucket"].to_string();
+    let s3_bucket = FLOCK_CONF["flock"]["s3_bucket"].to_string();
     if LAMBDA_CLIENT
         .get_function(GetFunctionRequest {
             function_name: String::from(func_name),

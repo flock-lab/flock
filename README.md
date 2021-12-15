@@ -1,6 +1,8 @@
 <img src="docs/img/flock.png" width=60%>
 
-## Flock: A Practical Serverless Streaming Query Engine
+## Flock: A Practical Serverless Streaming SQL Query Engine
+
+---
 
 [![CI](https://github.com/flock-lab/flock/workflows/CI/badge.svg?branch=code&event=pull_request)](https://github.com/flock-lab/flock/actions)
 [![codecov](https://codecov.io/gh/flock-lab/flock/branch/master/graph/badge.svg?token=1FOM4DJUZJ)](https://codecov.io/gh/flock-lab/flock)
@@ -10,9 +12,9 @@
 
 The generic lambda function code is built in advance and uploaded to AWS S3.
 
-| Lambda Function Code    | S3 Bucket      | S3 Key           |    S3 URL                        |
-| ----------------------- | ---------------| ---------------- | -------------------------------- |
-| [Nexmark Benchmark](https://beam.apache.org/documentation/sdks/java/testing/nexmark/)      | umd-flock   |   nexmark        |  https://umd-flock.s3.amazonaws.com/nexmark      |
+| Service  | Cloud Platform | S3 Bucket      | S3 Key           |    S3 URL                        |   [YSB Bench](https://github.com/yahoo/streaming-benchmarks)    |   [NEXMark Bench](https://beam.apache.org/documentation/sdks/java/testing/nexmark/) |
+| :---: | :---------------: | :----------------: | :--------------------------------: | :------------------: | :-------------------: | :-------------------: |
+| **Flock** | AWS Lambda | flock-lab   |   flock        |  s3://flock-lab/flock     | ✅ | ✅ |
 
 
 ## Build From Source Code
@@ -20,7 +22,8 @@ The generic lambda function code is built in advance and uploaded to AWS S3.
 You can enable the features `simd` (to use SIMD instructions) and/or `mimalloc` or `snmalloc` (to use either the mimalloc or snmalloc allocator) as features by passing them in as --features:
 
 ```shell
-cargo +nightly build --target x86_64-unknown-linux-musl --release --features "arrow/simd datafusion/simd snmalloc"
+cargo +nightly build --target x86_64-unknown-linux-musl --release \
+      --features "arrow/simd datafusion/simd snmalloc"
 ```
 
 ## Upgrade Cloud Function Services

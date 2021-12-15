@@ -298,7 +298,7 @@ pub fn physical_plan(schema: &SchemaRef, sql: &str, table_name: &str) -> Arc<dyn
 pub fn set_env_context(qflow: &QueryFlow, idx: usize) {
     let ctx = &qflow.ctx[&NodeIndex::new(idx)];
     std::env::set_var(
-        &FLOCK_CONF["lambda"]["name"],
+        &FLOCK_CONF["lambda"]["enviroment"],
         ctx.marshal(Encoding::default()).unwrap(),
     );
 }
