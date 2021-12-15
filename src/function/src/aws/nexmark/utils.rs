@@ -148,12 +148,12 @@ pub fn nexmark_event_to_batches(
             vec![],
         ),
         3 | 8 => (
-            NexMarkSource::to_batch_v2(&event.persons, PERSON_SCHEMA.clone(), *BATCH_SIZE / 2),
-            NexMarkSource::to_batch_v2(&event.auctions, AUCTION_SCHEMA.clone(), *BATCH_SIZE / 2),
+            NexMarkSource::to_batch_v2(&event.persons, PERSON_SCHEMA.clone(), *BATCH_SIZE / 5),
+            NexMarkSource::to_batch_v2(&event.auctions, AUCTION_SCHEMA.clone(), *BATCH_SIZE / 5),
         ),
         4 | 6 | 9 => (
-            NexMarkSource::to_batch_v2(&event.auctions, AUCTION_SCHEMA.clone(), *BATCH_SIZE / 2),
-            NexMarkSource::to_batch_v2(&event.bids, BID_SCHEMA.clone(), *BATCH_SIZE / 2),
+            NexMarkSource::to_batch_v2(&event.auctions, AUCTION_SCHEMA.clone(), *BATCH_SIZE / 8),
+            NexMarkSource::to_batch_v2(&event.bids, BID_SCHEMA.clone(), *BATCH_SIZE * 2),
         ),
         _ => unimplemented!(),
     };
