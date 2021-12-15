@@ -30,4 +30,4 @@ s3_nexmark_q4_plan_key = "nexmark_q4_plan"
 s3_nexmark_q6_plan_key = "nexmark_q6_plan"
 
 # the granularity of each type of data in the payload
-granule = 1024
+granule = 3096 
