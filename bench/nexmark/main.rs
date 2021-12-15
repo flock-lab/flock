@@ -282,7 +282,7 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
 
     info!("Waiting for the current invocations to be logged.");
     tokio::time::sleep(parse_duration("5s").unwrap()).await;
-    fetch_watchlogs(&NEXMARK_SOURCE_LOG_GROUP, parse_duration("20s").unwrap()).await?;
+    fetch_watchlogs(&NEXMARK_SOURCE_LOG_GROUP, parse_duration("1min").unwrap()).await?;
 
     Ok(())
 }
