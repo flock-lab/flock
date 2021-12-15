@@ -25,29 +25,26 @@ use rusoto_lambda::{InvocationRequest, InvocationResponse, Lambda, LambdaClient}
 use std::sync::Arc;
 
 lazy_static! {
-    static ref PERSON_SCHEMA: SchemaRef = Arc::new(Person::schema());
-    static ref AUCTION_SCHEMA: SchemaRef = Arc::new(Auction::schema());
-    static ref BID_SCHEMA: SchemaRef = Arc::new(Bid::schema());
-    static ref LAMBDA_CLIENT: LambdaClient = LambdaClient::new(Region::default());
-    static ref BATCH_SIZE: usize = FLOCK_CONF["lambda"]["granule"].parse::<usize>().unwrap();
+    static ref NEXMARK_BID: SchemaRef = Arc::new(Bid::schema());
+    static ref NEXMARK_PERSON: SchemaRef = Arc::new(Person::schema());
+    static ref NEXMARK_AUCTION: SchemaRef = Arc::new(Auction::schema());
+    static ref FLOCK_LAMBDA_ASYNC_CALL: String = "Event".to_string();
+    static ref FLOCK_LAMBDA_SYNC_CALL: String = "RequestResponse".to_string();
+    static ref FLOCK_LAMBDA_CLIENT: LambdaClient = LambdaClient::new(Region::default());
+    static ref FLOCK_GRANULE_SIZE: usize =
+        FLOCK_CONF["lambda"]["granule"].parse::<usize>().unwrap();
 }
-
-#[allow(dead_code)]
-static LAMBDA_SYNC_CALL: &str = "RequestResponse";
-
-#[allow(dead_code)]
-static LAMBDA_ASYNC_CALL: &str = "Event";
 
 /// A wrapper around a lambda function that can be called asynchronously.
 pub async fn invoke_lambda_function(
     function_name: String,
     payload: Option<Bytes>,
 ) -> Result<InvocationResponse> {
-    match LAMBDA_CLIENT
+    match FLOCK_LAMBDA_CLIENT
         .invoke(InvocationRequest {
             function_name,
             payload,
-            invocation_type: Some(format!("{}", LAMBDA_ASYNC_CALL)),
+            invocation_type: Some(format!("{}", FLOCK_LAMBDA_ASYNC_CALL.clone())),
             ..Default::default()
         })
         .await
@@ -95,18 +92,18 @@ pub fn nexmark_event_to_payload(
 
     match query_number {
         0 | 1 | 2 | 5 | 7 => Ok(to_payload(
-            &NexMarkSource::to_batch(&event.bids, BID_SCHEMA.clone()),
+            &NexMarkSource::to_batch(&event.bids, NEXMARK_BID.clone()),
             &vec![],
             uuid,
         )),
         3 | 8 => Ok(to_payload(
-            &NexMarkSource::to_batch(&event.persons, PERSON_SCHEMA.clone()),
-            &NexMarkSource::to_batch(&event.auctions, AUCTION_SCHEMA.clone()),
+            &NexMarkSource::to_batch(&event.persons, NEXMARK_PERSON.clone()),
+            &NexMarkSource::to_batch(&event.auctions, NEXMARK_AUCTION.clone()),
             uuid,
         )),
         4 | 6 | 9 => Ok(to_payload(
-            &NexMarkSource::to_batch(&event.auctions, AUCTION_SCHEMA.clone()),
-            &NexMarkSource::to_batch(&event.bids, BID_SCHEMA.clone()),
+            &NexMarkSource::to_batch(&event.auctions, NEXMARK_AUCTION.clone()),
+            &NexMarkSource::to_batch(&event.bids, NEXMARK_BID.clone()),
             uuid,
         )),
         _ => unimplemented!(),
@@ -144,16 +141,28 @@ pub fn nexmark_event_to_batches(
 
     let (r1, r2) = match query_number {
         0 | 1 | 2 | 5 | 7 => (
-            NexMarkSource::to_batch_v2(&event.bids, BID_SCHEMA.clone(), *BATCH_SIZE * 2),
+            NexMarkSource::to_batch_v2(&event.bids, NEXMARK_BID.clone(), *FLOCK_GRANULE_SIZE * 2),
             vec![],
         ),
         3 | 8 => (
-            NexMarkSource::to_batch_v2(&event.persons, PERSON_SCHEMA.clone(), *BATCH_SIZE / 5),
-            NexMarkSource::to_batch_v2(&event.auctions, AUCTION_SCHEMA.clone(), *BATCH_SIZE / 5),
+            NexMarkSource::to_batch_v2(
+                &event.persons,
+                NEXMARK_PERSON.clone(),
+                *FLOCK_GRANULE_SIZE / 5,
+            ),
+            NexMarkSource::to_batch_v2(
+                &event.auctions,
+                NEXMARK_AUCTION.clone(),
+                *FLOCK_GRANULE_SIZE / 5,
+            ),
         ),
         4 | 6 | 9 => (
-            NexMarkSource::to_batch_v2(&event.auctions, AUCTION_SCHEMA.clone(), *BATCH_SIZE / 8),
-            NexMarkSource::to_batch_v2(&event.bids, BID_SCHEMA.clone(), *BATCH_SIZE * 2),
+            NexMarkSource::to_batch_v2(
+                &event.auctions,
+                NEXMARK_AUCTION.clone(),
+                *FLOCK_GRANULE_SIZE / 8,
+            ),
+            NexMarkSource::to_batch_v2(&event.bids, NEXMARK_BID.clone(), *FLOCK_GRANULE_SIZE * 2),
         ),
         _ => unimplemented!(),
     };

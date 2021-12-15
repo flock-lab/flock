@@ -38,35 +38,30 @@ use std::sync::Arc;
 use structopt::StructOpt;
 use tokio::task::JoinHandle;
 
-#[allow(dead_code)]
-static LAMBDA_SYNC_CALL: &str = "RequestResponse";
-#[allow(dead_code)]
-static LAMBDA_ASYNC_CALL: &str = "Event";
-static NEXMARK_SOURCE_FUNCTION_NAME: &str = "nexmark_datasource";
-
 lazy_static! {
-    // The NexMark Table Schema
-    static ref PERSON: SchemaRef = Arc::new(Person::schema());
-    static ref AUCTION: SchemaRef = Arc::new(Auction::schema());
-    static ref BID: SchemaRef = Arc::new(Bid::schema());
+    // AWS Services
+    static ref FLOCK_LAMBDA_ASYNC_CALL: String = "Event".to_string();
+    static ref FLOCK_LAMBDA_SYNC_CALL: String = "RequestResponse".to_string();
 
-    // AWS Service Clients
-    static ref LAMBDA_CLIENT: LambdaClient = LambdaClient::new(Region::default());
-    static ref S3_CLIENT: S3Client = S3Client::new(Region::default());
-    static ref WATCHLOGS_CLIENT: CloudWatchLogsClient = CloudWatchLogsClient::new(Region::default());
+    static ref FLOCK_S3_KEY: String = FLOCK_CONF["flock"]["s3_key"].to_string();
+    static ref FLOCK_S3_BUCKET: String = FLOCK_CONF["flock"]["s3_bucket"].to_string();
 
-    // Flock-specific constants
-    static ref S3_NEXMARK_BUCKET: String = FLOCK_CONF["lambda"]["s3_bucket"].to_string();
-    static ref S3_NEXMARK_Q4_PLAN_KEY: String = FLOCK_CONF["lambda"]["s3_nexmark_q4_plan_key"].to_string();
-    static ref S3_NEXMARK_Q6_PLAN_KEY: String = FLOCK_CONF["lambda"]["s3_nexmark_q6_plan_key"].to_string();
-    static ref NEXMARK_SOURCE_LOG_GROUP: String = format!("/aws/lambda/{}", NEXMARK_SOURCE_FUNCTION_NAME);
+    static ref FLOCK_S3_CLIENT: S3Client = S3Client::new(Region::default());
+    static ref FLOCK_LAMBDA_CLIENT: LambdaClient = LambdaClient::new(Region::default());
+    static ref FLOCK_WATCHLOGS_CLIENT: CloudWatchLogsClient = CloudWatchLogsClient::new(Region::default());
 
-    static ref EMPTY_EXEC_PLAN: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(false, Arc::new(Schema::empty())));
+    static ref FLOCK_EMPTY_PLAN: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(false, Arc::new(Schema::empty())));
+    static ref FLOCK_CONCURRENCY: usize = FLOCK_CONF["lambda"]["concurrency"].parse::<usize>().unwrap();
+    static ref FLOCK_GRANULE_SIZE: usize = FLOCK_CONF["lambda"]["granule"].parse::<usize>().unwrap();
 
-    static ref PARALLELISM: usize = FLOCK_CONF["lambda"]["parallelism"]
-        .parse::<usize>()
-        .unwrap();
-    static ref GRANULE_SIZE: usize = FLOCK_CONF["lambda"]["granule"].parse::<usize>().unwrap();
+    // NEXMark Benchmark
+    static ref NEXMARK_BID: SchemaRef = Arc::new(Bid::schema());
+    static ref NEXMARK_PERSON: SchemaRef = Arc::new(Person::schema());
+    static ref NEXMARK_AUCTION: SchemaRef = Arc::new(Auction::schema());
+    static ref NEXMARK_SOURCE_FUNC_NAME: String = "nexmark_datasource".to_string();
+    static ref NEXMARK_SOURCE_LOG_GROUP: String = "/aws/lambda/nexmark_datasource".to_string();
+    static ref NEXMARK_Q4_S3_KEY: String = FLOCK_CONF["nexmark"]["q4_s3_key"].to_string();
+    static ref NEXMARK_Q6_S3_KEY: String = FLOCK_CONF["nexmark"]["q6_s3_key"].to_string();
 }
 
 #[derive(Default, Clone, Debug, StructOpt)]
@@ -142,11 +137,11 @@ async fn plan_placement(
     match query_number {
         4 | 6 => {
             let (s3_bucket, s3_key) = match query_number {
-                4 => (S3_NEXMARK_BUCKET.clone(), S3_NEXMARK_Q4_PLAN_KEY.clone()),
-                6 => (S3_NEXMARK_BUCKET.clone(), S3_NEXMARK_Q6_PLAN_KEY.clone()),
+                4 => (FLOCK_S3_BUCKET.clone(), NEXMARK_Q4_S3_KEY.clone()),
+                6 => (FLOCK_S3_BUCKET.clone(), NEXMARK_Q6_S3_KEY.clone()),
                 _ => unreachable!(),
             };
-            match S3_CLIENT
+            match FLOCK_S3_CLIENT
                 .list_objects_v2(ListObjectsV2Request {
                     bucket: s3_bucket.clone(),
                     prefix: Some(s3_key.clone()),
@@ -158,7 +153,7 @@ async fn plan_placement(
                 .key_count
             {
                 Some(0) => {
-                    S3_CLIENT
+                    FLOCK_S3_CLIENT
                         .put_object(PutObjectRequest {
                             bucket: s3_bucket.clone(),
                             key: s3_key.clone(),
@@ -170,7 +165,7 @@ async fn plan_placement(
                 }
                 _ => {}
             }
-            Ok((EMPTY_EXEC_PLAN.clone(), Some((s3_bucket, s3_key))))
+            Ok((FLOCK_EMPTY_PLAN.clone(), Some((s3_bucket, s3_key))))
         }
         _ => Ok((physcial_plan, None)),
     }
@@ -187,17 +182,17 @@ async fn create_nexmark_functions(
     let worker_func_name = format!("q{}-00", opt.query_number);
 
     let next_func_name =
-        if window != StreamWindow::ElementWise || opt.events_per_second > *GRANULE_SIZE * 2 {
-            CloudFunction::Group((worker_func_name.clone(), *PARALLELISM))
+        if window != StreamWindow::ElementWise || opt.events_per_second > *FLOCK_GRANULE_SIZE * 2 {
+            CloudFunction::Group((worker_func_name.clone(), *FLOCK_CONCURRENCY))
         } else {
             CloudFunction::Lambda(worker_func_name.clone())
         };
 
     let (plan, s3) = plan_placement(opt.query_number, physcial_plan).await?;
     let nexmark_source_ctx = ExecutionContext {
-        plan:        EMPTY_EXEC_PLAN.clone(),
+        plan:        FLOCK_EMPTY_PLAN.clone(),
         plan_s3_idx: s3.clone(),
-        name:        NEXMARK_SOURCE_FUNCTION_NAME.to_string(),
+        name:        NEXMARK_SOURCE_FUNC_NAME.clone(),
         next:        next_func_name.clone(),
         datasource:  DataSource::NexMarkEvent(NexMarkSource::default()),
     };
@@ -211,7 +206,10 @@ async fn create_nexmark_functions(
     };
 
     // Create the function for the nexmark source generator.
-    info!("Creating lambda function: {}", NEXMARK_SOURCE_FUNCTION_NAME);
+    info!(
+        "Creating lambda function: {}",
+        NEXMARK_SOURCE_FUNC_NAME.clone()
+    );
     create_lambda_function(&nexmark_source_ctx, opt.debug).await?;
 
     // Create the function for the nexmark worker.
@@ -220,12 +218,12 @@ async fn create_nexmark_functions(
             info!("Creating lambda function: {}", name);
             create_lambda_function(&nexmark_worker_ctx, opt.debug).await?;
         }
-        CloudFunction::Group((name, parallelism)) => {
+        CloudFunction::Group((name, concurrency)) => {
             info!(
                 "Creating lambda function group: {:?}",
                 nexmark_source_ctx.next
             );
-            for i in 0..*parallelism {
+            for i in 0..*concurrency {
                 let group_member_name = format!("{}-{:02}", name.clone(), i);
                 info!("Creating function member: {}", group_member_name);
                 nexmark_worker_ctx.name = group_member_name;
@@ -259,7 +257,7 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
     let tasks = (0..opt.generators)
         .into_iter()
         .map(|i| {
-            let f = NEXMARK_SOURCE_FUNCTION_NAME.to_string();
+            let f = NEXMARK_SOURCE_FUNC_NAME.clone();
             let s = nexmark_conf.clone();
             let m = metadata.clone();
             tokio::spawn(async move {
@@ -293,7 +291,7 @@ async fn fetch_watchlogs(group: &String, mtime: std::time::Duration) -> Result<(
     let mut token: Option<String> = None;
     let mut req = tail::create_filter_request(&group, mtime, None, token);
     loop {
-        match tail::fetch_logs(&WATCHLOGS_CLIENT, req, timeout)
+        match tail::fetch_logs(&FLOCK_WATCHLOGS_CLIENT, req, timeout)
             .await
             .map_err(|e| FlockError::Internal(e.to_string()))?
         {
@@ -323,11 +321,11 @@ async fn invoke_lambda_function(
     function_name: String,
     payload: Option<Bytes>,
 ) -> Result<InvocationResponse> {
-    match LAMBDA_CLIENT
+    match FLOCK_LAMBDA_CLIENT
         .invoke(InvocationRequest {
             function_name,
             payload,
-            invocation_type: Some(LAMBDA_ASYNC_CALL.to_string()),
+            invocation_type: Some(FLOCK_LAMBDA_ASYNC_CALL.clone()),
             ..Default::default()
         })
         .await
@@ -349,7 +347,7 @@ async fn set_lambda_concurrency(function_name: String, concurrency: i64) -> Resu
         function_name,
         reserved_concurrent_executions: concurrency,
     };
-    let concurrency = LAMBDA_CLIENT
+    let concurrency = FLOCK_LAMBDA_CLIENT
         .put_function_concurrency(request)
         .await
         .map_err(|e| FlockError::Internal(e.to_string()))?;
@@ -359,10 +357,8 @@ async fn set_lambda_concurrency(function_name: String, concurrency: i64) -> Resu
 
 /// Creates a single lambda function using bootstrap.zip in Amazon S3.
 async fn create_lambda_function(ctx: &ExecutionContext, debug: bool) -> Result<String> {
-    let s3_bucket = FLOCK_CONF["lambda"]["s3_bucket"].to_string();
-    let s3_key = FLOCK_CONF["lambda"]["s3_nexmark_key"].to_string();
     let func_name = ctx.name.clone();
-    if LAMBDA_CLIENT
+    if FLOCK_LAMBDA_CLIENT
         .get_function(GetFunctionRequest {
             function_name: ctx.name.clone(),
             ..Default::default()
@@ -370,11 +366,11 @@ async fn create_lambda_function(ctx: &ExecutionContext, debug: bool) -> Result<S
         .await
         .is_ok()
     {
-        let conf = LAMBDA_CLIENT
+        let conf = FLOCK_LAMBDA_CLIENT
             .update_function_code(UpdateFunctionCodeRequest {
                 function_name: func_name.clone(),
-                s3_bucket: Some(s3_bucket.clone()),
-                s3_key: Some(s3_key.clone()),
+                s3_bucket: Some(FLOCK_S3_BUCKET.clone()),
+                s3_key: Some(FLOCK_S3_KEY.clone()),
                 ..Default::default()
             })
             .await
@@ -382,11 +378,11 @@ async fn create_lambda_function(ctx: &ExecutionContext, debug: bool) -> Result<S
         conf.function_name
             .ok_or_else(|| FlockError::Internal("No function name!".to_string()))
     } else {
-        let conf = LAMBDA_CLIENT
+        let conf = FLOCK_LAMBDA_CLIENT
             .create_function(CreateFunctionRequest {
                 code: FunctionCode {
-                    s3_bucket: Some(s3_bucket.clone()),
-                    s3_key: Some(s3_key.clone()),
+                    s3_bucket: Some(FLOCK_S3_BUCKET.clone()),
+                    s3_key: Some(FLOCK_S3_KEY.clone()),
                     ..Default::default()
                 },
                 function_name: func_name.clone(),
@@ -460,9 +456,15 @@ mod tests {
 
             flock_ctx
                 .feed_data_sources(&vec![
-                    vec![NexMarkSource::to_batch(&event.bids, BID.clone())],
-                    vec![NexMarkSource::to_batch(&event.persons, PERSON.clone())],
-                    vec![NexMarkSource::to_batch(&event.auctions, AUCTION.clone())],
+                    vec![NexMarkSource::to_batch(&event.bids, NEXMARK_BID.clone())],
+                    vec![NexMarkSource::to_batch(
+                        &event.persons,
+                        NEXMARK_PERSON.clone(),
+                    )],
+                    vec![NexMarkSource::to_batch(
+                        &event.auctions,
+                        NEXMARK_AUCTION.clone(),
+                    )],
                 ])
                 .await?;
 

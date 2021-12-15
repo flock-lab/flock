@@ -43,7 +43,7 @@ thread_local! {
 }
 
 lazy_static! {
-    static ref CONTEXT_NAME: String = FLOCK_CONF["lambda"]["name"].to_string();
+    static ref CONTEXT_NAME: String = FLOCK_CONF["lambda"]["environment"].to_string();
 }
 
 /// A wrapper to allow the declaration of the execution context of the lambda

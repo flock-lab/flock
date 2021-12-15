@@ -59,7 +59,7 @@ macro_rules! init_exec_context {
     () => {{
         unsafe {
             // Init query executor from the cloud evironment.
-            let init_context = || match std::env::var(&FLOCK_CONF["lambda"]["name"]) {
+            let init_context = || match std::env::var(&FLOCK_CONF["lambda"]["environment"]) {
                 Ok(s) => {
                     EXECUTION_CONTEXT = CloudFunctionContext::Lambda((
                         Box::new(ExecutionContext::unmarshal(&s).unwrap()),
@@ -157,15 +157,15 @@ async fn source_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Valu
             .await?;
 
             let num_batches = output_partitions[0].len();
-            let parallelism = FLOCK_CONF["lambda"]["parallelism"]
+            let concurrency = FLOCK_CONF["lambda"]["concurrency"]
                 .parse::<usize>()
                 .unwrap();
 
-            if num_batches > parallelism {
+            if num_batches > concurrency {
                 ctx.feed_one_source(
                     &LambdaExecutor::repartition(
                         output_partitions,
-                        Partitioning::RoundRobinBatch(parallelism),
+                        Partitioning::RoundRobinBatch(concurrency),
                     )
                     .await?,
                 )
@@ -301,7 +301,7 @@ mod tests {
         let encoded = lambda_context.marshal(Encoding::default())?;
 
         // Configures the cloud environment
-        std::env::set_var(&FLOCK_CONF["lambda"]["name"], encoded);
+        std::env::set_var(&FLOCK_CONF["lambda"]["environment"], encoded);
 
         // First lambda call
         let event = json!({
