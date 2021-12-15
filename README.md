@@ -264,5 +264,5 @@ START RequestId: 78c64a1a-b312-4099-b596-541c078b04b7 Version: $LATEST
 
 ## License
 
-Copyright 2020 UMD Database Group.
+Copyright (c) 2020-present UMD Database Group.
 The library, examples, and all source code are released under [AGPL-3.0 License](LICENSE).
