@@ -280,23 +280,31 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
         info!("[OK] Received status from function. {:?}", response);
     }
 
-    fetch_watchlogs(&NEXMARK_SOURCE_LOG_GROUP, parse_duration("5min").unwrap()).await?;
+    info!("Waiting for the current invocations to be logged.");
+    tokio::time::sleep(parse_duration("5s").unwrap()).await;
+    fetch_watchlogs(&NEXMARK_SOURCE_LOG_GROUP, parse_duration("20s").unwrap()).await?;
 
     Ok(())
 }
 
 async fn fetch_watchlogs(group: &String, mtime: std::time::Duration) -> Result<()> {
+    let mut logged = false;
     let timeout = parse_duration("1min").unwrap();
     let sleep_for = parse_duration("5s").ok();
     let mut token: Option<String> = None;
     let mut req = tail::create_filter_request(&group, mtime, None, token);
     loop {
+        if logged {
+            break;
+        }
+
         match tail::fetch_logs(&FLOCK_WATCHLOGS_CLIENT, req, timeout)
             .await
             .map_err(|e| FlockError::Internal(e.to_string()))?
         {
             tail::AWSResponse::Token(x) => {
                 info!("Got a Token response");
+                logged = true;
                 token = Some(x);
                 req = tail::create_filter_request(&group, mtime, None, token);
             }
