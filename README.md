@@ -153,7 +153,7 @@ Nexmark Seconds to Run: 10
 2021-12-15 10:20:54 START RequestId: f65ef2a9-1fec-4e19-8793-9e10c5966506 Version: $LATEST
 2021-12-15 10:20:54 [2021-12-15T15:20:54Z INFO  runtime::datasource::nexmark::nexmark] Generating events for 10s over 1 partitions.
 2021-12-15 10:20:54 [2021-12-15T15:20:54Z INFO  nexmark_lambda::source] Nexmark Benchmark: Query 5
-2021-12-15 10:20:54 [2021-12-15T15:20:54Z INFO  nexmark_lambda::source] NexMarkSource { config: Config { args: {"threads": "1", "seconds": "10", "events-per-second": "1000"} }, window: HoppingWindow((10, 5)) }
+2021-12-15 10:20:54 [2021-12-15T15:20:54Z INFO  nexmark_lambda::source] NEXMarkSource { config: Config { args: {"threads": "1", "seconds": "10", "events-per-second": "1000"} }, window: HoppingWindow((10, 5)) }
 2021-12-15 10:20:54 [2021-12-15T15:20:54Z INFO  nexmark_lambda::source] [OK] Generate nexmark events.
 2021-12-15 10:20:54 [2021-12-15T15:20:54Z INFO  nexmark_lambda::utils] Epoch 0: 20 persons, 60 auctions, 920 bids.
 2021-12-15 10:20:54 [2021-12-15T15:20:54Z INFO  nexmark_lambda::utils] Epoch 1: 20 persons, 60 auctions, 920 bids.

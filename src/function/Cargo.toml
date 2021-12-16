@@ -16,6 +16,7 @@ aws_lambda_events = "0.5"
 bytes = "1.1.0"
 chrono = "0.4.19"
 datafusion = { git = "https://github.com/flock-lab/arrow-datafusion", branch = "flock" }
+driver = { path = "../driver" }
 env_logger = "^0.9"
 futures = "0.3.12"
 hashring = "0.2.0"
@@ -37,14 +38,6 @@ tokio = { version = "1.4", features = [ "macros", "io-util", "sync", "rt-multi-t
 driver = { path = "../driver" }
 test_utils = { path = "../test" }
 
-# [[bin]]
-# name = "aws_lambda"
-# path = "src/aws/lambda.rs"
-
 [[bin]]
-name = "nexmark_lambda"
-path = "src/aws/nexmark/main.rs"
-
-# [[bin]]
-# name = "hello"
-# path = "src/aws/hello.rs"
+name = "flock"
+path = "src/aws/main.rs"

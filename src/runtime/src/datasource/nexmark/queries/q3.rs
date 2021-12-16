@@ -18,7 +18,7 @@ fn main() {}
 mod tests {
     use crate::datasource::date::DateTime;
     use crate::datasource::nexmark::event::{Auction, Person};
-    use crate::datasource::nexmark::NexMarkSource;
+    use crate::datasource::nexmark::NEXMarkSource;
     use crate::error::Result;
     use crate::executor::plan::physical_plan;
     use crate::query::StreamWindow;
@@ -33,7 +33,7 @@ mod tests {
         let seconds = 5;
         let threads = 1;
         let event_per_second = 1000;
-        let nex = NexMarkSource::new(
+        let nex = NEXMarkSource::new(
             seconds,
             threads,
             event_per_second,
@@ -65,11 +65,11 @@ mod tests {
             // events to record batches
             let am = events.auctions.get(&DateTime::new(i)).unwrap();
             let (auctions, _) = am.get(&0).unwrap();
-            let auctions_batches = NexMarkSource::to_batch(&auctions, auction_schema.clone());
+            let auctions_batches = NEXMarkSource::to_batch(auctions, auction_schema.clone());
 
             let pm = events.persons.get(&DateTime::new(i)).unwrap();
             let (persons, _) = pm.get(&0).unwrap();
-            let person_batches = NexMarkSource::to_batch(&persons, person_schema.clone());
+            let person_batches = NEXMarkSource::to_batch(persons, person_schema.clone());
 
             // register memory tables
             let mut ctx = datafusion::execution::context::ExecutionContext::new();
@@ -80,7 +80,7 @@ mod tests {
             ctx.register_table("person", Arc::new(person_table))?;
 
             // optimize query plan and execute it
-            let physical_plan = physical_plan(&mut ctx, &sql)?;
+            let physical_plan = physical_plan(&mut ctx, sql)?;
             let batches = collect(physical_plan).await?;
 
             // show output

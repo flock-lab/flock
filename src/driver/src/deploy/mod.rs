@@ -56,7 +56,7 @@ impl ExecutionEnvironment {
             ExecutionEnvironment::Local => Err(FlockError::FunctionGeneration(
                 "Local execution doesn't require a deployment.".to_owned(),
             )),
-            ExecutionEnvironment::Lambda => Self::lambda_deployment(&query).await,
+            ExecutionEnvironment::Lambda => Self::lambda_deployment(query).await,
             _ => unimplemented!(),
         }
     }
@@ -72,16 +72,16 @@ impl ExecutionEnvironment {
     async fn lambda_deployment(flow: &QueryFlow) -> Result<()> {
         let client = &LambdaClient::new(Region::default());
         for (_, ctx) in flow.ctx.iter() {
-            let _: Vec<_> = flock::function_name(&ctx)
+            let _: Vec<_> = flock::function_name(ctx)
                 .iter()
                 .map(|name| async move {
                     client
                         .create_function(CreateFunctionRequest {
                             code: flock::function_code(),
-                            environment: flock::environment(&ctx, true),
+                            environment: flock::environment(ctx, true),
                             function_name: name.to_owned(),
                             handler: flock::handler(),
-                            memory_size: flock::memory_size(&ctx),
+                            memory_size: flock::memory_size(ctx),
                             role: flock::role().await,
                             runtime: flock::runtime(),
                             ..CreateFunctionRequest::default()

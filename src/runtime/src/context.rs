@@ -372,7 +372,7 @@ mod tests {
             CloudFunction::Lambda("SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836Z".to_owned());
         let datasource = DataSource::Payload;
 
-        let plan: Arc<dyn ExecutionPlan> = serde_json::from_str(&plan)?;
+        let plan: Arc<dyn ExecutionPlan> = serde_json::from_str(plan)?;
         let lambda_context = ExecutionContext {
             plan,
             name,
@@ -400,7 +400,7 @@ mod tests {
         ctx.register_table("test", Arc::new(provider))?;
 
         let sql = "SELECT MAX(c1), MIN(c2), c3 FROM test WHERE c2 < 99 GROUP BY c3";
-        let logical_plan = ctx.create_logical_plan(&sql)?;
+        let logical_plan = ctx.create_logical_plan(sql)?;
         let logical_plan = ctx.optimize(&logical_plan)?;
         let physical_plan = ctx.create_physical_plan(&logical_plan)?;
 
@@ -481,7 +481,7 @@ mod tests {
             "LIMIT 3"
         );
 
-        let logical_plan = ctx.create_logical_plan(&sql)?;
+        let logical_plan = ctx.create_logical_plan(sql)?;
         let logical_plan = ctx.optimize(&logical_plan)?;
         let physical_plan = ctx.create_physical_plan(&logical_plan)?;
 

@@ -18,7 +18,7 @@ fn main() {}
 mod tests {
     use crate::datasource::date::DateTime;
     use crate::datasource::nexmark::event::Bid;
-    use crate::datasource::nexmark::NexMarkSource;
+    use crate::datasource::nexmark::NEXMarkSource;
     use crate::error::FlockError;
     use crate::error::Result;
     use crate::executor::plan::physical_plan;
@@ -38,7 +38,7 @@ mod tests {
         // hopping window
         let window = 3;
         let hop = 2;
-        let nex = NexMarkSource::new(
+        let nex = NEXMarkSource::new(
             seconds,
             threads,
             event_per_second,
@@ -91,7 +91,7 @@ mod tests {
                 }
                 let bm = events.bids.get(&DateTime::new(j)).unwrap();
                 let (bids, _) = bm.get(&0).unwrap();
-                bids_batches.push(NexMarkSource::to_batch(&bids, bid_schema.clone()));
+                bids_batches.push(NEXMarkSource::to_batch(bids, bid_schema.clone()));
             }
 
             let old_batches = bids_batches.clone();
@@ -101,7 +101,7 @@ mod tests {
             ctx.register_table("bid", Arc::new(bid_table))?;
 
             // optimize the query plan and execute it
-            let physical_plan = physical_plan(&mut ctx, &sql)?;
+            let physical_plan = physical_plan(&mut ctx, sql)?;
             let batches = collect(physical_plan).await?;
 
             // show output

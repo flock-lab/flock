@@ -347,7 +347,7 @@ mod tests {
 
         // Option: Arrow Flight Data
         let options = arrow::ipc::writer::IpcWriteOptions::default();
-        let (_, flight_data) = flight_data_from_arrow_batch(&batch, &options);
+        let (_, flight_data) = flight_data_from_arrow_batch(batch, &options);
 
         {
             let flight_data_size = flight_data.data_header.len() + flight_data.data_body.len();

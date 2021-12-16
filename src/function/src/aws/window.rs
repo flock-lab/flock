@@ -11,40 +11,43 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use crate::utils::*;
+use crate::actor::*;
 use arrow::record_batch::RecordBatch;
 use chrono::Utc;
-use hashring::HashRing;
+use driver::deploy::common::*;
 use log::info;
-use nexmark::NexMarkStream;
 use runtime::prelude::*;
 use std::sync::Arc;
+
+type RelationPartitions = Vec<Vec<RecordBatch>>;
 
 /// Generate tumble windows workloads for the nexmark benchmark on cloud
 /// function services.
 ///
 /// # Arguments
-/// * `ctx` - the runtime context of the function.
-/// * `source` - the source stream of nexmark events.
+/// * `payload` - The payload of the function.
+/// * `stream` - the source stream of nexmark events.
 /// * `seconds` - the total number of seconds to generate workloads.
 /// * `window_size` - the size of the window in seconds.
-/// * `ring` - the consistent hashing ring to forward the windowed events to the
-///   same function execution environment.
-/// * `group_name` - the name of the group of the function.
-///
-/// # Returns
-/// The task join handles of the generated workloads.
 pub async fn tumbling_window_tasks(
-    query_number: usize,
-    source: Arc<NexMarkStream>,
+    payload: Payload,
+    stream: Arc<dyn DataStream>,
     seconds: usize,
     window_size: usize,
-    ring: &mut HashRing<String>,
-    group_name: String,
 ) -> Result<()> {
     assert!(seconds >= window_size);
 
-    let mut window: Box<Vec<(Vec<Vec<RecordBatch>>, Vec<Vec<RecordBatch>>)>> = Box::new(vec![]);
+    // To make data source generator function work generally, we *cannot*
+    // use `CONSISTENT_HASH_CONTEXT` from cloud environment. The cloud
+    // environment is used to specialize the plan for each function (stage
+    // of the query). We WANT to use the same data source function to handle
+    // all benchamrk queries.
+    // `ring`: the consistent hashing ring to forward the windowed events to the
+    // same function execution environment.
+    // `group_name`: the name of the group of the function.
+    let (mut ring, group_name) = infer_actor_info(payload.metadata)?;
+
+    let mut window: Box<Vec<(RelationPartitions, RelationPartitions)>> = Box::new(vec![]);
 
     for time in 0..seconds / window_size {
         let start = time * window_size;
@@ -53,11 +56,10 @@ pub async fn tumbling_window_tasks(
         // Update the tumbling window, and generate the next batch of data.
         window.drain(..);
         for t in start..end {
-            window.push(nexmark_event_to_batches(
-                source.clone(),
+            window.push(stream.select_event_to_batches(
                 t,
                 0, // generator id
-                query_number,
+                payload.query_number,
             )?);
         }
 
@@ -109,29 +111,23 @@ pub async fn tumbling_window_tasks(
 /// function services.
 ///
 /// # Arguments
-/// * `ctx` - the runtime context of the function.
-/// * `source` - the source stream of nexmark events.
+/// * `payload` - The payload of the function.
+/// * `stream` - the source stream of nexmark events.
 /// * `seconds` - the total number of seconds to generate workloads.
 /// * `window_size` - the size of the window in seconds.
 /// * `hop_size` - the size of the hop in seconds.
-/// * `ring` - the consistent hashing ring to forward the windowed events to the
-///   same function execution environment.
-/// * `group_name` - the name of the group of the function.
-///
-/// # Returns
-/// The task join handles of the generated workloads.
 pub async fn hopping_window_tasks(
-    query_number: usize,
-    source: Arc<NexMarkStream>,
+    payload: Payload,
+    stream: Arc<dyn DataStream>,
     seconds: usize,
     window_size: usize,
     hop_size: usize,
-    ring: &mut HashRing<String>,
-    group_name: String,
 ) -> Result<()> {
     assert!(seconds >= window_size);
 
-    let mut window: Box<Vec<(Vec<Vec<RecordBatch>>, Vec<Vec<RecordBatch>>)>> = Box::new(vec![]);
+    let (mut ring, group_name) = infer_actor_info(payload.metadata)?;
+
+    let mut window: Box<Vec<(RelationPartitions, RelationPartitions)>> = Box::new(vec![]);
 
     for time in (0..seconds).step_by(hop_size) {
         if time + window_size > seconds {
@@ -147,11 +143,10 @@ pub async fn hopping_window_tasks(
 
         // Update the hopping window, and generate the next batch of data.
         for t in time + start_pos..time + window_size {
-            window.push(nexmark_event_to_batches(
-                source.clone(),
+            window.push(stream.select_event_to_batches(
                 t,
                 0, // generator id
-                query_number,
+                payload.query_number,
             )?);
         }
 
@@ -203,35 +198,28 @@ pub async fn hopping_window_tasks(
 /// function services.
 ///
 /// # Arguments
-/// * `ctx` - the runtime context of the function.
-/// * `source` - the source stream of nexmark events.
+/// * `payload` - The payload of the function.
+/// * `stream` - the source stream of nexmark events.
 /// * `seconds` - the total number of seconds to generate workloads.
-/// * `ring` - the consistent hashing ring to forward the windowed events to the
-///   same function execution environment.
-/// * `group_name` - the name of the group of the function.
-///
-/// # Returns
-/// The task join handles of the generated workloads.
 pub async fn elementwise_tasks(
-    query_number: usize,
-    source: Arc<NexMarkStream>,
+    payload: Payload,
+    stream: Arc<dyn DataStream>,
     seconds: usize,
-    ring: &mut HashRing<String>,
-    group_name: String,
 ) -> Result<()> {
+    let (mut ring, group_name) = infer_actor_info(payload.metadata)?;
+
     for epoch in 0..seconds {
         info!("[OK] Send NexMark events (epoch: {}).", epoch);
-        let events = source.clone();
+        let events = stream.clone();
 
         if ring.len() == 1 {
             // lambda default concurrency
             let function_name = group_name.clone();
             let uuid = UuidBuilder::new_with_ts(&function_name, Utc::now().timestamp(), 1).next();
-            let payload = serde_json::to_vec(&nexmark_event_to_payload(
-                events,
+            let payload = serde_json::to_vec(&events.select_event_to_payload(
                 epoch,
                 0,
-                query_number,
+                payload.query_number,
                 uuid,
             )?)?
             .into();
@@ -241,11 +229,10 @@ pub async fn elementwise_tasks(
             );
         } else {
             // Calculate the total data packets to be sent.
-            let (a, b) = nexmark_event_to_batches(
-                events,
+            let (a, b) = events.select_event_to_batches(
                 epoch,
                 0, // generator id
-                query_number,
+                payload.query_number,
             )?;
             let size = if a.len() > b.len() { a.len() } else { b.len() };
 

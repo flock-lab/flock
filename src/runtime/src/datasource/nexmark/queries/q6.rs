@@ -18,7 +18,7 @@ fn main() {}
 mod tests {
     use crate::datasource::date::DateTime;
     use crate::datasource::nexmark::event::{Auction, Bid};
-    use crate::datasource::nexmark::NexMarkSource;
+    use crate::datasource::nexmark::NEXMarkSource;
     use crate::error::Result;
     use crate::executor::plan::physical_plan;
     use crate::query::StreamWindow;
@@ -62,7 +62,7 @@ mod tests {
         let seconds = 2;
         let threads = 1;
         let event_per_second = 1000;
-        let nex = NexMarkSource::new(
+        let nex = NEXMarkSource::new(
             seconds,
             threads,
             event_per_second,
@@ -95,11 +95,11 @@ mod tests {
             // events to record batches
             let am = events.auctions.get(&DateTime::new(i)).unwrap();
             let (auctions, _) = am.get(&0).unwrap();
-            let auctions_batches = NexMarkSource::to_batch(&auctions, auction_schema.clone());
+            let auctions_batches = NEXMarkSource::to_batch(auctions, auction_schema.clone());
 
             let bm = events.bids.get(&DateTime::new(i)).unwrap();
             let (bids, _) = bm.get(&0).unwrap();
-            let bids_batches = NexMarkSource::to_batch(&bids, bid_schema.clone());
+            let bids_batches = NEXMarkSource::to_batch(bids, bid_schema.clone());
 
             // register memory tables
             let mut ctx = datafusion::execution::context::ExecutionContext::new();
@@ -112,7 +112,7 @@ mod tests {
             // optimize query plan and execute it
 
             // 1. get the total distinct sellers during the epoch
-            let plan = physical_plan(&mut ctx, &sql1)?;
+            let plan = physical_plan(&mut ctx, sql1)?;
             let batches = collect(plan).await?;
             let total_distinct_sellers = batches[0]
                 .column(0)
@@ -122,12 +122,12 @@ mod tests {
                 .value(0);
 
             // 2. get the max price of auctions for each seller
-            let plan = physical_plan(&mut ctx, &sql2)?;
+            let plan = physical_plan(&mut ctx, sql2)?;
             let batches = collect_partitioned(plan).await?;
             let batches = repartition(
                 batches,
                 Partitioning::HashDiff(
-                    vec![Arc::new(Column::new(&"seller", 0))],
+                    vec![Arc::new(Column::new("seller", 0))],
                     total_distinct_sellers as usize,
                 ),
             )
@@ -146,7 +146,7 @@ mod tests {
             let q_table =
                 MemTable::try_new(output_partitions[0].schema(), vec![output_partitions])?;
             ctx.register_table("Q", Arc::new(q_table))?;
-            let plan = physical_plan(&mut ctx, &sql3)?;
+            let plan = physical_plan(&mut ctx, sql3)?;
             let output_partitions = collect(plan).await?;
 
             // show output

@@ -380,7 +380,7 @@ mod tests {
         ctx.register_table("test", Arc::new(provider))?;
 
         let sql = "SELECT MAX(c1), MIN(c2), c3 FROM test WHERE c2 < 99 GROUP BY c3";
-        let logical_plan = ctx.create_logical_plan(&sql)?;
+        let logical_plan = ctx.create_logical_plan(sql)?;
         let logical_plan = ctx.optimize(&logical_plan)?;
         let physical_plan = ctx.create_physical_plan(&logical_plan)?;
 

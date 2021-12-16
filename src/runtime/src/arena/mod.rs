@@ -187,12 +187,12 @@ mod tests {
 
         let mut arena = Arena::new();
         batches.into_iter().enumerate().for_each(|(i, batch)| {
-            let payload = to_payload(&[batch], &vec![], uuids.get(i));
+            let payload = to_payload(&[batch], &[], uuids.get(i));
             let (ready, _) = arena.reassemble(payload);
             if i < 7 {
-                assert_eq!(false, ready);
+                assert!(!ready);
             } else {
-                assert_eq!(true, ready);
+                assert!(ready);
             }
         });
 
@@ -202,7 +202,7 @@ mod tests {
         if let Some(window) = (*arena).get(&tid) {
             assert_eq!(8, window.size);
             assert_eq!(8, window.r1_records.len());
-            (0..8).for_each(|i| assert_eq!(true, window.bitmap.is_set(i)));
+            (0..8).for_each(|i| assert!(window.bitmap.is_set(i)));
         }
 
         assert_eq!(8, arena.batches(tid).0.len());

@@ -22,7 +22,7 @@ use humantime::parse_duration;
 use lazy_static::lazy_static;
 use log::info;
 use nexmark::event::{Auction, Bid, Person};
-use nexmark::NexMarkSource;
+use nexmark::NEXMarkSource;
 use runtime::prelude::*;
 use rusoto_core::{ByteStream, Region};
 use rusoto_lambda::InvocationResponse;
@@ -107,14 +107,14 @@ async fn register_nexmark_tables() -> Result<DataFusionExecutionContext> {
     Ok(ctx)
 }
 
-fn create_nexmark_source(opt: &NexmarkBenchmarkOpt) -> NexMarkSource {
+fn create_nexmark_source(opt: &NexmarkBenchmarkOpt) -> NEXMarkSource {
     let window = match opt.query_number {
         0 | 1 | 2 | 3 | 4 | 6 | 9 | 13 => StreamWindow::ElementWise,
         5 => StreamWindow::HoppingWindow((10, 5)),
         7..=8 => StreamWindow::TumblingWindow(Schedule::Seconds(10)),
         _ => unreachable!(),
     };
-    NexMarkSource::new(opt.seconds, opt.generators, opt.events_per_second, window)
+    NEXMarkSource::new(opt.seconds, opt.generators, opt.events_per_second, window)
 }
 
 async fn plan_placement(
@@ -128,7 +128,7 @@ async fn plan_placement(
                 6 => (FLOCK_S3_BUCKET.clone(), NEXMARK_Q6_S3_KEY.clone()),
                 _ => unreachable!(),
             };
-            match FLOCK_S3_CLIENT
+            if let Some(0) = FLOCK_S3_CLIENT
                 .list_objects_v2(ListObjectsV2Request {
                     bucket: s3_bucket.clone(),
                     prefix: Some(s3_key.clone()),
@@ -139,18 +139,15 @@ async fn plan_placement(
                 .map_err(|e| FlockError::Internal(e.to_string()))?
                 .key_count
             {
-                Some(0) => {
-                    FLOCK_S3_CLIENT
-                        .put_object(PutObjectRequest {
-                            bucket: s3_bucket.clone(),
-                            key: s3_key.clone(),
-                            body: Some(ByteStream::from(serde_json::to_vec(&physcial_plan)?)),
-                            ..Default::default()
-                        })
-                        .await
-                        .map_err(|e| FlockError::Internal(e.to_string()))?;
-                }
-                _ => {}
+                FLOCK_S3_CLIENT
+                    .put_object(PutObjectRequest {
+                        bucket: s3_bucket.clone(),
+                        key: s3_key.clone(),
+                        body: Some(ByteStream::from(serde_json::to_vec(&physcial_plan)?)),
+                        ..Default::default()
+                    })
+                    .await
+                    .map_err(|e| FlockError::Internal(e.to_string()))?;
             }
             Ok((FLOCK_EMPTY_PLAN.clone(), Some((s3_bucket, s3_key))))
         }
@@ -181,15 +178,15 @@ async fn create_nexmark_functions(
         plan_s3_idx: s3.clone(),
         name:        NEXMARK_SOURCE_FUNC_NAME.clone(),
         next:        next_func_name.clone(),
-        datasource:  DataSource::NexMarkEvent(NexMarkSource::default()),
+        datasource:  DataSource::NEXMarkEvent(NEXMarkSource::default()),
     };
 
     let mut nexmark_worker_ctx = ExecutionContext {
-        plan:        plan,
+        plan,
         plan_s3_idx: s3.clone(),
-        name:        worker_func_name.clone(),
-        next:        CloudFunction::None,
-        datasource:  DataSource::Payload,
+        name: worker_func_name.clone(),
+        next: CloudFunction::None,
+        datasource: DataSource::Payload,
     };
 
     // Create the function for the nexmark source generator.
@@ -225,7 +222,10 @@ async fn create_nexmark_functions(
 }
 
 async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
-    info!("Running benchmarks with the following options: {:?}", opt);
+    info!(
+        "Running the NEXMark benchmark with the following options: {:?}",
+        opt
+    );
     let nexmark_conf = create_nexmark_source(&opt);
     let query_number = opt.query_number;
 
@@ -239,7 +239,7 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
     // in the environment as part of the source function. Otherwise, we have to
     // *delete* and **recreate** the source function every time we change the query.
     let mut metadata = HashMap::new();
-    metadata.insert(format!("workers"), serde_json::to_string(&root_actor)?);
+    metadata.insert("workers".to_string(), serde_json::to_string(&root_actor)?);
 
     let tasks = (0..opt.generators)
         .into_iter()
@@ -248,15 +248,18 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
             let s = nexmark_conf.clone();
             let m = metadata.clone();
             tokio::spawn(async move {
-                info!("[OK] Invoke function: {} {}", f, i);
+                info!(
+                    "[OK] Invoking NEXMark source function: {} by generator {}",
+                    f, i
+                );
                 let p = serde_json::to_vec(&Payload {
-                    datasource: Some(DataSource::NexMarkEvent(s)),
+                    datasource: Some(DataSource::NEXMarkEvent(s)),
                     query_number: Some(query_number),
                     metadata: Some(m),
                     ..Default::default()
                 })?
                 .into();
-                Ok(invoke_lambda_function(f, Some(p)).await?)
+                invoke_lambda_function(f, Some(p)).await
             })
         })
         // this collect *is needed* so that the join below can switch between tasks.
@@ -330,12 +333,12 @@ mod tests {
 
             flock_ctx
                 .feed_data_sources(&vec![
-                    vec![NexMarkSource::to_batch(&event.bids, NEXMARK_BID.clone())],
-                    vec![NexMarkSource::to_batch(
+                    vec![NEXMarkSource::to_batch(&event.bids, NEXMARK_BID.clone())],
+                    vec![NEXMarkSource::to_batch(
                         &event.persons,
                         NEXMARK_PERSON.clone(),
                     )],
-                    vec![NexMarkSource::to_batch(
+                    vec![NEXMarkSource::to_batch(
                         &event.auctions,
                         NEXMARK_AUCTION.clone(),
                     )],

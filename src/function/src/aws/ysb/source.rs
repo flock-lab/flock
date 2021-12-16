@@ -33,7 +33,7 @@ use std::sync::Arc;
 pub async fn handler(ctx: &ExecutionContext, payload: Payload) -> Result<Value> {
     // Copy data source from the payload.
     let mut source = match payload.datasource.clone() {
-        Some(DataSource::NEXMarkEvent(source)) => source,
+        Some(DataSource::YSBEvent(source)) => source,
         _ => unreachable!(),
     };
 
@@ -49,24 +49,16 @@ pub async fn handler(ctx: &ExecutionContext, payload: Payload) -> Result<Value> 
     assert!(eps / gen > 0);
 
     let events = Arc::new(source.generate_data()?);
-    let query_number = payload.query_number.expect("Query number is missing.");
 
-    info!("Nexmark Benchmark: Query {:?}", query_number);
+    info!("Starting YSB Benchmark.");
     info!("{:?}", source);
-    info!("[OK] Generate nexmark events.");
+    info!("[OK] Generate YSB events.");
 
-    match source.window {
-        StreamWindow::TumblingWindow(Schedule::Seconds(window_size)) => {
-            tumbling_window_tasks(payload, events, sec, window_size).await?;
-        }
-        StreamWindow::HoppingWindow((window_size, hop_size)) => {
-            hopping_window_tasks(payload, events, sec, window_size, hop_size).await?;
-        }
-        StreamWindow::ElementWise => {
-            elementwise_tasks(payload, events, sec).await?;
-        }
-        _ => unimplemented!(),
-    };
+    if let StreamWindow::TumblingWindow(Schedule::Seconds(window_size)) = source.window {
+        tumbling_window_tasks(payload, events, sec, window_size).await?;
+    } else {
+        unreachable!();
+    }
 
-    Ok(json!({"name": &ctx.name, "type": "nexmark_bench".to_string()}))
+    Ok(json!({"name": &ctx.name, "type": "ysb_bench".to_string()}))
 }

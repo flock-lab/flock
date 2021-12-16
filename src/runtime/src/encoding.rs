@@ -156,7 +156,7 @@ mod tests {
             "LIMIT 3"
         );
 
-        let plan = ctx.create_logical_plan(&sql)?;
+        let plan = ctx.create_logical_plan(sql)?;
         let plan = ctx.optimize(&plan)?;
         let plan = ctx.create_physical_plan(&plan)?;
 

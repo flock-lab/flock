@@ -79,7 +79,7 @@ impl QueryFlow {
     ///   environment could be a local environment or a cloud platform such as
     ///   AWS Lambda, Google Compute Engine, Azure, etc.
     pub async fn deploy(&self, env: ExecutionEnvironment) -> Result<()> {
-        env.deploy(&self).await
+        env.deploy(self).await
     }
 
     /// Add a data source node into `QueryDag`.
@@ -153,7 +153,7 @@ impl QueryFlow {
 
         queue.push_back(root);
         while let Some(parent) = queue.pop_front() {
-            for (_, node) in dag.children(parent).iter(&dag) {
+            for (_, node) in dag.children(parent).iter(dag) {
                 ctx.insert(
                     node,
                     ExecutionContext {
@@ -219,7 +219,7 @@ mod tests {
 
         ctx.register_table("t", Arc::new(table))?;
 
-        let plan = physical_plan(&mut ctx, &sql)?;
+        let plan = physical_plan(&mut ctx, sql)?;
         let query: Box<dyn Query> = Box::new(StreamQuery {
             ansi_sql: sql.to_string(),
             schema,
@@ -227,7 +227,7 @@ mod tests {
             plan,
         });
 
-        let mut dag = QueryDag::from(&query.plan());
+        let mut dag = QueryDag::from(query.plan());
         QueryFlow::add_source(query.plan(), &mut dag);
         let ctx = QueryFlow::build_context(&*query, &mut dag);
 
@@ -239,7 +239,7 @@ mod tests {
             "{:?}",
             func.ctx
                 .get(&NodeIndex::new(idx))
-                .ok_or(FlockError::DagPartition(
+                .ok_or_else(|| FlockError::DagPartition(
                     "Failed to get data source field from the hash map".to_string()
                 ))?
                 .datasource
@@ -250,9 +250,11 @@ mod tests {
         Ok(func
             .ctx
             .get(&NodeIndex::new(idx))
-            .ok_or(FlockError::DagPartition(
-                "Failed to get function name field from the hash map".to_string(),
-            ))?
+            .ok_or_else(|| {
+                FlockError::DagPartition(
+                    "Failed to get function name field from the hash map".to_string(),
+                )
+            })?
             .name
             .clone())
     }
@@ -261,9 +263,11 @@ mod tests {
         Ok(func
             .ctx
             .get(&NodeIndex::new(idx))
-            .ok_or(FlockError::DagPartition(
-                "Failed to get next function field from the hash map".to_string(),
-            ))?
+            .ok_or_else(|| {
+                FlockError::DagPartition(
+                    "Failed to get next function field from the hash map".to_string(),
+                )
+            })?
             .next
             .clone())
     }
@@ -272,7 +276,7 @@ mod tests {
     async fn execute_context_with_select() -> Result<()> {
         let sql = concat!("SELECT b FROM t ORDER BY b ASC LIMIT 3");
 
-        let mut functions = init_query_flow(&sql).await?;
+        let mut functions = init_query_flow(sql).await?;
         assert_eq!("Payload", datasource(&functions, 0)?);
         assert_eq!("UnknownEvent", datasource(&functions, 1)?);
 
@@ -307,7 +311,7 @@ mod tests {
     async fn execute_context_with_agg() -> Result<()> {
         let sql = concat!("SELECT MIN(a), AVG(b) ", "FROM t ", "GROUP BY b");
 
-        let mut functions = init_query_flow(&sql).await?;
+        let mut functions = init_query_flow(sql).await?;
         assert_eq!("Payload", datasource(&functions, 0)?);
         assert_eq!("Payload", datasource(&functions, 1)?);
         assert_eq!("UnknownEvent", datasource(&functions, 2)?);

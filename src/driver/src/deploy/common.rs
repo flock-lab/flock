@@ -26,7 +26,7 @@ use rusoto_lambda::{
     Lambda, LambdaClient, PutFunctionConcurrencyRequest, UpdateFunctionCodeRequest,
 };
 use rusoto_logs::CloudWatchLogsClient;
-use rusoto_s3::{S3Client, S3};
+use rusoto_s3::S3Client;
 
 lazy_static! {
     // AWS Services
@@ -62,7 +62,7 @@ pub async fn fetch_aws_watchlogs(group: &String, mtime: std::time::Duration) -> 
     let timeout = parse_duration("1min").unwrap();
     let sleep_for = parse_duration("5s").ok();
     let mut token: Option<String> = None;
-    let mut req = tail::create_filter_request(&group, mtime, None, token);
+    let mut req = tail::create_filter_request(group, mtime, None, token);
     loop {
         if logged {
             break;
@@ -76,13 +76,13 @@ pub async fn fetch_aws_watchlogs(group: &String, mtime: std::time::Duration) -> 
                 info!("Got a Token response");
                 logged = true;
                 token = Some(x);
-                req = tail::create_filter_request(&group, mtime, None, token);
+                req = tail::create_filter_request(group, mtime, None, token);
             }
             AWSResponse::LastLog(t) => match sleep_for {
                 Some(x) => {
                     info!("Got a lastlog response");
                     token = None;
-                    req = tail::create_filter_from_timestamp(&group, t, None, token);
+                    req = tail::create_filter_from_timestamp(group, t, None, token);
                     info!("Waiting {:?} before requesting logs again...", x);
                     tokio::time::sleep(x).await;
                 }
@@ -108,13 +108,11 @@ pub async fn invoke_lambda_function(
         })
         .await
     {
-        Ok(response) => return Ok(response),
-        Err(err) => {
-            return Err(FlockError::Execution(format!(
-                "Lambda function execution failure: {}",
-                err
-            )))
-        }
+        Ok(response) => Ok(response),
+        Err(err) => Err(FlockError::Execution(format!(
+            "Lambda function execution failure: {}",
+            err
+        ))),
     }
 }
 
@@ -152,7 +150,7 @@ pub async fn create_lambda_function(ctx: &ExecutionContext, debug: bool) -> Resu
                 handler: flock::handler(),
                 role: flock::role().await,
                 runtime: flock::runtime(),
-                environment: flock::environment(&ctx, debug),
+                environment: flock::environment(ctx, debug),
                 timeout: Some(900),
                 ..Default::default()
             })

@@ -20,7 +20,7 @@ fn main() {}
 mod tests {
     use crate::datasource::date::DateTime;
     use crate::datasource::ysb::event::{AdEvent, Campaign};
-    use crate::datasource::ysb::ysb::YSBSource;
+    use crate::datasource::ysb::YSBSource;
     use crate::error::Result;
     use crate::executor::plan::physical_plan;
     use crate::query::{Schedule, StreamWindow};
@@ -68,7 +68,7 @@ mod tests {
             for i in d..d + window_size {
                 let m = stream.events.get(&DateTime::new(i)).unwrap();
                 let (ad_events, _) = m.get(&0).unwrap();
-                batches.push(YSBSource::to_batch(&ad_events, ad_event_schema.clone()));
+                batches.push(YSBSource::to_batch(ad_events, ad_event_schema.clone()));
             }
 
             // register memory tables
@@ -81,7 +81,7 @@ mod tests {
             ctx.register_table("campaigns", Arc::new(campaign_table))?;
 
             // optimize query plan and execute it
-            let physical_plan = physical_plan(&mut ctx, &sql)?;
+            let physical_plan = physical_plan(&mut ctx, sql)?;
             let output = collect(physical_plan).await?;
 
             // show output

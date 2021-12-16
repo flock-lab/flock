@@ -35,7 +35,7 @@ fn calculate_start_time(from: DateTime<Local>, delta: Duration) -> Option<i64> {
     let chrono_delta = Delta::from_std(delta).unwrap();
     let start_time = from.checked_sub_signed(chrono_delta).unwrap();
     let utc_time = DateTime::<Utc>::from_utc(start_time.naive_utc(), Utc);
-    return Some(utc_time.timestamp_millis());
+    Some(utc_time.timestamp_millis())
 }
 
 fn print_date(time: Option<i64>) -> String {
@@ -57,14 +57,14 @@ pub fn create_filter_request(
     filter: Option<String>,
     token: Option<String>,
 ) -> FilterLogEventsRequest {
-    let mut req = FilterLogEventsRequest::default();
-    let delta = calculate_start_time(Local::now(), start);
-    req.start_time = delta;
-    req.next_token = token;
-    req.limit = Some(100);
-    req.filter_pattern = filter;
-    req.log_group_name = group.to_string();
-    return req;
+    FilterLogEventsRequest {
+        start_time: calculate_start_time(Local::now(), start),
+        next_token: token,
+        limit: Some(100),
+        filter_pattern: filter,
+        log_group_name: group.to_string(),
+        ..Default::default()
+    }
 }
 
 /// Creates a log filter request for the given log group name.
@@ -74,13 +74,14 @@ pub fn create_filter_from_timestamp(
     filter: Option<String>,
     token: Option<String>,
 ) -> FilterLogEventsRequest {
-    let mut req = FilterLogEventsRequest::default();
-    req.start_time = start;
-    req.next_token = token;
-    req.limit = Some(100);
-    req.filter_pattern = filter;
-    req.log_group_name = group.to_string();
-    return req;
+    FilterLogEventsRequest {
+        start_time: start,
+        next_token: token,
+        limit: Some(100),
+        filter_pattern: filter,
+        log_group_name: group.to_string(),
+        ..Default::default()
+    }
 }
 
 /// Fetches the log events from the given log group.
@@ -111,7 +112,7 @@ pub async fn fetch_logs(
                 },
             }
         }
-        Err(x) => return Err(FlockError::Internal(format!("Error fetching logs: {}", x))),
+        Err(x) => Err(FlockError::Internal(format!("Error fetching logs: {}", x))),
     }
 }
 

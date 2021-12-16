@@ -64,17 +64,13 @@ async fn create_function(func_name: &str) -> Result<String> {
             })
             .await
         {
-            Ok(config) => {
-                return config.function_name.ok_or_else(|| {
-                    FlockError::Internal("Unable to find lambda function arn.".to_string())
-                })
-            }
-            Err(err) => {
-                return Err(FlockError::Internal(format!(
-                    "Failed to update lambda function: {}",
-                    err
-                )))
-            }
+            Ok(config) => config.function_name.ok_or_else(|| {
+                FlockError::Internal("Unable to find lambda function arn.".to_string())
+            }),
+            Err(err) => Err(FlockError::Internal(format!(
+                "Failed to update lambda function: {}",
+                err
+            ))),
         }
     } else {
         match LAMBDA_CLIENT
@@ -92,17 +88,13 @@ async fn create_function(func_name: &str) -> Result<String> {
             })
             .await
         {
-            Ok(config) => {
-                return config.function_name.ok_or_else(|| {
-                    FlockError::Internal("Unable to find lambda function arn.".to_string())
-                })
-            }
-            Err(err) => {
-                return Err(FlockError::Internal(format!(
-                    "Failed to create lambda function: {}",
-                    err
-                )))
-            }
+            Ok(config) => config.function_name.ok_or_else(|| {
+                FlockError::Internal("Unable to find lambda function arn.".to_string())
+            }),
+            Err(err) => Err(FlockError::Internal(format!(
+                "Failed to create lambda function: {}",
+                err
+            ))),
         }
     }
 }
@@ -146,7 +138,7 @@ async fn invoke_function(func_name: &'static str, num_events: usize) -> Result<(
                         err
                     ))),
                 };
-                Ok(response?)
+                response
             })
         })
         // this collect *is needed* so that the join below can switch between tasks.
@@ -183,12 +175,12 @@ async fn invoke_function(func_name: &'static str, num_events: usize) -> Result<(
 
 async fn scatter_gather_ops(num_events: usize, concurrency: usize) -> Result<()> {
     let func_names = vec!["flock_pg_scatter", "flock_pg_gather"];
-    create_function(&func_names[0]).await?;
-    create_function(&func_names[1]).await?;
-    set_function_concurrency(&func_names[0], concurrency).await?;
-    set_function_concurrency(&func_names[1], 1).await?;
+    create_function(func_names[0]).await?;
+    create_function(func_names[1]).await?;
+    set_function_concurrency(func_names[0], concurrency).await?;
+    set_function_concurrency(func_names[1], 1).await?;
     // invoke the first function in the scatter-gather pattern
-    invoke_function(&func_names[0], num_events).await?;
+    invoke_function(func_names[0], num_events).await?;
     Ok(())
 }
 
