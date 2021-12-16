@@ -13,7 +13,7 @@
 
 //! This is a playground for testing the system design ideas of Flock.
 
-use driver::deploy::lambda;
+use driver::deploy::flock;
 use lazy_static::lazy_static;
 use log::info;
 use runtime::prelude::*;
@@ -85,9 +85,9 @@ async fn create_function(func_name: &str) -> Result<String> {
                     ..Default::default()
                 },
                 function_name: String::from(func_name),
-                handler: lambda::handler(),
-                role: lambda::role().await,
-                runtime: lambda::runtime(),
+                handler: flock::handler(),
+                role: flock::role().await,
+                runtime: flock::runtime(),
                 ..Default::default()
             })
             .await

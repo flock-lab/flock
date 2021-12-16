@@ -23,7 +23,8 @@ use rusoto_lambda::{CreateFunctionRequest, Lambda, LambdaClient};
 use Schedule::Seconds;
 use StreamWindow::TumblingWindow;
 
-pub mod lambda;
+pub mod common;
+pub mod flock;
 
 /// Query Execution Context decides to execute your queries either remotely or
 /// locally.
@@ -71,18 +72,18 @@ impl ExecutionEnvironment {
     async fn lambda_deployment(flow: &QueryFlow) -> Result<()> {
         let client = &LambdaClient::new(Region::default());
         for (_, ctx) in flow.ctx.iter() {
-            let _: Vec<_> = lambda::function_name(&ctx)
+            let _: Vec<_> = flock::function_name(&ctx)
                 .iter()
                 .map(|name| async move {
                     client
                         .create_function(CreateFunctionRequest {
-                            code: lambda::function_code(),
-                            environment: lambda::environment(&ctx, true),
+                            code: flock::function_code(),
+                            environment: flock::environment(&ctx, true),
                             function_name: name.to_owned(),
-                            handler: lambda::handler(),
-                            memory_size: lambda::memory_size(&ctx),
-                            role: lambda::role().await,
-                            runtime: lambda::runtime(),
+                            handler: flock::handler(),
+                            memory_size: flock::memory_size(&ctx),
+                            role: flock::role().await,
+                            runtime: flock::runtime(),
                             ..CreateFunctionRequest::default()
                         })
                         .await

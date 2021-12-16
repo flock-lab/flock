@@ -119,7 +119,7 @@ $ ./nexmark.sh -r -q 5 -s 10 -e 1000 -p 1
 
 ```bash
 ============================================================
- Running the benchmark 
+ Running the benchmark
 ============================================================
 Nexmark Query Number: 5
 Nexmark Generators: 1
@@ -206,51 +206,51 @@ TART RequestId: 78a68707-3f3d-4244-a51a-584f9432709d Version: $LATEST
 [2021-12-15T15:20:56Z INFO  nexmark_lambda::actor] Receiving a data packet: Uuid { tid: "q5-1639581654", seq_num: 0, seq_len: 10 }
 [2021-12-15T15:20:56Z INFO  nexmark_lambda::actor] Window data collection has not been completed.
 END RequestId: 78a68707-3f3d-4244-a51a-584f9432709d
-REPORT RequestId: 78a68707-3f3d-4244-a51a-584f9432709d	Duration: 38.83 ms	Billed Duration: 66 ms	Memory Size: 128 MB	Max Memory Used: 17 MB	Init Duration: 26.32 ms	
+REPORT RequestId: 78a68707-3f3d-4244-a51a-584f9432709d	Duration: 38.83 ms	Billed Duration: 66 ms	Memory Size: 128 MB	Max Memory Used: 17 MB	Init Duration: 26.32 ms
 START RequestId: 23dae113-ccf3-449f-944f-116bb925daaf Version: $LATEST
 [2021-12-15T15:20:56Z INFO  nexmark_lambda::actor] Receiving a data packet: Uuid { tid: "q5-1639581654", seq_num: 5, seq_len: 10 }
 [2021-12-15T15:20:56Z INFO  nexmark_lambda::actor] Window data collection has not been completed.
 END RequestId: 23dae113-ccf3-449f-944f-116bb925daaf
-REPORT RequestId: 23dae113-ccf3-449f-944f-116bb925daaf	Duration: 1.71 ms	Billed Duration: 2 ms	Memory Size: 128 MB	Max Memory Used: 17 MB	
+REPORT RequestId: 23dae113-ccf3-449f-944f-116bb925daaf	Duration: 1.71 ms	Billed Duration: 2 ms	Memory Size: 128 MB	Max Memory Used: 17 MB
 START RequestId: e5e51594-5819-494c-a6d3-c9c9ed9ab865 Version: $LATEST
 [2021-12-15T15:20:56Z INFO  nexmark_lambda::actor] Receiving a data packet: Uuid { tid: "q5-1639581654", seq_num: 6, seq_len: 10 }
 [2021-12-15T15:20:56Z INFO  nexmark_lambda::actor] Window data collection has not been completed.
 END RequestId: e5e51594-5819-494c-a6d3-c9c9ed9ab865
-REPORT RequestId: e5e51594-5819-494c-a6d3-c9c9ed9ab865	Duration: 1.30 ms	Billed Duration: 2 ms	Memory Size: 128 MB	Max Memory Used: 18 MB	
+REPORT RequestId: e5e51594-5819-494c-a6d3-c9c9ed9ab865	Duration: 1.30 ms	Billed Duration: 2 ms	Memory Size: 128 MB	Max Memory Used: 18 MB
 START RequestId: def2fc0b-61da-49f8-80b4-9e49f5f4a091 Version: $LATEST
 [2021-12-15T15:20:56Z INFO  nexmark_lambda::actor] Receiving a data packet: Uuid { tid: "q5-1639581654", seq_num: 7, seq_len: 10 }
 [2021-12-15T15:20:56Z INFO  nexmark_lambda::actor] Window data collection has not been completed.
 END RequestId: def2fc0b-61da-49f8-80b4-9e49f5f4a091
-REPORT RequestId: def2fc0b-61da-49f8-80b4-9e49f5f4a091	Duration: 6.89 ms	Billed Duration: 7 ms	Memory Size: 128 MB	Max Memory Used: 18 MB	
+REPORT RequestId: def2fc0b-61da-49f8-80b4-9e49f5f4a091	Duration: 6.89 ms	Billed Duration: 7 ms	Memory Size: 128 MB	Max Memory Used: 18 MB
 START RequestId: a18c2e75-d1a4-4595-aa84-4cde90eecad4 Version: $LATEST
 [2021-12-15T15:20:56Z INFO  nexmark_lambda::actor] Receiving a data packet: Uuid { tid: "q5-1639581654", seq_num: 8, seq_len: 10 }
 [2021-12-15T15:20:56Z INFO  nexmark_lambda::actor] Window data collection has not been completed.
 END RequestId: a18c2e75-d1a4-4595-aa84-4cde90eecad4
-REPORT RequestId: a18c2e75-d1a4-4595-aa84-4cde90eecad4	Duration: 1.16 ms	Billed Duration: 2 ms	Memory Size: 128 MB	Max Memory Used: 18 MB	
+REPORT RequestId: a18c2e75-d1a4-4595-aa84-4cde90eecad4	Duration: 1.16 ms	Billed Duration: 2 ms	Memory Size: 128 MB	Max Memory Used: 18 MB
 START RequestId: 01168950-7558-4af6-9e8c-8f71c4542149 Version: $LATEST
 [2021-12-15T15:20:56Z INFO  nexmark_lambda::actor] Receiving a data packet: Uuid { tid: "q5-1639581654", seq_num: 9, seq_len: 10 }
 [2021-12-15T15:20:56Z INFO  nexmark_lambda::actor] Window data collection has not been completed.
 END RequestId: 01168950-7558-4af6-9e8c-8f71c4542149
-REPORT RequestId: 01168950-7558-4af6-9e8c-8f71c4542149	Duration: 8.22 ms	Billed Duration: 9 ms	Memory Size: 128 MB	Max Memory Used: 18 MB	
+REPORT RequestId: 01168950-7558-4af6-9e8c-8f71c4542149	Duration: 8.22 ms	Billed Duration: 9 ms	Memory Size: 128 MB	Max Memory Used: 18 MB
 START RequestId: c28193bb-b818-4cf4-863c-2e9d34dd2398 Version: $LATEST
 [2021-12-15T15:20:58Z INFO  nexmark_lambda::actor] Receiving a data packet: Uuid { tid: "q5-1639581654", seq_num: 1, seq_len: 10 }
 [2021-12-15T15:20:58Z INFO  nexmark_lambda::actor] Window data collection has not been completed.
 END RequestId: c28193bb-b818-4cf4-863c-2e9d34dd2398
-REPORT RequestId: c28193bb-b818-4cf4-863c-2e9d34dd2398	Duration: 1.18 ms	Billed Duration: 2 ms	Memory Size: 128 MB	Max Memory Used: 18 MB	
+REPORT RequestId: c28193bb-b818-4cf4-863c-2e9d34dd2398	Duration: 1.18 ms	Billed Duration: 2 ms	Memory Size: 128 MB	Max Memory Used: 18 MB
 START RequestId: 46e54b2e-91da-4609-9f54-f152d38681c7 Version: $LATEST
 [2021-12-15T15:20:58Z INFO  nexmark_lambda::actor] Receiving a data packet: Uuid { tid: "q5-1639581654", seq_num: 2, seq_len: 10 }
 [2021-12-15T15:20:58Z INFO  nexmark_lambda::actor] Window data collection has not been completed.
 END RequestId: 46e54b2e-91da-4609-9f54-f152d38681c7
-REPORT RequestId: 46e54b2e-91da-4609-9f54-f152d38681c7	Duration: 1.15 ms	Billed Duration: 2 ms	Memory Size: 128 MB	Max Memory Used: 18 MB	
+REPORT RequestId: 46e54b2e-91da-4609-9f54-f152d38681c7	Duration: 1.15 ms	Billed Duration: 2 ms	Memory Size: 128 MB	Max Memory Used: 18 MB
 START RequestId: 2b1c1fe0-9556-4849-8251-39ede796f0f0 Version: $LATEST
 [2021-12-15T15:20:58Z INFO  nexmark_lambda::actor] Receiving a data packet: Uuid { tid: "q5-1639581654", seq_num: 3, seq_len: 10 }
 [2021-12-15T15:20:58Z INFO  nexmark_lambda::actor] Window data collection has not been completed.
 END RequestId: 2b1c1fe0-9556-4849-8251-39ede796f0f0
-REPORT RequestId: 2b1c1fe0-9556-4849-8251-39ede796f0f0	Duration: 1.08 ms	Billed Duration: 2 ms	Memory Size: 128 MB	Max Memory Used: 18 MB	
+REPORT RequestId: 2b1c1fe0-9556-4849-8251-39ede796f0f0	Duration: 1.08 ms	Billed Duration: 2 ms	Memory Size: 128 MB	Max Memory Used: 18 MB
 START RequestId: 78c64a1a-b312-4099-b596-541c078b04b7 Version: $LATEST
 [2021-12-15T15:20:58Z INFO  nexmark_lambda::actor] Receiving a data packet: Uuid { tid: "q5-1639581654", seq_num: 4, seq_len: 10 }
 [2021-12-15T15:20:58Z INFO  nexmark_lambda::actor] Received all data packets for the window: "q5-1639581654"
-[2021-12-15T15:20:58Z INFO  nexmark_lambda::actor] 
+[2021-12-15T15:20:58Z INFO  nexmark_lambda::actor]
 +---------+-----+
 | auction | num |
 +---------+-----+

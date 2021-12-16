@@ -13,13 +13,11 @@
 
 use arrow::datatypes::{Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
-use bytes::Bytes;
 use datafusion::datasource::MemTable;
 use datafusion::execution::context::ExecutionContext as DataFusionExecutionContext;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::ExecutionPlan;
-use driver::deploy::lambda;
-use driver::logwatch::tail;
+use driver::deploy::common::*;
 use humantime::parse_duration;
 use lazy_static::lazy_static;
 use log::info;
@@ -27,11 +25,7 @@ use nexmark::event::{Auction, Bid, Person};
 use nexmark::NexMarkSource;
 use runtime::prelude::*;
 use rusoto_core::{ByteStream, Region};
-use rusoto_lambda::{
-    CreateFunctionRequest, FunctionCode, GetFunctionRequest, InvocationRequest, InvocationResponse,
-    Lambda, LambdaClient, PutFunctionConcurrencyRequest, UpdateFunctionCodeRequest,
-};
-use rusoto_logs::CloudWatchLogsClient;
+use rusoto_lambda::InvocationResponse;
 use rusoto_s3::{ListObjectsV2Request, PutObjectRequest, S3Client, S3};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -39,16 +33,9 @@ use structopt::StructOpt;
 use tokio::task::JoinHandle;
 
 lazy_static! {
-    // AWS Services
-    static ref FLOCK_LAMBDA_ASYNC_CALL: String = "Event".to_string();
-    static ref FLOCK_LAMBDA_SYNC_CALL: String = "RequestResponse".to_string();
-
     static ref FLOCK_S3_KEY: String = FLOCK_CONF["flock"]["s3_key"].to_string();
     static ref FLOCK_S3_BUCKET: String = FLOCK_CONF["flock"]["s3_bucket"].to_string();
-
     static ref FLOCK_S3_CLIENT: S3Client = S3Client::new(Region::default());
-    static ref FLOCK_LAMBDA_CLIENT: LambdaClient = LambdaClient::new(Region::default());
-    static ref FLOCK_WATCHLOGS_CLIENT: CloudWatchLogsClient = CloudWatchLogsClient::new(Region::default());
 
     static ref FLOCK_EMPTY_PLAN: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(false, Arc::new(Schema::empty())));
     static ref FLOCK_CONCURRENCY: usize = FLOCK_CONF["lambda"]["concurrency"].parse::<usize>().unwrap();
@@ -282,130 +269,9 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
 
     info!("Waiting for the current invocations to be logged.");
     tokio::time::sleep(parse_duration("5s").unwrap()).await;
-    fetch_watchlogs(&NEXMARK_SOURCE_LOG_GROUP, parse_duration("1min").unwrap()).await?;
+    fetch_aws_watchlogs(&NEXMARK_SOURCE_LOG_GROUP, parse_duration("1min").unwrap()).await?;
 
     Ok(())
-}
-
-async fn fetch_watchlogs(group: &String, mtime: std::time::Duration) -> Result<()> {
-    let mut logged = false;
-    let timeout = parse_duration("1min").unwrap();
-    let sleep_for = parse_duration("5s").ok();
-    let mut token: Option<String> = None;
-    let mut req = tail::create_filter_request(&group, mtime, None, token);
-    loop {
-        if logged {
-            break;
-        }
-
-        match tail::fetch_logs(&FLOCK_WATCHLOGS_CLIENT, req, timeout)
-            .await
-            .map_err(|e| FlockError::Internal(e.to_string()))?
-        {
-            tail::AWSResponse::Token(x) => {
-                info!("Got a Token response");
-                logged = true;
-                token = Some(x);
-                req = tail::create_filter_request(&group, mtime, None, token);
-            }
-            tail::AWSResponse::LastLog(t) => match sleep_for {
-                Some(x) => {
-                    info!("Got a lastlog response");
-                    token = None;
-                    req = tail::create_filter_from_timestamp(&group, t, None, token);
-                    info!("Waiting {:?} before requesting logs again...", x);
-                    tokio::time::sleep(x).await;
-                }
-                None => break,
-            },
-        };
-    }
-
-    Ok(())
-}
-
-/// Invoke the lambda function with the nexmark events.
-async fn invoke_lambda_function(
-    function_name: String,
-    payload: Option<Bytes>,
-) -> Result<InvocationResponse> {
-    match FLOCK_LAMBDA_CLIENT
-        .invoke(InvocationRequest {
-            function_name,
-            payload,
-            invocation_type: Some(FLOCK_LAMBDA_ASYNC_CALL.clone()),
-            ..Default::default()
-        })
-        .await
-    {
-        Ok(response) => return Ok(response),
-        Err(err) => {
-            return Err(FlockError::Execution(format!(
-                "Lambda function execution failure: {}",
-                err
-            )))
-        }
-    }
-}
-
-/// Set the lambda function's concurrency.
-/// <https://docs.aws.amazon.com/lambda/latest/dg/configuration-concurrency.html>
-async fn set_lambda_concurrency(function_name: String, concurrency: i64) -> Result<()> {
-    let request = PutFunctionConcurrencyRequest {
-        function_name,
-        reserved_concurrent_executions: concurrency,
-    };
-    let concurrency = FLOCK_LAMBDA_CLIENT
-        .put_function_concurrency(request)
-        .await
-        .map_err(|e| FlockError::Internal(e.to_string()))?;
-    assert_ne!(concurrency.reserved_concurrent_executions, Some(0));
-    Ok(())
-}
-
-/// Creates a single lambda function using bootstrap.zip in Amazon S3.
-async fn create_lambda_function(ctx: &ExecutionContext, debug: bool) -> Result<String> {
-    let func_name = ctx.name.clone();
-    if FLOCK_LAMBDA_CLIENT
-        .get_function(GetFunctionRequest {
-            function_name: ctx.name.clone(),
-            ..Default::default()
-        })
-        .await
-        .is_ok()
-    {
-        let conf = FLOCK_LAMBDA_CLIENT
-            .update_function_code(UpdateFunctionCodeRequest {
-                function_name: func_name.clone(),
-                s3_bucket: Some(FLOCK_S3_BUCKET.clone()),
-                s3_key: Some(FLOCK_S3_KEY.clone()),
-                ..Default::default()
-            })
-            .await
-            .map_err(|e| FlockError::Internal(e.to_string()))?;
-        conf.function_name
-            .ok_or_else(|| FlockError::Internal("No function name!".to_string()))
-    } else {
-        let conf = FLOCK_LAMBDA_CLIENT
-            .create_function(CreateFunctionRequest {
-                code: FunctionCode {
-                    s3_bucket: Some(FLOCK_S3_BUCKET.clone()),
-                    s3_key: Some(FLOCK_S3_KEY.clone()),
-                    ..Default::default()
-                },
-                function_name: func_name.clone(),
-                handler: lambda::handler(),
-                role: lambda::role().await,
-                runtime: lambda::runtime(),
-                environment: lambda::environment(&ctx, debug),
-                timeout: Some(900),
-                ..Default::default()
-            })
-            .await
-            .map_err(|e| FlockError::Internal(e.to_string()))?;
-        conf.function_name
-            .ok_or_else(|| FlockError::Internal("No function name!".to_string()))
-    }
 }
 
 /// Returns Nextmark query strings based on the query number.
