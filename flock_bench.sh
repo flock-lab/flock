@@ -19,16 +19,17 @@ source scripts/rainbow.sh
 ############################################################
 Help() {
   # Display Help
-  echo $(echogreen "Nexmark Benchmark Script for Flock")
+  echo $(echogreen "A Benchmark Script for Flock")
   echo
-  echo "Syntax: nexmark [-g|-h|-c|-r [-q <query_id>] [-s <number_of_seconds>] [-e <events_per_second>] [-p <number_of_parallel_streams>]]"
+  echo "Syntax: flock_bench [-g|-h|-c|-r [-b <bench_type>] [-q <query_id>] [-s <number_of_seconds>] [-e <events_per_second>] [-p <number_of_parallel_streams>]]"
   echo "options:"
   echo "g     Print the GPL license notification."
   echo "h     Print this Help."
   echo "c     Compile and deploy the benchmark."
-  echo "r     Run the benchmark."
-  echo "q     NexMark Query Number [0-9]. Default: 5"
-  echo "p     Number of NexMark Generators. Default: 1"
+  echo "r     Run the benchmark. Default: false"
+  echo "b     The type of the benchmark [nexmark, ysb]. Default: 'nexmark'"
+  echo "q     NexMark Query Number [0-9]. Ignored if '-b' is not 'nexmark'. Default: 5"
+  echo "p     Number of Data Generators. Default: 1"
   echo "s     Seconds to run the benchmark. Default: 10"
   echo "e     Number of events per second. Default: 1000"
   echo
@@ -39,7 +40,7 @@ Help() {
 ############################################################
 AGPLV3() {
   # Display GPL license
-  echo "Nexmark Benchmark Script for Flock"
+  echo "A Benchmark Script for Flock"
   echo
   echo "Copyright (c) 2020-present, UMD Database Group."
   echo
@@ -57,19 +58,19 @@ AGPLV3() {
 }
 
 ############################################################
-# Compile and Deploy Nexmark Bench                         #
+# Compile and Deploy Benchmarks                            #
 ############################################################
-Nexmark() {
+Build_and_Deploy() {
   # Compile and Deploy
   echo $(echogreen "============================================================")
-  echo $(echogreen "         Compiling and Deploying Nexmark Benchmark          ")
+  echo $(echogreen "         Compiling and Deploying Benchmarks                 ")
   echo $(echogreen "============================================================")
   echo
-  echo $(echogreen "[1] Compiling Nexmark Benchmark Lambda Function...")
+  echo $(echogreen "[1] Compiling Flock's Generic Lambda Function...")
   cd src/function
   cargo +nightly build --target x86_64-unknown-linux-gnu --release
   echo
-  echo $(echogreen "[2] Compiling Nexmark Benchmark Client ...")
+  echo $(echogreen "[2] Compiling the Benchmark Client ...")
   cd ../../bench
   cargo +nightly build --target x86_64-unknown-linux-gnu --release
   echo
@@ -77,13 +78,13 @@ Nexmark() {
   cd ../src/bin/cli
   cargo +nightly build --target x86_64-unknown-linux-gnu --release
   echo
-  echo $(echogreen "[4] Deploying Nexmark Benchmark Lambda Function...")
+  echo $(echogreen "[4] Deploying Flock's Generic Lambda Function...")
   cd ../../../target/x86_64-unknown-linux-gnu/release
-  ./flock-cli upload -p nexmark_lambda -k flock
+  ./flock-cli upload -p flock -k flock
   cd ../../..
   echo $(echoblue "-------------------------------------------------------------")
   echo
-  echo $(echogreen "[OK] Nexmark Benchmark Script Complete")
+  echo $(echogreen "[OK] Flock Completed Deployment.")
   echo
 }
 
@@ -91,13 +92,14 @@ Nexmark() {
 # Process the input options. Add options as needed.        #
 ############################################################
 run="false"
+bench="nexmark"
 generators=1
 events_per_second=1000
 seconds=10
 query=5
 flock=$(<src/bin/cli/src/flock)
 # Get the options
-while getopts "hgcrq:w:s:e:" option; do
+while getopts "hgcrq:b:p:s:e:" option; do
   case $option in
   h) # display Help
     Help
@@ -108,11 +110,14 @@ while getopts "hgcrq:w:s:e:" option; do
     exit
     ;;
   c) # compile and deploy the benchmark
-    Nexmark
+    Build_and_Deploy
     exit
     ;;
   r) # run the benchmark
     run="true"
+    ;;
+  b) # benchmark type
+    bench=$OPTARG
     ;;
   q) # set the query number
     query=$OPTARG
@@ -135,7 +140,6 @@ while getopts "hgcrq:w:s:e:" option; do
   esac
 done
 
-
 # Set the upper limit of the number of seconds to run the benchmark
 # to save cloud budget.
 if [ $seconds -gt 60 ]; then
@@ -149,26 +153,40 @@ if [ $query -gt 9 ]; then
   exit
 fi
 
+if [ $bench != "nexmark" ] && [ $bench != "ysb" ]; then
+  echo $(echored "Error: Benchmark type must be either 'nexmark' or 'ysb'.")
+  exit
+fi
+
 if [ "$run" = "true" ]; then
   echo "$flock"
   echo
   echo $(echogreen "============================================================")
   echo $(echogreen "                  Running the benchmark                     ")
   echo $(echogreen "============================================================")
-  echo "Nexmark Query Number: $query"
-  echo "Nexmark Generators: $generators"
-  echo "Nexmark Events Per Second: $events_per_second"
-  echo "Nexmark Seconds to Run: $seconds"
+  echo "Benchmark Type: ${bench^^}"
+  echo "Query Number: $query (ignored for YSB)"
+  echo "Generators: $generators"
+  echo "Events Per Second: $events_per_second"
+  echo "Seconds to Run: $seconds"
   echo $(echogreen "============================================================")
   echo
-  echo $(echogreen "[OK] Nexmark Benchmark Starting")
+  echo $(echogreen "[OK] Benchmark Starting")
   echo
+
+  if [ $bench = "ysb" ]; then
+    benchmark="ysb_bench"
+    query_args=""
+  else
+    benchmark="nexmark_bench"
+    query_args="-q $query"
+  fi
 
   # dry run to warm up the lambda functions.
   echo $(echogreen "[1] Warming up the lambda functions")
   echo
-  RUST_LOG=info ./target/x86_64-unknown-linux-gnu/release/nexmark_bench \
-    -q $query -g $generators -s $seconds --events_per_second $events_per_second --debug
+  RUST_LOG=info ./target/x86_64-unknown-linux-gnu/release/$benchmark \
+    $query_args -g $generators -s $seconds --events_per_second $events_per_second --debug
   echo $(echoblue "-------------------------------------------------------------")
   echo
   sleep 2
@@ -176,8 +194,8 @@ if [ "$run" = "true" ]; then
   # run the benchmark
   echo $(echogreen "[2] Running the benchmark")
   echo
-  RUST_LOG=info ./target/x86_64-unknown-linux-gnu/release/nexmark_bench \
-    -q $query -g $generators -s $seconds --events_per_second $events_per_second --debug
+  RUST_LOG=info ./target/x86_64-unknown-linux-gnu/release/$benchmark \
+    $query_args -g $generators -s $seconds --events_per_second $events_per_second --debug
   echo $(echoblue "-------------------------------------------------------------")
   echo
   echo $(echogreen "[OK] Nexmark Benchmark Complete")

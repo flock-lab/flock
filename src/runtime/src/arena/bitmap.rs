@@ -69,13 +69,13 @@ mod tests {
     #[tokio::test]
     async fn test_bitmap() -> Result<()> {
         let mut bitmap = Bitmap::new(1024);
-        (0..1024).for_each(|i| assert_eq!(false, bitmap.is_set(i)));
+        (0..1024).for_each(|i| assert!(!bitmap.is_set(i)));
 
         bitmap.set(0);
-        assert_eq!(true, bitmap.is_set(0));
+        assert!(bitmap.is_set(0));
 
         bitmap.set(100);
-        assert_eq!(true, bitmap.is_set(100));
+        assert!(bitmap.is_set(100));
 
         Ok(())
     }

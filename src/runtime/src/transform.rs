@@ -13,6 +13,7 @@
 
 //! This module contains various utility functions.
 
+use crate::datasource::DataSource;
 use crate::encoding::Encoding;
 use crate::error::{FlockError, Result};
 use crate::payload::{DataFrame, Payload, Uuid};
@@ -117,6 +118,7 @@ pub fn to_payload(batch1: &[RecordBatch], batch2: &[RecordBatch], uuid: Uuid) ->
     let mut payload = Payload {
         uuid,
         encoding: encoding.clone(),
+        datasource: DataSource::Payload,
         ..Default::default()
     };
     if !batch1.is_empty() {

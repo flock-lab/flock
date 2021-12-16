@@ -18,7 +18,7 @@ fn main() {}
 mod tests {
     use crate::datasource::date::DateTime;
     use crate::datasource::nexmark::event::Bid;
-    use crate::datasource::nexmark::NexMarkSource;
+    use crate::datasource::nexmark::NEXMarkSource;
     use crate::error::Result;
     use crate::executor::plan::physical_plan;
     use crate::query::StreamWindow;
@@ -29,7 +29,7 @@ mod tests {
     #[tokio::test]
     async fn local_query_0() -> Result<()> {
         // benchmark configuration
-        let nex = NexMarkSource::new(3, 1, 200, StreamWindow::ElementWise);
+        let nex = NEXMarkSource::new(3, 1, 200, StreamWindow::ElementWise);
 
         // data source generation
         let events = nex.generate_data()?;
@@ -42,7 +42,7 @@ mod tests {
             // events to record batches
             let bm = events.bids.get(&DateTime::new(i)).unwrap();
             let (bids, _) = bm.get(&0).unwrap();
-            let batches = NexMarkSource::to_batch(&bids, schema.clone());
+            let batches = NEXMarkSource::to_batch(bids, schema.clone());
 
             // register memory table
             let mut ctx = datafusion::execution::context::ExecutionContext::new();
@@ -50,7 +50,7 @@ mod tests {
             ctx.register_table("bid", Arc::new(table))?;
 
             // optimize query plan and execute it
-            let physical_plan = physical_plan(&mut ctx, &sql)?;
+            let physical_plan = physical_plan(&mut ctx, sql)?;
             let batches = collect(physical_plan).await?;
 
             // show output

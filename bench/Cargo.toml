@@ -30,3 +30,7 @@ tokio = { version = "1.4", features = [ "macros", "io-util", "sync", "rt-multi-t
 [[bin]]
 name = "nexmark_bench"
 path = "nexmark/main.rs"
+
+[[bin]]
+name = "ysb_bench"
+path = "ysb/main.rs"

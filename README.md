@@ -81,21 +81,22 @@ All the following Nexmark queries share the same lambda function code.
 | q9 | Winning Bids | Find the winning bid for each auction. | ✅ |
 | q13 | Bounded Side Input Join | Joins a stream to a bounded side input, modeling basic stream enrichment. | ✅ |
 
-We provide a script (`nexmark.sh`) to build, deploy and run the benchmark.
+We provide a script (`flock_bench.sh`) to build, deploy and run the benchmark.
 
 ```shell
-$ ./nexmark.sh -help
+$ ./flock_bench.sh -help
 
-Nexmark Benchmark Script for Flock
+A Benchmark Script for Flock
 
-Syntax: nexmark [-g|-h|-c|-r [-q <query_id>] [-s <number_of_seconds>] [-e <events_per_second>] [-p <number_of_parallel_streams>]]
+Syntax: flock_bench [-g|-h|-c|-r [-b <bench_type>] [-q <query_id>] [-s <number_of_seconds>] [-e <events_per_second>] [-p <number_of_parallel_streams>]]
 options:
 g     Print the GPL license notification.
 h     Print this Help.
 c     Compile and deploy the benchmark.
-r     Run the benchmark.
-q     NexMark Query Number [0-9]. Default: 5
-p     Number of NexMark Generators. Default: 1
+r     Run the benchmark. Default: false
+b     The type of the benchmark [nexmark, ysb]. Default: 'nexmark'
+q     NexMark Query Number [0-9]. Ignored if '-b' is not 'nexmark'. Default: 5
+p     Number of Data Generators. Default: 1
 s     Seconds to run the benchmark. Default: 10
 e     Number of events per second. Default: 1000
 ```
@@ -103,13 +104,13 @@ e     Number of events per second. Default: 1000
 To build and deploy the benchmark, run:
 
 ```shell
-$ ./nexmark.sh -c
+$ ./flock_bench.sh -c
 ```
 
 For example, to run the query 5 for 10 seconds with 1,000 events per second, and 1 generator, you can run:
 
 ```shell
-$ ./nexmark.sh -r -q 5 -s 10 -e 1000 -p 1
+$ ./flock_bench.sh -r -b nexmark -q 5 -s 10 -e 1000 -p 1
 ```
 
 <details>
@@ -119,76 +120,98 @@ $ ./nexmark.sh -r -q 5 -s 10 -e 1000 -p 1
 
 ```bash
 ============================================================
- Running the benchmark
+ Running the benchmark 
 ============================================================
-Nexmark Query Number: 5
-Nexmark Generators: 1
-Nexmark Events Per Second: 1000
-Nexmark Seconds to Run: 10
+Benchmark Type: NEXMARK
+Query Number: 5 (ignored for YSB)
+Generators: 1
+Events Per Second: 1000
+Seconds to Run: 10
 ============================================================
 
-[OK] Nexmark Benchmark Starting
+[OK] Benchmark Starting
 
 [1] Warming up the lambda functions
 
-[2021-12-15T15:20:48Z INFO  nexmark_bench] Running benchmarks with the following options: NexmarkBenchmarkOpt { query_number: 5, debug: true, generators: 1, seconds: 10, events_per_second: 1000 }
-[2021-12-15T15:20:48Z INFO  nexmark_bench] Creating lambda function: nexmark_datasource
-[2021-12-15T15:20:49Z INFO  nexmark_bench] Creating lambda function group: Group(("q5-00", 8))
-[2021-12-15T15:20:49Z INFO  nexmark_bench] Creating function member: q5-00-00
-[2021-12-15T15:20:49Z INFO  nexmark_bench] Creating function member: q5-00-01
-[2021-12-15T15:20:50Z INFO  nexmark_bench] Creating function member: q5-00-02
-[2021-12-15T15:20:50Z INFO  nexmark_bench] Creating function member: q5-00-03
-[2021-12-15T15:20:51Z INFO  nexmark_bench] Creating function member: q5-00-04
-[2021-12-15T15:20:51Z INFO  nexmark_bench] Creating function member: q5-00-05
-[2021-12-15T15:20:52Z INFO  nexmark_bench] Creating function member: q5-00-06
-[2021-12-15T15:20:52Z INFO  nexmark_bench] Creating function member: q5-00-07
-[2021-12-15T15:20:52Z INFO  nexmark_bench] [OK] Invoke function: nexmark_datasource 0
-[2021-12-15T15:20:52Z INFO  nexmark_bench] [OK] Received status from function. InvocationResponse { executed_version: None, function_error: None, log_result: None, payload: Some(b""), status_code: Some(202) }
-[2021-12-15T15:20:52Z INFO  driver::logwatch::tail] Sending log request FilterLogEventsRequest { end_time: None, filter_pattern: None, limit: Some(100), log_group_name: "/aws/lambda/nexmark_datasource", log_stream_name_prefix: None, log_stream_names: None, next_token: None, start_time: Some(1639581352971) }
-[2021-12-15T15:20:55Z INFO  driver::logwatch::tail] [OK] Got response from AWS CloudWatch Logs.
-[2021-12-15T15:20:55Z INFO  nexmark_bench] Got a lastlog response
-[2021-12-15T15:20:55Z INFO  nexmark_bench] Waiting 5s before requesting logs again...
-[2021-12-15T15:21:00Z INFO  driver::logwatch::tail] Sending log request FilterLogEventsRequest { end_time: None, filter_pattern: None, limit: Some(100), log_group_name: "/aws/lambda/nexmark_datasource", log_stream_name_prefix: None, log_stream_names: None, next_token: None, start_time: Some(1639581352971) }
-[2021-12-15T15:21:06Z INFO  driver::logwatch::tail] [OK] Got response from AWS CloudWatch Logs.
-2021-12-15 10:20:54 START RequestId: f65ef2a9-1fec-4e19-8793-9e10c5966506 Version: $LATEST
-2021-12-15 10:20:54 [2021-12-15T15:20:54Z INFO  runtime::datasource::nexmark::nexmark] Generating events for 10s over 1 partitions.
-2021-12-15 10:20:54 [2021-12-15T15:20:54Z INFO  nexmark_lambda::source] Nexmark Benchmark: Query 5
-2021-12-15 10:20:54 [2021-12-15T15:20:54Z INFO  nexmark_lambda::source] NexMarkSource { config: Config { args: {"threads": "1", "seconds": "10", "events-per-second": "1000"} }, window: HoppingWindow((10, 5)) }
-2021-12-15 10:20:54 [2021-12-15T15:20:54Z INFO  nexmark_lambda::source] [OK] Generate nexmark events.
-2021-12-15 10:20:54 [2021-12-15T15:20:54Z INFO  nexmark_lambda::utils] Epoch 0: 20 persons, 60 auctions, 920 bids.
-2021-12-15 10:20:54 [2021-12-15T15:20:54Z INFO  nexmark_lambda::utils] Epoch 1: 20 persons, 60 auctions, 920 bids.
-2021-12-15 10:20:54 [2021-12-15T15:20:54Z INFO  nexmark_lambda::utils] Epoch 2: 20 persons, 60 auctions, 920 bids.
-2021-12-15 10:20:54 [2021-12-15T15:20:54Z INFO  nexmark_lambda::utils] Epoch 3: 20 persons, 60 auctions, 920 bids.
-2021-12-15 10:20:54 [2021-12-15T15:20:54Z INFO  nexmark_lambda::utils] Epoch 4: 20 persons, 60 auctions, 920 bids.
-2021-12-15 10:20:54 [2021-12-15T15:20:54Z INFO  nexmark_lambda::utils] Epoch 5: 20 persons, 60 auctions, 920 bids.
-2021-12-15 10:20:54 [2021-12-15T15:20:54Z INFO  nexmark_lambda::utils] Epoch 6: 20 persons, 60 auctions, 920 bids.
-2021-12-15 10:20:54 [2021-12-15T15:20:54Z INFO  nexmark_lambda::utils] Epoch 7: 20 persons, 60 auctions, 920 bids.
-2021-12-15 10:20:54 [2021-12-15T15:20:54Z INFO  nexmark_lambda::utils] Epoch 8: 20 persons, 60 auctions, 920 bids.
-2021-12-15 10:20:54 [2021-12-15T15:20:54Z INFO  nexmark_lambda::utils] Epoch 9: 20 persons, 60 auctions, 920 bids.
-2021-12-15 10:20:54 [2021-12-15T15:20:54Z INFO  nexmark_lambda::window] [OK] Send 10 NexMark events from a window (epoch: 0-10) to function: q5-00-04.
-2021-12-15 10:20:54 [2021-12-15T15:20:54Z INFO  nexmark_lambda::window] [OK] Event 0 - function payload bytes: 21068
-2021-12-15 10:20:54 [2021-12-15T15:20:54Z INFO  nexmark_lambda::window] [OK] Received status from async lambda function. InvocationResponse { executed_version: None, function_error: None, log_result: None, payload: Some(b""), status_code: Some(202) }
-2021-12-15 10:20:54 [2021-12-15T15:20:54Z INFO  nexmark_lambda::window] [OK] Event 1 - function payload bytes: 22409
-2021-12-15 10:20:54 [2021-12-15T15:20:54Z INFO  nexmark_lambda::window] [OK] Received status from async lambda function. InvocationResponse { executed_version: None, function_error: None, log_result: None, payload: Some(b""), status_code: Some(202) }
-2021-12-15 10:20:54 [2021-12-15T15:20:54Z INFO  nexmark_lambda::window] [OK] Event 2 - function payload bytes: 21588
-2021-12-15 10:20:55 [2021-12-15T15:20:55Z INFO  nexmark_lambda::window] [OK] Received status from async lambda function. InvocationResponse { executed_version: None, function_error: None, log_result: None, payload: Some(b""), status_code: Some(202) }
-2021-12-15 10:20:55 [2021-12-15T15:20:55Z INFO  nexmark_lambda::window] [OK] Event 3 - function payload bytes: 21987
-2021-12-15 10:20:55 [2021-12-15T15:20:55Z INFO  nexmark_lambda::window] [OK] Received status from async lambda function. InvocationResponse { executed_version: None, function_error: None, log_result: None, payload: Some(b""), status_code: Some(202) }
-2021-12-15 10:20:55 [2021-12-15T15:20:55Z INFO  nexmark_lambda::window] [OK] Event 4 - function payload bytes: 22354
-2021-12-15 10:20:55 [2021-12-15T15:20:55Z INFO  nexmark_lambda::window] [OK] Received status from async lambda function. InvocationResponse { executed_version: None, function_error: None, log_result: None, payload: Some(b""), status_code: Some(202) }
-2021-12-15 10:20:55 [2021-12-15T15:20:55Z INFO  nexmark_lambda::window] [OK] Event 5 - function payload bytes: 22175
-2021-12-15 10:20:55 [2021-12-15T15:20:55Z INFO  nexmark_lambda::window] [OK] Received status from async lambda function. InvocationResponse { executed_version: None, function_error: None, log_result: None, payload: Some(b""), status_code: Some(202) }
-2021-12-15 10:20:55 [2021-12-15T15:20:55Z INFO  nexmark_lambda::window] [OK] Event 6 - function payload bytes: 21757
-2021-12-15 10:20:55 [2021-12-15T15:20:55Z INFO  nexmark_lambda::window] [OK] Received status from async lambda function. InvocationResponse { executed_version: None, function_error: None, log_result: None, payload: Some(b""), status_code: Some(202) }
-2021-12-15 10:20:55 [2021-12-15T15:20:55Z INFO  nexmark_lambda::window] [OK] Event 7 - function payload bytes: 21426
-2021-12-15 10:20:55 [2021-12-15T15:20:55Z INFO  nexmark_lambda::window] [OK] Received status from async lambda function. InvocationResponse { executed_version: None, function_error: None, log_result: None, payload: Some(b""), status_code: Some(202) }
-2021-12-15 10:20:55 [2021-12-15T15:20:55Z INFO  nexmark_lambda::window] [OK] Event 8 - function payload bytes: 21796
-2021-12-15 10:20:55 [2021-12-15T15:20:55Z INFO  nexmark_lambda::window] [OK] Received status from async lambda function. InvocationResponse { executed_version: None, function_error: None, log_result: None, payload: Some(b""), status_code: Some(202) }
-2021-12-15 10:20:55 [2021-12-15T15:20:55Z INFO  nexmark_lambda::window] [OK] Event 9 - function payload bytes: 21819
-2021-12-15 10:20:55 [2021-12-15T15:20:55Z INFO  nexmark_lambda::window] [OK] Received status from async lambda function. InvocationResponse { executed_version: None, function_error: None, log_result: None, payload: Some(b""), status_code: Some(202) }
-2021-12-15 10:20:55 END RequestId: f65ef2a9-1fec-4e19-8793-9e10c5966506
-2021-12-15 10:20:55 REPORT RequestId: f65ef2a9-1fec-4e19-8793-9e10c5966506      Duration: 1231.79 ms    Billed Duration: 1245 ms        Memory Size: 128 MB     Max Memory Used: 23 MB  Init Duration: 12.72 ms
-[2021-12-15T15:21:06Z INFO  nexmark_bench] Got a Token response
+[2021-12-16T19:09:13Z INFO  nexmark_bench] Running the NEXMark benchmark with the following options: NexmarkBenchmarkOpt { query_number: 5, debug: true, generators: 1, seconds: 10, events_per_second: 1000 }
+[2021-12-16T19:09:13Z INFO  nexmark_bench] Creating lambda function: flock_datasource
+[2021-12-16T19:09:13Z INFO  nexmark_bench] Creating lambda function group: Group(("q5-00", 8))
+[2021-12-16T19:09:13Z INFO  nexmark_bench] Creating function member: q5-00-00
+[2021-12-16T19:09:14Z INFO  nexmark_bench] Creating function member: q5-00-01
+[2021-12-16T19:09:14Z INFO  nexmark_bench] Creating function member: q5-00-02
+[2021-12-16T19:09:15Z INFO  nexmark_bench] Creating function member: q5-00-03
+[2021-12-16T19:09:15Z INFO  nexmark_bench] Creating function member: q5-00-04
+[2021-12-16T19:09:16Z INFO  nexmark_bench] Creating function member: q5-00-05
+[2021-12-16T19:09:16Z INFO  nexmark_bench] Creating function member: q5-00-06
+[2021-12-16T19:09:17Z INFO  nexmark_bench] Creating function member: q5-00-07
+[2021-12-16T19:09:17Z INFO  nexmark_bench] [OK] Invoking NEXMark source function: flock_datasource by generator 0
+[2021-12-16T19:09:17Z INFO  nexmark_bench] [OK] Received status from function. InvocationResponse { executed_version: None, function_error: None, log_result: None, payload: Some(b""), status_code: Some(202) }
+[2021-12-16T19:09:17Z INFO  nexmark_bench] Waiting for the current invocations to be logged.
+[2021-12-16T19:09:22Z INFO  driver::logwatch::tail] Sending log request FilterLogEventsRequest { end_time: None, filter_pattern: None, limit: Some(100), log_group_name: "/aws/lambda/flock_datasource", log_stream_name_prefix: None, log_stream_names: None, next_token: None, start_time: Some(1639681702541) }
+[2021-12-16T19:09:24Z INFO  driver::logwatch::tail] [OK] Got response from AWS CloudWatch Logs.
+[2021-12-16T19:09:24Z INFO  driver::deploy::common] Got a Token response
+-------------------------------------------------------------
+
+[2] Running the benchmark
+
+[2021-12-16T19:09:26Z INFO  nexmark_bench] Running the NEXMark benchmark with the following options: NexmarkBenchmarkOpt { query_number: 5, debug: true, generators: 1, seconds: 10, events_per_second: 1000 }
+[2021-12-16T19:09:26Z INFO  nexmark_bench] Creating lambda function: flock_datasource
+[2021-12-16T19:09:26Z INFO  nexmark_bench] Creating lambda function group: Group(("q5-00", 8))
+[2021-12-16T19:09:26Z INFO  nexmark_bench] Creating function member: q5-00-00
+[2021-12-16T19:09:27Z INFO  nexmark_bench] Creating function member: q5-00-01
+[2021-12-16T19:09:27Z INFO  nexmark_bench] Creating function member: q5-00-02
+[2021-12-16T19:09:28Z INFO  nexmark_bench] Creating function member: q5-00-03
+[2021-12-16T19:09:28Z INFO  nexmark_bench] Creating function member: q5-00-04
+[2021-12-16T19:09:28Z INFO  nexmark_bench] Creating function member: q5-00-05
+[2021-12-16T19:09:29Z INFO  nexmark_bench] Creating function member: q5-00-06
+[2021-12-16T19:09:29Z INFO  nexmark_bench] Creating function member: q5-00-07
+[2021-12-16T19:09:30Z INFO  nexmark_bench] [OK] Invoking NEXMark source function: flock_datasource by generator 0
+[2021-12-16T19:09:30Z INFO  nexmark_bench] [OK] Received status from function. InvocationResponse { executed_version: None, function_error: None, log_result: None, payload: Some(b""), status_code: Some(202) }
+[2021-12-16T19:09:30Z INFO  nexmark_bench] Waiting for the current invocations to be logged.
+[2021-12-16T19:09:35Z INFO  driver::logwatch::tail] Sending log request FilterLogEventsRequest { end_time: None, filter_pattern: None, limit: Some(100), log_group_name: "/aws/lambda/flock_datasource", log_stream_name_prefix: None, log_stream_names: None, next_token: None, start_time: Some(1639681715344) }
+[2021-12-16T19:09:38Z INFO  driver::logwatch::tail] [OK] Got response from AWS CloudWatch Logs.
+2021-12-16 14:09:18 START RequestId: fd8ae2ad-b64a-4e02-88c8-c43f00974022 Version: $LATEST
+2021-12-16 14:09:18 [2021-12-16T19:09:18Z INFO  runtime::datasource::nexmark::nexmark] Generating events for 10s over 1 partitions.
+2021-12-16 14:09:18 [2021-12-16T19:09:18Z INFO  flock::nexmark::source] Nexmark Benchmark: Query 5
+2021-12-16 14:09:18 [2021-12-16T19:09:18Z INFO  flock::nexmark::source] NEXMarkSource { config: Config { args: {"threads": "1", "events-per-second": "1000", "seconds": "10"} }, window: HoppingWindow((10, 5)) }
+2021-12-16 14:09:18 [2021-12-16T19:09:18Z INFO  flock::nexmark::source] [OK] Generate nexmark events.
+2021-12-16 14:09:18 [2021-12-16T19:09:18Z INFO  runtime::datasource::nexmark::nexmark] Epoch 0: 20 persons, 60 auctions, 920 bids.
+2021-12-16 14:09:18 [2021-12-16T19:09:18Z INFO  runtime::datasource::nexmark::nexmark] Epoch 1: 20 persons, 60 auctions, 920 bids.
+2021-12-16 14:09:18 [2021-12-16T19:09:18Z INFO  runtime::datasource::nexmark::nexmark] Epoch 2: 20 persons, 60 auctions, 920 bids.
+2021-12-16 14:09:18 [2021-12-16T19:09:18Z INFO  runtime::datasource::nexmark::nexmark] Epoch 3: 20 persons, 60 auctions, 920 bids.
+2021-12-16 14:09:18 [2021-12-16T19:09:18Z INFO  runtime::datasource::nexmark::nexmark] Epoch 4: 20 persons, 60 auctions, 920 bids.
+2021-12-16 14:09:18 [2021-12-16T19:09:18Z INFO  runtime::datasource::nexmark::nexmark] Epoch 5: 20 persons, 60 auctions, 920 bids.
+2021-12-16 14:09:19 [2021-12-16T19:09:19Z INFO  runtime::datasource::nexmark::nexmark] Epoch 6: 20 persons, 60 auctions, 920 bids.
+2021-12-16 14:09:19 [2021-12-16T19:09:19Z INFO  runtime::datasource::nexmark::nexmark] Epoch 7: 20 persons, 60 auctions, 920 bids.
+2021-12-16 14:09:19 [2021-12-16T19:09:19Z INFO  runtime::datasource::nexmark::nexmark] Epoch 8: 20 persons, 60 auctions, 920 bids.
+2021-12-16 14:09:19 [2021-12-16T19:09:19Z INFO  runtime::datasource::nexmark::nexmark] Epoch 9: 20 persons, 60 auctions, 920 bids.
+2021-12-16 14:09:19 [2021-12-16T19:09:19Z INFO  flock::window] [OK] Send 10 NexMark events from a window (epoch: 0-10) to function: q5-00-04.
+2021-12-16 14:09:19 [2021-12-16T19:09:19Z INFO  flock::window] [OK] Event 0 - function payload bytes: 21078
+2021-12-16 14:09:19 [2021-12-16T19:09:19Z INFO  flock::window] [OK] Received status from async lambda function. InvocationResponse { executed_version: None, function_error: None, log_result: None, payload: Some(b""), status_code: Some(202) }
+2021-12-16 14:09:19 [2021-12-16T19:09:19Z INFO  flock::window] [OK] Event 1 - function payload bytes: 22419
+2021-12-16 14:09:19 [2021-12-16T19:09:19Z INFO  flock::window] [OK] Received status from async lambda function. InvocationResponse { executed_version: None, function_error: None, log_result: None, payload: Some(b""), status_code: Some(202) }
+2021-12-16 14:09:19 [2021-12-16T19:09:19Z INFO  flock::window] [OK] Event 2 - function payload bytes: 21598
+2021-12-16 14:09:19 [2021-12-16T19:09:19Z INFO  flock::window] [OK] Received status from async lambda function. InvocationResponse { executed_version: None, function_error: None, log_result: None, payload: Some(b""), status_code: Some(202) }
+2021-12-16 14:09:19 [2021-12-16T19:09:19Z INFO  flock::window] [OK] Event 3 - function payload bytes: 21997
+2021-12-16 14:09:19 [2021-12-16T19:09:19Z INFO  flock::window] [OK] Received status from async lambda function. InvocationResponse { executed_version: None, function_error: None, log_result: None, payload: Some(b""), status_code: Some(202) }
+2021-12-16 14:09:19 [2021-12-16T19:09:19Z INFO  flock::window] [OK] Event 4 - function payload bytes: 22364
+2021-12-16 14:09:19 [2021-12-16T19:09:19Z INFO  flock::window] [OK] Received status from async lambda function. InvocationResponse { executed_version: None, function_error: None, log_result: None, payload: Some(b""), status_code: Some(202) }
+2021-12-16 14:09:19 [2021-12-16T19:09:19Z INFO  flock::window] [OK] Event 5 - function payload bytes: 22185
+2021-12-16 14:09:19 [2021-12-16T19:09:19Z INFO  flock::window] [OK] Received status from async lambda function. InvocationResponse { executed_version: None, function_error: None, log_result: None, payload: Some(b""), status_code: Some(202) }
+2021-12-16 14:09:19 [2021-12-16T19:09:19Z INFO  flock::window] [OK] Event 6 - function payload bytes: 21767
+2021-12-16 14:09:19 [2021-12-16T19:09:19Z INFO  flock::window] [OK] Received status from async lambda function. InvocationResponse { executed_version: None, function_error: None, log_result: None, payload: Some(b""), status_code: Some(202) }
+2021-12-16 14:09:19 [2021-12-16T19:09:19Z INFO  flock::window] [OK] Event 7 - function payload bytes: 21436
+2021-12-16 14:09:19 [2021-12-16T19:09:19Z INFO  flock::window] [OK] Received status from async lambda function. InvocationResponse { executed_version: None, function_error: None, log_result: None, payload: Some(b""), status_code: Some(202) }
+2021-12-16 14:09:19 [2021-12-16T19:09:19Z INFO  flock::window] [OK] Event 8 - function payload bytes: 21806
+2021-12-16 14:09:19 [2021-12-16T19:09:19Z INFO  flock::window] [OK] Received status from async lambda function. InvocationResponse { executed_version: None, function_error: None, log_result: None, payload: Some(b""), status_code: Some(202) }
+2021-12-16 14:09:19 [2021-12-16T19:09:19Z INFO  flock::window] [OK] Event 9 - function payload bytes: 21829
+2021-12-16 14:09:19 [2021-12-16T19:09:19Z INFO  flock::window] [OK] Received status from async lambda function. InvocationResponse { executed_version: None, function_error: None, log_result: None, payload: Some(b""), status_code: Some(202) }
+2021-12-16 14:09:19 END RequestId: fd8ae2ad-b64a-4e02-88c8-c43f00974022
+2021-12-16 14:09:19 REPORT RequestId: fd8ae2ad-b64a-4e02-88c8-c43f00974022      Duration: 1177.85 ms    Billed Duration: 1189 ms        Memory Size: 128 MB     Max Memory Used: 22 MB  Init Duration: 10.88 ms
+[2021-12-16T19:09:38Z INFO  driver::deploy::common] Got a Token response
+-------------------------------------------------------------
+
+[OK] Nexmark Benchmark Complete
 ```
 </details>
 </br>

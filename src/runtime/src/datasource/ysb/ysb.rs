@@ -14,10 +14,20 @@
 //! Yahoo Streaming Benchmark Suite.
 
 use crate::config::FLOCK_CONF;
-use crate::datasource::ysb::event::Campaign;
+use crate::datasource::config::Config;
+use crate::datasource::date::DateTime;
+use crate::datasource::ysb::event::{AdEvent, Campaign};
+use crate::datasource::ysb::generator::YSBGenerator;
+use crate::datasource::DataStream;
+use crate::error::FlockError;
+use crate::error::Result;
+use crate::payload::{Payload, Uuid};
+use crate::query::{Schedule, StreamWindow};
+use crate::transform::*;
 use arrow::datatypes::SchemaRef;
 use arrow::json;
 use arrow::record_batch::RecordBatch;
+use lazy_static::lazy_static;
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -25,11 +35,12 @@ use std::io::BufReader;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use crate::datasource::config::Config;
-use crate::datasource::date::DateTime;
-use crate::datasource::ysb::generator::YSBGenerator;
-use crate::error::Result;
-use crate::query::{Schedule, StreamWindow};
+lazy_static! {
+    static ref YSB_AD_EVENT: SchemaRef = Arc::new(AdEvent::schema());
+    static ref YSB_CAMPAIGN: SchemaRef = Arc::new(Campaign::schema());
+    static ref FLOCK_GRANULE_SIZE: usize =
+        FLOCK_CONF["lambda"]["granule"].parse::<usize>().unwrap();
+}
 
 type Epoch = DateTime;
 type SourceId = usize;
@@ -88,6 +99,106 @@ impl YSBStream {
         }
 
         Some((event, ad_events_num))
+    }
+}
+
+impl DataStream for YSBStream {
+    /// Select events from the stream and transform them into some record
+    /// batches.
+    ///
+    /// ## Arguments
+    /// * `time` - The time of the event.
+    /// * `generator` - The name of the generator.
+    /// * `query number` - The id of the nexmark query.
+    ///
+    /// ## Returns
+    /// A Flock's Payload.
+    fn select_event_to_batches(
+        &self,
+        time: usize,
+        generator: usize,
+        _query_number: Option<usize>,
+    ) -> Result<(Vec<Vec<RecordBatch>>, Vec<Vec<RecordBatch>>)> {
+        let (campaigns, num_campaigns) = self.campaigns.clone();
+        let (events, num_ad_events) = self
+            .select(time, generator)
+            .expect("Failed to select event.");
+
+        if events.ad_events.is_empty() {
+            return Err(FlockError::Execution("No YSB input!".to_owned()));
+        }
+
+        info!(
+            "Epoch {}: {} ad_events {} campaigns.",
+            time, num_ad_events, num_campaigns
+        );
+
+        let r1 = YSBSource::to_batch_v2(
+            &events.ad_events,
+            YSB_AD_EVENT.clone(),
+            *FLOCK_GRANULE_SIZE / 4,
+        );
+        let r2 = YSBSource::to_batch_v2(&campaigns, YSB_CAMPAIGN.clone(), *FLOCK_GRANULE_SIZE / 10);
+
+        let step = if r2.is_empty() { 2 } else { 1 };
+
+        let batch_partition = |batch: Vec<RecordBatch>| {
+            (0..batch.len())
+                .step_by(step)
+                .map(|start| {
+                    let end = if start + step > batch.len() {
+                        batch.len()
+                    } else {
+                        start + step
+                    };
+                    batch[start..end].to_vec()
+                })
+                .collect::<Vec<_>>()
+        };
+
+        if r2.is_empty() {
+            Ok((batch_partition(r1), vec![]))
+        } else {
+            Ok((batch_partition(r1), batch_partition(r2)))
+        }
+    }
+
+    /// Select events from the stream and transform them into a payload
+    ///
+    /// ## Arguments
+    /// * `time` - The time of the event.
+    /// * `generator` - The name of the generator.
+    /// * `query number` - The id of the nexmark query.
+    /// * `uuid` - The uuid of the produced payload.
+    ///
+    /// ## Returns
+    /// A Flock's Payload.
+    fn select_event_to_payload(
+        &self,
+        time: usize,
+        generator: usize,
+        _query_number: Option<usize>,
+        uuid: Uuid,
+    ) -> Result<Payload> {
+        let (campaigns, num_campaigns) = self.campaigns.clone();
+        let (events, num_ad_events) = self
+            .select(time, generator)
+            .expect("Failed to select event.");
+
+        if events.ad_events.is_empty() {
+            return Err(FlockError::Execution("No YSB input!".to_owned()));
+        }
+
+        info!(
+            "Epoch {}: {} ad_events {} campaigns.",
+            time, num_ad_events, num_campaigns
+        );
+
+        Ok(to_payload(
+            &YSBSource::to_batch(&events.ad_events, YSB_AD_EVENT.clone()),
+            &YSBSource::to_batch(&campaigns, YSB_CAMPAIGN.clone()),
+            uuid,
+        ))
     }
 }
 

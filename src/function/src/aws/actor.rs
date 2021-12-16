@@ -15,6 +15,7 @@ use arrow::record_batch::RecordBatch;
 use arrow::util::pretty::pretty_format_batches;
 use datafusion::physical_plan::Partitioning;
 use futures::executor::block_on;
+use hashring::HashRing;
 use lazy_static::lazy_static;
 use log::{info, warn};
 use rayon::prelude::*;
@@ -23,6 +24,7 @@ use rusoto_core::Region;
 use rusoto_lambda::{InvokeAsyncRequest, Lambda, LambdaClient};
 use serde_json::json;
 use serde_json::Value;
+use std::collections::HashMap;
 
 lazy_static! {
     static ref CONCURRENCY: usize = FLOCK_CONF["lambda"]["concurrency"]
@@ -33,7 +35,7 @@ lazy_static! {
 /// The function invocation counter per lambda instance.
 static mut INVOCATION_COUNTER_PER_INSTANCE: u32 = 0;
 
-/// The function executor for the nexmark benchmark.
+/// The generic function executor.
 ///
 /// This function is invoked by the datafusion runtime. It is responsible for
 /// executing the physical plan. It is also responsible for collecting the
@@ -56,19 +58,17 @@ pub async fn collect(
     let mut inputs = vec![];
     if !(r1_records.is_empty() || r1_records.iter().all(|r| r.is_empty())) {
         inputs.push(
-            LambdaExecutor::repartition(r1_records, Partitioning::RoundRobinBatch(*CONCURRENCY))
-                .await?,
+            LambdaExecutor::repartition(r1_records, Partitioning::RoundRobinBatch(16)).await?,
         );
     }
     if !(r2_records.is_empty() || r2_records.iter().all(|r| r.is_empty())) {
         inputs.push(
-            LambdaExecutor::repartition(r2_records, Partitioning::RoundRobinBatch(*CONCURRENCY))
-                .await?,
+            LambdaExecutor::repartition(r2_records, Partitioning::RoundRobinBatch(16)).await?,
         );
     }
 
     if inputs.is_empty() {
-        return Ok(vec![]);
+        Ok(vec![])
     } else {
         ctx.feed_data_sources(&inputs).await?;
         let output = ctx.execute().await?;
@@ -111,7 +111,7 @@ pub async fn handler(
                 info!("Received all data packets for the window: {:?}", uuid.tid);
                 arena.batches(uuid.tid)
             } else {
-                let response = format!("Window data collection has not been completed.");
+                let response = "Window data collection has not been completed.".to_string();
                 info!("{}", response);
                 return Ok(json!({ "response": response }));
             }
@@ -134,7 +134,7 @@ pub async fn handler(
         .await?;
         assert_eq!(1, batches.len());
         // call the next stage of the dataflow graph.
-        invoke_next_functions(&ctx, &mut batches[0])?;
+        invoke_next_functions(ctx, &mut batches[0])?;
     }
 
     // TODO(gangliao): sink results to other cloud services.
@@ -144,7 +144,7 @@ pub async fn handler(
 /// Invoke functions in the next stage of the data flow.
 fn invoke_next_functions(ctx: &ExecutionContext, batches: &mut Vec<RecordBatch>) -> Result<()> {
     // retrieve the next lambda function names
-    let next_func = LambdaExecutor::next_function(&ctx)?;
+    let next_func = LambdaExecutor::next_function(ctx)?;
 
     // create uuid builder to assign id to each payload
     let uuid_builder = UuidBuilder::new(&ctx.name, batches.len());
@@ -156,7 +156,7 @@ fn invoke_next_functions(ctx: &ExecutionContext, batches: &mut Vec<RecordBatch>)
             let uuid = uuid_builder.get(i);
             let request = InvokeAsyncRequest {
                 function_name: next_func.clone(),
-                invoke_args:   to_bytes(&batch, uuid, Encoding::default()),
+                invoke_args:   to_bytes(batch, uuid, Encoding::default()),
             };
 
             if let Ok(reponse) = block_on(client.invoke_async(request)) {
@@ -174,4 +174,46 @@ fn invoke_next_functions(ctx: &ExecutionContext, batches: &mut Vec<RecordBatch>)
     });
 
     Ok(())
+}
+
+pub fn infer_actor_info(
+    metadata: Option<HashMap<String, String>>,
+) -> Result<(HashRing<String>, String)> {
+    let metadata = metadata.expect("Metadata is missing.");
+    let next_function: CloudFunction = serde_json::from_str(
+        metadata
+            .get(&"workers".to_string())
+            .expect("workers is missing."),
+    )?;
+
+    let (group_name, group_size) = match &next_function {
+        CloudFunction::Lambda(name) => (name.clone(), 1),
+        CloudFunction::Group((name, size)) => (name.clone(), *size),
+        CloudFunction::None => (String::new(), 0),
+    };
+
+    // The *consistent hash* technique distributes the data packets in a time window
+    // to the same function name in the function group. Because each function in the
+    // function group has a concurrency of *1*, all data packets from the same query
+    // can be routed to the same function execution environment.
+    let mut ring: HashRing<String> = HashRing::new();
+    match group_size {
+        0 => {
+            unreachable!("group_size should not be 0.");
+        }
+        1 => {
+            // only one function in the function group, the data packets are routed to the
+            // next function.
+            ring.add(group_name.clone());
+        }
+        _ => {
+            // multiple functions in the function group, the data packets are routed to the
+            // function with the same hash value.
+            (0..group_size).for_each(|i| {
+                ring.add(format!("{}-{:02}", group_name, i));
+            });
+        }
+    }
+
+    Ok((ring, group_name))
 }

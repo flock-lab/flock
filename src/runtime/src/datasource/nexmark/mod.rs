@@ -73,4 +73,4 @@ pub mod nexmark;
 
 mod queries;
 
-pub use nexmark::{NexMarkEvent, NexMarkSource, NexMarkStream};
+pub use nexmark::{NEXMarkEvent, NEXMarkSource, NEXMarkStream};

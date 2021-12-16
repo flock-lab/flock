@@ -67,3 +67,5 @@ pub mod event;
 pub mod generator;
 pub mod query;
 pub mod ysb;
+
+pub use ysb::{YSBEvent, YSBSource, YSBStream};

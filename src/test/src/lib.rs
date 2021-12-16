@@ -285,8 +285,8 @@ pub fn register_table(schema: &SchemaRef, table_name: &str) -> ExecutionContext 
 ///
 /// `Arc<dyn ExecutionPlan>`: A physical execution plan.
 pub fn physical_plan(schema: &SchemaRef, sql: &str, table_name: &str) -> Arc<dyn ExecutionPlan> {
-    let mut ctx = register_table(&schema, table_name);
-    runtime::executor::plan::physical_plan(&mut ctx, &sql).unwrap()
+    let mut ctx = register_table(schema, table_name);
+    runtime::executor::plan::physical_plan(&mut ctx, sql).unwrap()
 }
 
 /// Set the cloud environment context to a specific cloud function in the query.

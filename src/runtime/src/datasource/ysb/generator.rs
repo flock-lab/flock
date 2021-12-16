@@ -158,9 +158,9 @@ mod tests {
     #[test]
     fn generate_ysb_data() -> Result<()> {
         let mut config = Config::new();
-        config.insert("threads", format!("1"));
-        config.insert("seconds", format!("2"));
-        config.insert("events-per-second", format!("1000"));
+        config.insert("threads", "1".to_string());
+        config.insert("seconds", "2".to_string());
+        config.insert("events-per-second", "1000".to_string());
 
         let data_dir = format!("{}/ysb", config.get_or("data-dir", "data"));
         let partitions = config.get_as_or("threads", 1);
@@ -187,7 +187,7 @@ mod tests {
                 let (_, d) = generator.next()?;
                 for e in d {
                     serde_json::to_writer(&file, &e)?;
-                    file.write(b"\n")?;
+                    file.write_all(b"\n")?;
                 }
             }));
         }

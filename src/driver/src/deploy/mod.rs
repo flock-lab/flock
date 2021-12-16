@@ -16,12 +16,9 @@
 
 use crate::funcgen::function::QueryFlow;
 
-use daggy::NodeIndex;
 use runtime::prelude::*;
 use rusoto_core::Region;
 use rusoto_lambda::{CreateFunctionRequest, Lambda, LambdaClient};
-use Schedule::Seconds;
-use StreamWindow::TumblingWindow;
 
 pub mod common;
 pub mod flock;
@@ -56,7 +53,7 @@ impl ExecutionEnvironment {
             ExecutionEnvironment::Local => Err(FlockError::FunctionGeneration(
                 "Local execution doesn't require a deployment.".to_owned(),
             )),
-            ExecutionEnvironment::Lambda => Self::lambda_deployment(&query).await,
+            ExecutionEnvironment::Lambda => Self::lambda_deployment(query).await,
             _ => unimplemented!(),
         }
     }
@@ -72,16 +69,16 @@ impl ExecutionEnvironment {
     async fn lambda_deployment(flow: &QueryFlow) -> Result<()> {
         let client = &LambdaClient::new(Region::default());
         for (_, ctx) in flow.ctx.iter() {
-            let _: Vec<_> = flock::function_name(&ctx)
+            let _: Vec<_> = flock::function_name(ctx)
                 .iter()
                 .map(|name| async move {
                     client
                         .create_function(CreateFunctionRequest {
                             code: flock::function_code(),
-                            environment: flock::environment(&ctx, true),
+                            environment: flock::environment(ctx, true),
                             function_name: name.to_owned(),
                             handler: flock::handler(),
-                            memory_size: flock::memory_size(&ctx),
+                            memory_size: flock::memory_size(ctx),
                             role: flock::role().await,
                             runtime: flock::runtime(),
                             ..CreateFunctionRequest::default()
@@ -89,58 +86,6 @@ impl ExecutionEnvironment {
                         .await
                 })
                 .collect();
-        }
-
-        // Event source mapping
-        if flow.query.as_any().downcast_ref::<StreamQuery>().is_some() {
-            // data source node
-            let ctx = &flow.ctx[&NodeIndex::new(flow.dag.node_count() - 1)];
-            match &ctx.datasource {
-                DataSource::KinesisEvent(event) => {
-                    let window_in_seconds = match &event.window {
-                        TumblingWindow(Seconds(secs)) => secs,
-                        _ => unimplemented!(),
-                    };
-                    let request = kinesis::create_event_source_mapping_request(
-                        &event.stream_name,
-                        &ctx.name,
-                        *window_in_seconds as i64,
-                    )
-                    .await?;
-                    match client.create_event_source_mapping(request).await {
-                        Err(e) => {
-                            return Err(FlockError::FunctionGeneration(format!(
-                                "Kinesis event source mapping failed: {}.",
-                                e
-                            )));
-                        }
-                        Ok(_) => return Ok(()),
-                    }
-                }
-                DataSource::KafkaEvent(event) => {
-                    let window_in_seconds = match &event.window {
-                        TumblingWindow(Seconds(secs)) => secs,
-                        _ => unimplemented!(),
-                    };
-                    let request = kafka::create_event_source_mapping_request(
-                        &ctx.name,
-                        *window_in_seconds as i64,
-                        &event.cluster_arn,
-                        &event.topics,
-                    )
-                    .await?;
-                    match client.create_event_source_mapping(request).await {
-                        Err(e) => {
-                            return Err(FlockError::FunctionGeneration(format!(
-                                "Kafka event source mapping failed: {}.",
-                                e
-                            )));
-                        }
-                        Ok(_) => return Ok(()),
-                    }
-                }
-                _ => unimplemented!(),
-            }
         }
 
         Ok(())

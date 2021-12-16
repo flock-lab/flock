@@ -25,7 +25,7 @@ pub use crate::arena::{Arena, WindowSession};
 pub use crate::config;
 pub use crate::config::FLOCK_CONF;
 pub use crate::context::{CloudFunction, ExecutionContext};
-pub use crate::datasource::{kafka, kinesis, nexmark, DataSource};
+pub use crate::datasource::{kafka, kinesis, nexmark, ysb, DataSource, DataStream};
 pub use crate::encoding::Encoding;
 pub use crate::error::{FlockError, Result};
 pub use crate::executor::{plan::physical_plan, ExecutionStrategy, Executor, LambdaExecutor};

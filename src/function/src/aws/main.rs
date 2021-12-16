@@ -11,12 +11,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-//! The generic lambda function for sub-plan execution on AWS Lambda.
+//! The main entry point for the generic lambda function.
 
 mod actor;
-mod source;
-mod utils;
+mod nexmark;
 mod window;
+mod ysb;
 
 use hashring::HashRing;
 use lambda_runtime::{handler_fn, Context};
@@ -115,9 +115,10 @@ macro_rules! init_exec_context {
 async fn handler(event: Payload, _: Context) -> Result<Value> {
     let (mut ctx, mut arena) = init_exec_context!();
 
-    match &ctx.datasource {
+    match &event.datasource {
         DataSource::Payload => actor::handler(&mut ctx, &mut arena, event).await,
-        DataSource::NexMarkEvent(_) => source::handler(&ctx, event).await,
+        DataSource::NEXMarkEvent(_) => nexmark::handler(ctx, event).await,
+        DataSource::YSBEvent(_) => ysb::handler(ctx, event).await,
         _ => unimplemented!(),
     }
 }
