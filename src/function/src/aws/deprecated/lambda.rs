@@ -287,14 +287,12 @@ mod tests {
         let name = "hello".to_owned();
         let next =
             CloudFunction::Lambda("SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836Z".to_owned());
-        let datasource = DataSource::Json;
 
         let plan: Arc<dyn ExecutionPlan> = serde_json::from_str(&plan).unwrap();
         let lambda_context = ExecutionContext {
             plan,
             name,
             next,
-            datasource,
             ..Default::default()
         };
 

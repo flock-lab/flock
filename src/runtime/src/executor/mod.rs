@@ -212,7 +212,7 @@ impl LambdaExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::datasource::{kinesis, DataSource};
+    use crate::datasource::kinesis;
     use crate::error::FlockError;
     use arrow::array::UInt32Array;
     use arrow::datatypes::{DataType, Field, Schema};
@@ -394,7 +394,6 @@ mod tests {
             plan: plan.clone(),
             name: "test".to_string(),
             next: CloudFunction::None,
-            datasource: DataSource::UnknownEvent,
             ..Default::default()
         };
         LambdaExecutor::next_function(&ctx).expect_err("No distributed execution plan");
@@ -403,7 +402,6 @@ mod tests {
             plan: plan.clone(),
             name: "test".to_string(),
             next: CloudFunction::Lambda("solo".to_string()),
-            datasource: DataSource::UnknownEvent,
             ..Default::default()
         };
         assert_eq!("solo", LambdaExecutor::next_function(&ctx)?);
@@ -412,7 +410,6 @@ mod tests {
             plan: plan.clone(),
             name: "test".to_string(),
             next: CloudFunction::Group(("chorus".to_string(), 24)),
-            datasource: DataSource::UnknownEvent,
             ..Default::default()
         };
 

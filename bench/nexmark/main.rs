@@ -178,7 +178,6 @@ async fn create_nexmark_functions(
         plan_s3_idx: s3.clone(),
         name:        NEXMARK_SOURCE_FUNC_NAME.clone(),
         next:        next_func_name.clone(),
-        datasource:  DataSource::NEXMarkEvent(NEXMarkSource::default()),
     };
 
     let mut nexmark_worker_ctx = ExecutionContext {
@@ -186,7 +185,6 @@ async fn create_nexmark_functions(
         plan_s3_idx: s3.clone(),
         name: worker_func_name.clone(),
         next: CloudFunction::None,
-        datasource: DataSource::Payload,
     };
 
     // Create the function for the nexmark source generator.
@@ -253,7 +251,7 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
                     f, i
                 );
                 let p = serde_json::to_vec(&Payload {
-                    datasource: Some(DataSource::NEXMarkEvent(s)),
+                    datasource: DataSource::NEXMarkEvent(s),
                     query_number: Some(query_number),
                     metadata: Some(m),
                     ..Default::default()

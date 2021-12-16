@@ -110,7 +110,6 @@ async fn create_ysb_functions(
         plan_s3_idx: None,
         name:        YSB_SOURCE_FUNC_NAME.clone(),
         next:        next_func_name.clone(),
-        datasource:  DataSource::YSBEvent(YSBSource::default()),
     };
 
     let mut ysb_worker_ctx = ExecutionContext {
@@ -118,7 +117,6 @@ async fn create_ysb_functions(
         plan_s3_idx: None,
         name:        worker_func_name.clone(),
         next:        CloudFunction::None,
-        datasource:  DataSource::Payload,
     };
 
     // Create the function for the ysb source generator.
@@ -173,7 +171,7 @@ async fn benchmark(opt: YSBBenchmarkOpt) -> Result<()> {
                     f, i
                 );
                 let p = serde_json::to_vec(&Payload {
-                    datasource: Some(DataSource::YSBEvent(s)),
+                    datasource: DataSource::YSBEvent(s),
                     metadata: Some(m),
                     ..Default::default()
                 })?

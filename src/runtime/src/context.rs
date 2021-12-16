@@ -14,7 +14,6 @@
 //! When the lambda function is called for the first time, it deserializes the
 //! corresponding execution context from the cloud environment variable.
 
-use super::datasource::DataSource;
 use super::encoding::Encoding;
 use crate::error::{FlockError, Result};
 use arrow::datatypes::{Schema, SchemaRef};
@@ -118,8 +117,6 @@ pub struct ExecutionContext {
     pub name:        CloudFunctionName,
     /// Lambda function name(s) for next invocation(s).
     pub next:        CloudFunction,
-    /// Data source where data that is being used originates from.
-    pub datasource:  DataSource,
 }
 
 impl Default for ExecutionContext {
@@ -129,7 +126,6 @@ impl Default for ExecutionContext {
             plan_s3_idx: None,
             name:        "".to_string(),
             next:        CloudFunction::None,
-            datasource:  DataSource::default(),
         }
     }
 }
@@ -139,7 +135,6 @@ impl PartialEq for ExecutionContext {
         self.plan_s3_idx == other.plan_s3_idx
             && self.name == other.name
             && self.next == other.next
-            && self.datasource == other.datasource
             && serde_json::to_string(&self.plan).unwrap()
                 == serde_json::to_string(&other.plan).unwrap()
     }
@@ -370,14 +365,12 @@ mod tests {
         let name = "hello".to_owned();
         let next =
             CloudFunction::Lambda("SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836Z".to_owned());
-        let datasource = DataSource::Payload;
 
         let plan: Arc<dyn ExecutionPlan> = serde_json::from_str(plan)?;
         let lambda_context = ExecutionContext {
             plan,
             name,
             next,
-            datasource,
             ..Default::default()
         };
 
@@ -415,7 +408,6 @@ mod tests {
             plan,
             name: "test".to_string(),
             next: CloudFunction::None,
-            datasource: DataSource::UnknownEvent,
             ..Default::default()
         };
         ctx.feed_one_source(&partitions).await?;
@@ -496,7 +488,6 @@ mod tests {
             plan,
             name: "test".to_string(),
             next: CloudFunction::None,
-            datasource: DataSource::UnknownEvent,
             ..Default::default()
         };
         ctx.feed_two_source(&partitions1, &partitions2).await?;

@@ -33,7 +33,7 @@ use std::sync::Arc;
 pub async fn handler(ctx: &ExecutionContext, payload: Payload) -> Result<Value> {
     // Copy data source from the payload.
     let mut source = match payload.datasource.clone() {
-        Some(DataSource::NEXMarkEvent(source)) => source,
+        DataSource::NEXMarkEvent(source) => source,
         _ => unreachable!(),
     };
 

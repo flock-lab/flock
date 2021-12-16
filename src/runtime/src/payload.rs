@@ -148,8 +148,8 @@ pub struct Payload {
     /// Note: using this value to guarantee the total size of payload doesn't
     /// exceed 256 KB due to the limitation of AWS Lambda's async invocation.
     pub encoding:     Encoding,
-    /// Only used for the benchmarking purpose.
-    pub datasource:   Option<DataSource>,
+    /// Where the payload is coming from.
+    pub datasource:   DataSource,
     /// The Nexmark query number for the benchmarking purposes.
     pub query_number: Option<usize>,
     /// The extra metadata for the payload.
