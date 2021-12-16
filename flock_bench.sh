@@ -21,7 +21,7 @@ Help() {
   # Display Help
   echo $(echogreen "A Benchmark Script for Flock")
   echo
-  echo "Syntax: nexmark [-g|-h|-c|-r [-b <bench_type>] [-q <query_id>] [-s <number_of_seconds>] [-e <events_per_second>] [-p <number_of_parallel_streams>]]"
+  echo "Syntax: flock_bench [-g|-h|-c|-r [-b <bench_type>] [-q <query_id>] [-s <number_of_seconds>] [-e <events_per_second>] [-p <number_of_parallel_streams>]]"
   echo "options:"
   echo "g     Print the GPL license notification."
   echo "h     Print this Help."
