@@ -41,8 +41,8 @@ lazy_static! {
     // YSB Benchmark
     static ref YSB_AD_EVENT: SchemaRef = Arc::new(AdEvent::schema());
     static ref YSB_CAMPAIGN: SchemaRef = Arc::new(Campaign::schema());
-    static ref YSB_SOURCE_FUNC_NAME: String = "nexmark_datasource".to_string();
-    static ref YSB_SOURCE_LOG_GROUP: String = "/aws/lambda/nexmark_datasource".to_string();
+    static ref YSB_SOURCE_FUNC_NAME: String = "flock_datasource".to_string();
+    static ref YSB_SOURCE_LOG_GROUP: String = "/aws/lambda/flock_datasource".to_string();
 }
 
 #[derive(Default, Clone, Debug, StructOpt)]

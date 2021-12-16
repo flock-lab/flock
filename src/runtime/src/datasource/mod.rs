@@ -63,9 +63,8 @@ pub enum DataSource {
     /// representing on online auction system.
     /// We use Nexmark benchmark to measure the performance of our system.
     NEXMarkEvent(NEXMarkSource),
-    /// YSB is a suite of pipelines inspired by the continuous data stream
-    /// queries, which includes multiple queries over a three entities model
-    /// representing on online auction system.
+    /// The Yahoo Streaming Benchmark is a well-known benchmark used in industry
+    /// to evaluate streaming systems.
     YSBEvent(YSBSource),
     /// Amazon Simple Queue Service (SQS) is a fully managed message queuing
     /// service that enables you to decouple and scale microservices,

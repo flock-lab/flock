@@ -45,8 +45,8 @@ lazy_static! {
     static ref NEXMARK_BID: SchemaRef = Arc::new(Bid::schema());
     static ref NEXMARK_PERSON: SchemaRef = Arc::new(Person::schema());
     static ref NEXMARK_AUCTION: SchemaRef = Arc::new(Auction::schema());
-    static ref NEXMARK_SOURCE_FUNC_NAME: String = "nexmark_datasource".to_string();
-    static ref NEXMARK_SOURCE_LOG_GROUP: String = "/aws/lambda/nexmark_datasource".to_string();
+    static ref NEXMARK_SOURCE_FUNC_NAME: String = "flock_datasource".to_string();
+    static ref NEXMARK_SOURCE_LOG_GROUP: String = "/aws/lambda/flock_datasource".to_string();
     static ref NEXMARK_Q4_S3_KEY: String = FLOCK_CONF["nexmark"]["q4_s3_key"].to_string();
     static ref NEXMARK_Q6_S3_KEY: String = FLOCK_CONF["nexmark"]["q6_s3_key"].to_string();
 }

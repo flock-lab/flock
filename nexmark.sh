@@ -79,7 +79,7 @@ Nexmark() {
   echo
   echo $(echogreen "[4] Deploying Nexmark Benchmark Lambda Function...")
   cd ../../../target/x86_64-unknown-linux-gnu/release
-  ./flock-cli upload -p nexmark_lambda -k flock
+  ./flock-cli upload -p flock -k flock
   cd ../../..
   echo $(echoblue "-------------------------------------------------------------")
   echo
