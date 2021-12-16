@@ -136,9 +136,9 @@ impl DataStream for YSBStream {
         let r1 = YSBSource::to_batch_v2(
             &events.ad_events,
             YSB_AD_EVENT.clone(),
-            *FLOCK_GRANULE_SIZE * 2,
+            *FLOCK_GRANULE_SIZE / 4,
         );
-        let r2 = YSBSource::to_batch_v2(&campaigns, YSB_CAMPAIGN.clone(), *FLOCK_GRANULE_SIZE / 5);
+        let r2 = YSBSource::to_batch_v2(&campaigns, YSB_CAMPAIGN.clone(), *FLOCK_GRANULE_SIZE / 10);
 
         let step = if r2.is_empty() { 2 } else { 1 };
 
