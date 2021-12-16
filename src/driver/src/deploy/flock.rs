@@ -22,24 +22,6 @@ use std::collections::hash_map::HashMap;
 
 use lazy_static::lazy_static;
 
-/// Your AWS Lambda function's code consists of scripts or compiled programs and
-/// their dependencies. You use a deployment package to deploy your function
-/// code to Lambda. Lambda supports two types of deployment packages: container
-/// images and .zip files. To approach real-time query processing, you **don't
-/// require** to upload the deployment package from your local machine. Flock
-/// uploaded the pre-compiled deployment package to Amazon Simple Storage
-/// Service (Amazon S3) in advance.
-struct LambdaDeploymentPackage<'a> {
-    /// S3 bucket for the pre-compiled deployment package.
-    pub s3_bucket:         &'a str,
-    /// S3 key for the pre-compiled deployment package.
-    pub s3_key:            &'a str,
-    /// S3 object version for the pre-compiled deployment package to be
-    /// compatible with the client version.
-    #[allow(dead_code)]
-    pub s3_object_version: &'a str,
-}
-
 /// The price for Duration depends on the amount of memory you allocate to your
 /// function. You can allocate any amount of memory to your function between
 /// 128MB and 10,240MB, in 1MB increments. The table below contains a few
@@ -65,7 +47,7 @@ struct LambdaDeploymentPackage<'a> {
 ///
 /// TODO: The follow-up research work here is to use machine learning to
 /// dynamically optimize the memory size setting of each lambda function.
-struct LambdaMemoryFootprint {
+struct FlockMemoryFootprint {
     // regular operator's memory size (MB).
     pub default:    i64,
     /// OLAP aggregate operator's memory size (MB).
@@ -77,28 +59,26 @@ struct LambdaMemoryFootprint {
 }
 
 lazy_static! {
-    static ref LAMBDA_DEPLOYMENT_PACKAGE: LambdaDeploymentPackage<'static> =
-        LambdaDeploymentPackage {
-            s3_bucket:         "umd-flock",
-            s3_key:            "regular",
-            s3_object_version: env!("CARGO_PKG_VERSION"),
-        };
-
-    static ref NEXMARK_DEPLOYMENT_PACKAGE: LambdaDeploymentPackage<'static> =
-        LambdaDeploymentPackage {
-            s3_bucket:         "umd-flock",
-            s3_key:            "nexmark",
-            s3_object_version: env!("CARGO_PKG_VERSION"),
-        };
+    /// Your AWS Lambda function's code consists of scripts or compiled programs and
+    /// their dependencies. You use a deployment package to deploy your function
+    /// code to Lambda. Lambda supports two types of deployment packages: container
+    /// images and .zip files. To approach real-time query processing, you **don't
+    /// require** to upload the deployment package from your local machine. Flock
+    /// uploaded the pre-compiled deployment package to Amazon Simple Storage
+    /// Service (Amazon S3) in advance.
+    /// S3 key for the pre-compiled deployment package.
+    static ref FLOCK_S3_KEY: String = FLOCK_CONF["flock"]["s3_key"].to_string();
+    /// S3 bucket for the pre-compiled deployment package.
+    static ref FLOCK_S3_BUCKET: String = FLOCK_CONF["flock"]["s3_bucket"].to_string();
 
     /// Amazon Linux 2
-    static ref LAMABDA_RUNTIME:  &'static str = "provided.al2";
+    static ref FLOCK_RUNTIME:  &'static str = "provided.al2";
 
     /// The Amazon Resource Name (ARN) of the function's execution role.
-    static ref ROLE_NAME: &'static str = "flock";
+    static ref FLOCK_ROLE_NAME: &'static str = "flock";
 
-    static ref LAMBDA_MEMORY_FOOTPRINT: LambdaMemoryFootprint =
-        LambdaMemoryFootprint {
+    static ref FLOCK_MEMORY: FlockMemoryFootprint =
+        FlockMemoryFootprint {
             default: 128,
             agg_batch: 2048,
             agg_stream: 512,
@@ -108,19 +88,8 @@ lazy_static! {
 /// The lambda function code in Amazon S3.
 pub fn function_code() -> FunctionCode {
     FunctionCode {
-        s3_bucket:         Some(LAMBDA_DEPLOYMENT_PACKAGE.s3_bucket.to_owned()),
-        s3_key:            Some(LAMBDA_DEPLOYMENT_PACKAGE.s3_key.to_owned()),
-        s3_object_version: None,
-        zip_file:          None,
-        image_uri:         None,
-    }
-}
-
-/// The nexmark benchmark code in Amazon S3.
-pub fn nexmark_function_code() -> FunctionCode {
-    FunctionCode {
-        s3_bucket:         Some(NEXMARK_DEPLOYMENT_PACKAGE.s3_bucket.to_owned()),
-        s3_key:            Some(NEXMARK_DEPLOYMENT_PACKAGE.s3_key.to_owned()),
+        s3_bucket:         Some(FLOCK_S3_BUCKET.clone()),
+        s3_key:            Some(FLOCK_S3_KEY.clone()),
         s3_object_version: None,
         zip_file:          None,
         image_uri:         None,
@@ -187,7 +156,7 @@ pub fn function_name(ctx: &ExecutionContext) -> Vec<String> {
 /// The identifier of the function's runtime.
 /// <https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html>
 pub fn runtime() -> Option<String> {
-    Some(LAMABDA_RUNTIME.to_owned())
+    Some(FLOCK_RUNTIME.to_owned())
 }
 
 /// The name of the method within your code that Lambda calls to execute your
@@ -202,7 +171,7 @@ pub fn handler() -> Option<String> {
 /// 128 MB. The value must be a multiple of 64 MB.
 pub fn memory_size(_ctx: &ExecutionContext) -> Option<i64> {
     // TODO: optimize the memory size for different subplans.
-    Some(LAMBDA_MEMORY_FOOTPRINT.default)
+    Some(FLOCK_MEMORY.default)
 }
 
 /// The Amazon Resource Name (ARN) of the function's execution role.
@@ -210,7 +179,7 @@ pub async fn role() -> String {
     let iam = IamClient::new(Region::default());
     let resp = iam
         .get_role(GetRoleRequest {
-            role_name: ROLE_NAME.to_owned(),
+            role_name: FLOCK_ROLE_NAME.to_owned(),
         })
         .await
         .unwrap();
