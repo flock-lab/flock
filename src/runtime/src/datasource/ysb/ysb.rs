@@ -19,6 +19,7 @@ use crate::datasource::date::DateTime;
 use crate::datasource::ysb::event::{AdEvent, Campaign};
 use crate::datasource::ysb::generator::YSBGenerator;
 use crate::datasource::DataStream;
+use crate::datasource::RelationPartitions;
 use crate::error::FlockError;
 use crate::error::Result;
 use crate::payload::{Payload, Uuid};
@@ -118,7 +119,7 @@ impl DataStream for YSBStream {
         time: usize,
         generator: usize,
         _query_number: Option<usize>,
-    ) -> Result<(Vec<Vec<RecordBatch>>, Vec<Vec<RecordBatch>>)> {
+    ) -> Result<(RelationPartitions, RelationPartitions)> {
         let (campaigns, num_campaigns) = self.campaigns.clone();
         let (events, num_ad_events) = self
             .select(time, generator)
@@ -157,9 +158,9 @@ impl DataStream for YSBStream {
         };
 
         if r2.is_empty() {
-            Ok((batch_partition(r1), vec![]))
+            Ok((Arc::new(batch_partition(r1)), Arc::new(vec![])))
         } else {
-            Ok((batch_partition(r1), batch_partition(r2)))
+            Ok((Arc::new(batch_partition(r1)), Arc::new(batch_partition(r2))))
         }
     }
 

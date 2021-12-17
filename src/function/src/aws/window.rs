@@ -12,14 +12,14 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use crate::actor::*;
-use arrow::record_batch::RecordBatch;
 use chrono::Utc;
 use driver::deploy::common::*;
 use log::info;
+use runtime::datasource::RelationPartitions;
 use runtime::prelude::*;
+use rusoto_lambda::InvocationResponse;
 use std::sync::Arc;
-
-type RelationPartitions = Vec<Vec<RecordBatch>>;
+use tokio::task::JoinHandle;
 
 /// Generate tumble windows workloads for the benchmark on cloud
 /// function services.
@@ -36,6 +36,7 @@ pub async fn tumbling_window_tasks(
     window_size: usize,
 ) -> Result<()> {
     assert!(seconds >= window_size);
+    let mut tasks: Vec<JoinHandle<Result<InvocationResponse>>> = vec![];
 
     // To make data source generator function work generally, we *cannot*
     // use `CONSISTENT_HASH_CONTEXT` from cloud environment. The cloud
@@ -69,10 +70,13 @@ pub async fn tumbling_window_tasks(
             .map(|(a, b)| if a.len() > b.len() { a.len() } else { b.len() })
             .sum::<usize>();
 
-        let mut uuid = UuidBuilder::new_with_ts(&group_name, Utc::now().timestamp(), size);
+        let mut uuid_builder = UuidBuilder::new_with_ts(&group_name, Utc::now().timestamp(), size);
 
         // Distribute the window data to a single function execution environment.
-        let function_name = ring.get(&uuid.tid).expect("hash ring failure.").to_string();
+        let function_name = ring
+            .get(&uuid_builder.tid)
+            .expect("hash ring failure.")
+            .to_string();
 
         // Call the next stage of the dataflow graph.
         info!(
@@ -87,21 +91,30 @@ pub async fn tumbling_window_tasks(
         for (a, b) in window.iter() {
             let num = if a.len() > b.len() { a.len() } else { b.len() };
             for i in 0..num {
-                let r1 = if i < a.len() { a[i].clone() } else { vec![] };
-                let r2 = if i < b.len() { b[i].clone() } else { vec![] };
-                let payload = serde_json::to_vec(&to_payload(&r1, &r2, uuid.next()))?;
-                info!(
-                    "[OK] Event {} - function payload bytes: {}",
-                    eid,
-                    payload.len()
-                );
-                info!(
-                    "[OK] Received status from async lambda function. {:?}",
-                    invoke_lambda_function(function_name.clone(), Some(payload.into())).await?
-                );
+                let ac = a.clone();
+                let bc = b.clone();
+                let empty = vec![];
+                let epoch_id = eid;
+                let uuid = uuid_builder.next();
+                let func_name = function_name.clone();
+                tasks.push(tokio::spawn(async move {
+                    let r1 = || if i < ac.len() { &ac[i] } else { &empty };
+                    let r2 = || if i < bc.len() { &bc[i] } else { &empty };
+                    let payload = serde_json::to_vec(&to_payload(r1(), r2(), uuid))?;
+                    info!(
+                        "[OK] Event {} - function payload bytes: {}",
+                        epoch_id,
+                        payload.len()
+                    );
+                    invoke_lambda_function(func_name, Some(payload.into())).await
+                }));
                 eid += 1;
             }
         }
+    }
+
+    for task in tasks {
+        task.await.expect("Lambda function execution failed.")?;
     }
 
     Ok(())
@@ -125,8 +138,8 @@ pub async fn hopping_window_tasks(
 ) -> Result<()> {
     assert!(seconds >= window_size);
 
+    let mut tasks: Vec<JoinHandle<Result<InvocationResponse>>> = vec![];
     let (mut ring, group_name) = infer_actor_info(payload.metadata)?;
-
     let mut window: Box<Vec<(RelationPartitions, RelationPartitions)>> = Box::new(vec![]);
 
     for time in (0..seconds).step_by(hop_size) {
@@ -156,10 +169,13 @@ pub async fn hopping_window_tasks(
             .map(|(a, b)| if a.len() > b.len() { a.len() } else { b.len() })
             .sum::<usize>();
 
-        let mut uuid = UuidBuilder::new_with_ts(&group_name, Utc::now().timestamp(), size);
+        let mut uuid_builder = UuidBuilder::new_with_ts(&group_name, Utc::now().timestamp(), size);
 
         // Distribute the window data to a single function execution environment.
-        let function_name = ring.get(&uuid.tid).expect("hash ring failure.").to_string();
+        let function_name = ring
+            .get(&uuid_builder.tid)
+            .expect("hash ring failure.")
+            .to_string();
 
         // Call the next stage of the dataflow graph.
         info!(
@@ -174,21 +190,30 @@ pub async fn hopping_window_tasks(
         for (a, b) in window.iter() {
             let num = if a.len() > b.len() { a.len() } else { b.len() };
             for i in 0..num {
-                let r1 = if i < a.len() { a[i].clone() } else { vec![] };
-                let r2 = if i < b.len() { b[i].clone() } else { vec![] };
-                let payload = serde_json::to_vec(&to_payload(&r1, &r2, uuid.next()))?;
-                info!(
-                    "[OK] Event {} - function payload bytes: {}",
-                    eid,
-                    payload.len()
-                );
-                info!(
-                    "[OK] Received status from async lambda function. {:?}",
-                    invoke_lambda_function(function_name.clone(), Some(payload.into())).await?
-                );
+                let ac = a.clone();
+                let bc = b.clone();
+                let empty = vec![];
+                let epoch_id = eid;
+                let uuid = uuid_builder.next();
+                let func_name = function_name.clone();
+                tasks.push(tokio::spawn(async move {
+                    let r1 = || if i < ac.len() { &ac[i] } else { &empty };
+                    let r2 = || if i < bc.len() { &bc[i] } else { &empty };
+                    let payload = serde_json::to_vec(&to_payload(r1(), r2(), uuid))?;
+                    info!(
+                        "[OK] Event {} - function payload bytes: {}",
+                        epoch_id,
+                        payload.len()
+                    );
+                    invoke_lambda_function(func_name, Some(payload.into())).await
+                }));
                 eid += 1;
             }
         }
+    }
+
+    for task in tasks {
+        task.await.expect("Lambda function execution failed.")?;
     }
 
     Ok(())
@@ -203,32 +228,32 @@ pub async fn hopping_window_tasks(
 /// * `seconds` - the total number of seconds to generate workloads.
 pub async fn elementwise_tasks(
     payload: Payload,
-    stream: Arc<dyn DataStream>,
+    stream: Arc<dyn DataStream + Send + Sync>,
     seconds: usize,
 ) -> Result<()> {
     let (mut ring, group_name) = infer_actor_info(payload.metadata)?;
-
+    let mut tasks: Vec<JoinHandle<Result<InvocationResponse>>> = vec![];
     for epoch in 0..seconds {
         info!("[OK] Send events (epoch: {}).", epoch);
         let events = stream.clone();
-
         if ring.len() == 1 {
-            // lambda default concurrency
+            // lambda default concurrency is 1000.
             let function_name = group_name.clone();
-            let uuid = UuidBuilder::new_with_ts(&function_name, Utc::now().timestamp(), 1).next();
-            let payload = serde_json::to_vec(&events.select_event_to_payload(
-                epoch,
-                0,
-                payload.query_number,
-                uuid,
-            )?)?
-            .into();
-            info!(
-                "[OK] Received status from async lambda function. {:?}",
-                invoke_lambda_function(function_name, Some(payload)).await?
-            );
+            tasks.push(tokio::spawn(async move {
+                let uuid =
+                    UuidBuilder::new_with_ts(&function_name, Utc::now().timestamp(), 1).next();
+                let payload = serde_json::to_vec(&events.select_event_to_payload(
+                    epoch,
+                    0,
+                    payload.query_number,
+                    uuid,
+                )?)?
+                .into();
+                invoke_lambda_function(function_name, Some(payload)).await
+            }));
         } else {
             // Calculate the total data packets to be sent.
+            // transfrom tuple (a, b) to (Arc::new(a), Arc::new(b))
             let (a, b) = events.select_event_to_batches(
                 epoch,
                 0, // generator id
@@ -236,10 +261,14 @@ pub async fn elementwise_tasks(
             )?;
             let size = if a.len() > b.len() { a.len() } else { b.len() };
 
-            let mut uuid = UuidBuilder::new_with_ts(&group_name, Utc::now().timestamp(), size);
+            let mut uuid_builder =
+                UuidBuilder::new_with_ts(&group_name, Utc::now().timestamp(), size);
 
             // Distribute the epoch data to a single function execution environment.
-            let function_name = ring.get(&uuid.tid).expect("hash ring failure.").to_string();
+            let function_name = ring
+                .get(&uuid_builder.tid)
+                .expect("hash ring failure.")
+                .to_string();
 
             // Call the next stage of the dataflow graph.
             info!(
@@ -248,20 +277,28 @@ pub async fn elementwise_tasks(
             );
 
             for i in 0..size {
-                let r1 = if i < a.len() { a[i].clone() } else { vec![] };
-                let r2 = if i < b.len() { b[i].clone() } else { vec![] };
-                let payload = serde_json::to_vec(&to_payload(&r1, &r2, uuid.next()))?;
-                info!(
-                    "[OK] Event {} - function payload bytes: {}",
-                    i,
-                    payload.len()
-                );
-                info!(
-                    "[OK] Received status from async lambda function. {:?}",
-                    invoke_lambda_function(function_name.clone(), Some(payload.into())).await?
-                );
+                let ac = a.clone();
+                let bc = b.clone();
+                let empty = vec![];
+                let uuid = uuid_builder.next();
+                let func_name = function_name.clone();
+                tasks.push(tokio::spawn(async move {
+                    let r1 = || if i < ac.len() { &ac[i] } else { &empty };
+                    let r2 = || if i < bc.len() { &bc[i] } else { &empty };
+                    let payload = serde_json::to_vec(&to_payload(r1(), r2(), uuid))?;
+                    info!(
+                        "[OK] Event {} - function payload bytes: {}",
+                        i,
+                        payload.len()
+                    );
+                    invoke_lambda_function(func_name, Some(payload.into())).await
+                }));
             }
         }
+    }
+
+    for task in tasks {
+        task.await.expect("Lambda function execution failed.")?;
     }
 
     Ok(())

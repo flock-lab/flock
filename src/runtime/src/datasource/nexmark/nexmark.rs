@@ -19,6 +19,7 @@ use crate::datasource::date::DateTime;
 use crate::datasource::nexmark::event::{Auction, Bid, Person};
 use crate::datasource::nexmark::generator::NEXMarkGenerator;
 use crate::datasource::DataStream;
+use crate::datasource::RelationPartitions;
 use crate::error::FlockError;
 use crate::error::Result;
 use crate::payload::{Payload, Uuid};
@@ -154,7 +155,7 @@ impl DataStream for NEXMarkStream {
         time: usize,
         generator: usize,
         query_number: Option<usize>,
-    ) -> Result<(Vec<Vec<RecordBatch>>, Vec<Vec<RecordBatch>>)> {
+    ) -> Result<(RelationPartitions, RelationPartitions)> {
         let (event, (persons_num, auctions_num, bids_num)) = self
             .select(time, generator)
             .expect("Failed to select event.");
@@ -164,7 +165,7 @@ impl DataStream for NEXMarkStream {
         }
 
         info!(
-            "Epoch {}: {} persons, {} auctions, {} bids.",
+            "Selecting events for epoch {}: {} persons, {} auctions, {} bids.",
             time, persons_num, auctions_num, bids_num
         );
 
@@ -221,9 +222,9 @@ impl DataStream for NEXMarkStream {
         };
 
         if r2.is_empty() {
-            Ok((batch_partition(r1), vec![]))
+            Ok((Arc::new(batch_partition(r1)), Arc::new(vec![])))
         } else {
-            Ok((batch_partition(r1), batch_partition(r2)))
+            Ok((Arc::new(batch_partition(r1)), Arc::new(batch_partition(r2))))
         }
     }
 

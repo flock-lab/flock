@@ -202,7 +202,6 @@ mod tests {
     use arrow::datatypes::{DataType, Field, Schema};
     use arrow::json;
     use arrow_flight::utils::flight_data_from_arrow_batch;
-    use rayon::prelude::*;
     use serde_json::Value;
     use std::sync::Arc;
     use std::time::Instant;
