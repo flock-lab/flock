@@ -197,13 +197,13 @@ async fn create_nexmark_functions(
         "Creating lambda function: {}",
         NEXMARK_SOURCE_FUNC_NAME.clone()
     );
-    create_lambda_function(&nexmark_source_ctx, opt.debug).await?;
+    create_lambda_function(&nexmark_source_ctx, Some(2048 /* MB */), opt.debug).await?;
 
     // Create the function for the nexmark worker.
     match &next_func_name {
         CloudFunction::Lambda(name) => {
             info!("Creating lambda function: {}", name);
-            create_lambda_function(&nexmark_worker_ctx, opt.debug).await?;
+            create_lambda_function(&nexmark_worker_ctx, Some(128), opt.debug).await?;
         }
         CloudFunction::Group((name, concurrency)) => {
             info!(
@@ -214,7 +214,7 @@ async fn create_nexmark_functions(
                 let group_member_name = format!("{}-{:02}", name.clone(), i);
                 info!("Creating function member: {}", group_member_name);
                 nexmark_worker_ctx.name = group_member_name;
-                create_lambda_function(&nexmark_worker_ctx, opt.debug).await?;
+                create_lambda_function(&nexmark_worker_ctx, Some(128), opt.debug).await?;
                 set_lambda_concurrency(nexmark_worker_ctx.name, 1).await?;
             }
         }

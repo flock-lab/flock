@@ -121,7 +121,7 @@ async fn create_ysb_functions(
 
     // Create the function for the ysb source generator.
     info!("Creating lambda function: {}", YSB_SOURCE_FUNC_NAME.clone());
-    create_lambda_function(&ysb_source_ctx, opt.debug).await?;
+    create_lambda_function(&ysb_source_ctx, Some(1024), opt.debug).await?;
 
     // Create the function for the ysb worker.
     match &next_func_name {
@@ -131,7 +131,7 @@ async fn create_ysb_functions(
                 let group_member_name = format!("{}-{:02}", name.clone(), i);
                 info!("Creating function member: {}", group_member_name);
                 ysb_worker_ctx.name = group_member_name;
-                create_lambda_function(&ysb_worker_ctx, opt.debug).await?;
+                create_lambda_function(&ysb_worker_ctx, Some(128), opt.debug).await?;
                 set_lambda_concurrency(ysb_worker_ctx.name, 1).await?;
             }
         }
