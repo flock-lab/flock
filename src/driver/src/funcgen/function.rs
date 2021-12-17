@@ -139,7 +139,7 @@ impl QueryFlow {
             ExecutionContext {
                 plan: dag.get_node(root).unwrap().plan.clone(),
                 name: QueryFlow::function_name(&query_code, &root, &timestamp),
-                next: CloudFunction::None, // the last function
+                next: CloudFunction::Sink(DataSinkType::Empty), // the last function
                 ..Default::default()
             },
         );
@@ -261,7 +261,10 @@ mod tests {
         assert!(function_name(&functions, 0)?.contains("00"));
         assert!(function_name(&functions, 1)?.contains("01"));
 
-        assert!(matches!(next_function(&functions, 0)?, CloudFunction::None));
+        assert!(matches!(
+            next_function(&functions, 0)?,
+            CloudFunction::Sink(..)
+        ));
         assert!(matches!(
             next_function(&functions, 1)?,
             CloudFunction::Lambda(..)
@@ -295,7 +298,10 @@ mod tests {
         assert!(function_name(&functions, 1)?.contains("01"));
         assert!(function_name(&functions, 2)?.contains("02"));
 
-        assert!(matches!(next_function(&functions, 0)?, CloudFunction::None));
+        assert!(matches!(
+            next_function(&functions, 0)?,
+            CloudFunction::Sink(..)
+        ));
         assert!(matches!(
             next_function(&functions, 1)?,
             CloudFunction::Group(..)

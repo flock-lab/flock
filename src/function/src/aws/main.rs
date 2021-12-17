@@ -76,7 +76,7 @@ macro_rules! init_exec_context {
                         CloudFunction::Group((name, group_size)) => {
                             (name.clone(), group_size.clone())
                         }
-                        CloudFunction::None => (String::new(), 0),
+                        CloudFunction::Sink(..) => (String::new(), 0),
                     };
 
                     // The *consistent hash* technique distributes the data packets in a time window

@@ -31,6 +31,7 @@
 pub mod arena;
 pub mod config;
 pub mod context;
+pub mod datasink;
 pub mod datasource;
 pub mod encoding;
 pub mod error;

@@ -214,7 +214,7 @@ async fn payload_handler(
 ) -> Result<Value> {
     let input_partitions = {
         if match &ctx.next {
-            CloudFunction::None | CloudFunction::Lambda(..) => true,
+            CloudFunction::Sink(..) | CloudFunction::Lambda(..) => true,
             CloudFunction::Group(..) => false,
         } {
             // ressemble lambda n to 1
@@ -241,7 +241,7 @@ async fn payload_handler(
     ctx.feed_one_source(&input_partitions).await?;
     let output_partitions = ctx.execute().await?;
 
-    if ctx.next != CloudFunction::None {
+    if ctx.next != CloudFunction::Sink(..) {
         let mut batches = LambdaExecutor::coalesce_batches(
             vec![output_partitions],
             FLOCK_CONF["lambda"]["payload_batch_size"]

@@ -21,13 +21,14 @@ Help() {
   # Display Help
   echo $(echogreen "A Benchmark Script for Flock")
   echo
-  echo "Syntax: flock_bench [-g|-h|-c|-r [-b <bench_type>] [-q <query_id>] [-s <number_of_seconds>] [-e <events_per_second>] [-p <number_of_parallel_streams>]]"
+  echo "Syntax: flock_bench [-g|-h|-c|-r [-b <bench_type>] [-d <data_sink_type>] [-q <query_id>] [-s <number_of_seconds>] [-e <events_per_second>] [-p <number_of_parallel_streams>]]"
   echo "options:"
   echo "g     Print the GPL license notification."
   echo "h     Print this Help."
   echo "c     Compile and deploy the benchmark."
   echo "r     Run the benchmark. Default: false"
   echo "b     The type of the benchmark [nexmark, ysb]. Default: 'nexmark'"
+  echo "d     The type of the data sink [empty: 0, s3: 1, dynamodb: 2, sqs: 3]. Default: 0"
   echo "q     NexMark Query Number [0-9]. Ignored if '-b' is not 'nexmark'. Default: 5"
   echo "p     Number of Data Generators. Default: 1"
   echo "s     Seconds to run the benchmark. Default: 10"
@@ -93,13 +94,14 @@ Build_and_Deploy() {
 ############################################################
 run="false"
 bench="nexmark"
+data_sink=0
 generators=1
 events_per_second=1000
 seconds=10
 query=5
 flock=$(<src/bin/cli/src/flock)
 # Get the options
-while getopts "hgcrq:b:p:s:e:" option; do
+while getopts "hgcrq:b:d:p:s:e:" option; do
   case $option in
   h) # display Help
     Help
@@ -118,6 +120,9 @@ while getopts "hgcrq:b:p:s:e:" option; do
     ;;
   b) # benchmark type
     bench=$OPTARG
+    ;;
+  d) # data sink type
+    data_sink=$OPTARG
     ;;
   q) # set the query number
     query=$OPTARG
@@ -158,6 +163,11 @@ if [ $bench != "nexmark" ] && [ $bench != "ysb" ]; then
   exit
 fi
 
+if [ $data_sink -gt 3 ] || [ $data_sink -lt 0 ]; then
+  echo $(echored "Error: Data sink type must be between 0 and 3.")
+  exit
+fi
+
 if [ "$run" = "true" ]; then
   echo "$flock"
   echo
@@ -177,16 +187,18 @@ if [ "$run" = "true" ]; then
   if [ $bench = "ysb" ]; then
     benchmark="ysb_bench"
     query_args=""
+    sink_args=""
   else
     benchmark="nexmark_bench"
     query_args="-q $query"
+    sink_args="-d $data_sink"
   fi
 
   # dry run to warm up the lambda functions.
   echo $(echogreen "[1] Warming up the lambda functions")
   echo
   RUST_LOG=info ./target/x86_64-unknown-linux-gnu/release/$benchmark \
-    $query_args -g $generators -s $seconds --events_per_second $events_per_second --debug
+    $query_args $sink_args -g $generators -s $seconds --events_per_second $events_per_second --debug
   echo $(echoblue "-------------------------------------------------------------")
   echo
   sleep 2
@@ -195,7 +207,7 @@ if [ "$run" = "true" ]; then
   echo $(echogreen "[2] Running the benchmark")
   echo
   RUST_LOG=info ./target/x86_64-unknown-linux-gnu/release/$benchmark \
-    $query_args -g $generators -s $seconds --events_per_second $events_per_second --debug
+    $query_args $sink_args -g $generators -s $seconds --events_per_second $events_per_second --debug
   echo $(echoblue "-------------------------------------------------------------")
   echo
   echo $(echogreen "[OK] Nexmark Benchmark Complete")

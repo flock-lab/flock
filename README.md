@@ -120,7 +120,7 @@ $ ./flock_bench.sh -r -b nexmark -q 5 -s 10 -e 1000 -p 1
 
 ```bash
 ============================================================
- Running the benchmark 
+ Running the benchmark
 ============================================================
 Benchmark Type: NEXMARK
 Query Number: 5 (ignored for YSB)

@@ -65,6 +65,11 @@ pub enum FlockError {
     Execution(String),
     /// Error returned during function generation.
     FunctionGeneration(String),
+    /// Error returned when the data sink fails to write data.
+    /// This error should not happen in normal usage of Flock.
+    DataSink(String),
+    /// Error returned when accessing the AWS services fails.
+    AWS(String),
 }
 
 impl From<io::Error> for FlockError {
@@ -136,6 +141,8 @@ impl Display for FlockError {
             FlockError::FunctionGeneration(ref desc) => {
                 write!(f, "Function generation error: {}", desc)
             }
+            FlockError::DataSink(ref desc) => write!(f, "Data sink error: {}", desc),
+            FlockError::AWS(ref desc) => write!(f, "AWS error: {}", desc),
         }
     }
 }

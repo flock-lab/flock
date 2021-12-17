@@ -5,7 +5,7 @@ description = "A utility module to simplify the initialization of lambda functio
 authors = [ "Gang Liao <gangliao@cs.umd.edu>", "Zejun Liu <zliu1238@cs.umd.edu>" ]
 license = "Apache-2.0"
 keywords = [ "AWS", "sql", "physical-plan", "dataflow" ]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 arrow = { git = "https://github.com/flock-lab/arrow-rs", branch = "flock", features = [ "simd" ] }
@@ -30,6 +30,7 @@ rusoto_kafka = "0.47.0"
 rusoto_kinesis = "0.47.0"
 rusoto_lambda = "0.47.0"
 rusoto_s3 = "0.47.0"
+rusoto_sqs = "0.47.0"
 rust-ini = "0.17"
 serde = { version = "1.0", features = [ "derive" ] }
 serde_bytes = "0.11"

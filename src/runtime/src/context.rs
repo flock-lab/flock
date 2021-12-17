@@ -15,6 +15,7 @@
 //! corresponding execution context from the cloud environment variable.
 
 use super::encoding::Encoding;
+use crate::datasink::DataSinkType;
 use crate::error::{FlockError, Result};
 use arrow::datatypes::{Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
@@ -74,13 +75,12 @@ pub enum CloudFunction {
     /// next call is `CloudFunctionName`-`i`.
     Group((CloudFunctionName, GroupSize)),
     /// There is no subsequent call to the cloud function at the end.
-    /// TODO(gangliao): This function must include data sink operation.
-    None,
+    Sink(DataSinkType),
 }
 
 impl Default for CloudFunction {
     fn default() -> Self {
-        CloudFunction::None
+        CloudFunction::Sink(DataSinkType::Empty)
     }
 }
 
@@ -125,7 +125,7 @@ impl Default for ExecutionContext {
             plan:        Arc::new(EmptyExec::new(false, Arc::new(Schema::empty()))),
             plan_s3_idx: None,
             name:        "".to_string(),
-            next:        CloudFunction::None,
+            next:        CloudFunction::Sink(DataSinkType::Empty),
         }
     }
 }
@@ -407,7 +407,7 @@ mod tests {
         let mut ctx = ExecutionContext {
             plan,
             name: "test".to_string(),
-            next: CloudFunction::None,
+            next: CloudFunction::Sink(DataSinkType::Empty),
             ..Default::default()
         };
         ctx.feed_one_source(&partitions).await?;
@@ -487,7 +487,7 @@ mod tests {
         let mut ctx = ExecutionContext {
             plan,
             name: "test".to_string(),
-            next: CloudFunction::None,
+            next: CloudFunction::Sink(DataSinkType::Empty),
             ..Default::default()
         };
         ctx.feed_two_source(&partitions1, &partitions2).await?;

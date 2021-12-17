@@ -13,6 +13,7 @@
 
 use arrow::datatypes::{Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
+use arrow::util::pretty::pretty_format_batches;
 use datafusion::datasource::MemTable;
 use datafusion::execution::context::ExecutionContext as DataFusionExecutionContext;
 use datafusion::physical_plan::empty::EmptyExec;
@@ -72,6 +73,10 @@ struct NexmarkBenchmarkOpt {
     /// Number of events generated among generators per second
     #[structopt(short = "e", long = "events_per_second", default_value = "100000")]
     events_per_second: usize,
+
+    /// The data sink type to use
+    #[structopt(short = "d", long = "data_sink_type", default_value = "0")]
+    data_sink_type: usize,
 }
 
 #[tokio::main]
@@ -184,7 +189,7 @@ async fn create_nexmark_functions(
         plan,
         plan_s3_idx: s3.clone(),
         name: worker_func_name.clone(),
-        next: CloudFunction::None,
+        next: CloudFunction::Sink(DataSinkType::new(opt.data_sink_type)?),
     };
 
     // Create the function for the nexmark source generator.
@@ -213,7 +218,7 @@ async fn create_nexmark_functions(
                 set_lambda_concurrency(nexmark_worker_ctx.name, 1).await?;
             }
         }
-        CloudFunction::None => unreachable!(),
+        CloudFunction::Sink(_) => unreachable!(),
     }
 
     Ok(next_func_name)
@@ -271,6 +276,20 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
     info!("Waiting for the current invocations to be logged.");
     tokio::time::sleep(parse_duration("5s").unwrap()).await;
     fetch_aws_watchlogs(&NEXMARK_SOURCE_LOG_GROUP, parse_duration("1min").unwrap()).await?;
+
+    let sink_type = DataSinkType::new(opt.data_sink_type)?;
+    if sink_type != DataSinkType::Empty {
+        let data_sink = DataSink::read(format!("q{}", opt.query_number), sink_type).await?;
+        let (last_function, batches) = data_sink.to_record_batch()?;
+        info!(
+            "[OK] Received {} batches from the data sink.",
+            batches.len()
+        );
+        info!("[OK] Last data sink function: {}", last_function);
+        let function_log_group = format!("/aws/lambda/{}", last_function);
+        fetch_aws_watchlogs(&function_log_group, parse_duration("1min").unwrap()).await?;
+        println!("{}", pretty_format_batches(&batches)?);
+    }
 
     Ok(())
 }

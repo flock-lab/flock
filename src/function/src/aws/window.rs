@@ -21,12 +21,12 @@ use std::sync::Arc;
 
 type RelationPartitions = Vec<Vec<RecordBatch>>;
 
-/// Generate tumble windows workloads for the nexmark benchmark on cloud
+/// Generate tumble windows workloads for the benchmark on cloud
 /// function services.
 ///
 /// # Arguments
 /// * `payload` - The payload of the function.
-/// * `stream` - the source stream of nexmark events.
+/// * `stream` - the source stream of events.
 /// * `seconds` - the total number of seconds to generate workloads.
 /// * `window_size` - the size of the window in seconds.
 pub async fn tumbling_window_tasks(
@@ -76,7 +76,7 @@ pub async fn tumbling_window_tasks(
 
         // Call the next stage of the dataflow graph.
         info!(
-            "[OK] Send {} NexMark events from a window (epoch: {}-{}) to function: {}.",
+            "[OK] Send {} events from a window (epoch: {}-{}) to function: {}.",
             size,
             time,
             time + window_size,
@@ -107,12 +107,12 @@ pub async fn tumbling_window_tasks(
     Ok(())
 }
 
-/// Generate hopping windows workloads for the nexmark benchmark on cloud
+/// Generate hopping windows workloads for the benchmark on cloud
 /// function services.
 ///
 /// # Arguments
 /// * `payload` - The payload of the function.
-/// * `stream` - the source stream of nexmark events.
+/// * `stream` - the source stream of events.
 /// * `seconds` - the total number of seconds to generate workloads.
 /// * `window_size` - the size of the window in seconds.
 /// * `hop_size` - the size of the hop in seconds.
@@ -163,7 +163,7 @@ pub async fn hopping_window_tasks(
 
         // Call the next stage of the dataflow graph.
         info!(
-            "[OK] Send {} NexMark events from a window (epoch: {}-{}) to function: {}.",
+            "[OK] Send {} events from a window (epoch: {}-{}) to function: {}.",
             size,
             time,
             time + window_size,
@@ -194,12 +194,12 @@ pub async fn hopping_window_tasks(
     Ok(())
 }
 
-/// Generate normal elementwose workloads for the nexmark benchmark on cloud
+/// Generate normal elementwose workloads for the benchmark on cloud
 /// function services.
 ///
 /// # Arguments
 /// * `payload` - The payload of the function.
-/// * `stream` - the source stream of nexmark events.
+/// * `stream` - the source stream of events.
 /// * `seconds` - the total number of seconds to generate workloads.
 pub async fn elementwise_tasks(
     payload: Payload,
@@ -209,7 +209,7 @@ pub async fn elementwise_tasks(
     let (mut ring, group_name) = infer_actor_info(payload.metadata)?;
 
     for epoch in 0..seconds {
-        info!("[OK] Send NexMark events (epoch: {}).", epoch);
+        info!("[OK] Send events (epoch: {}).", epoch);
         let events = stream.clone();
 
         if ring.len() == 1 {
@@ -243,7 +243,7 @@ pub async fn elementwise_tasks(
 
             // Call the next stage of the dataflow graph.
             info!(
-                "[OK] Send {} NexMark events from epoch {} to function: {}.",
+                "[OK] Send {} events from epoch {} to function: {}.",
                 size, epoch, function_name
             );
 

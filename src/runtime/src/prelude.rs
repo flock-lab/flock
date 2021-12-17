@@ -25,6 +25,7 @@ pub use crate::arena::{Arena, WindowSession};
 pub use crate::config;
 pub use crate::config::FLOCK_CONF;
 pub use crate::context::{CloudFunction, ExecutionContext};
+pub use crate::datasink::{DataSink, DataSinkType};
 pub use crate::datasource::{kafka, kinesis, nexmark, ysb, DataSource, DataStream};
 pub use crate::encoding::Encoding;
 pub use crate::error::{FlockError, Result};
