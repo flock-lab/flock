@@ -38,6 +38,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::io::Read;
 use std::sync::Arc;
+use uuid::Uuid;
 
 lazy_static! {
     static ref FLOCK_S3_BUCKET: String = FLOCK_CONF["flock"]["s3_bucket"].to_string();
@@ -207,6 +208,7 @@ impl DataSink {
                 queue_url,
                 message_body: serde_json::to_string(&self).unwrap(),
                 message_group_id: Some(queue_name.to_string()),
+                message_deduplication_id: Some(format!("{}", Uuid::new_v4())),
                 ..Default::default()
             })
             .await
