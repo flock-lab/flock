@@ -32,9 +32,6 @@ lazy_static! {
         .unwrap();
 }
 
-/// The function invocation counter per lambda instance.
-static mut INVOCATION_COUNTER_PER_INSTANCE: u32 = 0;
-
 /// The generic function executor.
 ///
 /// This function is invoked by the datafusion runtime. It is responsible for
@@ -73,10 +70,6 @@ pub async fn collect(
         ctx.feed_data_sources(&inputs).await?;
         let output = ctx.execute().await?;
         info!("{}", pretty_format_batches(&output)?);
-        unsafe {
-            INVOCATION_COUNTER_PER_INSTANCE += 1;
-            info!("# invocations: {}", INVOCATION_COUNTER_PER_INSTANCE);
-        }
         Ok(output)
     }
 }
@@ -102,7 +95,7 @@ pub async fn handler(
 
     let input_partitions = {
         if match &ctx.next {
-            CloudFunction::None | CloudFunction::Lambda(..) => true,
+            CloudFunction::Sink(..) | CloudFunction::Lambda(..) => true,
             CloudFunction::Group(..) => false,
         } {
             // ressemble data packets to a single window.
@@ -124,21 +117,27 @@ pub async fn handler(
 
     let output = collect(ctx, input_partitions.0, input_partitions.1).await?;
 
-    if ctx.next != CloudFunction::None {
-        let mut batches = LambdaExecutor::coalesce_batches(
-            vec![output],
-            FLOCK_CONF["lambda"]["payload_batch_size"]
-                .parse::<usize>()
-                .unwrap(),
-        )
-        .await?;
-        assert_eq!(1, batches.len());
-        // call the next stage of the dataflow graph.
-        invoke_next_functions(ctx, &mut batches[0])?;
+    match &ctx.next {
+        CloudFunction::Sink(sink_type) => {
+            info!("[Ok] Sinking data to {:?}", sink_type);
+            DataSink::new(ctx.name.clone(), output, Encoding::default())
+                .write(sink_type.clone())
+                .await
+        }
+        _ => {
+            let mut batches = LambdaExecutor::coalesce_batches(
+                vec![output],
+                FLOCK_CONF["lambda"]["payload_batch_size"]
+                    .parse::<usize>()
+                    .unwrap(),
+            )
+            .await?;
+            assert_eq!(1, batches.len());
+            // call the next stage of the dataflow graph.
+            invoke_next_functions(ctx, &mut batches[0])?;
+            Ok(json!({"name": &ctx.name, "tid": tid}))
+        }
     }
-
-    // TODO(gangliao): sink results to other cloud services.
-    Ok(json!({"name": &ctx.name, "tid": tid}))
 }
 
 /// Invoke functions in the next stage of the data flow.
@@ -189,7 +188,7 @@ pub fn infer_actor_info(
     let (group_name, group_size) = match &next_function {
         CloudFunction::Lambda(name) => (name.clone(), 1),
         CloudFunction::Group((name, size)) => (name.clone(), *size),
-        CloudFunction::None => (String::new(), 0),
+        CloudFunction::Sink(..) => (String::new(), 0),
     };
 
     // The *consistent hash* technique distributes the data packets in a time window

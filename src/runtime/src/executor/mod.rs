@@ -185,7 +185,7 @@ impl LambdaExecutor {
     /// Returns the next cloud function names for invocation.
     pub fn next_function(ctx: &ExecutionContext) -> Result<String> {
         let mut lambdas = match &ctx.next {
-            CloudFunction::None => vec![],
+            CloudFunction::Sink(..) => vec![],
             CloudFunction::Group((name, num)) => {
                 (0..*num).map(|i| format!("{}-{}", name, i)).collect()
             }
@@ -212,6 +212,7 @@ impl LambdaExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::datasink::DataSinkType;
     use crate::datasource::kinesis;
     use crate::error::FlockError;
     use arrow::array::UInt32Array;
@@ -393,7 +394,7 @@ mod tests {
         let mut ctx = ExecutionContext {
             plan: plan.clone(),
             name: "test".to_string(),
-            next: CloudFunction::None,
+            next: CloudFunction::Sink(DataSinkType::Empty),
             ..Default::default()
         };
         LambdaExecutor::next_function(&ctx).expect_err("No distributed execution plan");

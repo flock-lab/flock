@@ -202,6 +202,7 @@ mod tests {
     use arrow::datatypes::{DataType, Field, Schema};
     use arrow::json;
     use arrow_flight::utils::flight_data_from_arrow_batch;
+    use rayon::prelude::*;
     use serde_json::Value;
     use std::sync::Arc;
     use std::time::Instant;
@@ -387,6 +388,37 @@ mod tests {
         }
 
         Ok(())
+    }
+
+    // Convert record batch to payload for network transmission.
+    fn to_vec(batches: &[RecordBatch], uuid: Uuid, encoding: Encoding) -> Vec<u8> {
+        let options = arrow::ipc::writer::IpcWriteOptions::default();
+        let data_frames = batches
+            .par_iter()
+            .map(|b| {
+                let (_, flight_data) = flight_data_from_arrow_batch(b, &options);
+                if encoding != Encoding::None {
+                    DataFrame {
+                        header: encoding.compress(&flight_data.data_header).unwrap(),
+                        body:   encoding.compress(&flight_data.data_body).unwrap(),
+                    }
+                } else {
+                    DataFrame {
+                        header: flight_data.data_header,
+                        body:   flight_data.data_body,
+                    }
+                }
+            })
+            .collect();
+
+        serde_json::to_vec(&Payload {
+            data: data_frames,
+            schema: schema_to_bytes(batches[0].schema()),
+            uuid,
+            encoding,
+            ..Default::default()
+        })
+        .unwrap()
     }
 
     #[tokio::test]

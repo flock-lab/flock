@@ -126,7 +126,7 @@ pub fn environment(ctx: &ExecutionContext, debug: bool) -> Option<Environment> {
 /// The length constraint applies only to the full ARN. If you
 /// specify only the function name, it is limited to 64 characters in length.
 ///
-/// - If the next call is `CloudFunction::None`, then the current lambda
+/// - If the next call is `CloudFunction::Sink`, then the current lambda
 ///   function's concurrency = 1 and its type is `CloudFunction::Group((name,
 ///   group_size))`.
 ///
@@ -139,7 +139,7 @@ pub fn environment(ctx: &ExecutionContext, debug: bool) -> Option<Environment> {
 ///   group_size))`.
 pub fn function_name(ctx: &ExecutionContext) -> Vec<String> {
     match &ctx.next {
-        CloudFunction::None => (0..CONCURRENCY_8)
+        CloudFunction::Sink(_) => (0..CONCURRENCY_8)
             .map(|idx| format!("{}-{}", ctx.name, idx))
             .collect(),
         CloudFunction::Group(..) => vec![ctx.name.to_owned()],

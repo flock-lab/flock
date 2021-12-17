@@ -6,7 +6,7 @@ authors = [ "Gang Liao <gangliao@cs.umd.edu>" ]
 license = "Apache-2.0"
 keywords = [ "Flock", "repl", "client", "cli" ]
 categories = [ "command-line-interface", "command-line-utilities" ]
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
