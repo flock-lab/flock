@@ -206,6 +206,7 @@ impl DataSink {
             .send_message(SendMessageRequest {
                 queue_url,
                 message_body: serde_json::to_string(&self).unwrap(),
+                message_group_id: Some(queue_name.to_string()),
                 ..Default::default()
             })
             .await
