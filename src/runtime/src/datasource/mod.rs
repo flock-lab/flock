@@ -20,7 +20,11 @@ use kafka::KafkaSource;
 use kinesis::KinesisSource;
 use nexmark::NEXMarkSource;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use ysb::YSBSource;
+
+/// A relation's data in Arrow record batches.
+pub type RelationPartitions = Arc<Vec<Vec<RecordBatch>>>;
 
 /// A streaming data source trait.
 pub trait DataStream {
@@ -46,7 +50,7 @@ pub trait DataStream {
         time: usize,
         generator: usize,
         query_number: Option<usize>,
-    ) -> Result<(Vec<Vec<RecordBatch>>, Vec<Vec<RecordBatch>>)>;
+    ) -> Result<(RelationPartitions, RelationPartitions)>;
 }
 
 /// A Data Source for either stream processing or batch processing.
