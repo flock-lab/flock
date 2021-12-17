@@ -117,7 +117,11 @@ pub async fn invoke_lambda_function(
 }
 
 /// Creates a single lambda function using bootstrap.zip in Amazon S3.
-pub async fn create_lambda_function(ctx: &ExecutionContext, debug: bool) -> Result<String> {
+pub async fn create_lambda_function(
+    ctx: &ExecutionContext,
+    memory_size: Option<i64>,
+    debug: bool,
+) -> Result<String> {
     let func_name = ctx.name.clone();
     if FLOCK_LAMBDA_CLIENT
         .get_function(GetFunctionRequest {
@@ -150,6 +154,7 @@ pub async fn create_lambda_function(ctx: &ExecutionContext, debug: bool) -> Resu
                 handler: flock::handler(),
                 role: flock::role().await,
                 runtime: flock::runtime(),
+                memory_size,
                 environment: flock::environment(ctx, debug),
                 timeout: Some(900),
                 ..Default::default()
