@@ -120,9 +120,13 @@ pub async fn handler(
     match &ctx.next {
         CloudFunction::Sink(sink_type) => {
             info!("[Ok] Sinking data to {:?}", sink_type);
-            DataSink::new(ctx.name.clone(), output, Encoding::default())
-                .write(sink_type.clone())
-                .await
+            if !output.is_empty() {
+                DataSink::new(ctx.name.clone(), output, Encoding::default())
+                    .write(sink_type.clone())
+                    .await
+            } else {
+                Ok(json!({ "response": "No data to sink." }))
+            }
         }
         _ => {
             let mut batches = LambdaExecutor::coalesce_batches(
