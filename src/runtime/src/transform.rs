@@ -92,7 +92,12 @@ pub fn to_value(batches: &[RecordBatch], uuid: Uuid, encoding: Encoding) -> Valu
 }
 
 /// Convert record batches to payload using the default encoding.
-pub fn to_payload(batch1: &[RecordBatch], batch2: &[RecordBatch], uuid: Uuid) -> Payload {
+pub fn to_payload(
+    batch1: &[RecordBatch],
+    batch2: &[RecordBatch],
+    uuid: Uuid,
+    sync: bool,
+) -> Payload {
     let options = arrow::ipc::writer::IpcWriteOptions::default();
     let encoding = Encoding::default();
     let dataframe = |batches: &[RecordBatch]| -> Vec<DataFrame> {
@@ -118,7 +123,7 @@ pub fn to_payload(batch1: &[RecordBatch], batch2: &[RecordBatch], uuid: Uuid) ->
     let mut payload = Payload {
         uuid,
         encoding: encoding.clone(),
-        datasource: DataSource::Payload,
+        datasource: DataSource::Payload(sync),
         ..Default::default()
     };
     if !batch1.is_empty() {

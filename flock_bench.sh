@@ -21,12 +21,13 @@ Help() {
   # Display Help
   echo $(echogreen "A Benchmark Script for Flock")
   echo
-  echo "Syntax: flock_bench [-g|-h|-c|-r [-b <bench_type>] [-d <data_sink_type>] [-q <query_id>] [-s <number_of_seconds>] [-e <events_per_second>] [-p <number_of_parallel_streams>]]"
+  echo "Syntax: flock_bench [-g|-h|-c|-r|-a [-b <bench_type>] [-d <data_sink_type>] [-q <query_id>] [-s <number_of_seconds>] [-e <events_per_second>] [-p <number_of_parallel_streams>]]"
   echo "options:"
   echo "g     Print the GPL license notification."
   echo "h     Print this Help."
   echo "c     Compile and deploy the benchmark."
   echo "r     Run the benchmark. Default: false"
+  echo "a     Async invoke the function. Default: sync invoke"
   echo "b     The type of the benchmark [nexmark, ysb]. Default: 'nexmark'"
   echo "d     The type of the data sink [empty: 0, s3: 1, dynamodb: 2, sqs: 3]. Default: 0"
   echo "q     NexMark Query Number [0-9]. Ignored if '-b' is not 'nexmark'. Default: 5"
@@ -93,6 +94,7 @@ Build_and_Deploy() {
 # Process the input options. Add options as needed.        #
 ############################################################
 run="false"
+async="false"
 bench="nexmark"
 data_sink=0
 generators=1
@@ -117,6 +119,9 @@ while getopts "hgcrq:b:d:p:s:e:" option; do
     ;;
   r) # run the benchmark
     run="true"
+    ;;
+  a) # async invoke the function
+    async="true"
     ;;
   b) # benchmark type
     bench=$OPTARG
@@ -179,6 +184,8 @@ if [ "$run" = "true" ]; then
   echo "Generators: $generators"
   echo "Events Per Second: $events_per_second"
   echo "Seconds to Run: $seconds"
+  echo "Data Sink: $data_sink (ignored for YSB)"
+  echo "Async Invoke: $async"
   echo $(echogreen "============================================================")
   echo
   echo $(echogreen "[OK] Benchmark Starting")
@@ -194,11 +201,17 @@ if [ "$run" = "true" ]; then
     sink_args="-d $data_sink"
   fi
 
+  if [ $async = "true" ]; then
+    async_args="--async"
+  else
+    async_args=""
+  fi
+
   # dry run to warm up the lambda functions.
   echo $(echogreen "[1] Warming up the lambda functions")
   echo
   RUST_LOG=info ./target/x86_64-unknown-linux-gnu/release/$benchmark \
-    $query_args $sink_args -g $generators -s $seconds --events_per_second $events_per_second --debug
+    $query_args $sink_args $async_args -g $generators -s $seconds --events_per_second $events_per_second --debug
   echo $(echoblue "-------------------------------------------------------------")
   echo
   sleep 2
@@ -207,7 +220,7 @@ if [ "$run" = "true" ]; then
   echo $(echogreen "[2] Running the benchmark")
   echo
   RUST_LOG=info ./target/x86_64-unknown-linux-gnu/release/$benchmark \
-    $query_args $sink_args -g $generators -s $seconds --events_per_second $events_per_second --debug
+    $query_args $sink_args $async_args -g $generators -s $seconds --events_per_second $events_per_second --debug
   echo $(echoblue "-------------------------------------------------------------")
   echo
   echo $(echogreen "[OK] Nexmark Benchmark Complete")

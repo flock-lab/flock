@@ -262,7 +262,7 @@ async fn handler(event: Value, _: Context) -> Result<Value> {
     let (mut ctx, mut arena) = init_exec_context!();
 
     match &ctx.datasource {
-        DataSource::Payload => payload_handler(&mut ctx, &mut arena, event).await,
+        DataSource::Payload(_) => payload_handler(&mut ctx, &mut arena, event).await,
         DataSource::KinesisEvent(_) | DataSource::KafkaEvent(_) => {
             source_handler(&mut ctx, event).await
         }

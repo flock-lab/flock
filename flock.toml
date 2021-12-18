@@ -26,7 +26,8 @@ aggregate_threshold = 10485760
 regular_threshold = 20971520
 
 # the granularity of each type of data in the payload
-granule = 3096
+async_granule = 3096
+sync_granule = 74304
 
 [nexmark]
 

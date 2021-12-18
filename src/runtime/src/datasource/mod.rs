@@ -25,6 +25,8 @@ use ysb::YSBSource;
 
 /// A relation's data in Arrow record batches.
 pub type RelationPartitions = Arc<Vec<Vec<RecordBatch>>>;
+/// To determine the function type to be called: sync or async.
+pub type FastAggregate = bool;
 
 /// A streaming data source trait.
 pub trait DataStream {
@@ -38,6 +40,7 @@ pub trait DataStream {
         generator: usize,
         query_number: Option<usize>,
         uuid: Uuid,
+        sync: bool,
     ) -> Result<Payload>;
 
     /// Select events from the stream and transform them into record batches.
@@ -50,6 +53,7 @@ pub trait DataStream {
         time: usize,
         generator: usize,
         query_number: Option<usize>,
+        sync: bool,
     ) -> Result<(RelationPartitions, RelationPartitions)>;
 }
 
@@ -90,10 +94,10 @@ pub enum DataSource {
     /// writing device-specific code.
     IoTButtonEvent,
     /// Lambda function invocation payload (request and response)
-    /// - 6 MB (synchronous)
-    /// - 256 KB (asynchronous)
+    /// - 6 MB (synchronous) if FAST_AGGREGATE is true
+    /// - 256 KB (asynchronous) if FAST_AGGREGATE is false
     /// <https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html>
-    Payload,
+    Payload(FastAggregate),
     /// Data source for unit tests.
     Json,
     /// Unknown data source.

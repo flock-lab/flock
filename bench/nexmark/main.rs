@@ -40,7 +40,6 @@ lazy_static! {
 
     static ref FLOCK_EMPTY_PLAN: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(false, Arc::new(Schema::empty())));
     static ref FLOCK_CONCURRENCY: usize = FLOCK_CONF["lambda"]["concurrency"].parse::<usize>().unwrap();
-    static ref FLOCK_GRANULE_SIZE: usize = FLOCK_CONF["lambda"]["granule"].parse::<usize>().unwrap();
 
     // NEXMark Benchmark
     static ref NEXMARK_BID: SchemaRef = Arc::new(Bid::schema());
@@ -77,6 +76,10 @@ struct NexmarkBenchmarkOpt {
     /// The data sink type to use
     #[structopt(short = "d", long = "data_sink_type", default_value = "0")]
     data_sink_type: usize,
+
+    /// The function invocation mode to use
+    #[structopt(long = "async")]
+    async_type: bool,
 }
 
 #[tokio::main]
@@ -170,8 +173,14 @@ async fn create_nexmark_functions(
 ) -> Result<CloudFunction> {
     let worker_func_name = format!("q{}-00", opt.query_number);
 
+    let granule_size = if opt.async_type {
+        *FLOCK_ASYNC_GRANULE_SIZE * 2
+    } else {
+        *FLOCK_SYNC_GRANULE_SIZE * 2
+    };
+
     let next_func_name =
-        if window != StreamWindow::ElementWise || opt.events_per_second > *FLOCK_GRANULE_SIZE * 2 {
+        if window != StreamWindow::ElementWise || opt.events_per_second > granule_size {
             CloudFunction::Group((worker_func_name.clone(), *FLOCK_CONCURRENCY))
         } else {
             CloudFunction::Lambda(worker_func_name.clone())
@@ -243,6 +252,14 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
     // *delete* and **recreate** the source function every time we change the query.
     let mut metadata = HashMap::new();
     metadata.insert("workers".to_string(), serde_json::to_string(&root_actor)?);
+    metadata.insert(
+        "invocation_type".to_string(),
+        if opt.async_type {
+            "async".to_string()
+        } else {
+            "sync".to_string()
+        },
+    );
 
     let tasks = (0..opt.generators)
         .into_iter()
@@ -262,7 +279,7 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
                     ..Default::default()
                 })?
                 .into();
-                invoke_lambda_function(f, Some(p)).await
+                invoke_lambda_function(f, Some(p), FLOCK_LAMBDA_ASYNC_CALL.to_string()).await
             })
         })
         // this collect *is needed* so that the join below can switch between tasks.

@@ -187,7 +187,7 @@ mod tests {
 
         let mut arena = Arena::new();
         batches.into_iter().enumerate().for_each(|(i, batch)| {
-            let payload = to_payload(&[batch], &[], uuids.get(i));
+            let payload = to_payload(&[batch], &[], uuids.get(i), false);
             let (ready, _) = arena.reassemble(payload);
             if i < 7 {
                 assert!(!ready);
