@@ -103,7 +103,7 @@ seconds=10
 query=5
 flock=$(<src/bin/cli/src/flock)
 # Get the options
-while getopts "hgcrq:b:d:p:s:e:" option; do
+while getopts "hgcraq:b:d:p:s:e:" option; do
   case $option in
   h) # display Help
     Help
