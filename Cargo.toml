@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "bench",
+    "scripts/parser/cloudwatch",
     "src/bin/cli",
     "src/driver",
     "src/function",
