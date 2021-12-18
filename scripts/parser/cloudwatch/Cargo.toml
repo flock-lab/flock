@@ -1,0 +1,20 @@
+[package]
+name = "cloudwatch"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.51"
+clap = "2.33.3"
+env_logger = "^0.9"
+humantime = "2.1.0"
+itertools = "0.10.0"
+
+log = "0.4.14"
+structopt = { version = "0.3", default-features = false }
+
+[[bin]]
+name = "cloudwatch_parser"
+path = "src/main.rs"
