@@ -116,7 +116,7 @@ async fn handler(event: Payload, _: Context) -> Result<Value> {
     let (mut ctx, mut arena) = init_exec_context!();
 
     match &event.datasource {
-        DataSource::Payload => actor::handler(&mut ctx, &mut arena, event).await,
+        DataSource::Payload(_) => actor::handler(&mut ctx, &mut arena, event).await,
         DataSource::NEXMarkEvent(_) => nexmark::handler(ctx, event).await,
         DataSource::YSBEvent(_) => ysb::handler(ctx, event).await,
         _ => unimplemented!(),

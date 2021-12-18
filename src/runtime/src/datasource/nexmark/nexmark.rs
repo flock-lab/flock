@@ -40,8 +40,12 @@ lazy_static! {
     static ref NEXMARK_BID: SchemaRef = Arc::new(Bid::schema());
     static ref NEXMARK_PERSON: SchemaRef = Arc::new(Person::schema());
     static ref NEXMARK_AUCTION: SchemaRef = Arc::new(Auction::schema());
-    static ref FLOCK_GRANULE_SIZE: usize =
-        FLOCK_CONF["lambda"]["granule"].parse::<usize>().unwrap();
+    static ref FLOCK_SYNC_GRANULE_SIZE: usize = FLOCK_CONF["lambda"]["sync_granule"]
+        .parse::<usize>()
+        .unwrap();
+    static ref FLOCK_ASYNC_GRANULE_SIZE: usize = FLOCK_CONF["lambda"]["async_granule"]
+        .parse::<usize>()
+        .unwrap();
 }
 
 type Epoch = DateTime;
@@ -147,6 +151,7 @@ impl DataStream for NEXMarkStream {
     /// * `time` - The time of the event.
     /// * `generator` - The name of the generator.
     /// * `query number` - The id of the nexmark query.
+    /// * `sync` - Whether to use the sync or async granule.
     ///
     /// ## Returns
     /// A Flock's Payload.
@@ -155,6 +160,7 @@ impl DataStream for NEXMarkStream {
         time: usize,
         generator: usize,
         query_number: Option<usize>,
+        sync: bool,
     ) -> Result<(RelationPartitions, RelationPartitions)> {
         let (event, (persons_num, auctions_num, bids_num)) = self
             .select(time, generator)
@@ -169,38 +175,35 @@ impl DataStream for NEXMarkStream {
             time, persons_num, auctions_num, bids_num
         );
 
+        let granule_size = if sync {
+            *FLOCK_SYNC_GRANULE_SIZE
+        } else {
+            *FLOCK_ASYNC_GRANULE_SIZE
+        };
         let (r1, r2) = match query_number.expect("Query number is not set.") {
             0 | 1 | 2 | 5 | 7 => (
-                NEXMarkSource::to_batch_v2(
-                    &event.bids,
-                    NEXMARK_BID.clone(),
-                    *FLOCK_GRANULE_SIZE * 2,
-                ),
+                NEXMarkSource::to_batch_v2(&event.bids, NEXMARK_BID.clone(), granule_size * 2),
                 vec![],
             ),
             3 | 8 => (
                 NEXMarkSource::to_batch_v2(
                     &event.persons,
                     NEXMARK_PERSON.clone(),
-                    *FLOCK_GRANULE_SIZE / 5,
+                    granule_size / 5,
                 ),
                 NEXMarkSource::to_batch_v2(
                     &event.auctions,
                     NEXMARK_AUCTION.clone(),
-                    *FLOCK_GRANULE_SIZE / 5,
+                    granule_size / 5,
                 ),
             ),
             4 | 6 | 9 => (
                 NEXMarkSource::to_batch_v2(
                     &event.auctions,
                     NEXMARK_AUCTION.clone(),
-                    *FLOCK_GRANULE_SIZE / 8,
+                    granule_size / 8,
                 ),
-                NEXMarkSource::to_batch_v2(
-                    &event.bids,
-                    NEXMARK_BID.clone(),
-                    *FLOCK_GRANULE_SIZE * 2,
-                ),
+                NEXMarkSource::to_batch_v2(&event.bids, NEXMARK_BID.clone(), granule_size * 2),
             ),
             _ => unimplemented!(),
         };
@@ -235,6 +238,7 @@ impl DataStream for NEXMarkStream {
     /// * `generator` - The name of the generator.
     /// * `query number` - The id of the nexmark query.
     /// * `uuid` - The uuid of the produced payload.
+    /// * `sync` - The function invocation type.
     ///
     /// ## Returns
     /// A Flock's Payload.
@@ -244,6 +248,7 @@ impl DataStream for NEXMarkStream {
         generator: usize,
         query_number: Option<usize>,
         uuid: Uuid,
+        sync: bool,
     ) -> Result<Payload> {
         let (event, (persons_num, auctions_num, bids_num)) = self
             .select(time, generator)
@@ -263,16 +268,19 @@ impl DataStream for NEXMarkStream {
                 &NEXMarkSource::to_batch(&event.bids, NEXMARK_BID.clone()),
                 &[],
                 uuid,
+                sync,
             )),
             3 | 8 => Ok(to_payload(
                 &NEXMarkSource::to_batch(&event.persons, NEXMARK_PERSON.clone()),
                 &NEXMarkSource::to_batch(&event.auctions, NEXMARK_AUCTION.clone()),
                 uuid,
+                sync,
             )),
             4 | 6 | 9 => Ok(to_payload(
                 &NEXMarkSource::to_batch(&event.auctions, NEXMARK_AUCTION.clone()),
                 &NEXMarkSource::to_batch(&event.bids, NEXMARK_BID.clone()),
                 uuid,
+                sync,
             )),
             _ => unimplemented!(),
         }
@@ -394,7 +402,7 @@ impl NEXMarkSource {
 
     /// Converts NEXMarkSource events to record batches in Arrow.
     pub fn to_batch(events: &[u8], schema: SchemaRef) -> Vec<RecordBatch> {
-        let batch_size = FLOCK_CONF["lambda"]["granule"].parse::<usize>().unwrap();
+        let batch_size = *FLOCK_SYNC_GRANULE_SIZE;
         let mut reader = json::Reader::new(BufReader::new(events), schema, batch_size, None);
 
         let mut batches = vec![];

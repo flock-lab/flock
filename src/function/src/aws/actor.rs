@@ -179,15 +179,32 @@ fn invoke_next_functions(ctx: &ExecutionContext, batches: &mut Vec<RecordBatch>)
     Ok(())
 }
 
+pub fn infer_invocation_type(metadata: &Option<HashMap<String, String>>) -> Result<bool> {
+    let mut sync = true;
+    if let Some(metadata) = metadata {
+        if let Some(invocation_type) = metadata.get("invocation_type") {
+            if invocation_type.parse::<String>().unwrap() == "async" {
+                sync = false;
+            }
+        }
+    }
+    Ok(sync)
+}
+
 pub fn infer_actor_info(
-    metadata: Option<HashMap<String, String>>,
+    metadata: &Option<HashMap<String, String>>,
 ) -> Result<(HashRing<String>, String)> {
-    let metadata = metadata.expect("Metadata is missing.");
-    let next_function: CloudFunction = serde_json::from_str(
-        metadata
-            .get(&"workers".to_string())
-            .expect("workers is missing."),
-    )?;
+    #[allow(unused_assignments)]
+    let mut next_function = CloudFunction::default();
+    if let Some(metadata) = metadata {
+        next_function = serde_json::from_str(
+            metadata
+                .get(&"workers".to_string())
+                .expect("workers is missing."),
+        )?;
+    } else {
+        return Err(FlockError::Execution("metadata is missing.".to_owned()));
+    }
 
     let (group_name, group_size) = match &next_function {
         CloudFunction::Lambda(name) => (name.clone(), 1),

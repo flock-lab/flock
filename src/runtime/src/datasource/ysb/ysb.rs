@@ -39,8 +39,12 @@ use std::thread;
 lazy_static! {
     static ref YSB_AD_EVENT: SchemaRef = Arc::new(AdEvent::schema());
     static ref YSB_CAMPAIGN: SchemaRef = Arc::new(Campaign::schema());
-    static ref FLOCK_GRANULE_SIZE: usize =
-        FLOCK_CONF["lambda"]["granule"].parse::<usize>().unwrap();
+    static ref FLOCK_SYNC_GRANULE_SIZE: usize = FLOCK_CONF["lambda"]["sync_granule"]
+        .parse::<usize>()
+        .unwrap();
+    static ref FLOCK_ASYNC_GRANULE_SIZE: usize = FLOCK_CONF["lambda"]["async_granule"]
+        .parse::<usize>()
+        .unwrap();
 }
 
 type Epoch = DateTime;
@@ -111,6 +115,7 @@ impl DataStream for YSBStream {
     /// * `time` - The time of the event.
     /// * `generator` - The name of the generator.
     /// * `query number` - The id of the nexmark query.
+    /// * `sync` - Whether to use the sync or async granule.
     ///
     /// ## Returns
     /// A Flock's Payload.
@@ -119,6 +124,7 @@ impl DataStream for YSBStream {
         time: usize,
         generator: usize,
         _query_number: Option<usize>,
+        sync: bool,
     ) -> Result<(RelationPartitions, RelationPartitions)> {
         let (campaigns, num_campaigns) = self.campaigns.clone();
         let (events, num_ad_events) = self
@@ -134,12 +140,14 @@ impl DataStream for YSBStream {
             time, num_ad_events, num_campaigns
         );
 
-        let r1 = YSBSource::to_batch_v2(
-            &events.ad_events,
-            YSB_AD_EVENT.clone(),
-            *FLOCK_GRANULE_SIZE / 4,
-        );
-        let r2 = YSBSource::to_batch_v2(&campaigns, YSB_CAMPAIGN.clone(), *FLOCK_GRANULE_SIZE / 10);
+        let granule_size = if sync {
+            *FLOCK_SYNC_GRANULE_SIZE
+        } else {
+            *FLOCK_ASYNC_GRANULE_SIZE
+        };
+
+        let r1 = YSBSource::to_batch_v2(&events.ad_events, YSB_AD_EVENT.clone(), granule_size / 4);
+        let r2 = YSBSource::to_batch_v2(&campaigns, YSB_CAMPAIGN.clone(), granule_size / 10);
 
         let step = if r2.is_empty() { 2 } else { 1 };
 
@@ -171,6 +179,7 @@ impl DataStream for YSBStream {
     /// * `generator` - The name of the generator.
     /// * `query number` - The id of the nexmark query.
     /// * `uuid` - The uuid of the produced payload.
+    /// * `sync` - The function invocation type.
     ///
     /// ## Returns
     /// A Flock's Payload.
@@ -180,6 +189,7 @@ impl DataStream for YSBStream {
         generator: usize,
         _query_number: Option<usize>,
         uuid: Uuid,
+        sync: bool,
     ) -> Result<Payload> {
         let (campaigns, num_campaigns) = self.campaigns.clone();
         let (events, num_ad_events) = self
@@ -199,6 +209,7 @@ impl DataStream for YSBStream {
             &YSBSource::to_batch(&events.ad_events, YSB_AD_EVENT.clone()),
             &YSBSource::to_batch(&campaigns, YSB_CAMPAIGN.clone()),
             uuid,
+            sync,
         ))
     }
 }
@@ -307,7 +318,7 @@ impl YSBSource {
 
     /// Converts YSBSource events to record batches in Arrow.
     pub fn to_batch(events: &[u8], schema: SchemaRef) -> Vec<RecordBatch> {
-        let batch_size = FLOCK_CONF["lambda"]["granule"].parse::<usize>().unwrap();
+        let batch_size = *FLOCK_SYNC_GRANULE_SIZE;
         let mut reader = json::Reader::new(BufReader::new(events), schema, batch_size, None);
 
         let mut batches = vec![];

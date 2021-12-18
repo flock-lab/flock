@@ -29,9 +29,14 @@ use rusoto_logs::CloudWatchLogsClient;
 use rusoto_s3::S3Client;
 
 lazy_static! {
-    // AWS Services
-    static ref FLOCK_LAMBDA_ASYNC_CALL: String = "Event".to_string();
-    static ref FLOCK_LAMBDA_SYNC_CALL: String = "RequestResponse".to_string();
+    /// AWS Lambda function async invocation.
+    pub static ref FLOCK_LAMBDA_ASYNC_CALL: String = "Event".to_string();
+    /// AWS Lambda function sync invocation.
+    pub static ref FLOCK_LAMBDA_SYNC_CALL: String = "RequestResponse".to_string();
+    /// Flock sync invocation granularity.
+    pub static ref FLOCK_SYNC_GRANULE_SIZE: usize = FLOCK_CONF["lambda"]["sync_granule"].parse::<usize>().unwrap();
+    /// Flock async invocation granularity.
+    pub static ref FLOCK_ASYNC_GRANULE_SIZE: usize = FLOCK_CONF["lambda"]["async_granule"].parse::<usize>().unwrap();
 
     static ref FLOCK_S3_KEY: String = FLOCK_CONF["flock"]["s3_key"].to_string();
     static ref FLOCK_S3_BUCKET: String = FLOCK_CONF["flock"]["s3_bucket"].to_string();
@@ -98,12 +103,13 @@ pub async fn fetch_aws_watchlogs(group: &String, mtime: std::time::Duration) -> 
 pub async fn invoke_lambda_function(
     function_name: String,
     payload: Option<Bytes>,
+    invocation_type: String,
 ) -> Result<InvocationResponse> {
     match FLOCK_LAMBDA_CLIENT
         .invoke(InvocationRequest {
             function_name,
             payload,
-            invocation_type: Some(FLOCK_LAMBDA_ASYNC_CALL.clone()),
+            invocation_type: Some(invocation_type),
             ..Default::default()
         })
         .await
