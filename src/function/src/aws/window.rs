@@ -247,9 +247,9 @@ pub async fn elementwise_tasks(
                     0,
                     payload.query_number,
                     uuid,
-                )?)?
-                .into();
-                invoke_lambda_function(function_name, Some(payload)).await
+                )?)?;
+                info!("[OK] function payload bytes: {}", payload.len());
+                invoke_lambda_function(function_name, Some(payload.into())).await
             }));
         } else {
             // Calculate the total data packets to be sent.
