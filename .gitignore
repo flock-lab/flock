@@ -37,3 +37,6 @@ buildNumber.properties
 
 # VS Code
 .vscode
+
+.metals
+scripts/parser/cloudwatch/src/logs
