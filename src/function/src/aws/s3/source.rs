@@ -118,6 +118,7 @@ pub async fn handler(_ctx: &ExecutionContext, payload: Payload) -> Result<Value>
         _ => unimplemented!(),
     };
 
+    let size = bytes.len();
     info!(
         "[OK] {} function payload: {} bytes",
         function_name,
@@ -143,5 +144,6 @@ pub async fn handler(_ctx: &ExecutionContext, payload: Payload) -> Result<Value>
         "key": s3_key.clone(),
         "uuid": serde_json::to_string(&uuid)?,
         "encoding": serde_json::to_string(&Encoding::default())?,
+        "bytes": size.to_string(),
     }))
 }

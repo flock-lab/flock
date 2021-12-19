@@ -20,6 +20,7 @@ use driver::deploy::common::*;
 use log::info;
 use nexmark_bench::*;
 use runtime::prelude::*;
+use serde_json::Value;
 use std::collections::HashMap;
 use std::time::SystemTime;
 use structopt::StructOpt;
@@ -78,7 +79,7 @@ async fn benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
     })?
     .into();
 
-    let resp = serde_json::to_value(
+    let resp: Value = serde_json::from_slice(
         &invoke_lambda_function(
             NEXMARK_SOURCE_FUNC_NAME.clone(),
             Some(payload),
@@ -88,6 +89,8 @@ async fn benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
         .payload
         .expect("No response"),
     )?;
+
+    info!("Recieved response from the source function: {:#?}", resp);
 
     let function_name = resp["function"].as_str().unwrap().to_string();
     let sync = true;
@@ -113,7 +116,7 @@ async fn benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
     .into();
 
     info!("[OK] Invoking NEXMark worker function: {}", function_name);
-    let resp = serde_json::to_value(
+    let resp: Value = serde_json::from_slice(
         &invoke_lambda_function(
             function_name.clone(),
             Some(payload),
