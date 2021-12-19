@@ -82,18 +82,28 @@ pub async fn handler(_ctx: &ExecutionContext, payload: Payload) -> Result<Value>
                     payload.query_number,
                     sync,
                 )?;
-                r1.append(Arc::get_mut(&mut a).unwrap());
-                r2.append(Arc::get_mut(&mut b).unwrap());
+                if a.len() > 0 {
+                    r1.append(Arc::get_mut(&mut a).unwrap());
+                }
+                if b.len() > 0 {
+                    r2.append(Arc::get_mut(&mut b).unwrap());
+                }
             }
-            if r1.len() != 1 {
+            if r1.len() > 1 {
                 r1 = LambdaExecutor::repartition(r1, Partitioning::RoundRobinBatch(1)).await?;
             }
-            if r2.len() != 1 {
+            if r2.len() > 1 {
                 r2 = LambdaExecutor::repartition(r2, Partitioning::RoundRobinBatch(1)).await?;
             }
-            assert!(r1.len() == 1);
-            assert!(r2.len() == 1);
-            serde_json::to_vec(&to_payload(&r1[0], &r2[0], uuid.clone(), sync))?
+            assert!(r1.len() <= 1);
+            assert!(r2.len() <= 1);
+
+            serde_json::to_vec(&to_payload(
+                if r1.len() == 1 { &r1[0] } else { &[] },
+                if r2.len() == 1 { &r2[0] } else { &[] },
+                uuid.clone(),
+                sync,
+            ))?
         }
         StreamWindow::ElementWise => {
             assert!(sec == 1);
