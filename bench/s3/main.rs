@@ -92,15 +92,22 @@ async fn benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
     let function_name = resp["function"].as_str().unwrap().to_string();
     let sync = true;
 
-    let mut metadata = HashMap::new();
-    metadata.insert("s3_bucket".to_string(), resp["bucket"].as_str().unwrap());
-    metadata.insert("s3_key".to_string(), resp["key"].as_str().unwrap());
+    let mut metadata: HashMap<String, String> = HashMap::new();
+    metadata.insert(
+        "s3_bucket".to_string(),
+        resp["bucket"].as_str().unwrap().to_string(),
+    );
+    metadata.insert(
+        "s3_key".to_string(),
+        resp["key"].as_str().unwrap().to_string(),
+    );
 
     let payload = serde_json::to_vec(&Payload {
         query_number: Some(query_number),
         datasource: DataSource::Payload(sync),
         uuid: serde_json::from_str(resp["uuid"].as_str().unwrap())?,
         encoding: serde_json::from_str(resp["encoding"].as_str().unwrap())?,
+        metadata: Some(metadata),
         ..Default::default()
     })?
     .into();
