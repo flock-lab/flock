@@ -34,54 +34,55 @@ use structopt::StructOpt;
 use tokio::task::JoinHandle;
 
 lazy_static! {
-    static ref FLOCK_S3_KEY: String = FLOCK_CONF["flock"]["s3_key"].to_string();
-    static ref FLOCK_S3_BUCKET: String = FLOCK_CONF["flock"]["s3_bucket"].to_string();
-    static ref FLOCK_S3_CLIENT: S3Client = S3Client::new(Region::default());
+    pub static ref FLOCK_S3_KEY: String = FLOCK_CONF["flock"]["s3_key"].to_string();
+    pub static ref FLOCK_S3_BUCKET: String = FLOCK_CONF["flock"]["s3_bucket"].to_string();
+    pub static ref FLOCK_S3_CLIENT: S3Client = S3Client::new(Region::default());
 
-    static ref FLOCK_EMPTY_PLAN: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(false, Arc::new(Schema::empty())));
-    static ref FLOCK_CONCURRENCY: usize = FLOCK_CONF["lambda"]["concurrency"].parse::<usize>().unwrap();
+    pub static ref FLOCK_EMPTY_PLAN: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(false, Arc::new(Schema::empty())));
+    pub static ref FLOCK_CONCURRENCY: usize = FLOCK_CONF["lambda"]["concurrency"].parse::<usize>().unwrap();
 
     // NEXMark Benchmark
-    static ref NEXMARK_BID: SchemaRef = Arc::new(Bid::schema());
-    static ref NEXMARK_PERSON: SchemaRef = Arc::new(Person::schema());
-    static ref NEXMARK_AUCTION: SchemaRef = Arc::new(Auction::schema());
-    static ref NEXMARK_SOURCE_FUNC_NAME: String = "flock_datasource".to_string();
-    static ref NEXMARK_SOURCE_LOG_GROUP: String = "/aws/lambda/flock_datasource".to_string();
-    static ref NEXMARK_Q4_S3_KEY: String = FLOCK_CONF["nexmark"]["q4_s3_key"].to_string();
-    static ref NEXMARK_Q6_S3_KEY: String = FLOCK_CONF["nexmark"]["q6_s3_key"].to_string();
+    pub static ref NEXMARK_BID: SchemaRef = Arc::new(Bid::schema());
+    pub static ref NEXMARK_PERSON: SchemaRef = Arc::new(Person::schema());
+    pub static ref NEXMARK_AUCTION: SchemaRef = Arc::new(Auction::schema());
+    pub static ref NEXMARK_SOURCE_FUNC_NAME: String = "flock_datasource".to_string();
+    pub static ref NEXMARK_SOURCE_LOG_GROUP: String = "/aws/lambda/flock_datasource".to_string();
+    pub static ref NEXMARK_Q4_S3_KEY: String = FLOCK_CONF["nexmark"]["q4_s3_key"].to_string();
+    pub static ref NEXMARK_Q6_S3_KEY: String = FLOCK_CONF["nexmark"]["q6_s3_key"].to_string();
 }
 
 #[derive(Default, Clone, Debug, StructOpt)]
-struct NexmarkBenchmarkOpt {
+pub struct NexmarkBenchmarkOpt {
     /// Query number
     #[structopt(short = "q", long = "query_number", default_value = "1")]
-    query_number: usize,
+    pub query_number: usize,
 
     /// Activate debug mode to see query results
     #[structopt(short, long)]
-    debug: bool,
+    pub debug: bool,
 
     /// Number of threads or generators of each test run
     #[structopt(short = "g", long = "generators", default_value = "100")]
-    generators: usize,
+    pub generators: usize,
 
     /// Number of threads to use for parallel execution
     #[structopt(short = "s", long = "seconds", default_value = "10")]
-    seconds: usize,
+    pub seconds: usize,
 
     /// Number of events generated among generators per second
     #[structopt(short = "e", long = "events_per_second", default_value = "100000")]
-    events_per_second: usize,
+    pub events_per_second: usize,
 
     /// The data sink type to use
     #[structopt(short = "d", long = "data_sink_type", default_value = "0")]
-    data_sink_type: usize,
+    pub data_sink_type: usize,
 
     /// The function invocation mode to use
     #[structopt(long = "async")]
-    async_type: bool,
+    pub async_type: bool,
 }
 
+#[allow(dead_code)]
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::init();
@@ -89,7 +90,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn register_nexmark_tables() -> Result<DataFusionExecutionContext> {
+pub async fn register_nexmark_tables() -> Result<DataFusionExecutionContext> {
     let mut ctx = DataFusionExecutionContext::new();
     let person_schema = Arc::new(Person::schema());
     let person_table = MemTable::try_new(
@@ -115,7 +116,7 @@ async fn register_nexmark_tables() -> Result<DataFusionExecutionContext> {
     Ok(ctx)
 }
 
-fn create_nexmark_source(opt: &NexmarkBenchmarkOpt) -> NEXMarkSource {
+pub fn create_nexmark_source(opt: &NexmarkBenchmarkOpt) -> NEXMarkSource {
     let window = match opt.query_number {
         0 | 1 | 2 | 3 | 4 | 6 | 9 | 13 => StreamWindow::ElementWise,
         5 => StreamWindow::HoppingWindow((10, 5)),
@@ -125,7 +126,7 @@ fn create_nexmark_source(opt: &NexmarkBenchmarkOpt) -> NEXMarkSource {
     NEXMarkSource::new(opt.seconds, opt.generators, opt.events_per_second, window)
 }
 
-async fn plan_placement(
+pub async fn plan_placement(
     query_number: usize,
     physcial_plan: Arc<dyn ExecutionPlan>,
 ) -> Result<(Arc<dyn ExecutionPlan>, Option<(String, String)>)> {
@@ -166,7 +167,7 @@ async fn plan_placement(
 /// Create lambda functions for a given NexMark query.
 /// The returned function is the worker group as a whole which will be executed
 /// by the NexmarkBenchmark data generator function.
-async fn create_nexmark_functions(
+pub async fn create_nexmark_functions(
     opt: NexmarkBenchmarkOpt,
     window: StreamWindow,
     physcial_plan: Arc<dyn ExecutionPlan>,
@@ -233,6 +234,7 @@ async fn create_nexmark_functions(
     Ok(next_func_name)
 }
 
+#[allow(dead_code)]
 async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
     info!(
         "Running the NEXMark benchmark with the following options: {:?}",
@@ -312,7 +314,7 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
 }
 
 /// Returns Nextmark query strings based on the query number.
-fn nexmark_query(query_number: usize) -> String {
+pub fn nexmark_query(query_number: usize) -> String {
     match query_number {
         0 => include_str!("query/q0.sql"),
         1 => include_str!("query/q1.sql"),

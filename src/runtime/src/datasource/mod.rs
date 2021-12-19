@@ -100,6 +100,8 @@ pub enum DataSource {
     Payload(FastAggregate),
     /// Data source for unit tests.
     Json,
+    /// AWS S3 for baseline benchmark.
+    S3(NEXMarkSource),
     /// Unknown data source.
     UnknownEvent,
 }
