@@ -121,7 +121,9 @@ pub async fn handler(
 
     let input_partitions = {
         if let Some((bucket, key)) = infer_s3_mode(&event.metadata) {
+            info!("Reading payload from S3...");
             let (r1, r2, _) = read_payload_from_s3(bucket, key).await?.to_record_batch();
+            info!("[OK] Received payload from S3.");
             (vec![r1], vec![r2])
         } else if match &ctx.next {
             CloudFunction::Sink(..) | CloudFunction::Lambda(..) => true,
