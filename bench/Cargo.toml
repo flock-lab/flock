@@ -35,3 +35,7 @@ path = "nexmark/main.rs"
 [[bin]]
 name = "ysb_bench"
 path = "ysb/main.rs"
+
+[[bin]]
+name = "s3_bench"
+path = "s3/main.rs"

@@ -14,6 +14,7 @@
 use arrow::record_batch::RecordBatch;
 use arrow::util::pretty::pretty_format_batches;
 use datafusion::physical_plan::Partitioning;
+use driver::deploy::common::*;
 use futures::executor::block_on;
 use hashring::HashRing;
 use lazy_static::lazy_static;
@@ -22,9 +23,11 @@ use rayon::prelude::*;
 use runtime::prelude::*;
 use rusoto_core::Region;
 use rusoto_lambda::{InvokeAsyncRequest, Lambda, LambdaClient};
+use rusoto_s3::{GetObjectRequest, S3};
 use serde_json::json;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::io::Read;
 
 lazy_static! {
     static ref CONCURRENCY: usize = FLOCK_CONF["lambda"]["concurrency"]
@@ -74,6 +77,29 @@ pub async fn collect(
     }
 }
 
+/// Read the payload from S3 via the S3 bucket and the key.
+async fn read_payload_from_s3(bucket: String, key: String) -> Result<Payload> {
+    let body = FLOCK_S3_CLIENT
+        .get_object(GetObjectRequest {
+            bucket,
+            key,
+            ..Default::default()
+        })
+        .await
+        .map_err(|e| FlockError::AWS(e.to_string()))?
+        .body
+        .take()
+        .expect("body is empty");
+    let payload: Payload = tokio::task::spawn_blocking(move || {
+        let mut buf = Vec::new();
+        body.into_blocking_read().read_to_end(&mut buf).unwrap();
+        serde_json::from_slice(&buf).unwrap()
+    })
+    .await
+    .expect("failed to load payload from S3");
+    Ok(payload)
+}
+
 /// The endpoint for worker function invocations. The worker function
 /// invocations are invoked by the data source generator or the former stage of
 /// the dataflow pipeline.
@@ -94,7 +120,12 @@ pub async fn handler(
     let tid = event.uuid.tid.clone();
 
     let input_partitions = {
-        if match &ctx.next {
+        if let Some((bucket, key)) = infer_s3_mode(&event.metadata) {
+            info!("Reading payload from S3...");
+            let (r1, r2, _) = read_payload_from_s3(bucket, key).await?.to_record_batch();
+            info!("[OK] Received payload from S3.");
+            (vec![r1], vec![r2])
+        } else if match &ctx.next {
             CloudFunction::Sink(..) | CloudFunction::Lambda(..) => true,
             CloudFunction::Group(..) => false,
         } {
@@ -110,8 +141,8 @@ pub async fn handler(
             }
         } else {
             // data packet is an individual event for the current function.
-            let (r1_records, r2_records, _) = event.to_record_batch();
-            (vec![r1_records], vec![r2_records])
+            let (r1, r2, _) = event.to_record_batch();
+            (vec![r1], vec![r2])
         }
     };
 
@@ -179,6 +210,7 @@ fn invoke_next_functions(ctx: &ExecutionContext, batches: &mut Vec<RecordBatch>)
     Ok(())
 }
 
+/// Infer the invocation mode of the function.
 pub fn infer_invocation_type(metadata: &Option<HashMap<String, String>>) -> Result<bool> {
     let mut sync = true;
     if let Some(metadata) = metadata {
@@ -191,6 +223,21 @@ pub fn infer_invocation_type(metadata: &Option<HashMap<String, String>>) -> Resu
     Ok(sync)
 }
 
+/// Infer the S3 communucation mode of the function.
+pub fn infer_s3_mode(metadata: &Option<HashMap<String, String>>) -> Option<(String, String)> {
+    if let Some(metadata) = metadata {
+        if let (Some(bucket), Some(key)) = (metadata.get("s3_bucket"), metadata.get("s3_key")) {
+            let bucket = bucket.parse::<String>().unwrap();
+            let key = key.parse::<String>().unwrap();
+            if !bucket.is_empty() && !key.is_empty() {
+                return Some((bucket, key));
+            }
+        }
+    }
+    None
+}
+
+/// Infer the actor information for the function invocation.
 pub fn infer_actor_info(
     metadata: &Option<HashMap<String, String>>,
 ) -> Result<(HashRing<String>, String)> {

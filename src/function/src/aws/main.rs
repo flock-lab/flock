@@ -15,6 +15,7 @@
 
 mod actor;
 mod nexmark;
+mod s3;
 mod window;
 mod ysb;
 
@@ -119,6 +120,7 @@ async fn handler(event: Payload, _: Context) -> Result<Value> {
         DataSource::Payload(_) => actor::handler(&mut ctx, &mut arena, event).await,
         DataSource::NEXMarkEvent(_) => nexmark::handler(ctx, event).await,
         DataSource::YSBEvent(_) => ysb::handler(ctx, event).await,
+        DataSource::S3(_) => s3::handler(ctx, event).await,
         _ => unimplemented!(),
     }
 }

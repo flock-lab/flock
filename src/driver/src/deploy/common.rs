@@ -38,10 +38,13 @@ lazy_static! {
     /// Flock async invocation granularity.
     pub static ref FLOCK_ASYNC_GRANULE_SIZE: usize = FLOCK_CONF["lambda"]["async_granule"].parse::<usize>().unwrap();
 
-    static ref FLOCK_S3_KEY: String = FLOCK_CONF["flock"]["s3_key"].to_string();
-    static ref FLOCK_S3_BUCKET: String = FLOCK_CONF["flock"]["s3_bucket"].to_string();
+    /// Flock s3 key prefix.
+    pub static ref FLOCK_S3_KEY: String = FLOCK_CONF["flock"]["s3_key"].to_string();
+    /// Flock S3 bucket name.
+    pub static ref FLOCK_S3_BUCKET: String = FLOCK_CONF["flock"]["s3_bucket"].to_string();
 
-    static ref FLOCK_S3_CLIENT: S3Client = S3Client::new(Region::default());
+    /// Flock's AWS S3 client.
+    pub static ref FLOCK_S3_CLIENT: S3Client = S3Client::new(Region::default());
     static ref FLOCK_LAMBDA_CLIENT: LambdaClient = LambdaClient::new(Region::default());
     static ref FLOCK_WATCHLOGS_CLIENT: CloudWatchLogsClient = CloudWatchLogsClient::new(Region::default());
 }
