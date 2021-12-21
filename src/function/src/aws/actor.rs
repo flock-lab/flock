@@ -12,7 +12,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use arrow::record_batch::RecordBatch;
-use arrow::util::pretty::pretty_format_batches;
 use datafusion::physical_plan::Partitioning;
 use driver::deploy::common::*;
 use futures::executor::block_on;
@@ -72,7 +71,11 @@ pub async fn collect(
     } else {
         ctx.feed_data_sources(&inputs).await?;
         let output = ctx.execute().await?;
-        info!("{}", pretty_format_batches(&output)?);
+        info!("[OK] The execution is finished.");
+        if !output.is_empty() {
+            info!("[Ok] Output schema: {:?}", output[0].schema());
+            info!("[Ok] Output row count: {}", output[0].num_rows());
+        }
         Ok(output)
     }
 }
