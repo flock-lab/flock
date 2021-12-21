@@ -80,6 +80,10 @@ pub struct NexmarkBenchmarkOpt {
     /// The function invocation mode to use
     #[structopt(long = "async")]
     pub async_type: bool,
+
+    /// The worker function's memory size
+    #[structopt(short = "m", long = "memory_size", default_value = "128")]
+    pub memory_size: i64,
 }
 
 #[allow(dead_code)]
@@ -213,7 +217,7 @@ pub async fn create_nexmark_functions(
     match &next_func_name {
         CloudFunction::Lambda(name) => {
             info!("Creating lambda function: {}", name);
-            create_lambda_function(&nexmark_worker_ctx, Some(128), opt.debug).await?;
+            create_lambda_function(&nexmark_worker_ctx, Some(opt.memory_size), opt.debug).await?;
         }
         CloudFunction::Group((name, concurrency)) => {
             info!(
@@ -224,7 +228,8 @@ pub async fn create_nexmark_functions(
                 let group_member_name = format!("{}-{:02}", name.clone(), i);
                 info!("Creating function member: {}", group_member_name);
                 nexmark_worker_ctx.name = group_member_name;
-                create_lambda_function(&nexmark_worker_ctx, Some(128), opt.debug).await?;
+                create_lambda_function(&nexmark_worker_ctx, Some(opt.memory_size), opt.debug)
+                    .await?;
                 set_lambda_concurrency(nexmark_worker_ctx.name, 1).await?;
             }
         }

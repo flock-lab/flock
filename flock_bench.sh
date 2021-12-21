@@ -21,7 +21,7 @@ Help() {
   # Display Help
   echo $(echogreen "A Benchmark Script for Flock")
   echo
-  echo "Syntax: flock_bench [-g|-h|-c|-r|-a [-b <bench_type>] [-d <data_sink_type>] [-q <query_id>] [-s <number_of_seconds>] [-e <events_per_second>] [-p <number_of_parallel_streams>]]"
+  echo "Syntax: flock_bench [-g|-h|-c|-r|-a [-b <bench_type>] [-d <data_sink_type>] [-q <query_id>] [-s <number_of_seconds>] [-e <events_per_second>] [-p <number_of_parallel_streams>] [-m <memory_size>]]"
   echo "options:"
   echo "g     Print the GPL license notification."
   echo "h     Print this Help."
@@ -34,6 +34,7 @@ Help() {
   echo "p     Number of Data Generators. Default: 1"
   echo "s     Seconds to run the benchmark. Default: 10"
   echo "e     Number of events per second. Default: 1000"
+  echo "m     The cloud function's memory size. Default: 128"
   echo
 }
 
@@ -96,6 +97,7 @@ Build_and_Deploy() {
 run="false"
 async="false"
 bench="nexmark"
+memory_size="128"
 data_sink=0
 generators=1
 events_per_second=1000
@@ -103,7 +105,7 @@ seconds=10
 query=5
 flock=$(<src/bin/cli/src/flock)
 # Get the options
-while getopts "hgcraq:b:d:p:s:e:" option; do
+while getopts "hgcraq:b:d:p:s:e:m:" option; do
   case $option in
   h) # display Help
     Help
@@ -141,6 +143,9 @@ while getopts "hgcraq:b:d:p:s:e:" option; do
   e) # set the number of events per second
     events_per_second=$OPTARG
     ;;
+  m) # set the memory size
+    memory_size=$OPTARG
+    ;;
   \?) # Invalid option
     echo $(echored "Error: Invalid option")
     echo
@@ -173,6 +178,12 @@ if [ $data_sink -gt 3 ] || [ $data_sink -lt 0 ]; then
   exit
 fi
 
+
+if [ $memory_size -gt 10240 ]; then
+  echo $(echored "Error: The cloud function's memory size must be less than 10GB.")
+  exit
+fi
+
 if [ "$run" = "true" ]; then
   echo "$flock"
   echo
@@ -186,6 +197,7 @@ if [ "$run" = "true" ]; then
   echo "Seconds to Run: $seconds"
   echo "Data Sink: $data_sink (ignored for YSB)"
   echo "Async Invoke: $async"
+  echo "Function Memory Size: $memory_size"
   echo $(echogreen "============================================================")
   echo
   echo $(echogreen "[OK] Benchmark Starting")
@@ -211,7 +223,7 @@ if [ "$run" = "true" ]; then
   echo $(echogreen "[1] Warming up the lambda functions")
   echo
   RUST_LOG=info ./target/x86_64-unknown-linux-gnu/release/$benchmark \
-    $query_args $sink_args $async_args -g $generators -s $seconds --events_per_second $events_per_second --debug
+    $query_args $sink_args $async_args -g $generators -s $seconds -m $memory_size --events_per_second $events_per_second --debug
   echo $(echoblue "-------------------------------------------------------------")
   echo
   sleep 2
@@ -220,7 +232,7 @@ if [ "$run" = "true" ]; then
   echo $(echogreen "[2] Running the benchmark")
   echo
   RUST_LOG=info ./target/x86_64-unknown-linux-gnu/release/$benchmark \
-    $query_args $sink_args $async_args -g $generators -s $seconds --events_per_second $events_per_second --debug
+    $query_args $sink_args $async_args -g $generators -s $seconds -m $memory_size --events_per_second $events_per_second --debug
   echo $(echoblue "-------------------------------------------------------------")
   echo
   echo $(echogreen "[OK] Nexmark Benchmark Complete")

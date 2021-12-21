@@ -27,12 +27,16 @@ use rusoto_lambda::{
 };
 use rusoto_logs::CloudWatchLogsClient;
 use rusoto_s3::S3Client;
+use std::time::Duration;
 
 lazy_static! {
     /// AWS Lambda function async invocation.
     pub static ref FLOCK_LAMBDA_ASYNC_CALL: String = "Event".to_string();
     /// AWS Lambda function sync invocation.
     pub static ref FLOCK_LAMBDA_SYNC_CALL: String = "RequestResponse".to_string();
+    /// AWS Lambda function maximum error retry.
+    pub static ref FLOCK_LAMBDA_MAX_RETRIES: usize = FLOCK_CONF["lambda"]["max_invoke_retries"].parse::<usize>().unwrap();
+
     /// Flock sync invocation granularity.
     pub static ref FLOCK_SYNC_GRANULE_SIZE: usize = FLOCK_CONF["lambda"]["sync_granule"].parse::<usize>().unwrap();
     /// Flock async invocation granularity.
@@ -102,26 +106,61 @@ pub async fn fetch_aws_watchlogs(group: &String, mtime: std::time::Duration) -> 
     Ok(())
 }
 
-/// Invoke the lambda function with the nexmark events.
+/// Invoke the lambda function with the given payload.
+///
+/// # Arguments
+/// * `function_name` - The name of the lambda function.
+/// * `payload` - The payload to be passed to the lambda function.
+/// * `invocation_type` - The invocation type of the lambda function.
+///   - `Event` - Asynchronous invocation.
+///   - `RequestResponse` - Synchronous invocation.
+///
+/// # Returns
+/// The result of the invocation.
 pub async fn invoke_lambda_function(
     function_name: String,
     payload: Option<Bytes>,
     invocation_type: String,
 ) -> Result<InvocationResponse> {
-    match FLOCK_LAMBDA_CLIENT
-        .invoke(InvocationRequest {
-            function_name,
-            payload,
-            invocation_type: Some(invocation_type),
-            ..Default::default()
-        })
-        .await
-    {
-        Ok(response) => Ok(response),
-        Err(err) => Err(FlockError::Execution(format!(
-            "Lambda function execution failure: {}",
-            err
-        ))),
+    let request = InvocationRequest {
+        function_name,
+        payload,
+        invocation_type: Some(invocation_type.clone()),
+        ..Default::default()
+    };
+
+    if invocation_type == *FLOCK_LAMBDA_ASYNC_CALL {
+        let response = FLOCK_LAMBDA_CLIENT
+            .invoke(request)
+            .await
+            .map_err(|e| FlockError::AWS(e.to_string()))?;
+        Ok(response)
+    } else {
+        // Error retries and exponential backoff in AWS Lambda
+        let mut retries = 0;
+        loop {
+            let response = FLOCK_LAMBDA_CLIENT
+                .invoke(request.clone())
+                .await
+                .map_err(|e| FlockError::AWS(e.to_string()))?;
+            if response.function_error.is_none() {
+                return Ok(response);
+            }
+            if retries > 0 {
+                info!("Retrying invocation...");
+            }
+
+            tokio::time::sleep(Duration::from_millis(2_u64.pow(retries) * 100)).await;
+
+            retries += 1;
+
+            if retries as usize > *FLOCK_LAMBDA_MAX_RETRIES {
+                return Err(FlockError::AWS(format!(
+                    "Sync invocation failed after {} retries",
+                    *FLOCK_LAMBDA_MAX_RETRIES
+                )));
+            }
+        }
     }
 }
 

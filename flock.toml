@@ -29,6 +29,9 @@ regular_threshold = 20971520
 async_granule = 3096
 sync_granule = 74304
 
+# error retries and exponential backoff in AWS Lambda
+max_invoke_retries = 10
+
 [nexmark]
 
 s3_key = "nexmark"
