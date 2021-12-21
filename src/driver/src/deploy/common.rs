@@ -27,6 +27,7 @@ use rusoto_lambda::{
 };
 use rusoto_logs::CloudWatchLogsClient;
 use rusoto_s3::S3Client;
+use std::time::Duration;
 
 lazy_static! {
     /// AWS Lambda function async invocation.
@@ -148,7 +149,9 @@ pub async fn invoke_lambda_function(
             if retries > 0 {
                 info!("Retrying invocation...");
             }
-            tokio::time::sleep(std::time::Duration::from_secs(2u64.pow(retries))).await;
+
+            tokio::time::sleep(Duration::from_millis(2_u64.pow(retries) * 100)).await;
+
             retries += 1;
 
             if retries as usize > *FLOCK_LAMBDA_MAX_RETRIES {
