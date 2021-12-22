@@ -12,13 +12,14 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use arrow::record_batch::RecordBatch;
-use datafusion::physical_plan::Partitioning;
+use datafusion::physical_plan::Partitioning::RoundRobinBatch;
 use driver::deploy::common::*;
 use futures::executor::block_on;
 use hashring::HashRing;
 use lazy_static::lazy_static;
 use log::{info, warn};
 use rayon::prelude::*;
+use runtime::executor::LambdaExecutor as executor;
 use runtime::prelude::*;
 use rusoto_core::Region;
 use rusoto_lambda::{InvokeAsyncRequest, Lambda, LambdaClient};
@@ -27,6 +28,7 @@ use serde_json::json;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::io::Read;
+use std::sync::{Arc, Mutex};
 
 lazy_static! {
     static ref CONCURRENCY: usize = FLOCK_CONF["lambda"]["concurrency"]
@@ -51,25 +53,52 @@ lazy_static! {
 /// A vector of Arrow RecordBatch.
 pub async fn collect(
     ctx: &mut ExecutionContext,
-    r1_records: Vec<Vec<RecordBatch>>,
-    r2_records: Vec<Vec<RecordBatch>>,
+    partitions: Vec<Vec<Vec<RecordBatch>>>,
 ) -> Result<Vec<RecordBatch>> {
-    let mut inputs = vec![];
-    if !(r1_records.is_empty() || r1_records.iter().all(|r| r.is_empty())) {
-        inputs.push(
-            LambdaExecutor::repartition(r1_records, Partitioning::RoundRobinBatch(16)).await?,
-        );
-    }
-    if !(r2_records.is_empty() || r2_records.iter().all(|r| r.is_empty())) {
-        inputs.push(
-            LambdaExecutor::repartition(r2_records, Partitioning::RoundRobinBatch(16)).await?,
-        );
+    let inputs = Arc::new(Mutex::new(vec![]));
+
+    info!("Repartitioning the input data before execution.");
+    let tasks = partitions
+        .into_iter()
+        .map(|batches| {
+            let input = inputs.clone();
+            tokio::spawn(async move {
+                if !(batches.is_empty() || batches.iter().all(|r| r.is_empty())) {
+                    if batches.len() != 1 {
+                        let output = executor::repartition(batches, RoundRobinBatch(1)).await?;
+                        assert_eq!(1, output.len());
+                        info!(
+                            "Input record size: {}.",
+                            output[0].par_iter().map(|r| r.num_rows()).sum::<usize>()
+                        );
+                        let output = executor::coalesce_batches(output, 1024).await?;
+                        let output = executor::repartition(output, RoundRobinBatch(16)).await?;
+                        input.lock().unwrap().push(output);
+                    } else {
+                        info!(
+                            "Input record size: {}.",
+                            batches[0].par_iter().map(|r| r.num_rows()).sum::<usize>()
+                        );
+                        let output = executor::repartition(batches, RoundRobinBatch(16)).await?;
+                        input.lock().unwrap().push(output);
+                    }
+                }
+                Ok(())
+            })
+        })
+        .collect::<Vec<tokio::task::JoinHandle<Result<()>>>>();
+
+    for task in tasks {
+        task.await.expect("Failed to repartition the input.")?;
     }
 
-    if inputs.is_empty() {
+    let input_partitions = Arc::try_unwrap(inputs).unwrap().into_inner().unwrap();
+
+    info!("Executing the physical plan.");
+    if input_partitions.is_empty() {
         Ok(vec![])
     } else {
-        ctx.feed_data_sources(&inputs).await?;
+        ctx.feed_data_sources(&input_partitions).await?;
         let output = ctx.execute().await?;
         info!("[OK] The execution is finished.");
         if !output.is_empty() {
@@ -125,9 +154,14 @@ pub async fn handler(
     let input_partitions = {
         if let Some((bucket, key)) = infer_s3_mode(&event.metadata) {
             info!("Reading payload from S3...");
-            let (r1, r2, _) = read_payload_from_s3(bucket, key).await?.to_record_batch();
+            let payload = read_payload_from_s3(bucket, key).await?;
             info!("[OK] Received payload from S3.");
-            (vec![r1], vec![r2])
+
+            info!("Parsing payload to input partitions...");
+            let (r1, r2, _) = payload.to_record_batch();
+            info!("[OK] Parsed payload.");
+
+            vec![vec![r1], vec![r2]]
         } else if match &ctx.next {
             CloudFunction::Sink(..) | CloudFunction::Lambda(..) => true,
             CloudFunction::Group(..) => false,
@@ -145,11 +179,11 @@ pub async fn handler(
         } else {
             // data packet is an individual event for the current function.
             let (r1, r2, _) = event.to_record_batch();
-            (vec![r1], vec![r2])
+            vec![vec![r1], vec![r2]]
         }
     };
 
-    let output = collect(ctx, input_partitions.0, input_partitions.1).await?;
+    let output = collect(ctx, input_partitions).await?;
 
     match &ctx.next {
         CloudFunction::Sink(sink_type) => {
@@ -163,7 +197,7 @@ pub async fn handler(
             }
         }
         _ => {
-            let mut batches = LambdaExecutor::coalesce_batches(
+            let mut batches = executor::coalesce_batches(
                 vec![output],
                 FLOCK_CONF["lambda"]["payload_batch_size"]
                     .parse::<usize>()

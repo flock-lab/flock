@@ -114,6 +114,12 @@ impl From<base64::DecodeError> for FlockError {
     }
 }
 
+impl From<&str> for FlockError {
+    fn from(e: &str) -> Self {
+        FlockError::Internal(e.to_string())
+    }
+}
+
 impl Display for FlockError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match *self {

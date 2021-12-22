@@ -77,11 +77,11 @@ impl Arena {
     }
 
     /// Get the data fragments in the temporal window via the key.
-    pub fn batches(&mut self, tid: String) -> (Vec<Vec<RecordBatch>>, Vec<Vec<RecordBatch>>) {
+    pub fn batches(&mut self, tid: String) -> Vec<Vec<Vec<RecordBatch>>> {
         if let Some((_, window)) = (*self).remove(&tid) {
-            (window.r1_records, window.r2_records)
+            vec![window.r1_records, window.r2_records]
         } else {
-            (vec![], vec![])
+            vec![vec![], vec![]]
         }
     }
 
@@ -205,8 +205,8 @@ mod tests {
             (0..8).for_each(|i| assert!(window.bitmap.is_set(i)));
         }
 
-        assert_eq!(8, arena.batches(tid).0.len());
-        assert_eq!(0, arena.batches("no exists".to_string()).0.len());
+        assert_eq!(8, arena.batches(tid)[0].len());
+        assert_eq!(0, arena.batches("no exists".to_string())[0].len());
 
         Ok(())
     }

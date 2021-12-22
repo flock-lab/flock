@@ -71,11 +71,11 @@ Build_and_Deploy() {
   echo
   echo $(echogreen "[1] Compiling Flock's Generic Lambda Function...")
   cd src/function
-  cargo +nightly build --target x86_64-unknown-linux-gnu --release
+  cargo +nightly build --target x86_64-unknown-linux-gnu --release --features "arrow/simd datafusion/simd mimalloc"
   echo
   echo $(echogreen "[2] Compiling the Benchmark Client ...")
   cd ../../bench
-  cargo +nightly build --target x86_64-unknown-linux-gnu --release
+  cargo +nightly build --target x86_64-unknown-linux-gnu --release --features "arrow/simd datafusion/simd mimalloc"
   echo
   echo $(echogreen "[3] Compiling Flock CLI...")
   cd ../src/bin/cli
@@ -219,17 +219,8 @@ if [ "$run" = "true" ]; then
     async_args=""
   fi
 
-  # dry run to warm up the lambda functions.
-  echo $(echogreen "[1] Warming up the lambda functions")
-  echo
-  RUST_LOG=info ./target/x86_64-unknown-linux-gnu/release/$benchmark \
-    $query_args $sink_args $async_args -g $generators -s $seconds -m $memory_size --events_per_second $events_per_second --debug
-  echo $(echoblue "-------------------------------------------------------------")
-  echo
-  sleep 2
-
   # run the benchmark
-  echo $(echogreen "[2] Running the benchmark")
+  echo $(echogreen "[1] Running the benchmark")
   echo
   RUST_LOG=info ./target/x86_64-unknown-linux-gnu/release/$benchmark \
     $query_args $sink_args $async_args -g $generators -s $seconds -m $memory_size --events_per_second $events_per_second --debug
