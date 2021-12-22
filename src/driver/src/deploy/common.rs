@@ -147,6 +147,12 @@ pub async fn invoke_lambda_function(
                 return Ok(response);
             }
             if retries > 0 {
+                if response.payload.is_some() {
+                    info!(
+                        "Function invocation error: {:?}",
+                        serde_json::from_slice::<serde_json::Value>(&response.payload.unwrap())
+                    );
+                }
                 info!("Retrying invocation...");
             }
 
