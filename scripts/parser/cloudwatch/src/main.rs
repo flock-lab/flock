@@ -32,6 +32,12 @@ struct CloudWatchLogOpt {
     // Output file path.
     #[structopt(short = "o", long = "output", default_value = "agg_latency/log.csv")]
     _output: String,
+    // Start time.
+    #[structopt(short = "s", long = "start", default_value = "")]
+    start:   String,
+    // End time.
+    #[structopt(short = "e", long = "end", default_value = "")]
+    end:     String,
 }
 
 // The output is wrapped in a Result to allow matching on errors
@@ -128,25 +134,45 @@ fn main() -> Result<()> {
     env_logger::init();
 
     let opt = CloudWatchLogOpt::from_args();
-    let input = opt.path;
 
-    if !Path::new(&input).exists() {
-        bail!("The log file ({}) doesn't exist.", input);
-    }
+    if !opt.start.is_empty() && !opt.end.is_empty() {
+        info!("Caculating the time interval");
+        let start_time: SystemTime = opt.start[0..opt.start.rfind('-').unwrap()]
+            .to_string()
+            .parse::<humantime::Timestamp>()
+            .unwrap()
+            .into();
+        let end_time: SystemTime = opt.end[0..opt.end.rfind('-').unwrap()]
+            .to_string()
+            .parse::<humantime::Timestamp>()
+            .unwrap()
+            .into();
+        let difference = end_time.duration_since(start_time)?;
+        info!(
+            "The time interval is {} milliseconds",
+            difference.as_millis()
+        );
+    } else {
+        let input = opt.path;
 
-    // filter lines that contain "START" and "END"
-    let mut log_lines = Vec::new();
-    if let Ok(lines) = read_lines(input) {
-        for line in lines.flatten() {
-            if line.contains("START") || line.contains("END") {
-                log_lines.push(line);
+        if !Path::new(&input).exists() {
+            bail!("The log file ({}) doesn't exist.", input);
+        }
+
+        // filter lines that contain "START" and "END"
+        let mut log_lines = Vec::new();
+        if let Ok(lines) = read_lines(input) {
+            for line in lines.flatten() {
+                if line.contains("START") || line.contains("END") {
+                    log_lines.push(line);
+                }
             }
         }
-    }
 
-    compute_time(&log_lines)?;
-    invoke_intervals(&log_lines)?;
-    total_time(&log_lines)?;
+        compute_time(&log_lines)?;
+        invoke_intervals(&log_lines)?;
+        total_time(&log_lines)?;
+    }
 
     Ok(())
 }
