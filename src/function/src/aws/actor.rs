@@ -188,7 +188,7 @@ pub async fn handler(
     match &ctx.next {
         CloudFunction::Sink(sink_type) => {
             info!("[Ok] Sinking data to {:?}", sink_type);
-            if !output.is_empty() {
+            if !output.is_empty() && DataSinkType::Empty != *sink_type {
                 DataSink::new(ctx.name.clone(), output, Encoding::default())
                     .write(sink_type.clone())
                     .await
