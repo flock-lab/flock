@@ -15,7 +15,6 @@
 
 use driver::deploy::flock;
 use lazy_static::lazy_static;
-use log::info;
 use runtime::prelude::*;
 use rusoto_core::Region;
 use rusoto_lambda::{
@@ -23,7 +22,6 @@ use rusoto_lambda::{
     Lambda, LambdaClient, PutFunctionConcurrencyRequest, UpdateFunctionCodeRequest,
 };
 use serde_json::json;
-use serde_json::Value;
 use structopt::StructOpt;
 
 lazy_static! {
@@ -144,31 +142,7 @@ async fn invoke_function(func_name: &'static str, num_events: usize) -> Result<(
         // this collect *is needed* so that the join below can switch between tasks.
         .collect::<Vec<tokio::task::JoinHandle<Result<InvocationResponse>>>>();
 
-    for task in tasks {
-        // The HTTP status code is in the 200 range for a successful request.
-        // - For the RequestResponse invocation type, this status code is 200.
-        // - For the Event invocation type, this status code is 202.
-        // - For the DryRun invocation type, the status code is 204.
-        let response = task.await.expect("Lambda function execution failed.")?;
-        match response.status_code {
-            Some(200) => {
-                info!(
-                    "{:?}",
-                    serde_json::from_slice::<Value>(&response.payload.ok_or_else(|| {
-                        FlockError::Internal(
-                            "Failed to parse the payload of the function response.".to_string(),
-                        )
-                    })?)?
-                );
-            }
-            Some(202) => {
-                info!(" [OK] Received status from async lambda function.");
-            }
-            _ => {
-                panic!("Incorrect Lambda invocation!");
-            }
-        }
-    }
+    futures::future::join_all(tasks).await;
 
     Ok(())
 }

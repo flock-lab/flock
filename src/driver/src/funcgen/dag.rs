@@ -315,7 +315,7 @@ mod tests {
         let sql = "SELECT MAX(c1), MIN(c2), c3 FROM aggregate_test_100 WHERE c2 < 99 GROUP BY c3";
         let logical_plan = ctx.create_logical_plan(sql)?;
         let logical_plan = ctx.optimize(&logical_plan)?;
-        let physical_plan = ctx.create_physical_plan(&logical_plan)?;
+        let physical_plan = ctx.create_physical_plan(&logical_plan).await?;
 
         let serialized = serde_json::to_string(&physical_plan).unwrap();
 
@@ -526,35 +526,35 @@ mod tests {
     #[tokio::test]
     async fn simple_select() -> Result<()> {
         let sql = concat!("SELECT c1 FROM test_table");
-        quick_init(sql)?;
+        quick_init(sql).await?;
         Ok(())
     }
 
     #[tokio::test]
     async fn select_alias() -> Result<()> {
         let sql = concat!("SELECT c1 as col_1 FROM test_table");
-        quick_init(sql)?;
+        quick_init(sql).await?;
         Ok(())
     }
 
     #[tokio::test]
     async fn cast() -> Result<()> {
         let sql = concat!("SELECT CAST(c2 AS int) FROM test_table");
-        quick_init(sql)?;
+        quick_init(sql).await?;
         Ok(())
     }
 
     #[tokio::test]
     async fn math() -> Result<()> {
         let sql = concat!("SELECT c1+c2 FROM test_table");
-        quick_init(sql)?;
+        quick_init(sql).await?;
         Ok(())
     }
 
     #[tokio::test]
     async fn math_sqrt() -> Result<()> {
         let sql = concat!("SELECT c1>=c2 FROM test_table");
-        quick_init(sql)?;
+        quick_init(sql).await?;
         Ok(())
     }
 
@@ -563,7 +563,7 @@ mod tests {
     #[tokio::test]
     async fn filter_query() -> Result<()> {
         let sql = concat!("SELECT c1, c2 FROM test_table WHERE c2 < 99");
-        quick_init(sql)?;
+        quick_init(sql).await?;
         Ok(())
     }
 
@@ -571,7 +571,7 @@ mod tests {
     #[tokio::test]
     async fn filter_select_all() -> Result<()> {
         let sql = concat!("SELECT * FROM test_table WHERE c2 < 99");
-        quick_init(sql)?;
+        quick_init(sql).await?;
         Ok(())
     }
 
@@ -580,10 +580,10 @@ mod tests {
     #[tokio::test]
     async fn aggregate_query_no_group_by_count_distinct_wide() -> Result<()> {
         let sql = concat!("SELECT COUNT(DISTINCT c1) FROM test_table");
-        let dag = &mut quick_init(sql)?;
+        let dag = &mut quick_init(sql).await?;
 
-        assert_eq!(2, dag.node_count());
-        assert_eq!(1, dag.edge_count());
+        assert_eq!(3, dag.node_count());
+        assert_eq!(2, dag.edge_count());
 
         let mut iter = dag.node_weights_mut();
         let mut subplan = iter.next().unwrap();
@@ -602,13 +602,21 @@ mod tests {
             .get_plan_str()
             .contains(r#"execution_plan":"memory_exec"#));
 
+        subplan = iter.next().unwrap();
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"hash_aggregate_exec","mode":"Partial"#));
+        assert!(subplan
+            .get_plan_str()
+            .contains(r#"execution_plan":"memory_exec"#));
+
         Ok(())
     }
 
     #[tokio::test]
     async fn aggregate_query_no_group_by() -> Result<()> {
         let sql = concat!("SELECT MIN(c1), AVG(c4), COUNT(c3) FROM test_table");
-        quick_init(sql)?;
+        quick_init(sql).await?;
         Ok(())
     }
 
@@ -621,7 +629,7 @@ mod tests {
             "FROM test_table ",
             "GROUP BY c3"
         );
-        let dag = &mut quick_init(sql)?;
+        let dag = &mut quick_init(sql).await?;
 
         assert_eq!(2, dag.node_count());
         assert_eq!(1, dag.edge_count());
@@ -654,7 +662,7 @@ mod tests {
     #[tokio::test]
     async fn sort() -> Result<()> {
         let sql = concat!("SELECT c1, c2, c3 ", "FROM test_table ", "ORDER BY c1 ");
-        quick_init(sql)?;
+        quick_init(sql).await?;
         Ok(())
     }
 
@@ -668,7 +676,7 @@ mod tests {
             "ORDER BY c1 ",
             "LIMIT 4"
         );
-        quick_init(sql)?;
+        quick_init(sql).await?;
         Ok(())
     }
 
@@ -681,7 +689,7 @@ mod tests {
             "FROM test_table ",
             "WHERE c2 < 99"
         );
-        let dag = &mut quick_init(sql)?;
+        let dag = &mut quick_init(sql).await?;
 
         assert_eq!(2, dag.node_count());
         assert_eq!(1, dag.edge_count());
@@ -724,7 +732,7 @@ mod tests {
             "WHERE c2 < 101 AND c1 > 91 ",
             "GROUP BY c3"
         );
-        let dag = &mut quick_init(sql)?;
+        let dag = &mut quick_init(sql).await?;
 
         assert_eq!(2, dag.node_count());
         assert_eq!(1, dag.edge_count());
@@ -770,7 +778,7 @@ mod tests {
             "ORDER BY c3 ",
             "LIMIT 3"
         );
-        let dag = &mut quick_init(sql)?;
+        let dag = &mut quick_init(sql).await?;
 
         assert_eq!(2, dag.node_count());
         assert_eq!(1, dag.edge_count());
@@ -810,7 +818,7 @@ mod tests {
         Ok(())
     }
 
-    fn quick_init(sql: &str) -> Result<QueryDag> {
+    async fn quick_init(sql: &str) -> Result<QueryDag> {
         let schema = Arc::new(Schema::new(vec![
             Field::new("c1", DataType::Int64, false),
             Field::new("c2", DataType::Float64, false),
@@ -854,7 +862,7 @@ mod tests {
 
         let logical_plan = ctx.create_logical_plan(sql)?;
         let optimized_plan = ctx.optimize(&logical_plan)?;
-        let physical_plan = ctx.create_physical_plan(&optimized_plan)?;
+        let physical_plan = ctx.create_physical_plan(&optimized_plan).await?;
         println!("{}", serde_json::to_string(&physical_plan)?);
         Ok(QueryDag::from(&physical_plan))
     }
@@ -904,7 +912,7 @@ mod tests {
 
         let plan = ctx.create_logical_plan(sql)?;
         let plan = ctx.optimize(&plan)?;
-        let plan = ctx.create_physical_plan(&plan)?;
+        let plan = ctx.create_physical_plan(&plan).await?;
 
         //       +-----------------+
         //       |global_limit_exec|

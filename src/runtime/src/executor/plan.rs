@@ -74,8 +74,11 @@ query_has_op_function!(HashJoinExec, contain_join);
 query_has_op_function!(HashAggregateExec, contain_aggregate);
 
 /// Planning phase and return the execution plan.
-pub fn physical_plan(ctx: &mut ExecutionContext, sql: &str) -> Result<Arc<dyn ExecutionPlan>> {
+pub async fn physical_plan(
+    ctx: &mut ExecutionContext,
+    sql: &str,
+) -> Result<Arc<dyn ExecutionPlan>> {
     let logical_plan = ctx.create_logical_plan(sql)?;
     let logical_plan = ctx.optimize(&logical_plan)?;
-    Ok(ctx.create_physical_plan(&logical_plan)?)
+    Ok(ctx.create_physical_plan(&logical_plan).await?)
 }

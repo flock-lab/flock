@@ -61,7 +61,7 @@ mod tests {
                             ROW_NUMBER()
                             OVER (
                                 partition BY seller
-                                ORDER BY b_date_time DESC) time_rank
+                                ORDER BY b_date_time DESC) AS time_rank
                     FROM   (SELECT  seller,
                                     a_id,
                                     price,
@@ -69,14 +69,14 @@ mod tests {
                                     ROW_NUMBER()
                                     OVER (
                                         partition BY a_id
-                                        ORDER BY price DESC) price_rank
+                                        ORDER BY price DESC) AS price_rank
                             FROM    auction
                                     INNER JOIN bid
                                             ON a_id = auction
                             WHERE   b_date_time BETWEEN a_date_time AND expires
                             ORDER   BY a_id,
-                                    price DESC)
-                    WHERE   price_rank = 1)
+                                    price DESC) AS Q
+                    WHERE   price_rank = 1) AS R
             WHERE   time_rank <= 10
             GROUP   BY seller
         "};
@@ -98,13 +98,15 @@ mod tests {
             // register memory tables
             let mut ctx = datafusion::execution::context::ExecutionContext::new();
             let auction_table = MemTable::try_new(auction_schema.clone(), vec![auctions_batches])?;
+            ctx.deregister_table("auction")?;
             ctx.register_table("auction", Arc::new(auction_table))?;
 
             let bid_table = MemTable::try_new(bid_schema.clone(), vec![bids_batches])?;
+            ctx.deregister_table("bid")?;
             ctx.register_table("bid", Arc::new(bid_table))?;
 
             // optimize query plan and execute it
-            let plan = physical_plan(&mut ctx, sql)?;
+            let plan = physical_plan(&mut ctx, sql).await?;
             let output_partitions = collect(plan).await?;
 
             // show output

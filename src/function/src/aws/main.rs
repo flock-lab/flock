@@ -114,10 +114,10 @@ macro_rules! init_exec_context {
 }
 
 async fn handler(event: Payload, _: Context) -> Result<Value> {
-    let (mut ctx, mut arena) = init_exec_context!();
+    let (ctx, arena) = init_exec_context!();
 
     match &event.datasource {
-        DataSource::Payload(_) => actor::handler(&mut ctx, &mut arena, event).await,
+        DataSource::Payload(_) => actor::handler(ctx, arena, event).await,
         DataSource::NEXMarkEvent(_) => nexmark::handler(ctx, event).await,
         DataSource::YSBEvent(_) => ysb::handler(ctx, event).await,
         DataSource::S3(_) => s3::handler(ctx, event).await,

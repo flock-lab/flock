@@ -158,7 +158,7 @@ mod tests {
 
         let plan = ctx.create_logical_plan(sql)?;
         let plan = ctx.optimize(&plan)?;
-        let plan = ctx.create_physical_plan(&plan)?;
+        let plan = ctx.create_physical_plan(&plan).await?;
 
         for en in [Encoding::Snappy, Encoding::Lz4, Encoding::Zstd].iter() {
             let json = serde_json::to_string(&plan).unwrap();

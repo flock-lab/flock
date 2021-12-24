@@ -81,7 +81,7 @@ mod tests {
             ctx.register_table("campaigns", Arc::new(campaign_table))?;
 
             // optimize query plan and execute it
-            let physical_plan = physical_plan(&mut ctx, sql)?;
+            let physical_plan = physical_plan(&mut ctx, sql).await?;
             let output = collect(physical_plan).await?;
 
             // show output

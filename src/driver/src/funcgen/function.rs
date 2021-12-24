@@ -211,7 +211,7 @@ mod tests {
 
         ctx.register_table("t", Arc::new(table))?;
 
-        let plan = physical_plan(&mut ctx, sql)?;
+        let plan = physical_plan(&mut ctx, sql).await?;
         let query: Box<dyn Query> = Box::new(StreamQuery {
             ansi_sql: sql.to_string(),
             schema,

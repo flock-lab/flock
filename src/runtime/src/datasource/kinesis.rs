@@ -127,6 +127,7 @@ mod test {
     use super::*;
 
     #[test]
+    #[ignore]
     fn example_kinesis_event() {
         let data = include_bytes!("../../../test/data/example-kinesis-event.json");
         let parsed: KinesisEvent = serde_json::from_slice(data).unwrap();

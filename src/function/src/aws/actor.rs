@@ -88,9 +88,7 @@ pub async fn collect(
         })
         .collect::<Vec<tokio::task::JoinHandle<Result<()>>>>();
 
-    for task in tasks {
-        task.await.expect("Failed to repartition the input.")?;
-    }
+    futures::future::join_all(tasks).await;
 
     let input_partitions = Arc::try_unwrap(inputs).unwrap().into_inner().unwrap();
 

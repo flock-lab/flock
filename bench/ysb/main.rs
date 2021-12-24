@@ -156,7 +156,7 @@ async fn benchmark(opt: YSBBenchmarkOpt) -> Result<()> {
     let ysb_conf = create_ysb_source(&opt);
 
     let mut ctx = register_ysb_tables().await?;
-    let plan = physical_plan(&mut ctx, &ysb_query())?;
+    let plan = physical_plan(&mut ctx, &ysb_query()).await?;
     let root_actor = create_ysb_functions(opt.clone(), plan).await?;
 
     // The source generator function needs the metadata to determine the type of the
@@ -197,10 +197,7 @@ async fn benchmark(opt: YSBBenchmarkOpt) -> Result<()> {
         // this collect *is needed* so that the join below can switch between tasks.
         .collect::<Vec<JoinHandle<Result<InvocationResponse>>>>();
 
-    for task in tasks {
-        let response = task.await.expect("Lambda function execution failed.")?;
-        info!("[OK] Received status from function. {:?}", response);
-    }
+    futures::future::join_all(tasks).await;
 
     info!("Waiting for the current invocations to be logged.");
     tokio::time::sleep(parse_duration("5s").unwrap()).await;
@@ -235,7 +232,7 @@ mod tests {
 
         let sql = ysb_query();
         let mut ctx = register_ysb_tables().await?;
-        let plan = physical_plan(&mut ctx, &sql)?;
+        let plan = physical_plan(&mut ctx, &sql).await?;
         let mut flock_ctx = ExecutionContext {
             plan,
             ..Default::default()

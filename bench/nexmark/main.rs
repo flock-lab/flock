@@ -249,7 +249,7 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
     let query_number = opt.query_number;
 
     let mut ctx = register_nexmark_tables().await?;
-    let plan = physical_plan(&mut ctx, &nexmark_query(query_number))?;
+    let plan = physical_plan(&mut ctx, &nexmark_query(query_number)).await?;
     let root_actor =
         create_nexmark_functions(opt.clone(), nexmark_conf.window.clone(), plan).await?;
 
@@ -292,10 +292,7 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
         // this collect *is needed* so that the join below can switch between tasks.
         .collect::<Vec<JoinHandle<Result<InvocationResponse>>>>();
 
-    for task in tasks {
-        let response = task.await.expect("Lambda function execution failed.")?;
-        info!("[OK] Received status from function. {:?}", response);
-    }
+    futures::future::join_all(tasks).await;
 
     info!("Waiting for the current invocations to be logged.");
     tokio::time::sleep(parse_duration("5s").unwrap()).await;
@@ -366,7 +363,7 @@ mod tests {
         ];
         let mut ctx = register_nexmark_tables().await?;
         for sql in sqls {
-            let plan = physical_plan(&mut ctx, &sql)?;
+            let plan = physical_plan(&mut ctx, &sql).await?;
             let mut flock_ctx = ExecutionContext {
                 plan,
                 ..Default::default()

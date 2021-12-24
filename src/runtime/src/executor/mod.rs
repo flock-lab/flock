@@ -314,7 +314,10 @@ mod tests {
         )
         .await?;
 
-        let total_rows: usize = output_partitions.iter().map(|x| x.len()).sum();
+        let total_rows: usize = output_partitions
+            .iter()
+            .map(|x| x.iter().map(|x| x.num_rows()).sum::<usize>())
+            .sum();
 
         assert_eq!(8, output_partitions.len());
         assert_eq!(total_rows, 8 * 50 * 3);
@@ -370,6 +373,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn next_function() -> Result<()> {
         let input = include_str!("../../../test/data/example-kinesis-event-1.json");
         let input: KinesisEvent = serde_json::from_str(input).unwrap();
@@ -383,7 +387,7 @@ mod tests {
         let sql = "SELECT MAX(c1), MIN(c2), c3 FROM test WHERE c2 < 99 GROUP BY c3";
         let logical_plan = ctx.create_logical_plan(sql)?;
         let logical_plan = ctx.optimize(&logical_plan)?;
-        let physical_plan = ctx.create_physical_plan(&logical_plan)?;
+        let physical_plan = ctx.create_physical_plan(&logical_plan).await?;
 
         // Serialize the physical plan and skip its record batches
         let plan = serde_json::to_string(&physical_plan)?;

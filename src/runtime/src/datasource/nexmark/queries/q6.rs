@@ -104,15 +104,17 @@ mod tests {
             // register memory tables
             let mut ctx = datafusion::execution::context::ExecutionContext::new();
             let auction_table = MemTable::try_new(auction_schema.clone(), vec![auctions_batches])?;
+            ctx.deregister_table("auction")?;
             ctx.register_table("auction", Arc::new(auction_table))?;
 
             let bid_table = MemTable::try_new(bid_schema.clone(), vec![bids_batches])?;
+            ctx.deregister_table("bid")?;
             ctx.register_table("bid", Arc::new(bid_table))?;
 
             // optimize query plan and execute it
 
             // 1. get the total distinct sellers during the epoch
-            let plan = physical_plan(&mut ctx, sql1)?;
+            let plan = physical_plan(&mut ctx, sql1).await?;
             let batches = collect(plan).await?;
             let total_distinct_sellers = batches[0]
                 .column(0)
@@ -122,7 +124,7 @@ mod tests {
                 .value(0);
 
             // 2. get the max price of auctions for each seller
-            let plan = physical_plan(&mut ctx, sql2)?;
+            let plan = physical_plan(&mut ctx, sql2).await?;
             let batches = collect_partitioned(plan).await?;
             let batches = repartition(
                 batches,
@@ -145,8 +147,9 @@ mod tests {
             // 4. the average selling price per seller for their last 10 closed auctions.
             let q_table =
                 MemTable::try_new(output_partitions[0].schema(), vec![output_partitions])?;
+            ctx.deregister_table("Q")?;
             ctx.register_table("Q", Arc::new(q_table))?;
-            let plan = physical_plan(&mut ctx, sql3)?;
+            let plan = physical_plan(&mut ctx, sql3).await?;
             let output_partitions = collect(plan).await?;
 
             // show output
