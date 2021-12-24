@@ -79,6 +79,7 @@ All the following Nexmark queries share the same lambda function code.
 | q7 | Highest Bid | Select the bids with the highest bid price in the last period. | ✅ |
 | q8 | Monitor New Users | Select people who have entered the system and created auctions in the last period. | ✅ |
 | q9 | Winning Bids | Find the winning bid for each auction. | ✅ |
+| q10 | Log to File System |  Log all events to AWS S3, SQS, and DynamoDB. Illustrates windows streaming data into partitioned file system. | ✅ |
 | q13 | Bounded Side Input Join | Joins a stream to a bounded side input, modeling basic stream enrichment. | ✅ |
 
 We provide a script (`flock_bench.sh`) to build, deploy and run the benchmark.
