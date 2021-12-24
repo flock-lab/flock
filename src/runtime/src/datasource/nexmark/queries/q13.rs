@@ -17,18 +17,36 @@ fn main() {}
 #[cfg(test)]
 mod tests {
     use crate::datasource::date::DateTime;
-    use crate::datasource::nexmark::event::{Auction, Bid};
+    use crate::datasource::nexmark::event::Bid;
     use crate::datasource::nexmark::NEXMarkSource;
     use crate::error::Result;
     use crate::executor::plan::physical_plan;
     use crate::query::StreamWindow;
+    use arrow::datatypes::{DataType, Field, Schema};
+    use arrow::util::pretty::pretty_format_batches;
     use datafusion::datasource::MemTable;
+    use datafusion::execution::context::ExecutionContext as DataFusionExecutionContext;
     use datafusion::physical_plan::collect;
+    use datafusion::prelude::CsvReadOptions;
     use indoc::indoc;
+    use std::fs::File;
+    use std::io::Write;
+    use std::path::Path;
     use std::sync::Arc;
 
+    static SIDE_INPUT_DOWNLOAD_URL: &str = concat!(
+        "https://gist.githubusercontent.com/gangliao/",
+        "de6f544b8a93f26081036e0a7f8c1715/raw/",
+        "586c88ad6f89d12c9f1753622eddf4788f6f0f9d/",
+        "nexmark_q13_side_input.csv"
+    );
+
+    static SIDE_INPUT_DIRECTORY: &str = "/tmp/data";
+    static SIDE_INPUT_FILE_NAME: &str = "nexmark_q13_side_input.csv";
+    static SIDE_INPUT_TABLE_NAME: &str = "side_input";
+
     #[tokio::test]
-    async fn local_query_4() -> Result<()> {
+    async fn local_query_13() -> Result<()> {
         // benchmark configuration
         let seconds = 2;
         let threads = 1;
@@ -44,39 +62,52 @@ mod tests {
         let events = nex.generate_data()?;
 
         let sql = indoc! {"
-            SELECT  category,
-                    Avg(final)
-            FROM   (SELECT Max(price) AS final,
-                            category
-                    FROM   auction
-                            INNER JOIN bid
-                                    ON a_id = auction
-                    WHERE  b_date_time BETWEEN a_date_time AND expires
-                    GROUP  BY a_id,
-                            category) AS Q
-            GROUP  BY category;
+            SELECT  auction,
+                    bidder,
+                    price,
+                    b_date_time,
+                    value
+            FROM    bid
+                    JOIN side_input
+                        ON auction = key;
         "};
 
-        let auction_schema = Arc::new(Auction::schema());
+        // 1. Downloading the side input data from github gist
+        let data = reqwest::get(SIDE_INPUT_DOWNLOAD_URL)
+            .await
+            .map_err(|_| "Failed to download side input data")?
+            .text_with_charset("utf-8")
+            .await
+            .map_err(|_| "Failed to read side input data")?;
+
+        std::fs::create_dir_all(SIDE_INPUT_DIRECTORY).unwrap();
+        let local_path = Path::new(SIDE_INPUT_DIRECTORY).join(SIDE_INPUT_FILE_NAME);
+        let mut file = File::create(local_path.clone())?;
+        file.write_all(data.as_bytes())?;
+
+        // 2. Creating the table
+        let mut ctx = DataFusionExecutionContext::new();
+        let schema = Schema::new(vec![
+            Field::new("key", DataType::Int32, false),
+            Field::new("value", DataType::Int32, false),
+        ]);
+        ctx.register_csv(
+            SIDE_INPUT_TABLE_NAME,
+            &local_path.into_os_string().to_string_lossy(),
+            CsvReadOptions::new().schema(&schema).has_header(true),
+        )
+        .await?;
+
         let bid_schema = Arc::new(Bid::schema());
 
         // sequential processing
         for i in 0..seconds {
             // events to record batches
-            let am = events.auctions.get(&DateTime::new(i)).unwrap();
-            let (auctions, _) = am.get(&0).unwrap();
-            let auctions_batches = NEXMarkSource::to_batch(auctions, auction_schema.clone());
-
             let bm = events.bids.get(&DateTime::new(i)).unwrap();
             let (bids, _) = bm.get(&0).unwrap();
             let bids_batches = NEXMarkSource::to_batch(bids, bid_schema.clone());
 
             // register memory tables
-            let mut ctx = datafusion::execution::context::ExecutionContext::new();
-            let auction_table = MemTable::try_new(auction_schema.clone(), vec![auctions_batches])?;
-            ctx.deregister_table("auction")?;
-            ctx.register_table("auction", Arc::new(auction_table))?;
-
             let bid_table = MemTable::try_new(bid_schema.clone(), vec![bids_batches])?;
             ctx.deregister_table("bid")?;
             ctx.register_table("bid", Arc::new(bid_table))?;
@@ -86,8 +117,7 @@ mod tests {
             let batches = collect(physical_plan).await?;
 
             // show output
-            let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
-            println!("{}", formatted);
+            println!("{}", pretty_format_batches(&batches)?);
         }
 
         Ok(())

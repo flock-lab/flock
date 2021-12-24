@@ -9,6 +9,6 @@ FROM   bid
                     INNER JOIN bid
                             ON a_id = auction
              WHERE  b_date_time BETWEEN a_date_time AND expires
-             GROUP  BY a_id)
+             GROUP  BY a_id) AS Q
          ON auction = id
             AND price = final;

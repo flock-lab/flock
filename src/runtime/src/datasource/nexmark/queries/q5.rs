@@ -98,10 +98,11 @@ mod tests {
             // register the memory tables
             let mut ctx = datafusion::execution::context::ExecutionContext::new();
             let bid_table = MemTable::try_new(bid_schema.clone(), bids_batches)?;
+            ctx.deregister_table("bid")?;
             ctx.register_table("bid", Arc::new(bid_table))?;
 
             // optimize the query plan and execute it
-            let physical_plan = physical_plan(&mut ctx, sql)?;
+            let physical_plan = physical_plan(&mut ctx, sql).await?;
             let batches = collect(physical_plan).await?;
 
             // show output

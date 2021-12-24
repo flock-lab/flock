@@ -54,7 +54,7 @@ async fn benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
     let query_number = opt.query_number;
 
     let mut ctx = register_nexmark_tables().await?;
-    let plan = physical_plan(&mut ctx, &nexmark_query(query_number))?;
+    let plan = physical_plan(&mut ctx, &nexmark_query(query_number)).await?;
     let root_actor =
         create_nexmark_functions(opt.clone(), nexmark_conf.window.clone(), plan).await?;
 

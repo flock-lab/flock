@@ -138,6 +138,7 @@ mod test {
     use arrow::util::pretty;
 
     #[test]
+    #[ignore]
     fn example_kafka_event() -> Result<()> {
         let data = include_bytes!("../../../test/data/example-kafka-event.json");
         let parsed: KafkaEvent = serde_json::from_slice(data)?;
