@@ -19,7 +19,6 @@ use hashring::HashRing;
 use lazy_static::lazy_static;
 use log::{info, warn};
 use rayon::prelude::*;
-use runtime::executor::LambdaExecutor as executor;
 use runtime::prelude::*;
 use rusoto_core::Region;
 use rusoto_lambda::{InvokeAsyncRequest, Lambda, LambdaClient};
@@ -65,21 +64,21 @@ pub async fn collect(
             tokio::spawn(async move {
                 if !(batches.is_empty() || batches.iter().all(|r| r.is_empty())) {
                     if batches.len() != 1 {
-                        let output = executor::repartition(batches, RoundRobinBatch(1)).await?;
+                        let output = repartition(batches, RoundRobinBatch(1)).await?;
                         assert_eq!(1, output.len());
                         info!(
                             "Input record size: {}.",
                             output[0].par_iter().map(|r| r.num_rows()).sum::<usize>()
                         );
-                        let output = executor::coalesce_batches(output, 1024).await?;
-                        let output = executor::repartition(output, RoundRobinBatch(16)).await?;
+                        let output = coalesce_batches(output, 1024).await?;
+                        let output = repartition(output, RoundRobinBatch(16)).await?;
                         input.lock().unwrap().push(output);
                     } else {
                         info!(
                             "Input record size: {}.",
                             batches[0].par_iter().map(|r| r.num_rows()).sum::<usize>()
                         );
-                        let output = executor::repartition(batches, RoundRobinBatch(16)).await?;
+                        let output = repartition(batches, RoundRobinBatch(16)).await?;
                         input.lock().unwrap().push(output);
                     }
                 }
@@ -186,7 +185,7 @@ pub async fn handler(
     match &ctx.next {
         CloudFunction::Sink(sink_type) => {
             info!("[Ok] Sinking data to {:?}", sink_type);
-            if !output.is_empty() && DataSinkType::Empty != *sink_type {
+            if !output.is_empty() && DataSinkType::Blackhole != *sink_type {
                 DataSink::new(ctx.name.clone(), output, Encoding::default())
                     .write(sink_type.clone())
                     .await
@@ -195,7 +194,7 @@ pub async fn handler(
             }
         }
         _ => {
-            let mut batches = executor::coalesce_batches(
+            let mut batches = coalesce_batches(
                 vec![output],
                 FLOCK_CONF["lambda"]["payload_batch_size"]
                     .parse::<usize>()

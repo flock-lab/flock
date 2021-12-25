@@ -99,10 +99,8 @@ pub enum StreamWindow {
     /// rowcount interval.
     SlidingWindow((Window, Slide)),
     /// Session windows group events that arrive at similar times, filtering out
-    /// periods of time where there is no data. Session window function has
-    /// three main parameters: timeout, maximum duration, and partitioning key
-    /// (optional).
-    SessionWindow,
+    /// periods of time where there is no data.
+    SessionWindow(Schedule),
     /// Stagger window is a windowing method that is suited for analyzing
     /// groups of data that arrive at inconsistent times. It is well suited for
     /// any time-series analytics use case, such as a set of related sales or

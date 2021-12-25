@@ -299,7 +299,7 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
     fetch_aws_watchlogs(&NEXMARK_SOURCE_LOG_GROUP, parse_duration("1min").unwrap()).await?;
 
     let sink_type = DataSinkType::new(opt.data_sink_type)?;
-    if sink_type != DataSinkType::Empty {
+    if sink_type != DataSinkType::Blackhole {
         let data_sink = DataSink::read(format!("q{}", opt.query_number), sink_type).await?;
         let (last_function, batches) = data_sink.to_record_batch()?;
         info!(
