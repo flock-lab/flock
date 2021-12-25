@@ -140,7 +140,7 @@ impl Person {
                 Field::new("state", DataType::Utf8, false),
                 Field::new(
                     "p_date_time",
-                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Timestamp(TimeUnit::Millisecond, None),
                     false,
                 ),
             ],
@@ -229,12 +229,12 @@ impl Auction {
                 Field::new("reserve", DataType::Int32, false),
                 Field::new(
                     "a_date_time",
-                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Timestamp(TimeUnit::Millisecond, None),
                     false,
                 ),
                 Field::new(
                     "expires",
-                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Timestamp(TimeUnit::Millisecond, None),
                     false,
                 ),
                 Field::new("seller", DataType::Int32, false),
@@ -343,7 +343,7 @@ impl Bid {
                 Field::new("price", DataType::Int32, false),
                 Field::new(
                     "b_date_time",
-                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Timestamp(TimeUnit::Millisecond, None),
                     false,
                 ),
             ],
