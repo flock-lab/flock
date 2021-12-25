@@ -196,7 +196,6 @@ impl Payload {
 mod tests {
     use super::*;
     use crate::error::Result;
-    use crate::executor::{Executor, LambdaExecutor};
     use arrow::array::{Array, StructArray};
     use arrow::csv;
     use arrow::datatypes::{DataType, Field, Schema};

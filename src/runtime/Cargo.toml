@@ -15,6 +15,8 @@ aws_lambda_events = "0.5"
 base64 = "0.13.0"
 blake2 = "0.9"
 bytes = "1.0.1"
+chrono = "0.4.19"
+
 dashmap = "5.0.0"
 datafusion = { git = "https://github.com/flock-lab/arrow-datafusion", branch = "flock" }
 futures = "0.3.12"
