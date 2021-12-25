@@ -7,13 +7,11 @@
 <a href="https://cla-assistant.io/flock-lab/flock"><img src="https://cla-assistant.io/readme/badge/flock-lab/flock" alt="CLA assistant" /></a>
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
 
-
 The generic lambda function code is built in advance and uploaded to AWS S3.
 
-| Service  | Cloud Platform | S3 Bucket      | S3 Key           |    S3 URL                        |   [YSB Bench](https://github.com/yahoo/streaming-benchmarks)    |   [NEXMark Bench](https://beam.apache.org/documentation/sdks/java/testing/nexmark/) |
-| :---: | :---------------: | :----------------: | :--------------------------------: | :------------------: | :-------------------: | :-------------------: |
-| **Flock** | AWS Lambda | flock-lab   |   flock        |  s3://flock-lab/flock     | ✅ | ✅ |
-
+|  Service  | Cloud Platform | S3 Bucket | S3 Key |        S3 URL        | [YSB Bench](https://github.com/yahoo/streaming-benchmarks) | [NEXMark Bench](https://beam.apache.org/documentation/sdks/java/testing/nexmark/) |
+| :-------: | :------------: | :-------: | :----: | :------------------: | :--------------------------------------------------------: | :-------------------------------------------------------------------------------: |
+| **Flock** |   AWS Lambda   | flock-lab | flock  | s3://flock-lab/flock |                             ✅                             |                                        ✅                                         |
 
 ## Build From Source Code
 
@@ -59,28 +57,29 @@ SUBCOMMANDS:
     nexmark    The NEXMark Benchmark Tool
     upload     Uploads a function code to AWS S3
 ```
+
 </details>
 </br>
-
 
 ## Nexmark Benchmark
 
 All the following Nexmark queries share the same lambda function code.
 
-| Query    | Name     | Summary  | Flock |
-| -------- | -------- | -------- | -------- |
-| q0 | Pass Through | Measures the monitoring overhead including the source generator. | ✅ |
-| q1 | Currency Conversion | Convert each bid value from dollars to euros. | ✅ |
-| q2 | Selection | Find bids with specific auction ids and show their bid price. | ✅ |
-| q3 | Local Item Suggestion | Who is selling in OR, ID or CA in category 10, and for what auction ids?  | ✅ |
-| q4 | Average Price for a Category | Select the average of the wining bid prices for all auctions in each category. | ✅ |
-| q5 | Hot Items | Which auctions have seen the most bids in the last period? | ✅ |
-| q6 | Average Selling Price by Seller | What is the average selling price per seller for their last 10 closed auctions. | ✅ |
-| q7 | Highest Bid | Select the bids with the highest bid price in the last period. | ✅ |
-| q8 | Monitor New Users | Select people who have entered the system and created auctions in the last period. | ✅ |
-| q9 | Winning Bids | Find the winning bid for each auction. | ✅ |
-| q10 | Log to File System |  Log all events to AWS S3, SQS, and DynamoDB. Illustrates windows streaming data into partitioned file system. | ✅ |
-| q13 | Bounded Side Input Join | Joins a stream to a bounded side input, modeling basic stream enrichment. | ✅ |
+| Query | Name                            | Summary                                                                                                       | Flock |
+| ----- | ------------------------------- | ------------------------------------------------------------------------------------------------------------- | ----- |
+| q0    | Pass Through                    | Measures the monitoring overhead including the source generator.                                              | ✅    |
+| q1    | Currency Conversion             | Convert each bid value from dollars to euros.                                                                 | ✅    |
+| q2    | Selection                       | Find bids with specific auction ids and show their bid price.                                                 | ✅    |
+| q3    | Local Item Suggestion           | Who is selling in OR, ID or CA in category 10, and for what auction ids?                                      | ✅    |
+| q4    | Average Price for a Category    | Select the average of the wining bid prices for all auctions in each category.                                | ✅    |
+| q5    | Hot Items                       | Which auctions have seen the most bids in the last period?                                                    | ✅    |
+| q6    | Average Selling Price by Seller | What is the average selling price per seller for their last 10 closed auctions.                               | ✅    |
+| q7    | Highest Bid                     | Select the bids with the highest bid price in the last period.                                                | ✅    |
+| q8    | Monitor New Users               | Select people who have entered the system and created auctions in the last period.                            | ✅    |
+| q9    | Winning Bids                    | Find the winning bid for each auction.                                                                        | ✅    |
+| q10   | Log to File System              | Log all events to AWS S3, SQS, and DynamoDB. Illustrates windows streaming data into partitioned file system. | ✅    |
+| q11   | User Sessions                   | How many bids did a user make in each session they were active? Illustrates session windows.                  | ✅    |
+| q13   | Bounded Side Input Join         | Joins a stream to a bounded side input, modeling basic stream enrichment.                                     | ✅    |
 
 We provide a script (`flock_bench.sh`) to build, deploy and run the benchmark.
 
@@ -214,11 +213,9 @@ Seconds to Run: 10
 
 [OK] Nexmark Benchmark Complete
 ```
+
 </details>
 </br>
-
-
-
 
 <details>
 <summary>
@@ -281,10 +278,9 @@ START RequestId: 78c64a1a-b312-4099-b596-541c078b04b7 Version: $LATEST
 | 1500    | 841 |
 +---------+-----+
 ```
+
 </details>
 </br>
-
-
 
 ## License
 

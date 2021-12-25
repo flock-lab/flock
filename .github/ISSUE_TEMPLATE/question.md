@@ -1,10 +1,9 @@
 ---
 name: Question
 about: Ask question about this project
-title: ''
+title: ""
 labels: question
-assignees: ''
-
+assignees: ""
 ---
 
 **Which part is this question about**
