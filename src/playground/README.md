@@ -32,7 +32,7 @@ This module includes two lambda functions:
 The client will sends `N` events to the `flock_pg_scatter` function. The `flock_pg_scatter` function sends the events to the `flock_pg_gather` function. The `flock_pg_gather` function receives the events and sums them up.
 The ith event contains a integer value `i + 1` where i starts from 0. For example, the first event contains 1, the second event contains 2, and so on.
 
-If we send 100 events to the `flock_pg_scatter` function, the `flock_pg_gather` function will receive 100 events. The sum of the events is 100 _ 101 / 2 = 5050. If we send 500 events, the sum of the events is 500 _ 501 / 2 = 125250. If we send 800 events, the sum of the events is 800 \* 801 / 2 = 320400.
+If we send 100 events to the `flock_pg_scatter` function, the `flock_pg_gather` function will receive 100 events. The sum of the events is 100 \* 101 / 2 = 5050. If we send 500 events, the sum of the events is 500 \* 501 / 2 = 125250. If we send 800 events, the sum of the events is 800 \* 801 / 2 = 320400.
 
 ### Example
 
