@@ -1,33 +1,32 @@
 .boxedtable {
-
-    background-color: inherit;
-    border-collapse:collapse;
+  background-color: inherit;
+  border-collapse: collapse;
 }
 
 .boxedtable td {
-    border: 1px solid black;
-    padding-left: 10px;
-    padding-right: 10px;
+  border: 1px solid black;
+  padding-left: 10px;
+  padding-right: 10px;
 }
 
 .version {
-visibility:hidden;
+  visibility: hidden;
 }
 
 .strike {
-    text-decoration: line-through;
+  text-decoration: line-through;
 }
 
 .accessibility-link {
-   float: right;
+  float: right;
 }
 
 .tocset td a {
-    color: #92919b;
+  color: #92919b;
 }
 .tocset td a.tocviewselflink {
-   color: #fbfafb;
-   text-decoration: underline;
+  color: #fbfafb;
+  text-decoration: underline;
 }
 
 .ExerciseBody {
@@ -39,29 +38,39 @@ visibility:hidden;
 }
 
 .Exercise {
-   font-weight: bold;
-   background-color: #ffb167;
-   padding: 5px 0px 5px 10px;
-   margin-left: -10px;
+  font-weight: bold;
+  background-color: #ffb167;
+  padding: 5px 0px 5px 10px;
+  margin-left: -10px;
 }
 
 .tocset {
-    color: #fbfafb;
-    background-color: #2a292d;
+  color: #fbfafb;
+  background-color: #2a292d;
 }
 
-a, .toclink, .toptoclink, .tocviewlink, .tocviewselflink, .tocviewtoggle, .plainlink,
-.techinside, .techoutside:hover, .techinside:hover {
-    color: #22609e;
+a,
+.toclink,
+.toptoclink,
+.tocviewlink,
+.tocviewselflink,
+.tocviewtoggle,
+.plainlink,
+.techinside,
+.techoutside:hover,
+.techinside:hover {
+  color: #22609e;
 }
 
 .boxed {
-    background: #fbfafb;
+  background: #fbfafb;
 }
 
-.navsettop a, .navsetbottom a {
-    color: #fbfafb;
+.navsettop a,
+.navsetbottom a {
+  color: #fbfafb;
 }
-.navsettop a:hover, .navsetbottom a:hover {
-    background-color: black;
+.navsettop a:hover,
+.navsetbottom a:hover {
+  background-color: black;
 }
