@@ -80,7 +80,7 @@ pub enum CloudFunction {
 
 impl Default for CloudFunction {
     fn default() -> Self {
-        CloudFunction::Sink(DataSinkType::Empty)
+        CloudFunction::Sink(DataSinkType::Blackhole)
     }
 }
 
@@ -125,7 +125,7 @@ impl Default for ExecutionContext {
             plan:        Arc::new(EmptyExec::new(false, Arc::new(Schema::empty()))),
             plan_s3_idx: None,
             name:        "".to_string(),
-            next:        CloudFunction::Sink(DataSinkType::Empty),
+            next:        CloudFunction::Sink(DataSinkType::Blackhole),
         }
     }
 }
@@ -408,7 +408,7 @@ mod tests {
         let mut ctx = ExecutionContext {
             plan,
             name: "test".to_string(),
-            next: CloudFunction::Sink(DataSinkType::Empty),
+            next: CloudFunction::Sink(DataSinkType::Blackhole),
             ..Default::default()
         };
         ctx.feed_one_source(&partitions).await?;
@@ -488,7 +488,7 @@ mod tests {
         let mut ctx = ExecutionContext {
             plan,
             name: "test".to_string(),
-            next: CloudFunction::Sink(DataSinkType::Empty),
+            next: CloudFunction::Sink(DataSinkType::Blackhole),
             ..Default::default()
         };
         ctx.feed_two_source(&partitions1, &partitions2).await?;

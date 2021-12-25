@@ -309,7 +309,7 @@ mod tests {
             .sum();
         println!("Arrow RecordBatch data (in-memory): {}", size);
 
-        let batches = LambdaExecutor::coalesce_batches(vec![batches], size).await?;
+        let batches = coalesce_batches(vec![batches], size).await?;
         assert_eq!(1, batches.len());
         assert_eq!(1, batches[0].len());
 

@@ -32,16 +32,11 @@ use crate::payload::Uuid;
 use crate::transform::*;
 use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
-use datafusion::physical_plan::coalesce_batches::CoalesceBatchesExec;
-use datafusion::physical_plan::memory::MemoryExec;
-use datafusion::physical_plan::repartition::RepartitionExec;
-use datafusion::physical_plan::{ExecutionPlan, Partitioning};
-use futures::stream::StreamExt;
+use datafusion::physical_plan::Partitioning;
 use plan::*;
 use rand::Rng;
 use rayon::prelude::*;
 use serde_json::Value;
-use std::sync::Arc;
 
 /// The execution strategy of the first cloud function.
 ///
@@ -61,66 +56,15 @@ pub enum ExecutionStrategy {
 /// The query executor on cloud function.
 #[async_trait]
 pub trait Executor {
-    /// Combines small batches into larger batches for more efficient use of
-    /// vectorized processing by upstream operators
-    async fn coalesce_batches(
-        input_partitions: Vec<Vec<RecordBatch>>,
-        target_batch_size: usize,
-    ) -> Result<Vec<Vec<RecordBatch>>> {
-        // create physical plan
-        let exec = MemoryExec::try_new(&input_partitions, input_partitions[0][0].schema(), None)?;
-        let exec: Arc<dyn ExecutionPlan> =
-            Arc::new(CoalesceBatchesExec::new(Arc::new(exec), target_batch_size));
-
-        // execute and collect results
-        let output_partition_count = exec.output_partitioning().partition_count();
-        let mut output_partitions = Vec::with_capacity(output_partition_count);
-        for i in 0..output_partition_count {
-            // execute this *output* partition and collect all batches
-            let mut stream = exec.execute(i).await?;
-            let mut batches = vec![];
-            while let Some(result) = stream.next().await {
-                batches.push(result?);
-            }
-            output_partitions.push(batches);
-        }
-        Ok(output_partitions)
-    }
-
-    /// Maps N input partitions to M output partitions based on a
-    /// partitioning scheme. No guarantees are made about the order of the
-    /// resulting partitions.
-    async fn repartition(
-        input_partitions: Vec<Vec<RecordBatch>>,
-        partitioning: Partitioning,
-    ) -> Result<Vec<Vec<RecordBatch>>> {
-        // create physical plan
-        let exec = MemoryExec::try_new(&input_partitions, input_partitions[0][0].schema(), None)?;
-        let exec = RepartitionExec::try_new(Arc::new(exec), partitioning)?;
-
-        // execute and collect results
-        let mut output_partitions = vec![];
-        for i in 0..exec.partitioning().partition_count() {
-            // execute this *output* partition and collect all batches
-            let mut stream = exec.execute(i).await?;
-            let mut batches = vec![];
-            while let Some(result) = stream.next().await {
-                batches.push(result?);
-            }
-            output_partitions.push(batches);
-        }
-        Ok(output_partitions)
-    }
-
     /// Event sink or data sink is a function designed to send the events from
     /// the function to the customers.
     async fn event_sink(batches: Vec<Vec<RecordBatch>>) -> Result<Value> {
         // coalesce batches to one and only one batch
-        let batches = Self::repartition(batches, Partitioning::RoundRobinBatch(1)).await?;
+        let batches = repartition(batches, Partitioning::RoundRobinBatch(1)).await?;
         assert_eq!(1, batches.len());
 
         let batch_size = batches[0].par_iter().map(|r| r.num_rows()).sum();
-        let output_partitions = LambdaExecutor::coalesce_batches(batches, batch_size).await?;
+        let output_partitions = coalesce_batches(batches, batch_size).await?;
         assert_eq!(1, output_partitions.len());
         assert_eq!(1, output_partitions[0].len());
 
@@ -214,163 +158,10 @@ mod tests {
     use super::*;
     use crate::datasink::DataSinkType;
     use crate::datasource::kinesis;
-    use crate::error::FlockError;
-    use arrow::array::UInt32Array;
-    use arrow::datatypes::{DataType, Field, Schema};
     use aws_lambda_events::event::kinesis::KinesisEvent;
     use datafusion::datasource::MemTable;
-    use datafusion::physical_plan::expressions::col;
-    use tokio::task::JoinHandle;
-
-    #[tokio::test]
-    async fn test_concat_batches() -> Result<()> {
-        let schema = test_schema();
-        let partition = create_vec_batches(&schema, 10);
-        let partitions = vec![partition];
-
-        let output_partitions = LambdaExecutor::coalesce_batches(partitions, 20).await?;
-        assert_eq!(1, output_partitions.len());
-
-        // input is 10 batches x 8 rows (80 rows)
-        // expected output is batches of at least 20 rows (except for the final batch)
-        let batches = &output_partitions[0];
-        assert_eq!(4, batches.len());
-        assert_eq!(24, batches[0].num_rows());
-        assert_eq!(24, batches[1].num_rows());
-        assert_eq!(24, batches[2].num_rows());
-        assert_eq!(8, batches[3].num_rows());
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn one_to_many_round_robin() -> Result<()> {
-        // define input partitions
-        let schema = test_schema();
-        let partition = create_vec_batches(&schema, 50);
-        let partitions = vec![partition];
-
-        // repartition from 1 input to 4 output
-        let output_partitions =
-            LambdaExecutor::repartition(partitions, Partitioning::RoundRobinBatch(4)).await?;
-
-        assert_eq!(4, output_partitions.len());
-        assert_eq!(13, output_partitions[0].len());
-        assert_eq!(13, output_partitions[1].len());
-        assert_eq!(12, output_partitions[2].len());
-        assert_eq!(12, output_partitions[3].len());
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn many_to_one_round_robin() -> Result<()> {
-        // define input partitions
-        let schema = test_schema();
-        let partition = create_vec_batches(&schema, 50);
-        let partitions = vec![partition.clone(), partition.clone(), partition.clone()];
-
-        // repartition from 3 input to 1 output
-        let output_partitions =
-            LambdaExecutor::repartition(partitions, Partitioning::RoundRobinBatch(1)).await?;
-
-        assert_eq!(1, output_partitions.len());
-        assert_eq!(150, output_partitions[0].len());
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn many_to_many_round_robin() -> Result<()> {
-        // define input partitions
-        let schema = test_schema();
-        let partition = create_vec_batches(&schema, 50);
-        let partitions = vec![partition.clone(), partition.clone(), partition.clone()];
-
-        // repartition from 3 input to 5 output
-        let output_partitions =
-            LambdaExecutor::repartition(partitions, Partitioning::RoundRobinBatch(5)).await?;
-
-        assert_eq!(5, output_partitions.len());
-        assert_eq!(30, output_partitions[0].len());
-        assert_eq!(30, output_partitions[1].len());
-        assert_eq!(30, output_partitions[2].len());
-        assert_eq!(30, output_partitions[3].len());
-        assert_eq!(30, output_partitions[4].len());
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn many_to_many_hash_partition() -> Result<()> {
-        // define input partitions
-        let schema = test_schema();
-        let partition = create_vec_batches(&schema, 50);
-        let partitions = vec![partition.clone(), partition.clone(), partition.clone()];
-
-        let output_partitions = LambdaExecutor::repartition(
-            partitions,
-            Partitioning::Hash(vec![col("c0", &schema)?], 8),
-        )
-        .await?;
-
-        let total_rows: usize = output_partitions
-            .iter()
-            .map(|x| x.iter().map(|x| x.num_rows()).sum::<usize>())
-            .sum();
-
-        assert_eq!(8, output_partitions.len());
-        assert_eq!(total_rows, 8 * 50 * 3);
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn many_to_many_round_robin_within_tokio_task() -> Result<()> {
-        let join_handle: JoinHandle<Result<Vec<Vec<RecordBatch>>>> = tokio::spawn(async move {
-            // define input partitions
-            let schema = test_schema();
-            let partition = create_vec_batches(&schema, 50);
-            let partitions = vec![partition.clone(), partition.clone(), partition.clone()];
-
-            // repartition from 3 input to 5 output
-            LambdaExecutor::repartition(partitions, Partitioning::RoundRobinBatch(5)).await
-        });
-
-        let output_partitions = join_handle
-            .await
-            .map_err(|e| FlockError::Internal(e.to_string()))??;
-
-        assert_eq!(5, output_partitions.len());
-        assert_eq!(30, output_partitions[0].len());
-        assert_eq!(30, output_partitions[1].len());
-        assert_eq!(30, output_partitions[2].len());
-        assert_eq!(30, output_partitions[3].len());
-        assert_eq!(30, output_partitions[4].len());
-
-        Ok(())
-    }
-
-    fn test_schema() -> Arc<Schema> {
-        Arc::new(Schema::new(vec![Field::new("c0", DataType::UInt32, false)]))
-    }
-
-    fn create_vec_batches(schema: &Arc<Schema>, num_batches: usize) -> Vec<RecordBatch> {
-        let batch = create_batch(schema);
-        let mut vec = Vec::with_capacity(num_batches);
-        for _ in 0..num_batches {
-            vec.push(batch.clone());
-        }
-        vec
-    }
-
-    fn create_batch(schema: &Arc<Schema>) -> RecordBatch {
-        RecordBatch::try_new(
-            schema.clone(),
-            vec![Arc::new(UInt32Array::from(vec![1, 2, 3, 4, 5, 6, 7, 8]))],
-        )
-        .unwrap()
-    }
+    use datafusion::physical_plan::ExecutionPlan;
+    use std::sync::Arc;
 
     #[tokio::test]
     #[ignore]
@@ -398,7 +189,7 @@ mod tests {
         let mut ctx = ExecutionContext {
             plan: plan.clone(),
             name: "test".to_string(),
-            next: CloudFunction::Sink(DataSinkType::Empty),
+            next: CloudFunction::Sink(DataSinkType::Blackhole),
             ..Default::default()
         };
         LambdaExecutor::next_function(&ctx).expect_err("No distributed execution plan");

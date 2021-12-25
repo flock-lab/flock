@@ -90,10 +90,10 @@ pub async fn handler(_ctx: &ExecutionContext, payload: Payload) -> Result<Value>
                 }
             }
             if r1.len() > 1 {
-                r1 = LambdaExecutor::repartition(r1, Partitioning::RoundRobinBatch(1)).await?;
+                r1 = repartition(r1, Partitioning::RoundRobinBatch(1)).await?;
             }
             if r2.len() > 1 {
-                r2 = LambdaExecutor::repartition(r2, Partitioning::RoundRobinBatch(1)).await?;
+                r2 = repartition(r2, Partitioning::RoundRobinBatch(1)).await?;
             }
             assert!(r1.len() <= 1);
             assert!(r2.len() <= 1);

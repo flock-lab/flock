@@ -139,7 +139,7 @@ impl QueryFlow {
             ExecutionContext {
                 plan: dag.get_node(root).unwrap().plan.clone(),
                 name: QueryFlow::function_name(&query_code, &root, &timestamp),
-                next: CloudFunction::Sink(DataSinkType::Empty), // the last function
+                next: CloudFunction::Sink(DataSinkType::Blackhole), // the last function
                 ..Default::default()
             },
         );

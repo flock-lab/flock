@@ -50,20 +50,20 @@ lazy_static! {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum DataSinkType {
     /// No data sink.
-    Empty    = 0,
+    Blackhole = 0,
     /// Write to AWS S3.
-    S3       = 1,
+    S3        = 1,
     /// Write to AWS DynamoDB.
-    DynamoDB = 2,
+    DynamoDB  = 2,
     /// Write to AWS SQS.
-    SQS      = 3,
+    SQS       = 3,
 }
 
 impl DataSinkType {
     /// Convert the user input to the corresponding data sink type.
     pub fn new(data_sink: usize) -> Result<DataSinkType> {
         match data_sink {
-            0 => Ok(DataSinkType::Empty),
+            0 => Ok(DataSinkType::Blackhole),
             1 => Ok(DataSinkType::S3),
             2 => Ok(DataSinkType::DynamoDB),
             3 => Ok(DataSinkType::SQS),
@@ -125,7 +125,7 @@ impl DataSink {
     /// Write the record batches to the data sink.
     pub async fn write(&self, data_sink: DataSinkType) -> Result<Value> {
         match data_sink {
-            DataSinkType::Empty => {}
+            DataSinkType::Blackhole => {}
             DataSinkType::SQS => {
                 self.write_to_sqs().await?;
             }
@@ -140,7 +140,7 @@ impl DataSink {
     /// Read the record batches from the data sink.
     pub async fn read(function_name: String, data_sink: DataSinkType) -> Result<DataSink> {
         match data_sink {
-            DataSinkType::Empty => Ok(DataSink {
+            DataSinkType::Blackhole => Ok(DataSink {
                 function_name,
                 ..Default::default()
             }),

@@ -148,7 +148,7 @@ async fn source_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Valu
     match LambdaExecutor::choose_strategy(&ctx, &batch) {
         ExecutionStrategy::Centralized => {
             // feed data into the physical plan
-            let output_partitions = LambdaExecutor::coalesce_batches(
+            let output_partitions = coalesce_batches(
                 vec![batch],
                 FLOCK_CONF["lambda"]["target_batch_size"]
                     .parse::<usize>()
@@ -163,7 +163,7 @@ async fn source_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Valu
 
             if num_batches > concurrency {
                 ctx.feed_one_source(
-                    &LambdaExecutor::repartition(
+                    &repartition(
                         output_partitions,
                         Partitioning::RoundRobinBatch(concurrency),
                     )
@@ -172,7 +172,7 @@ async fn source_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Valu
                 .await?;
             } else if num_batches > 1 {
                 ctx.feed_one_source(
-                    &LambdaExecutor::repartition(
+                    &repartition(
                         output_partitions,
                         Partitioning::RoundRobinBatch(num_batches),
                     )
@@ -192,7 +192,7 @@ async fn source_handler(ctx: &mut ExecutionContext, event: Value) -> Result<Valu
             LambdaExecutor::event_sink(vec![batches]).await
         }
         ExecutionStrategy::Distributed => {
-            let mut batches = LambdaExecutor::coalesce_batches(
+            let mut batches = coalesce_batches(
                 vec![batch],
                 FLOCK_CONF["lambda"]["payload_batch_size"]
                     .parse::<usize>()
@@ -242,7 +242,7 @@ async fn payload_handler(
     let output_partitions = ctx.execute().await?;
 
     if ctx.next != CloudFunction::Sink(..) {
-        let mut batches = LambdaExecutor::coalesce_batches(
+        let mut batches = coalesce_batches(
             vec![output_partitions],
             FLOCK_CONF["lambda"]["payload_batch_size"]
                 .parse::<usize>()
@@ -386,8 +386,7 @@ mod tests {
 
         (0..10).for_each(|i| assert_eq!(1024, batch[i].num_rows()));
 
-        let new_batch =
-            LambdaExecutor::repartition(vec![batch], Partitioning::RoundRobinBatch(8)).await?;
+        let new_batch = repartition(vec![batch], Partitioning::RoundRobinBatch(8)).await?;
 
         assert_eq!(8, new_batch.len());
 

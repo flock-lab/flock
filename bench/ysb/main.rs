@@ -123,7 +123,7 @@ async fn create_ysb_functions(
         plan:        physcial_plan,
         plan_s3_idx: None,
         name:        worker_func_name.clone(),
-        next:        CloudFunction::Sink(DataSinkType::Empty),
+        next:        CloudFunction::Sink(DataSinkType::Blackhole),
     };
 
     // Create the function for the ysb source generator.
