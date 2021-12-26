@@ -39,8 +39,11 @@ jobs:
         with:
           filters: |
             src:
-              - 'bench/**'
-              - 'src/**'
+              - 'benchmarks/**'
+              - 'flock/**'
+              - 'flock-cli/**'
+              - 'flock-function/**'
+              - 'playground/**'
       - name: build and tests
         if: steps.changes.outputs.src == 'true'
         run: |

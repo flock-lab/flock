@@ -23,6 +23,7 @@ mod tests {
     use crate::runtime::executor::plan::physical_plan;
     use crate::runtime::query::Schedule;
     use crate::runtime::query::StreamWindow;
+    use crate::transmute::event_bytes_to_batch;
     use datafusion::datasource::MemTable;
     use datafusion::physical_plan::collect;
     use indoc::indoc;
@@ -74,11 +75,11 @@ mod tests {
             for i in d..d + window_size {
                 let am = events.auctions.get(&Epoch::new(i)).unwrap();
                 let (auctions, _) = am.get(&0).unwrap();
-                auctions_batches.push(NEXMarkSource::to_batch(auctions, auction_schema.clone()));
+                auctions_batches.push(event_bytes_to_batch(auctions, auction_schema.clone(), 1024));
 
                 let pm = events.persons.get(&Epoch::new(i)).unwrap();
                 let (persons, _) = pm.get(&0).unwrap();
-                person_batches.push(NEXMarkSource::to_batch(persons, person_schema.clone()));
+                person_batches.push(event_bytes_to_batch(persons, person_schema.clone(), 1024));
             }
 
             // register memory tables

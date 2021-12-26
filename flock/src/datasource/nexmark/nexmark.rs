@@ -24,15 +24,13 @@ use crate::error::FlockError;
 use crate::error::Result;
 use crate::runtime::payload::{Payload, Uuid};
 use crate::runtime::query::StreamWindow;
-use crate::runtime::transform::*;
+use crate::transmute::*;
 use arrow::datatypes::SchemaRef;
-use arrow::json;
 use arrow::record_batch::RecordBatch;
 use lazy_static::lazy_static;
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::io::BufReader;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -181,28 +179,16 @@ impl DataStream for NEXMarkStream {
         };
         let (r1, r2) = match query_number.expect("Query number is not set.") {
             0 | 1 | 2 | 5 | 7 => (
-                NEXMarkSource::to_batch_v2(&event.bids, NEXMARK_BID.clone(), granule_size * 2),
+                event_bytes_to_batch(&event.bids, NEXMARK_BID.clone(), granule_size * 2),
                 vec![],
             ),
             3 | 8 => (
-                NEXMarkSource::to_batch_v2(
-                    &event.persons,
-                    NEXMARK_PERSON.clone(),
-                    granule_size / 5,
-                ),
-                NEXMarkSource::to_batch_v2(
-                    &event.auctions,
-                    NEXMARK_AUCTION.clone(),
-                    granule_size / 5,
-                ),
+                event_bytes_to_batch(&event.persons, NEXMARK_PERSON.clone(), granule_size / 5),
+                event_bytes_to_batch(&event.auctions, NEXMARK_AUCTION.clone(), granule_size / 5),
             ),
             4 | 6 | 9 => (
-                NEXMarkSource::to_batch_v2(
-                    &event.auctions,
-                    NEXMARK_AUCTION.clone(),
-                    granule_size / 8,
-                ),
-                NEXMarkSource::to_batch_v2(&event.bids, NEXMARK_BID.clone(), granule_size * 2),
+                event_bytes_to_batch(&event.auctions, NEXMARK_AUCTION.clone(), granule_size / 8),
+                event_bytes_to_batch(&event.bids, NEXMARK_BID.clone(), granule_size * 2),
             ),
             _ => unimplemented!(),
         };
@@ -262,22 +248,23 @@ impl DataStream for NEXMarkStream {
             time, persons_num, auctions_num, bids_num
         );
 
+        let batch_size = *FLOCK_SYNC_GRANULE_SIZE;
         match query_number.expect("Query number is not set.") {
             0 | 1 | 2 | 5 | 7 => Ok(to_payload(
-                &NEXMarkSource::to_batch(&event.bids, NEXMARK_BID.clone()),
+                &event_bytes_to_batch(&event.bids, NEXMARK_BID.clone(), batch_size),
                 &[],
                 uuid,
                 sync,
             )),
             3 | 8 => Ok(to_payload(
-                &NEXMarkSource::to_batch(&event.persons, NEXMARK_PERSON.clone()),
-                &NEXMarkSource::to_batch(&event.auctions, NEXMARK_AUCTION.clone()),
+                &event_bytes_to_batch(&event.persons, NEXMARK_PERSON.clone(), batch_size),
+                &event_bytes_to_batch(&event.auctions, NEXMARK_AUCTION.clone(), batch_size),
                 uuid,
                 sync,
             )),
             4 | 6 | 9 => Ok(to_payload(
-                &NEXMarkSource::to_batch(&event.auctions, NEXMARK_AUCTION.clone()),
-                &NEXMarkSource::to_batch(&event.bids, NEXMARK_BID.clone()),
+                &event_bytes_to_batch(&event.auctions, NEXMARK_AUCTION.clone(), batch_size),
+                &event_bytes_to_batch(&event.bids, NEXMARK_BID.clone(), batch_size),
                 uuid,
                 sync,
             )),
@@ -399,28 +386,6 @@ impl NEXMarkSource {
         Ok(std::mem::take(&mut events))
     }
 
-    /// Converts NEXMarkSource events to record batches in Arrow.
-    pub fn to_batch(events: &[u8], schema: SchemaRef) -> Vec<RecordBatch> {
-        let batch_size = *FLOCK_SYNC_GRANULE_SIZE;
-        let mut reader = json::Reader::new(BufReader::new(events), schema, batch_size, None);
-
-        let mut batches = vec![];
-        while let Some(batch) = reader.next().unwrap() {
-            batches.push(batch);
-        }
-        batches
-    }
-
-    /// Converts NEXMarkSource events to record batches in Arrow.
-    pub fn to_batch_v2(events: &[u8], schema: SchemaRef, batch_size: usize) -> Vec<RecordBatch> {
-        let mut reader = json::Reader::new(BufReader::new(events), schema, batch_size, None);
-        let mut batches = vec![];
-        while let Some(batch) = reader.next().unwrap() {
-            batches.push(batch);
-        }
-        batches
-    }
-
     /// Counts the number of events. (for testing)
     pub fn count_events(&self, events: &NEXMarkStream) -> usize {
         let threads: usize = self.config.get_as_or("threads", 100);
@@ -509,18 +474,20 @@ mod test {
         // decompression and deserialization
         let de_events: NEXMarkEvent = serde_json::from_value(values).unwrap();
 
+        let batch_size = *FLOCK_SYNC_GRANULE_SIZE;
+
         let person_schema = Arc::new(Person::schema());
-        let batches = NEXMarkSource::to_batch(&de_events.persons, person_schema);
+        let batches = event_bytes_to_batch(&de_events.persons, person_schema, batch_size);
         let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
         println!("{}", formatted);
 
         let auction_schema = Arc::new(Auction::schema());
-        let batches = NEXMarkSource::to_batch(&de_events.auctions, auction_schema);
+        let batches = event_bytes_to_batch(&de_events.auctions, auction_schema, batch_size);
         let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
         println!("{}", formatted);
 
         let bid_schema = Arc::new(Bid::schema());
-        let batches = NEXMarkSource::to_batch(&de_events.bids, bid_schema);
+        let batches = event_bytes_to_batch(&de_events.bids, bid_schema, batch_size);
         let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
         println!("{}", formatted);
 

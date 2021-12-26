@@ -20,4 +20,3 @@ pub mod context;
 pub mod executor;
 pub mod payload;
 pub mod query;
-pub mod transform;

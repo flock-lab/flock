@@ -145,7 +145,7 @@ mod tests {
     use super::*;
     use crate::error::Result;
     use crate::runtime::payload::UuidBuilder;
-    use crate::runtime::transform::to_payload;
+    use crate::transmute::to_payload;
     use arrow::csv;
     use arrow::datatypes::{DataType, Field, Schema};
 

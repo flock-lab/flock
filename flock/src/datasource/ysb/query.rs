@@ -24,6 +24,7 @@ mod tests {
     use crate::error::Result;
     use crate::runtime::executor::plan::physical_plan;
     use crate::runtime::query::{Schedule, StreamWindow};
+    use crate::transmute::event_bytes_to_batch;
     use datafusion::datasource::MemTable;
     use datafusion::physical_plan::collect;
     use indoc::indoc;
@@ -59,7 +60,7 @@ mod tests {
         let ad_event_schema = Arc::new(AdEvent::schema());
         let campaign_schema = Arc::new(Campaign::schema());
         let (campaigns, _) = stream.campaigns.clone();
-        let campaign_batches = YSBSource::to_batch(&campaigns, campaign_schema.clone());
+        let campaign_batches = event_bytes_to_batch(&campaigns, campaign_schema.clone(), 1024);
 
         for i in 0..seconds / window_size {
             let mut batches = vec![];
@@ -68,7 +69,11 @@ mod tests {
             for i in d..d + window_size {
                 let m = stream.events.get(&Epoch::new(i)).unwrap();
                 let (ad_events, _) = m.get(&0).unwrap();
-                batches.push(YSBSource::to_batch(ad_events, ad_event_schema.clone()));
+                batches.push(event_bytes_to_batch(
+                    ad_events,
+                    ad_event_schema.clone(),
+                    1024,
+                ));
             }
 
             // register memory tables

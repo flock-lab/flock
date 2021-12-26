@@ -22,6 +22,7 @@ mod tests {
     use crate::error::{FlockError, Result};
     use crate::runtime::executor::plan::physical_plan;
     use crate::runtime::query::StreamWindow;
+    use crate::transmute::event_bytes_to_batch;
     use datafusion::datasource::MemTable;
     use datafusion::physical_plan::collect;
     use indoc::indoc;
@@ -90,7 +91,7 @@ mod tests {
                 }
                 let bm = events.bids.get(&Epoch::new(j)).unwrap();
                 let (bids, _) = bm.get(&0).unwrap();
-                bids_batches.push(NEXMarkSource::to_batch(bids, bid_schema.clone()));
+                bids_batches.push(event_bytes_to_batch(bids, bid_schema.clone(), 1024));
             }
 
             let old_batches = bids_batches.clone();

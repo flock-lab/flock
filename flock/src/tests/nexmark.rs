@@ -14,25 +14,26 @@
 //! NEXMark events for testing.
 
 use crate::datasource::nexmark::event::{Auction, Bid, Person};
-use crate::datasource::nexmark::{NEXMarkEvent, NEXMarkSource};
+use crate::datasource::nexmark::NEXMarkEvent;
 use crate::error::Result;
+use crate::transmute::event_bytes_to_batch;
 use lambda_runtime::{handler_fn, Context};
 use std::sync::Arc;
 
 #[allow(dead_code)]
 async fn handler(event: NEXMarkEvent, _: Context) -> Result<NEXMarkEvent> {
     let person_schema = Arc::new(Person::schema());
-    let batches = NEXMarkSource::to_batch(&event.persons, person_schema);
+    let batches = event_bytes_to_batch(&event.persons, person_schema, 1024);
     let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
     println!("{}", formatted);
 
     let auction_schema = Arc::new(Auction::schema());
-    let batches = NEXMarkSource::to_batch(&event.auctions, auction_schema);
+    let batches = event_bytes_to_batch(&event.auctions, auction_schema, 1024);
     let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
     println!("{}", formatted);
 
     let bid_schema = Arc::new(Bid::schema());
-    let batches = NEXMarkSource::to_batch(&event.bids, bid_schema);
+    let batches = event_bytes_to_batch(&event.bids, bid_schema, 1024);
     let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
     println!("{}", formatted);
 
@@ -50,6 +51,7 @@ async fn main() -> Result<()> {
 mod tests {
     use super::*;
     use crate::datasource::config::Config;
+    use crate::datasource::nexmark::NEXMarkSource;
     use rusoto_core::Region;
     use rusoto_lambda::{InvocationRequest, Lambda, LambdaClient};
 
@@ -69,17 +71,17 @@ mod tests {
         let ret_events = handler(events, Context::default()).await?;
 
         let person_schema = Arc::new(Person::schema());
-        let batches = NEXMarkSource::to_batch(&ret_events.persons, person_schema);
+        let batches = event_bytes_to_batch(&ret_events.persons, person_schema, 1024);
         let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
         println!("{}", formatted);
 
         let auction_schema = Arc::new(Auction::schema());
-        let batches = NEXMarkSource::to_batch(&ret_events.auctions, auction_schema);
+        let batches = event_bytes_to_batch(&ret_events.auctions, auction_schema, 1024);
         let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
         println!("{}", formatted);
 
         let bid_schema = Arc::new(Bid::schema());
-        let batches = NEXMarkSource::to_batch(&ret_events.bids, bid_schema);
+        let batches = event_bytes_to_batch(&ret_events.bids, bid_schema, 1024);
         let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
         println!("{}", formatted);
 
@@ -115,17 +117,17 @@ mod tests {
         // decompression and deserialization
         let de_events: NEXMarkEvent = serde_json::from_slice(&response.payload.unwrap()).unwrap();
         let person_schema = Arc::new(Person::schema());
-        let batches = NEXMarkSource::to_batch(&de_events.persons, person_schema);
+        let batches = event_bytes_to_batch(&de_events.persons, person_schema, 1024);
         let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
         println!("{}", formatted);
 
         let auction_schema = Arc::new(Auction::schema());
-        let batches = NEXMarkSource::to_batch(&de_events.auctions, auction_schema);
+        let batches = event_bytes_to_batch(&de_events.auctions, auction_schema, 1024);
         let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
         println!("{}", formatted);
 
         let bid_schema = Arc::new(Bid::schema());
-        let batches = NEXMarkSource::to_batch(&de_events.bids, bid_schema);
+        let batches = event_bytes_to_batch(&de_events.bids, bid_schema, 1024);
         let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
         println!("{}", formatted);
 

@@ -22,6 +22,7 @@ mod tests {
     use crate::error::Result;
     use crate::runtime::executor::plan::physical_plan;
     use crate::runtime::query::StreamWindow;
+    use crate::transmute::event_bytes_to_batch;
     use arrow::datatypes::{DataType, Field, Schema};
     use arrow::util::pretty::pretty_format_batches;
     use datafusion::datasource::MemTable;
@@ -105,7 +106,7 @@ mod tests {
             // events to record batches
             let bm = events.bids.get(&Epoch::new(i)).unwrap();
             let (bids, _) = bm.get(&0).unwrap();
-            let bids_batches = NEXMarkSource::to_batch(bids, bid_schema.clone());
+            let bids_batches = event_bytes_to_batch(bids, bid_schema.clone(), 1024);
 
             // register memory tables
             let bid_table = MemTable::try_new(bid_schema.clone(), vec![bids_batches])?;

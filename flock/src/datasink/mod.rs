@@ -18,7 +18,7 @@ use crate::config::FLOCK_CONF;
 use crate::encoding::Encoding;
 use crate::error::{FlockError, Result};
 use crate::runtime::payload::DataFrame;
-use crate::runtime::transform::*;
+use crate::transmute::*;
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
 use arrow_flight::utils::flight_data_from_arrow_batch;

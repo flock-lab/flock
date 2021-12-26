@@ -22,6 +22,7 @@ mod tests {
     use crate::error::Result;
     use crate::runtime::executor::plan::physical_plan;
     use crate::runtime::query::StreamWindow;
+    use crate::transmute::event_bytes_to_batch;
     use datafusion::datasource::MemTable;
     use datafusion::physical_plan::collect;
     use std::sync::Arc;
@@ -43,7 +44,7 @@ mod tests {
             // events to record batches
             let bm = events.bids.get(&Epoch::new(i)).unwrap();
             let (bids, _) = bm.get(&0).unwrap();
-            let batches = NEXMarkSource::to_batch(bids, schema.clone());
+            let batches = event_bytes_to_batch(bids, schema.clone(), 1024);
 
             // register memory table
             let mut ctx = datafusion::execution::context::ExecutionContext::new();
