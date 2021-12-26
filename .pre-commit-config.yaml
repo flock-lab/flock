@@ -55,7 +55,7 @@ repos:
     rev: master
     hooks:
       - id: prettier
-        exclude: src/test/data/plan
+        exclude: src/tests/data/plan
         files: \.(md|css|yml|js)
   - repo: https://github.com/flock-lab/pre-commit-rust
     rev: master

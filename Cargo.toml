@@ -1,13 +1,11 @@
 [workspace]
 members = [
-    "bench",
+    "benchmarks",
+    "flock",
+    "flock-cli",
+    "flock-function",
+    "playground",
     "scripts/parser/cloudwatch",
-    "src/bin/cli",
-    "src/driver",
-    "src/function",
-    "src/playground",
-    "src/runtime",
-    "src/test",
 ]
 
 [profile.release]

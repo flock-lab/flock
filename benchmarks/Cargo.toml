@@ -1,0 +1,40 @@
+[package]
+name = "benchmarks"
+version = "0.2.0"
+authors = [ "Gang Liao <gangliao@cs.umd.edu>" ]
+edition = "2021"
+publish = false
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+arrow = { git = "https://github.com/flock-lab/arrow-rs", branch = "flock", features = [ "simd" ] }
+chrono = "0.4.19"
+datafusion = { git = "https://github.com/flock-lab/arrow-datafusion", branch = "flock" }
+env_logger = "^0.9"
+flock = { path = "../flock" }
+futures = "0.3"
+humantime = "2.1.0"
+itertools = "0.10.0"
+lazy_static = "1.4"
+log = "0.4.14"
+rusoto_core = "0.47.0"
+rusoto_lambda = "0.47.0"
+rusoto_logs = "0.47.0"
+rusoto_s3 = "0.47.0"
+rusoto_sqs = "0.47.0"
+serde_json = "1.0"
+structopt = { version = "0.3", default-features = false }
+tokio = { version = "1.4", features = [ "macros", "io-util", "sync", "rt-multi-thread", "time" ] }
+
+[[bin]]
+name = "nexmark_bench"
+path = "nexmark/main.rs"
+
+[[bin]]
+name = "ysb_bench"
+path = "ysb/main.rs"
+
+[[bin]]
+name = "s3_bench"
+path = "s3/main.rs"

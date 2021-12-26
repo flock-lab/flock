@@ -70,19 +70,19 @@ Build_and_Deploy() {
   echo $(echogreen "============================================================")
   echo
   echo $(echogreen "[1] Compiling Flock's Generic Lambda Function...")
-  cd src/function
+  cd flock-function
   cargo +nightly build --target x86_64-unknown-linux-gnu --release --features "arrow/simd datafusion/simd mimalloc"
   echo
   echo $(echogreen "[2] Compiling the Benchmark Client ...")
-  cd ../../bench
+  cd ../benchmarks
   cargo +nightly build --target x86_64-unknown-linux-gnu --release --features "arrow/simd datafusion/simd mimalloc"
   echo
   echo $(echogreen "[3] Compiling Flock CLI...")
-  cd ../src/bin/cli
+  cd ../flock-cli
   cargo +nightly build --target x86_64-unknown-linux-gnu --release
   echo
   echo $(echogreen "[4] Deploying Flock's Generic Lambda Function...")
-  cd ../../../target/x86_64-unknown-linux-gnu/release
+  cd ../target/x86_64-unknown-linux-gnu/release
   ./flock-cli upload -p flock -k flock
   cd ../../..
   echo $(echoblue "-------------------------------------------------------------")
@@ -103,7 +103,7 @@ generators=1
 events_per_second=1000
 seconds=10
 query=5
-flock=$(<src/bin/cli/src/flock)
+
 # Get the options
 while getopts "hgcraq:b:d:p:s:e:m:" option; do
   case $option in
@@ -185,7 +185,6 @@ if [ $memory_size -gt 10240 ]; then
 fi
 
 if [ "$run" = "true" ]; then
-  echo "$flock"
   echo
   echo $(echogreen "============================================================")
   echo $(echogreen "                  Running the benchmark                     ")
