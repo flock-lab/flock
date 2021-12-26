@@ -19,34 +19,34 @@ use serde::{Deserialize, Serialize};
 #[derive(
     Eq, PartialEq, Ord, PartialOrd, Clone, Serialize, Deserialize, Debug, Hash, Copy, Default,
 )]
-pub struct DateTime(pub usize);
+pub struct Epoch(pub usize);
 
-impl DateTime {
+impl Epoch {
     /// Creates a new date time.
-    pub fn new(date_time: usize) -> DateTime {
-        DateTime(date_time)
+    pub fn new(date_time: usize) -> Epoch {
+        Epoch(date_time)
     }
 }
 
-impl ::std::ops::Deref for DateTime {
+impl ::std::ops::Deref for Epoch {
     type Target = usize;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl ::std::ops::Add for DateTime {
+impl ::std::ops::Add for Epoch {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
-        DateTime(self.0 + other.0)
+        Epoch(self.0 + other.0)
     }
 }
 
-impl ::std::ops::Sub for DateTime {
+impl ::std::ops::Sub for Epoch {
     type Output = Self;
 
     fn sub(self, other: Self) -> Self {
-        DateTime(self.0 - other.0)
+        Epoch(self.0 - other.0)
     }
 }

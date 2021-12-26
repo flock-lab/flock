@@ -18,7 +18,7 @@ fn main() {}
 
 #[cfg(test)]
 mod tests {
-    use crate::datasource::date::DateTime;
+    use crate::datasource::epoch::Epoch;
     use crate::datasource::ysb::event::{AdEvent, Campaign};
     use crate::datasource::ysb::YSBSource;
     use crate::error::Result;
@@ -66,7 +66,7 @@ mod tests {
             let d = i * window_size;
             // moves the tumbling window
             for i in d..d + window_size {
-                let m = stream.events.get(&DateTime::new(i)).unwrap();
+                let m = stream.events.get(&Epoch::new(i)).unwrap();
                 let (ad_events, _) = m.get(&0).unwrap();
                 batches.push(YSBSource::to_batch(ad_events, ad_event_schema.clone()));
             }

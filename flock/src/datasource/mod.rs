@@ -120,7 +120,7 @@ impl DataSource {
 }
 
 pub mod config;
-pub mod date;
+pub mod epoch;
 pub mod kafka;
 pub mod kinesis;
 pub mod nexmark;

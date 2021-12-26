@@ -15,7 +15,7 @@
 
 use crate::config::FLOCK_CONF;
 use crate::datasource::config::Config;
-use crate::datasource::date::DateTime;
+use crate::datasource::epoch::Epoch;
 use crate::datasource::ysb::event::{AdEvent, Campaign};
 use crate::datasource::ysb::generator::YSBGenerator;
 use crate::datasource::DataStream;
@@ -47,7 +47,6 @@ lazy_static! {
         .unwrap();
 }
 
-type Epoch = DateTime;
 type SourceId = usize;
 type Partition = usize;
 type NumEvents = usize;
@@ -348,7 +347,7 @@ impl YSBSource {
                     .map(|s| {
                         stream
                             .events
-                            .get(&DateTime::new(s))
+                            .get(&Epoch::new(s))
                             .unwrap()
                             .get(&p)
                             .unwrap()

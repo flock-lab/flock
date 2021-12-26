@@ -16,7 +16,7 @@ fn main() {}
 
 #[cfg(test)]
 mod tests {
-    use crate::datasource::date::DateTime;
+    use crate::datasource::epoch::Epoch;
     use crate::datasource::nexmark::event::Bid;
     use crate::datasource::nexmark::NEXMarkSource;
     use crate::error::Result;
@@ -67,7 +67,7 @@ mod tests {
             let d = j * window_size;
             // moves the tumbling window
             for i in d..d + window_size {
-                let bm = events.bids.get(&DateTime::new(i)).unwrap();
+                let bm = events.bids.get(&Epoch::new(i)).unwrap();
                 let (bids, _) = bm.get(&0).unwrap();
                 batches.push(NEXMarkSource::to_batch(bids, schema.clone()));
             }
