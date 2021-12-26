@@ -214,6 +214,7 @@ fn ysb_query() -> String {
 mod tests {
     use super::*;
     use arrow::util::pretty::pretty_format_batches;
+    use flock::transmute::event_bytes_to_batch;
 
     #[tokio::test]
     async fn ysb_sql_query() -> Result<()> {
@@ -239,8 +240,12 @@ mod tests {
 
         flock_ctx
             .feed_data_sources(&[
-                vec![YSBSource::to_batch(&event.ad_events, YSB_AD_EVENT.clone())],
-                vec![YSBSource::to_batch(&campaigns, YSB_CAMPAIGN.clone())],
+                vec![event_bytes_to_batch(
+                    &event.ad_events,
+                    YSB_AD_EVENT.clone(),
+                    1024,
+                )],
+                vec![event_bytes_to_batch(&campaigns, YSB_CAMPAIGN.clone(), 1024)],
             ])
             .await?;
 

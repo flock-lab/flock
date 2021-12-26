@@ -36,3 +36,4 @@ pub mod prelude;
 pub mod runtime;
 pub mod test_util;
 pub mod tests;
+pub mod transmute;

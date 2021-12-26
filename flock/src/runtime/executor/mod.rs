@@ -29,7 +29,7 @@ use crate::error::{FlockError, Result};
 use crate::runtime::context::CloudFunction;
 use crate::runtime::context::ExecutionContext;
 use crate::runtime::payload::Uuid;
-use crate::runtime::transform::*;
+use crate::transmute::*;
 use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
 use datafusion::physical_plan::Partitioning;
@@ -68,7 +68,7 @@ pub trait Executor {
         assert_eq!(1, output_partitions.len());
         assert_eq!(1, output_partitions[0].len());
 
-        Ok(to_value(
+        Ok(batch_to_json_value(
             &output_partitions[0],
             Uuid::default(),
             Encoding::default(),

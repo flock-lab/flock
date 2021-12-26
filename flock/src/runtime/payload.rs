@@ -18,7 +18,7 @@
 
 use crate::datasource::DataSource;
 use crate::encoding::Encoding;
-use crate::runtime::transform::*;
+use crate::transmute::*;
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
 use arrow_flight::utils::flight_data_to_arrow_batch;
@@ -427,7 +427,7 @@ mod tests {
         let uuid = uuid_builder.next_uuid();
 
         let now = Instant::now();
-        let value = to_value(&batches, uuid.clone(), Encoding::default());
+        let value = batch_to_json_value(&batches, uuid.clone(), Encoding::default());
         println!(
             "serde payload to value (with compression) - time: {} ms",
             now.elapsed().as_millis()
@@ -435,7 +435,7 @@ mod tests {
 
         let payload1: Payload = serde_json::from_value(value.clone())?;
         let now = Instant::now();
-        let (de_batches, _, de_uuid) = to_batch(value);
+        let (de_batches, _, de_uuid) = json_value_to_batch(value);
         println!(
             "serde value to batch (with decompression) - time: {} ms",
             now.elapsed().as_millis()
@@ -497,7 +497,7 @@ mod tests {
         let batches = init_batches();
         let bytes = to_bytes(&batches[0], uuid_builder.next_uuid(), Encoding::default());
         let value: Value = serde_json::from_slice(&bytes)?;
-        let (de_batches, _, _) = to_batch(value);
+        let (de_batches, _, _) = json_value_to_batch(value);
 
         assert_eq!(batches[0].schema(), de_batches[0].schema());
         assert_eq!(batches[0].columns(), de_batches[0].columns());

@@ -22,7 +22,7 @@ mod tests {
     use crate::error::{FlockError, Result};
     use crate::runtime::executor::plan::physical_plan;
     use crate::runtime::query::{Schedule, StreamWindow};
-    use crate::runtime::transform::*;
+    use crate::transmute::*;
     use arrow::array::{Int32Array, TimestampMillisecondArray, UInt64Array};
     use arrow::record_batch::RecordBatch;
     use arrow::util::pretty::pretty_format_batches;
@@ -74,7 +74,7 @@ mod tests {
         for i in 0..seconds {
             let bm = events.bids.get(&Epoch::new(i)).unwrap();
             let (bids, _) = bm.get(&0).unwrap();
-            let mut batches = vec![NEXMarkSource::to_batch(bids, schema.clone())];
+            let mut batches = vec![event_bytes_to_batch(bids, schema.clone(), 1024)];
 
             // register memory tables
             let mut ctx = datafusion::execution::context::ExecutionContext::new();

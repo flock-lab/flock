@@ -18,6 +18,7 @@ use crate::encoding::Encoding;
 use crate::error::{FlockError, Result};
 use crate::runtime::payload::{DataFrame, Payload, Uuid};
 use arrow::datatypes::{Schema, SchemaRef};
+use arrow::json;
 use arrow::record_batch::RecordBatch;
 use arrow_flight::utils::flight_data_from_arrow_batch;
 use arrow_flight::FlightData;
@@ -29,6 +30,7 @@ use datafusion::physical_plan::{ExecutionPlan, Partitioning};
 use futures::stream::StreamExt;
 use rayon::prelude::*;
 use serde_json::Value;
+use std::io::BufReader;
 use std::sync::Arc;
 
 /// Combines small batches into larger batches for more efficient use of
@@ -110,14 +112,14 @@ pub fn schema_from_bytes(bytes: &[u8]) -> Result<Arc<Schema>> {
     Ok(Arc::new(schema))
 }
 
-/// Convert incoming payload to record batch in Arrow.
-pub fn to_batch(event: Value) -> (Vec<RecordBatch>, Vec<RecordBatch>, Uuid) {
+/// Convert incoming payload to record batches in Arrow format.
+pub fn json_value_to_batch(event: Value) -> (Vec<RecordBatch>, Vec<RecordBatch>, Uuid) {
     let payload: Payload = serde_json::from_value(event).unwrap();
     payload.to_record_batch()
 }
 
-/// Convert record batch to payload for network transmission.
-pub fn to_value(batches: &[RecordBatch], uuid: Uuid, encoding: Encoding) -> Value {
+/// Convert record batches to payload for network transmission.
+pub fn batch_to_json_value(batches: &[RecordBatch], uuid: Uuid, encoding: Encoding) -> Value {
     let options = arrow::ipc::writer::IpcWriteOptions::default();
     let data_frames = batches
         .par_iter()
@@ -222,6 +224,20 @@ pub fn to_bytes(batch: &RecordBatch, uuid: Uuid, encoding: Encoding) -> bytes::B
     })
     .unwrap()
     .into()
+}
+
+/// Converts events to record batches in Arrow format.
+pub fn event_bytes_to_batch(
+    events: &[u8],
+    schema: SchemaRef,
+    batch_size: usize,
+) -> Vec<RecordBatch> {
+    let mut reader = json::Reader::new(BufReader::new(events), schema, batch_size, None);
+    let mut batches = vec![];
+    while let Some(batch) = reader.next().unwrap() {
+        batches.push(batch);
+    }
+    batches
 }
 
 #[cfg(test)]

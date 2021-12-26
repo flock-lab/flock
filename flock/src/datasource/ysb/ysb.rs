@@ -24,15 +24,13 @@ use crate::error::FlockError;
 use crate::error::Result;
 use crate::runtime::payload::{Payload, Uuid};
 use crate::runtime::query::{Schedule, StreamWindow};
-use crate::runtime::transform::*;
+use crate::transmute::*;
 use arrow::datatypes::SchemaRef;
-use arrow::json;
 use arrow::record_batch::RecordBatch;
 use lazy_static::lazy_static;
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::io::BufReader;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -145,8 +143,8 @@ impl DataStream for YSBStream {
             *FLOCK_ASYNC_GRANULE_SIZE
         };
 
-        let r1 = YSBSource::to_batch_v2(&events.ad_events, YSB_AD_EVENT.clone(), granule_size / 4);
-        let r2 = YSBSource::to_batch_v2(&campaigns, YSB_CAMPAIGN.clone(), granule_size / 10);
+        let r1 = event_bytes_to_batch(&events.ad_events, YSB_AD_EVENT.clone(), granule_size / 4);
+        let r2 = event_bytes_to_batch(&campaigns, YSB_CAMPAIGN.clone(), granule_size / 10);
 
         let step = if r2.is_empty() { 2 } else { 1 };
 
@@ -204,9 +202,10 @@ impl DataStream for YSBStream {
             time, num_ad_events, num_campaigns
         );
 
+        let batch_size = *FLOCK_SYNC_GRANULE_SIZE;
         Ok(to_payload(
-            &YSBSource::to_batch(&events.ad_events, YSB_AD_EVENT.clone()),
-            &YSBSource::to_batch(&campaigns, YSB_CAMPAIGN.clone()),
+            &event_bytes_to_batch(&events.ad_events, YSB_AD_EVENT.clone(), batch_size),
+            &event_bytes_to_batch(&campaigns, YSB_CAMPAIGN.clone(), batch_size),
             uuid,
             sync,
         ))
@@ -315,28 +314,6 @@ impl YSBSource {
         Ok(std::mem::take(&mut stream))
     }
 
-    /// Converts YSBSource events to record batches in Arrow.
-    pub fn to_batch(events: &[u8], schema: SchemaRef) -> Vec<RecordBatch> {
-        let batch_size = *FLOCK_SYNC_GRANULE_SIZE;
-        let mut reader = json::Reader::new(BufReader::new(events), schema, batch_size, None);
-
-        let mut batches = vec![];
-        while let Some(batch) = reader.next().unwrap() {
-            batches.push(batch);
-        }
-        batches
-    }
-
-    /// Converts YSBSource events to record batches in Arrow.
-    pub fn to_batch_v2(events: &[u8], schema: SchemaRef, batch_size: usize) -> Vec<RecordBatch> {
-        let mut reader = json::Reader::new(BufReader::new(events), schema, batch_size, None);
-        let mut batches = vec![];
-        while let Some(batch) = reader.next().unwrap() {
-            batches.push(batch);
-        }
-        batches
-    }
-
     /// Counts the number of events. (for testing)
     pub fn count_events(&self, stream: &YSBStream) -> usize {
         let threads: usize = self.config.get_as_or("threads", 16);
@@ -397,9 +374,9 @@ mod test {
     #[test]
     fn test_ysb_serialization() -> Result<()> {
         let mut config = Config::new();
-        config.insert("threads", 10.to_string());
-        config.insert("seconds", 1.to_string());
-        config.insert("events-per-second", 100.to_string());
+        config.insert("threads", 10u32.to_string());
+        config.insert("seconds", 1u32.to_string());
+        config.insert("events-per-second", 100u32.to_string());
         let ysb = YSBSource {
             config,
             ..Default::default()
@@ -414,7 +391,11 @@ mod test {
         let de_events: YSBEvent = serde_json::from_value(values).unwrap();
 
         let ad_event_schema = Arc::new(AdEvent::schema());
-        let batches = YSBSource::to_batch(&de_events.ad_events, ad_event_schema);
+        let batches = event_bytes_to_batch(
+            &de_events.ad_events,
+            ad_event_schema,
+            *FLOCK_SYNC_GRANULE_SIZE,
+        );
         let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
         println!("{}", formatted);
 

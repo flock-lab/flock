@@ -336,6 +336,7 @@ pub fn nexmark_query(query_number: usize) -> String {
 mod tests {
     use super::*;
     use arrow::util::pretty::pretty_format_batches;
+    use flock::transmute::event_bytes_to_batch;
 
     #[tokio::test]
     async fn nexmark_sql_queries() -> Result<()> {
@@ -370,14 +371,16 @@ mod tests {
 
             flock_ctx
                 .feed_data_sources(&[
-                    vec![NEXMarkSource::to_batch(&event.bids, NEXMARK_BID.clone())],
-                    vec![NEXMarkSource::to_batch(
+                    vec![event_bytes_to_batch(&event.bids, NEXMARK_BID.clone(), 1024)],
+                    vec![event_bytes_to_batch(
                         &event.persons,
                         NEXMARK_PERSON.clone(),
+                        1024,
                     )],
-                    vec![NEXMarkSource::to_batch(
+                    vec![event_bytes_to_batch(
                         &event.auctions,
                         NEXMARK_AUCTION.clone(),
+                        1024,
                     )],
                 ])
                 .await?;
