@@ -13,7 +13,7 @@
 
 //! YSB Ad Event.
 
-use crate::datasource::date::DateTime;
+use crate::datasource::epoch::Epoch;
 use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -33,7 +33,7 @@ pub struct AdEvent {
     /// A string, one of "view", "click", and "purchase".
     pub event_type: String,
     /// An integer timestamp in milliseconds of the time the event occurred.
-    pub event_time: DateTime,
+    pub event_time: Epoch,
     /// A string of the user's IP address.
     pub ip_address: String,
 }

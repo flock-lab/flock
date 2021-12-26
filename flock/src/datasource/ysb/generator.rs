@@ -14,7 +14,7 @@
 //! The data generator for YSB.
 
 use crate::datasource::config::Config;
-use crate::datasource::date::DateTime;
+use crate::datasource::epoch::Epoch;
 use crate::datasource::ysb::event::AdEvent;
 use rand::prelude::SliceRandom;
 use rand::{self, Rng, SeedableRng};
@@ -64,7 +64,7 @@ impl YSBGenerator {
     }
 
     /// Produces the next epoch's events.
-    pub fn next_epoch(&mut self) -> Result<(DateTime, (Vec<u8>, usize))> {
+    pub fn next_epoch(&mut self) -> Result<(Epoch, (Vec<u8>, usize))> {
         let ad_types = vec!["banner", "modal", "sponsored-search", "mail", "mobile"]
             .into_iter()
             .map(String::from)
@@ -91,7 +91,7 @@ impl YSBGenerator {
                     .clone(),
                 ad_type:    ad_types.choose(&mut rng).unwrap().to_string(),
                 event_type: event_types.choose(&mut rng).unwrap().to_string(),
-                event_time: DateTime(self.time as usize),
+                event_time: Epoch(self.time as usize),
                 ip_address: String::from("0.0.0.0"),
             };
 
@@ -102,12 +102,12 @@ impl YSBGenerator {
             self.time += self.timestep;
         }
 
-        Ok((DateTime(epoch), (data, num)))
+        Ok((Epoch(epoch), (data, num)))
     }
 
     /// Produces the events in the next epoch.
     #[allow(dead_code)]
-    fn next(&mut self) -> Result<(DateTime, Vec<AdEvent>)> {
+    fn next(&mut self) -> Result<(Epoch, Vec<AdEvent>)> {
         let ad_types = vec!["banner", "modal", "sponsored-search", "mail", "mobile"]
             .into_iter()
             .map(String::from)
@@ -133,7 +133,7 @@ impl YSBGenerator {
                     .clone(),
                 ad_type:    ad_types.choose(&mut rng).unwrap().to_string(),
                 event_type: event_types.choose(&mut rng).unwrap().to_string(),
-                event_time: DateTime(self.time as usize),
+                event_time: Epoch(self.time as usize),
                 ip_address: String::from("0.0.0.0"),
             });
             self.time += self.timestep;
@@ -142,7 +142,7 @@ impl YSBGenerator {
         if data.is_empty() {
             Err(Error::new(ErrorKind::Other, "out of data"))
         } else {
-            Ok((DateTime(epoch), data))
+            Ok((Epoch(epoch), data))
         }
     }
 }

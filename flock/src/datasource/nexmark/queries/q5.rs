@@ -16,7 +16,7 @@ fn main() {}
 
 #[cfg(test)]
 mod tests {
-    use crate::datasource::date::DateTime;
+    use crate::datasource::epoch::Epoch;
     use crate::datasource::nexmark::event::Bid;
     use crate::datasource::nexmark::NEXMarkSource;
     use crate::error::{FlockError, Result};
@@ -88,7 +88,7 @@ mod tests {
                 if j >= seconds {
                     break;
                 }
-                let bm = events.bids.get(&DateTime::new(j)).unwrap();
+                let bm = events.bids.get(&Epoch::new(j)).unwrap();
                 let (bids, _) = bm.get(&0).unwrap();
                 bids_batches.push(NEXMarkSource::to_batch(bids, bid_schema.clone()));
             }

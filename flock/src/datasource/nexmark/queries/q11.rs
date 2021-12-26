@@ -16,7 +16,7 @@ fn main() {}
 
 #[cfg(test)]
 mod tests {
-    use crate::datasource::date::DateTime as Epoch;
+    use crate::datasource::epoch::Epoch;
     use crate::datasource::nexmark::event::Bid;
     use crate::datasource::nexmark::NEXMarkSource;
     use crate::error::{FlockError, Result};

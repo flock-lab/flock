@@ -15,7 +15,7 @@
 
 use crate::config::FLOCK_CONF;
 use crate::datasource::config::Config;
-use crate::datasource::date::DateTime;
+use crate::datasource::epoch::Epoch;
 use crate::datasource::nexmark::event::{Auction, Bid, Person};
 use crate::datasource::nexmark::generator::NEXMarkGenerator;
 use crate::datasource::DataStream;
@@ -48,7 +48,6 @@ lazy_static! {
         .unwrap();
 }
 
-type Epoch = DateTime;
 type SourceId = usize;
 type Partition = usize;
 type NumEvents = usize;
@@ -432,25 +431,19 @@ impl NEXMarkSource {
                     .map(|s| {
                         events
                             .persons
-                            .get(&DateTime::new(s))
+                            .get(&Epoch::new(s))
                             .unwrap()
                             .get(&p)
                             .unwrap()
                             .1
                             + events
                                 .auctions
-                                .get(&DateTime::new(s))
+                                .get(&Epoch::new(s))
                                 .unwrap()
                                 .get(&p)
                                 .unwrap()
                                 .1
-                            + events
-                                .bids
-                                .get(&DateTime::new(s))
-                                .unwrap()
-                                .get(&p)
-                                .unwrap()
-                                .1
+                            + events.bids.get(&Epoch::new(s)).unwrap().get(&p).unwrap().1
                     })
                     .sum::<usize>()
             })
