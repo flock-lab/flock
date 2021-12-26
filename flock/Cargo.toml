@@ -1,0 +1,81 @@
+[package]
+name = "flock"
+version = "0.2.0"
+description = "Flock is a cloud-native, distributed, fault-tolerant, and highly-available streaming query engine that supports SQL on cloud function services."
+authors = [ "Gang Liao <gangliao@cs.umd.edu>" ]
+license = "AGPL-3.0"
+keywords = [ "cloud", "sql", "lambda", "dataflow", "FaaS" ]
+edition = "2021"
+
+[features]
+snmalloc = [ "snmalloc-rs" ]
+
+[dependencies]
+arrow = { git = "https://github.com/flock-lab/arrow-rs", branch = "flock", features = [ "simd" ] }
+arrow-flight = { git = "https://github.com/flock-lab/arrow-rs", branch = "flock" }
+async-trait = "0.1.42"
+aws_lambda_events = "0.5"
+base64 = "0.13.0"
+blake2 = "0.9"
+bytes = "1.0.1"
+chrono = "0.4.19"
+daggy = { git = "https://github.com/flock-lab/daggy", branch = "master" }
+dashmap = "5.0.0"
+datafusion = { git = "https://github.com/flock-lab/arrow-datafusion", branch = "flock" }
+env_logger = "^0.9"
+fake = { version = "2.4", features = [ 'derive', 'chrono' ] }
+
+filetime = { version = "0.2", optional = true }
+fixedbitset = { version = "0.4.0", optional = true }
+futures = "0.3.12"
+glob = { version = "0.3", optional = true }
+hashring = "0.2.0"
+humantime = "2.1.0"
+indoc = "1.0.3"
+itertools = "0.10.0"
+json = "0.12.4"
+lambda_runtime = { git = "https://github.com/awslabs/aws-lambda-rust-runtime/", branch = "master" }
+lazy_static = "1.4"
+log = "0.4.14"
+lz4 = "1.23.1"
+mimalloc = { version = "0.1", optional = true, default-features = false }
+num_cpus = { version = "1.13.0", optional = true }
+rand = { version = "0.8.3", features = [ "small_rng", "std_rng" ] }
+rayon = "1.5"
+regex = { version = "1.4.3", optional = true }
+remove_dir_all = { version = "0.7", optional = true }
+rusoto_core = "0.47.0"
+rusoto_iam = "0.47.0"
+rusoto_kafka = "0.47.0"
+rusoto_kinesis = "0.47.0"
+rusoto_lambda = "0.47.0"
+rusoto_logs = "0.47.0"
+rusoto_s3 = "0.47.0"
+rusoto_sqs = "0.47.0"
+rust-ini = "0.17"
+serde = { version = "1.0", features = [ "derive" ] }
+serde_bytes = "0.11"
+serde_json = "1.0"
+snap = "1.0.3"
+snmalloc-rs = { version = "0.2", optional = true, features = [ "cache-friendly" ] }
+sqlparser = "0.13.0"
+structopt = { version = "0.3", default-features = false }
+text_io = "0.1.8"
+tokio = { version = "1.4", features = [ "macros", "io-util", "sync", "rt-multi-thread" ] }
+url = { version = "2.0", optional = true }
+uuid = { version = "0.8.2", features = [ "v4" ] }
+zstd = "0.9.0+zstd.1.5.0"
+
+[dev-dependencies]
+cargo_toml = "0.10.1"
+
+reqwest = "0.11.7"
+
+[lib]
+name = "flock"
+path = "src/lib.rs"
+crate-type = [ "lib" ]
+
+# [[bin]]
+# name = "test_nexmark"
+# path = "src/tests/nexmark.rs"

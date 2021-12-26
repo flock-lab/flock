@@ -40,3 +40,8 @@ buildNumber.properties
 
 .metals
 scripts/parser/cloudwatch/src/logs
+
+# temporary files
+flock/data/
+flock/datasource/data
+flock/datasink/data
