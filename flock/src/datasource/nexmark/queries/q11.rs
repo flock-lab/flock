@@ -28,8 +28,9 @@ mod tests {
     use arrow::util::pretty::pretty_format_batches;
     use chrono::{DateTime, NaiveDateTime, Utc};
     use datafusion::datasource::MemTable;
+    use datafusion::logical_plan::{col, count_distinct};
     use datafusion::physical_plan::collect;
-    use datafusion::physical_plan::expressions::col;
+    use datafusion::physical_plan::expressions::col as expr_col;
     use datafusion::physical_plan::Partitioning;
     use indoc::indoc;
     use std::collections::HashMap;
@@ -51,7 +52,9 @@ mod tests {
         // data source generation
         let events = nex.generate_data()?;
 
-        let sql1 = "SELECT COUNT(DISTINCT bidder) FROM bid;";
+        // let sql1 = "SELECT COUNT(DISTINCT bidder) FROM bid;";
+        // let plan = physical_plan(&mut ctx, sql1).await?;
+        // let output = collect(plan).await?;
 
         let sql2 = indoc! {"
             SELECT  bidder,
@@ -83,8 +86,12 @@ mod tests {
             ctx.register_table("bid", Arc::new(table))?;
 
             // 1. get the total distinct bidders during the epoch
-            let plan = physical_plan(&mut ctx, sql1).await?;
-            let output = collect(plan).await?;
+            let output = ctx
+                .table("bid")?
+                .aggregate(vec![], vec![count_distinct(col("bidder"))])?
+                .collect()
+                .await?;
+
             let total_distinct_bidders = output[0]
                 .column(0)
                 .as_any()
@@ -111,7 +118,7 @@ mod tests {
             let partitions = repartition(
                 batches,
                 Partitioning::HashDiff(
-                    vec![col("bidder", &schema)?],
+                    vec![expr_col("bidder", &schema)?],
                     total_distinct_bidders as usize,
                 ),
             )
