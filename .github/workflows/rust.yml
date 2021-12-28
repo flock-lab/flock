@@ -28,12 +28,12 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2021-12-07
+          toolchain: nightly
           override: true
           components: rustfmt, clippy
-      - name: update umd-arrow
+      - name: update all third-party dependencies
         run: |
-          cargo update --package arrow
+          cargo update
       - uses: dorny/paths-filter@v2
         id: changes
         with:
