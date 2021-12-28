@@ -13,7 +13,7 @@ humantime = "2.1.0"
 itertools = "0.10.0"
 
 log = "0.4.14"
-structopt = { version = "0.3", default-features = false }
+structopt = { git = "https://github.com/flock-lab/structopt", branch = "master", default-features = false }
 
 [[bin]]
 name = "cloudwatch_parser"

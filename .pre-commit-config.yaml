@@ -14,7 +14,7 @@
 ---
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks.git
-    rev: v2.4.0
+    rev: v4.1.0
     hooks:
       - id: trailing-whitespace
         args: ["--markdown-linebreak-ext=md"]
@@ -40,7 +40,7 @@ repos:
       - id: google-style-java
         pass_filenames: false
   - repo: git://github.com/pre-commit/mirrors-yapf
-    rev: v0.29.0
+    rev: v0.32.0
     hooks:
       - id: yapf
         language: system
@@ -52,13 +52,13 @@ repos:
         language: system
         files: \.(go|py|sh|java|yaml|rs)$
   - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: master
+    rev: v2.5.1
     hooks:
       - id: prettier
         exclude: src/tests/data/plan
         files: \.(md|css|yml|js)
   - repo: https://github.com/flock-lab/pre-commit-rust
-    rev: master
+    rev: v1.0
     hooks:
       - id: fmt
       - id: cargo-check

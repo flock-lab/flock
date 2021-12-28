@@ -59,7 +59,7 @@ serde_json = "1.0"
 snap = "1.0.3"
 snmalloc-rs = { version = "0.2", optional = true, features = [ "cache-friendly" ] }
 sqlparser = "0.13.0"
-structopt = { version = "0.3", default-features = false }
+structopt = { git = "https://github.com/flock-lab/structopt", branch = "master", default-features = false }
 text_io = "0.1.8"
 tokio = { version = "1.4", features = [ "macros", "io-util", "sync", "rt-multi-thread" ] }
 url = { version = "2.0", optional = true }
