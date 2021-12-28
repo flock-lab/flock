@@ -28,6 +28,7 @@ mod tests {
     use arrow::util::pretty::pretty_format_batches;
     use chrono::{DateTime, NaiveDateTime, Utc};
     use datafusion::datasource::MemTable;
+    use datafusion::execution::context::ExecutionContext as DataFusionExecutionContext;
     use datafusion::logical_plan::{col, count_distinct};
     use datafusion::physical_plan::collect;
     use datafusion::physical_plan::expressions::col as expr_col;
@@ -35,6 +36,25 @@ mod tests {
     use indoc::indoc;
     use std::collections::HashMap;
     use std::sync::Arc;
+
+    /// get back the input data from the registered table after the query is
+    /// executed
+    fn get_input_from_table(ctx: &mut DataFusionExecutionContext) -> Result<Vec<Vec<RecordBatch>>> {
+        Ok(unsafe {
+            Arc::get_mut_unchecked(
+                &mut ctx
+                    .deregister_table("bid")
+                    .map_err(FlockError::DataFusion)?
+                    .ok_or_else(|| {
+                        FlockError::Internal("Failed to deregister table `bid`".to_string())
+                    })?,
+            )
+            .as_mut_any()
+            .downcast_mut::<MemTable>()
+            .unwrap()
+            .batches()
+        })
+    }
 
     #[tokio::test]
     async fn local_query_11() -> Result<()> {
@@ -59,8 +79,8 @@ mod tests {
         let sql2 = indoc! {"
             SELECT  bidder,
                     Count(*)         AS bid_count,
-                    Min(b_date_time) AS starttime,
-                    Max(b_date_time) AS endtime
+                    Min(b_date_time) AS start_time,
+                    Max(b_date_time) AS end_time
             FROM    bid
             GROUP BY bidder;
         "};
@@ -77,10 +97,10 @@ mod tests {
         for i in 0..seconds {
             let bm = events.bids.get(&Epoch::new(i)).unwrap();
             let (bids, _) = bm.get(&0).unwrap();
-            let mut batches = vec![event_bytes_to_batch(bids, schema.clone(), 1024)];
+            let batches = vec![event_bytes_to_batch(bids, schema.clone(), 1024)];
 
             // register memory tables
-            let mut ctx = datafusion::execution::context::ExecutionContext::new();
+            let mut ctx = DataFusionExecutionContext::new();
             let table = MemTable::try_new(schema.clone(), batches)?;
             ctx.deregister_table("bid")?;
             ctx.register_table("bid", Arc::new(table))?;
@@ -99,24 +119,9 @@ mod tests {
                 .unwrap()
                 .value(0);
 
-            unsafe {
-                batches = Arc::get_mut_unchecked(
-                    &mut ctx
-                        .deregister_table("bid")
-                        .map_err(FlockError::DataFusion)?
-                        .ok_or_else(|| {
-                            FlockError::Internal("Failed to deregister table `bid`".to_string())
-                        })?,
-                )
-                .as_mut_any()
-                .downcast_mut::<MemTable>()
-                .unwrap()
-                .batches();
-            }
-
             // 2. get the distinct partition for each bidder
             let partitions = repartition(
-                batches,
+                get_input_from_table(&mut ctx)?,
                 Partitioning::HashDiff(
                     vec![expr_col("bidder", &schema)?],
                     total_distinct_bidders as usize,
@@ -128,7 +133,7 @@ mod tests {
             let sessions: Vec<Vec<RecordBatch>> = partitions
                 .into_iter()
                 .filter(|x| !x.is_empty())
-                .map(|partition| {
+                .flat_map(|partition| {
                     let mut session = vec![];
                     let bidder = partition[0]
                         .column(1 /* bidder field */)
@@ -187,7 +192,6 @@ mod tests {
                     }
                     session
                 })
-                .flatten()
                 .collect();
 
             if !sessions.is_empty() {

@@ -24,7 +24,7 @@ rusoto_logs = "0.47.0"
 rusoto_s3 = "0.47.0"
 rusoto_sqs = "0.47.0"
 serde_json = "1.0"
-structopt = { version = "0.3", default-features = false }
+structopt = { git = "https://github.com/flock-lab/structopt", branch = "master", default-features = false }
 tokio = { version = "1.4", features = [ "macros", "io-util", "sync", "rt-multi-thread", "time" ] }
 
 [[bin]]
