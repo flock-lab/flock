@@ -314,16 +314,20 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
 
     let sink_type = DataSinkType::new(opt.data_sink_type)?;
     if sink_type != DataSinkType::Blackhole {
-        let data_sink = DataSink::read(format!("q{}", opt.query_number), sink_type).await?;
-        let (last_function, batches) = data_sink.decode_record_batches()?;
+        let data_sink = DataSink::read(
+            format!("q{}", opt.query_number),
+            sink_type,
+            DataSinkFormat::default(),
+        )
+        .await?;
         info!(
             "[OK] Received {} batches from the data sink.",
-            batches.len()
+            data_sink.record_batches.len()
         );
-        info!("[OK] Last data sink function: {}", last_function);
-        let function_log_group = format!("/aws/lambda/{}", last_function);
+        info!("[OK] Last data sink function: {}", data_sink.function_name);
+        let function_log_group = format!("/aws/lambda/{}", data_sink.function_name);
         fetch_aws_watchlogs(&function_log_group, parse_duration("1min").unwrap()).await?;
-        println!("{}", pretty_format_batches(&batches)?);
+        println!("{}", pretty_format_batches(&data_sink.record_batches)?);
     }
 
     Ok(())

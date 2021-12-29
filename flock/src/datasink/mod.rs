@@ -25,6 +25,8 @@ use arrow::record_batch::RecordBatch;
 use arrow_flight::utils::flight_data_from_arrow_batch;
 use arrow_flight::utils::flight_data_to_arrow_batch;
 use arrow_flight::FlightData;
+use datafusion::execution::context::ExecutionContext;
+use datafusion::prelude::CsvReadOptions;
 use parquet::arrow::ArrowWriter;
 use rayon::prelude::*;
 use rusoto_core::ByteStream;
@@ -155,21 +157,26 @@ impl DataSink {
     }
 
     /// Read the record batches from the data sink.
-    pub async fn read(function_name: String, data_sink: DataSinkType) -> Result<DataSink> {
-        match data_sink {
+    pub async fn read(
+        function_name: String,
+        sink_type: DataSinkType,
+        sink_format: DataSinkFormat,
+    ) -> Result<DataSink> {
+        match sink_type {
             DataSinkType::Blackhole => Ok(DataSink {
                 function_name,
                 ..Default::default()
             }),
             DataSinkType::SQS => DataSink::read_from_sqs(function_name).await,
             DataSinkType::S3 => DataSink::read_from_s3(function_name).await,
-            DataSinkType::EFS => DataSink::read_from_efs(function_name).await,
+            DataSinkType::EFS => DataSink::read_from_efs(function_name, sink_format).await,
             _ => unimplemented!(),
         }
     }
 
-    /// Convert the data sink to record batches.
-    pub fn decode_record_batches(self) -> Result<(String, Vec<RecordBatch>)> {
+    /// This is an internal function that is used to decode `self.encoded_data`
+    /// to `self.record_batches` for future use.
+    fn decode_record_batches(&mut self) -> Result<()> {
         let record_batch = |df: Vec<DataFrame>, schema: Arc<Schema>| -> Vec<RecordBatch> {
             df.into_par_iter()
                 .map(|d| {
@@ -189,14 +196,12 @@ impl DataSink {
         };
 
         if self.record_batches.is_empty() {
-            let dataframe = unmarshal(self.encoded_data, self.encoding.clone());
-            Ok((
-                self.function_name,
-                record_batch(dataframe, schema_from_bytes(&self.schema)?),
-            ))
-        } else {
-            Ok((self.function_name, *self.record_batches))
+            let dataframe = unmarshal(self.encoded_data.clone(), self.encoding.clone());
+            self.record_batches =
+                Box::new(record_batch(dataframe, schema_from_bytes(&self.schema)?));
         }
+
+        Ok(())
     }
 
     /// This is an internal function that is used to encode the
@@ -346,8 +351,13 @@ impl DataSink {
 
         assert!(messages.len() <= 1);
 
-        serde_json::from_str(messages[0].body.as_ref().expect("Message body not found"))
-            .map_err(|e| FlockError::AWS(e.to_string()))
+        let mut data: DataSink =
+            serde_json::from_str(messages[0].body.as_ref().expect("Message body not found"))
+                .map_err(|e| FlockError::AWS(e.to_string()))?;
+
+        data.decode_record_batches()?;
+
+        Ok(data)
     }
 
     async fn read_from_s3(function_name: String) -> Result<DataSink> {
@@ -364,16 +374,72 @@ impl DataSink {
             .take()
             .expect("body is empty");
 
-        Ok(tokio::task::spawn_blocking(move || {
+        let mut data: DataSink = tokio::task::spawn_blocking(move || {
             let mut buf = Vec::new();
             body.into_blocking_read().read_to_end(&mut buf).unwrap();
             serde_json::from_slice(&buf).unwrap()
         })
         .await
-        .expect("failed to load plan from S3"))
+        .expect("failed to load plan from S3");
+
+        data.decode_record_batches()?;
+
+        Ok(data)
     }
 
-    async fn read_from_efs(_function_name: String) -> Result<DataSink> {
-        unimplemented!();
+    async fn read_from_efs(function_name: String, sink_format: DataSinkFormat) -> Result<DataSink> {
+        let fs_path = Path::new(&*FLOCK_EFS_ROOT_DIR).join(function_name.clone());
+        let ctx = Box::new(ExecutionContext::new());
+
+        let mut tasks = vec![];
+        match sink_format {
+            DataSinkFormat::CSV => {
+                let options = CsvReadOptions::new()
+                    .has_header(true)
+                    .schema_infer_max_records(100);
+                for entry in std::fs::read_dir(fs_path)? {
+                    let entry = entry?;
+                    if entry.file_name().to_str().unwrap().ends_with(".csv") {
+                        let mut context = ctx.clone();
+                        let task: JoinHandle<Result<Vec<RecordBatch>>> = task::spawn(async move {
+                            let df = context
+                                .read_csv(entry.path().to_str().unwrap(), options)
+                                .await
+                                .unwrap();
+                            df.collect().await.map_err(FlockError::from)
+                        });
+                        tasks.push(task);
+                    }
+                }
+            }
+            DataSinkFormat::Parquet => {
+                for entry in std::fs::read_dir(fs_path)? {
+                    let entry = entry?;
+                    if entry.file_name().to_str().unwrap().ends_with(".parquet") {
+                        let mut context = ctx.clone();
+                        let task: JoinHandle<Result<Vec<RecordBatch>>> = task::spawn(async move {
+                            let df = context
+                                .read_parquet(entry.path().to_str().unwrap())
+                                .await
+                                .unwrap();
+                            df.collect().await.map_err(FlockError::from)
+                        });
+                        tasks.push(task);
+                    }
+                }
+            }
+            _ => unimplemented!(),
+        }
+
+        let mut records = vec![];
+        for task in tasks {
+            records.push(task.await.map_err(|e| FlockError::AWS(e.to_string()))??);
+        }
+
+        Ok(DataSink {
+            function_name: function_name.clone(),
+            record_batches: Box::new(records.into_iter().flatten().collect()),
+            ..Default::default()
+        })
     }
 }
