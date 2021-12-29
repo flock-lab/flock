@@ -29,12 +29,14 @@ use rusoto_efs::{
     RootDirectory,
 };
 use rusoto_lambda::{
-    CreateFunctionRequest, FunctionCode, GetFunctionRequest, InvocationRequest, InvocationResponse,
-    Lambda, LambdaClient, PutFunctionConcurrencyRequest, UpdateFunctionCodeRequest,
+    CreateFunctionRequest, FileSystemConfig, FunctionCode, GetFunctionRequest, InvocationRequest,
+    InvocationResponse, Lambda, LambdaClient, PutFunctionConcurrencyRequest,
+    UpdateFunctionCodeRequest,
 };
 use rusoto_logs::CloudWatchLogsClient;
 use rusoto_s3::S3Client;
 use rusoto_sqs::SqsClient;
+use std::path::Path;
 use std::time::Duration;
 
 lazy_static! {
@@ -202,6 +204,7 @@ pub async fn invoke_lambda_function(
 pub async fn create_lambda_function(
     ctx: &ExecutionContext,
     memory_size: Option<i64>,
+    efs: String,
     debug: bool,
 ) -> Result<String> {
     let func_name = ctx.name.clone();
@@ -225,6 +228,7 @@ pub async fn create_lambda_function(
         conf.function_name
             .ok_or_else(|| FlockError::Internal("No function name!".to_string()))
     } else {
+        let mount_path = Path::new(&*FLOCK_EFS_ROOT_DIR).join(func_name.clone());
         let conf = FLOCK_LAMBDA_CLIENT
             .create_function(CreateFunctionRequest {
                 code: FunctionCode {
@@ -239,6 +243,10 @@ pub async fn create_lambda_function(
                 memory_size,
                 environment: DeployConfig::environment(ctx, debug),
                 timeout: Some(900),
+                file_system_configs: Some(vec![FileSystemConfig {
+                    arn:              efs,
+                    local_mount_path: mount_path.to_str().unwrap().to_string(),
+                }]),
                 ..Default::default()
             })
             .await
@@ -248,7 +256,7 @@ pub async fn create_lambda_function(
     }
 }
 
-/// Creates a elastic file system.
+/// Creates an elastic file system.
 ///
 /// Amazon Elastic File System (Amazon EFS) provides a simple, scalable, elastic
 /// file system for general purpose workloads for use with AWS Cloud services

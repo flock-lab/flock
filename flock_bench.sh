@@ -29,7 +29,7 @@ Help() {
   echo "r     Run the benchmark. Default: false"
   echo "a     Async invoke the function. Default: sync invoke"
   echo "b     The type of the benchmark [nexmark, ysb]. Default: 'nexmark'"
-  echo "d     The type of the data sink [empty: 0, s3: 1, dynamodb: 2, sqs: 3]. Default: 0"
+  echo "d     The type of the data sink [empty: 0, s3: 1, dynamodb: 2, sqs: 3, efs: 4]. Default: 0"
   echo "q     NexMark Query Number [0-9]. Ignored if '-b' is not 'nexmark'. Default: 5"
   echo "p     Number of Data Generators. Default: 1"
   echo "s     Seconds to run the benchmark. Default: 10"
@@ -75,7 +75,7 @@ Build_and_Deploy() {
   echo
   echo $(echogreen "[2] Compiling the Benchmark Client ...")
   cd ../benchmarks
-  cargo +nightly build --target x86_64-unknown-linux-gnu --release --features "arrow/simd datafusion/simd mimalloc"
+  cargo +nightly build --target x86_64-unknown-linux-gnu --release --features "arrow/simd datafusion/simd"
   echo
   echo $(echogreen "[3] Compiling Flock CLI...")
   cd ../flock-cli
@@ -173,8 +173,8 @@ if [ $bench != "nexmark" ] && [ $bench != "ysb" ]; then
   exit
 fi
 
-if [ $data_sink -gt 3 ] || [ $data_sink -lt 0 ]; then
-  echo $(echored "Error: Data sink type must be between 0 and 3.")
+if [ $data_sink -gt 4 ] || [ $data_sink -lt 0 ]; then
+  echo $(echored "Error: Data sink type must be between 0 and 4.")
   exit
 fi
 

@@ -171,9 +171,10 @@ pub async fn plan_placement(
 /// The returned function is the worker group as a whole which will be executed
 /// by the NexmarkBenchmark data generator function.
 pub async fn create_nexmark_functions(
-    opt: NexmarkBenchmarkOpt,
+    opt: &NexmarkBenchmarkOpt,
     window: StreamWindow,
     physcial_plan: Arc<dyn ExecutionPlan>,
+    efs: String,
 ) -> Result<CloudFunction> {
     let worker_func_name = format!("q{}-00", opt.query_number);
 
@@ -210,13 +211,25 @@ pub async fn create_nexmark_functions(
         "Creating lambda function: {}",
         NEXMARK_SOURCE_FUNC_NAME.clone()
     );
-    create_lambda_function(&nexmark_source_ctx, Some(2048 /* MB */), opt.debug).await?;
+    create_lambda_function(
+        &nexmark_source_ctx,
+        Some(2048 /* MB */),
+        efs.clone(),
+        opt.debug,
+    )
+    .await?;
 
     // Create the function for the nexmark worker.
     match &next_func_name {
         CloudFunction::Lambda(name) => {
             info!("Creating lambda function: {}", name);
-            create_lambda_function(&nexmark_worker_ctx, Some(opt.memory_size), opt.debug).await?;
+            create_lambda_function(
+                &nexmark_worker_ctx,
+                Some(opt.memory_size),
+                efs.clone(),
+                opt.debug,
+            )
+            .await?;
         }
         CloudFunction::Group((name, concurrency)) => {
             info!(
@@ -227,8 +240,13 @@ pub async fn create_nexmark_functions(
                 let group_member_name = format!("{}-{:02}", name.clone(), i);
                 info!("Creating function member: {}", group_member_name);
                 nexmark_worker_ctx.name = group_member_name;
-                create_lambda_function(&nexmark_worker_ctx, Some(opt.memory_size), opt.debug)
-                    .await?;
+                create_lambda_function(
+                    &nexmark_worker_ctx,
+                    Some(opt.memory_size),
+                    efs.clone(),
+                    opt.debug,
+                )
+                .await?;
                 set_lambda_concurrency(nexmark_worker_ctx.name, 1).await?;
             }
         }
@@ -238,17 +256,13 @@ pub async fn create_nexmark_functions(
     Ok(next_func_name)
 }
 
-async fn create_file_system(sink_type: usize) -> Option<String> {
-    info!("Using {:?} as the data sink", sink_type);
-    let sink = DataSinkType::new(sink_type).ok()?;
-    if sink == DataSinkType::EFS {
-        let efs_id = create_elastic_file_system().await.ok()?;
-        let access_point_id = create_efs_access_point(&efs_id).await.ok()?;
-        let access_point_arn = describe_efs_access_point(&access_point_id).await.ok()?;
-        Some(access_point_arn)
-    } else {
-        None
-    }
+/// Create an Elastic file system access point for Flock.
+pub async fn create_file_system() -> Result<String> {
+    let efs_id = create_elastic_file_system().await?;
+    let access_point_id = create_efs_access_point(&efs_id).await?;
+    describe_efs_access_point(&access_point_id)
+        .await
+        .map_err(|e| FlockError::AWS(format!("{}", e)))
 }
 
 #[allow(dead_code)]
@@ -257,22 +271,20 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
         "Running the NEXMark benchmark with the following options: {:?}",
         opt
     );
-    let nexmark_conf = create_nexmark_source(&opt);
     let query_number = opt.query_number;
+    let nexmark_conf = create_nexmark_source(&opt);
+    let efs = create_file_system().await?;
 
     let mut ctx = register_nexmark_tables().await?;
     let plan = physical_plan(&mut ctx, &nexmark_query(query_number)).await?;
-    let root_actor =
-        create_nexmark_functions(opt.clone(), nexmark_conf.window.clone(), plan).await?;
-
-    let _dfs = create_file_system(opt.data_sink_type).await;
+    let worker = create_nexmark_functions(&opt, nexmark_conf.window.clone(), plan, efs).await?;
 
     // The source generator function needs the metadata to determine the type of the
     // workers such as single function or a group. We don't want to keep this info
     // in the environment as part of the source function. Otherwise, we have to
     // *delete* and **recreate** the source function every time we change the query.
     let mut metadata = HashMap::new();
-    metadata.insert("workers".to_string(), serde_json::to_string(&root_actor)?);
+    metadata.insert("workers".to_string(), serde_json::to_string(&worker)?);
     metadata.insert(
         "invocation_type".to_string(),
         if opt.async_type {

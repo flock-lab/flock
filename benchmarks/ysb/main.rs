@@ -11,6 +11,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+#[path = "../nexmark/main.rs"]
+mod nexmark_bench;
+use nexmark_bench::create_file_system;
+
 use arrow::datatypes::{Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
 use datafusion::datasource::MemTable;
@@ -105,8 +109,9 @@ fn create_ysb_source(opt: &YSBBenchmarkOpt) -> YSBSource {
 /// The returned function is the worker group as a whole which will be executed
 /// by the YSB data generator function.
 async fn create_ysb_functions(
-    opt: YSBBenchmarkOpt,
+    opt: &YSBBenchmarkOpt,
     physcial_plan: Arc<dyn ExecutionPlan>,
+    efs: String,
 ) -> Result<CloudFunction> {
     let worker_func_name = "ysb-00".to_string();
     let next_func_name = CloudFunction::Group((worker_func_name.clone(), *FLOCK_CONCURRENCY));
@@ -127,7 +132,7 @@ async fn create_ysb_functions(
 
     // Create the function for the ysb source generator.
     info!("Creating lambda function: {}", YSB_SOURCE_FUNC_NAME.clone());
-    create_lambda_function(&ysb_source_ctx, Some(1024), opt.debug).await?;
+    create_lambda_function(&ysb_source_ctx, Some(1024), efs.clone(), opt.debug).await?;
 
     // Create the function for the ysb worker.
     match &next_func_name {
@@ -137,7 +142,13 @@ async fn create_ysb_functions(
                 let group_member_name = format!("{}-{:02}", name.clone(), i);
                 info!("Creating function member: {}", group_member_name);
                 ysb_worker_ctx.name = group_member_name;
-                create_lambda_function(&ysb_worker_ctx, Some(opt.memory_size), opt.debug).await?;
+                create_lambda_function(
+                    &ysb_worker_ctx,
+                    Some(opt.memory_size),
+                    efs.clone(),
+                    opt.debug,
+                )
+                .await?;
                 set_lambda_concurrency(ysb_worker_ctx.name, 1).await?;
             }
         }
@@ -153,10 +164,10 @@ async fn benchmark(opt: YSBBenchmarkOpt) -> Result<()> {
         opt
     );
     let ysb_conf = create_ysb_source(&opt);
-
+    let efs = create_file_system().await?;
     let mut ctx = register_ysb_tables().await?;
     let plan = physical_plan(&mut ctx, &ysb_query()).await?;
-    let root_actor = create_ysb_functions(opt.clone(), plan).await?;
+    let root_actor = create_ysb_functions(&opt, plan, efs).await?;
 
     // The source generator function needs the metadata to determine the type of the
     // workers such as single function or a group. We don't want to keep this info

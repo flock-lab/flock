@@ -50,19 +50,19 @@ async fn benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
         opt
     );
     let nexmark_conf = create_nexmark_source(opt);
+    let efs = create_file_system().await?;
     let query_number = opt.query_number;
 
     let mut ctx = register_nexmark_tables().await?;
     let plan = physical_plan(&mut ctx, &nexmark_query(query_number)).await?;
-    let root_actor =
-        create_nexmark_functions(opt.clone(), nexmark_conf.window.clone(), plan).await?;
+    let worker = create_nexmark_functions(opt, nexmark_conf.window.clone(), plan, efs).await?;
 
     // The source generator function needs the metadata to determine the type of the
     // workers such as single function or a group. We don't want to keep this info
     // in the environment as part of the source function. Otherwise, we have to
     // *delete* and **recreate** the source function every time we change the query.
     let mut metadata = HashMap::new();
-    metadata.insert("workers".to_string(), serde_json::to_string(&root_actor)?);
+    metadata.insert("workers".to_string(), serde_json::to_string(&worker)?);
     metadata.insert("invocation_type".to_string(), "sync".to_string());
 
     let start_time = SystemTime::now();
