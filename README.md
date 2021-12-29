@@ -80,7 +80,7 @@ All the following Nexmark queries share the same lambda function code.
 | [q9](https://github.com/flock-lab/flock/blob/master/flock/src/datasource/nexmark/queries/q9.sql)   | Winning Bids                    | Find the winning bid for each auction.                                                                              | ✅    |
 | [q10](https://github.com/flock-lab/flock/blob/master/flock/src/datasource/nexmark/queries/q10.sql) | Log to File System              | Log all events to AWS S3, SQS, and DynamoDB. Illustrates windows streaming data into partitioned file system.       | ✅    |
 | [q11](https://github.com/flock-lab/flock/blob/master/flock/src/datasource/nexmark/queries/q11.sql) | User Sessions                   | How many bids did a user make in each session they were active? Illustrates session windows.                        | ✅    |
-| [q12](https://github.com/flock-lab/flock/blob/master/flock/src/datasource/nexmark/queries/q12.sql) | Processing Time Windows         | How many bids does a user make within a fixed processing time limit? Illustrates working in processing time window. |
+| [q12](https://github.com/flock-lab/flock/blob/master/flock/src/datasource/nexmark/queries/q12.sql) | Processing Time Windows         | How many bids does a user make within a fixed processing time limit? Illustrates working in processing time window. | ✅    |
 | [q13](https://github.com/flock-lab/flock/blob/master/flock/src/datasource/nexmark/queries/q13.sql) | Bounded Side Input Join         | Joins a stream to a bounded side input, modeling basic stream enrichment.                                           | ✅    |
 
 We provide a script (`flock_bench.sh`) to build, deploy and run the benchmark.

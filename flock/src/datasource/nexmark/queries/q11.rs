@@ -37,6 +37,9 @@ mod tests {
     use std::collections::HashMap;
     use std::sync::Arc;
 
+    /// 2015-07-15 00:00:00
+    const BASE_TIME: i64 = 1_436_918_400_000;
+
     /// get back the input data from the registered table after the query is
     /// executed
     fn get_input_from_table(ctx: &mut DataFusionExecutionContext) -> Result<Vec<Vec<RecordBatch>>> {
@@ -56,12 +59,51 @@ mod tests {
         })
     }
 
+    fn find_session_windows(
+        map: &HashMap<usize, Vec<Vec<RecordBatch>>>,
+        interval: usize,
+        i: usize,
+    ) -> Result<Vec<usize>> {
+        let mut to_remove = vec![];
+
+        map.iter().for_each(|(bidder, batches)| {
+            // get the last batch
+            let batch = batches.last().unwrap().last().unwrap();
+
+            // get the last bid's date time
+            let last_timestamp = batch
+                .column(3 /* b_date_time field */)
+                .as_any()
+                .downcast_ref::<TimestampMillisecondArray>()
+                .unwrap()
+                .value(batch.num_rows() - 1);
+
+            let last_date_time = DateTime::<Utc>::from_utc(
+                NaiveDateTime::from_timestamp(last_timestamp / 1000, 0),
+                Utc,
+            );
+
+            let epoch_gap_time = DateTime::<Utc>::from_utc(
+                NaiveDateTime::from_timestamp(BASE_TIME / 1000 + i as i64, 0),
+                Utc,
+            );
+
+            if epoch_gap_time.signed_duration_since(last_date_time)
+                > chrono::Duration::seconds(interval as i64)
+            {
+                to_remove.push(bidder.to_owned());
+            }
+        });
+
+        Ok(to_remove)
+    }
+
     #[tokio::test]
     async fn local_query_11() -> Result<()> {
         // benchmark configuration
-        let seconds = 20;
+        let seconds = 40;
         let threads = 1;
-        let event_per_second = 50;
+        let event_per_second = 100;
         let nex = NEXMarkSource::new(
             seconds,
             threads,
@@ -95,6 +137,7 @@ mod tests {
 
         // sequential processing
         for i in 0..seconds {
+            println!("Epoch {}", i);
             let bm = events.bids.get(&Epoch::new(i)).unwrap();
             let (bids, _) = bm.get(&0).unwrap();
             let batches = vec![event_bytes_to_batch(bids, schema.clone(), 1024)];
@@ -129,11 +172,11 @@ mod tests {
             )
             .await?;
 
-            // add each partition to the map based on the column `bidder`
-            let sessions: Vec<Vec<RecordBatch>> = partitions
+            // 3. add each partition to the map based on the column `bidder`
+            let mut sessions: Vec<Vec<Vec<RecordBatch>>> = partitions
                 .into_iter()
                 .filter(|x| !x.is_empty())
-                .flat_map(|partition| {
+                .map(|partition| {
                     let mut session = vec![];
                     let bidder = partition[0]
                         .column(1 /* bidder field */)
@@ -183,7 +226,6 @@ mod tests {
                         if curr_date_time.signed_duration_since(last_date_time)
                             > chrono::Duration::seconds(interval as i64)
                         {
-                            println!("New Session Window");
                             session = map.remove(&(bidder as usize)).unwrap();
                         }
                         map.entry(bidder as usize)
@@ -194,6 +236,13 @@ mod tests {
                 })
                 .collect();
 
+            // 4. iterate over the map and find the new tumble windows
+            let to_remove = find_session_windows(&map, interval, i)?;
+            to_remove.iter().for_each(|bidder| {
+                sessions.push(map.remove(bidder).unwrap());
+            });
+
+            let sessions: Vec<Vec<RecordBatch>> = sessions.into_iter().flatten().collect();
             if !sessions.is_empty() {
                 let table = MemTable::try_new(schema.clone(), sessions)?;
                 ctx.deregister_table("bid")?;
