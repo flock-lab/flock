@@ -24,7 +24,6 @@ dashmap = "5.0.0"
 datafusion = { git = "https://github.com/flock-lab/arrow-datafusion", branch = "flock" }
 env_logger = "^0.9"
 fake = { version = "2.4", features = [ 'derive', 'chrono' ] }
-
 filetime = { version = "0.2", optional = true }
 fixedbitset = { version = "0.4.0", optional = true }
 futures = "0.3.12"
@@ -45,6 +44,7 @@ rayon = "1.5"
 regex = { version = "1.4.3", optional = true }
 remove_dir_all = { version = "0.7", optional = true }
 rusoto_core = "0.47.0"
+rusoto_efs = "0.47.0"
 rusoto_iam = "0.47.0"
 rusoto_kafka = "0.47.0"
 rusoto_kinesis = "0.47.0"

@@ -57,6 +57,8 @@ pub enum DataSinkType {
     DynamoDB  = 2,
     /// Write to AWS SQS.
     SQS       = 3,
+    /// Write to AWS EFS.
+    EFS       = 4,
 }
 
 impl DataSinkType {
@@ -67,6 +69,7 @@ impl DataSinkType {
             1 => Ok(DataSinkType::S3),
             2 => Ok(DataSinkType::DynamoDB),
             3 => Ok(DataSinkType::SQS),
+            4 => Ok(DataSinkType::EFS),
             _ => Err(FlockError::DataSink(format!(
                 "Unknown data sink type: {}",
                 data_sink
@@ -132,6 +135,9 @@ impl DataSink {
             DataSinkType::S3 => {
                 self.write_to_s3().await?;
             }
+            DataSinkType::EFS => {
+                self.write_to_efs().await?;
+            }
             _ => unimplemented!(),
         }
         Ok(json!({"name": self.function_name.clone(), "sink_type": data_sink, "status": "success"}))
@@ -146,6 +152,7 @@ impl DataSink {
             }),
             DataSinkType::SQS => DataSink::read_from_sqs(function_name).await,
             DataSinkType::S3 => DataSink::read_from_s3(function_name).await,
+            DataSinkType::EFS => DataSink::read_from_efs(function_name).await,
             _ => unimplemented!(),
         }
     }
@@ -232,6 +239,10 @@ impl DataSink {
         Ok(())
     }
 
+    async fn write_to_efs(&self) -> Result<()> {
+        unimplemented!();
+    }
+
     async fn read_from_sqs(function_name: String) -> Result<DataSink> {
         let queue_name = function_name.split('-').next().unwrap();
         let queue_url = FLOCK_SQS_CLIENT
@@ -282,5 +293,9 @@ impl DataSink {
         })
         .await
         .expect("failed to load plan from S3"))
+    }
+
+    async fn read_from_efs(_function_name: String) -> Result<DataSink> {
+        unimplemented!();
     }
 }
