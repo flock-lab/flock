@@ -315,7 +315,7 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
     let sink_type = DataSinkType::new(opt.data_sink_type)?;
     if sink_type != DataSinkType::Blackhole {
         let data_sink = DataSink::read(format!("q{}", opt.query_number), sink_type).await?;
-        let (last_function, batches) = data_sink.to_record_batch()?;
+        let (last_function, batches) = data_sink.decode_record_batches()?;
         info!(
             "[OK] Received {} batches from the data sink.",
             batches.len()

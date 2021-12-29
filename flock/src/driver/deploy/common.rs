@@ -34,6 +34,7 @@ use rusoto_lambda::{
 };
 use rusoto_logs::CloudWatchLogsClient;
 use rusoto_s3::S3Client;
+use rusoto_sqs::SqsClient;
 use std::time::Duration;
 
 lazy_static! {
@@ -74,6 +75,8 @@ lazy_static! {
     pub static ref FLOCK_LAMBDA_CLIENT: LambdaClient = LambdaClient::new(Region::default());
     /// Flock EFS Client.
     pub static ref FLOCK_EFS_CLIENT: EfsClient = EfsClient::new(Region::default());
+    /// Flock SQS Client.
+    pub static ref FLOCK_SQS_CLIENT: SqsClient = SqsClient::new(Region::default());
     /// Flock CloudWatch Logs Client.
     pub static ref FLOCK_WATCHLOGS_CLIENT: CloudWatchLogsClient = CloudWatchLogsClient::new(Region::default());
 }
