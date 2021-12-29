@@ -238,19 +238,16 @@ pub async fn create_nexmark_functions(
     Ok(next_func_name)
 }
 
-async fn create_file_system(sink_type: usize) -> Result<String> {
+async fn create_file_system(sink_type: usize) -> Option<String> {
     info!("Using {:?} as the data sink", sink_type);
-    let sink = DataSinkType::new(sink_type)?;
+    let sink = DataSinkType::new(sink_type).ok()?;
     if sink == DataSinkType::EFS {
-        let efs_id = create_elastic_file_system().await?;
-        let access_point_id = create_efs_access_point(&efs_id).await?;
-        let access_point_arn = describe_efs_access_point(&access_point_id).await?;
-        Ok(access_point_arn)
+        let efs_id = create_elastic_file_system().await.ok()?;
+        let access_point_id = create_efs_access_point(&efs_id).await.ok()?;
+        let access_point_arn = describe_efs_access_point(&access_point_id).await.ok()?;
+        Some(access_point_arn)
     } else {
-        Err(FlockError::AWS(format!(
-            "Failure to create file system for data sink: {:?}",
-            sink
-        )))
+        None
     }
 }
 
@@ -268,7 +265,7 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
     let root_actor =
         create_nexmark_functions(opt.clone(), nexmark_conf.window.clone(), plan).await?;
 
-    let _dfs = create_file_system(opt.data_sink_type).await?;
+    let _dfs = create_file_system(opt.data_sink_type).await;
 
     // The source generator function needs the metadata to determine the type of the
     // workers such as single function or a group. We don't want to keep this info
