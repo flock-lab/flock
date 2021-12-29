@@ -14,10 +14,10 @@
 //! This module provides different data sinks for the Flock runtime to write
 //! data to.
 
-use crate::driver::deploy::common::*;
 use crate::encoding::Encoding;
 use crate::error::{FlockError, Result};
 use crate::runtime::payload::DataFrame;
+use crate::services::*;
 use crate::transmute::*;
 use arrow::csv;
 use arrow::datatypes::Schema;

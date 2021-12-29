@@ -20,7 +20,6 @@ use crate::error::{FlockError, Result};
 use rusoto_core::Region;
 use rusoto_lambda::{CreateFunctionRequest, Lambda, LambdaClient};
 
-pub mod common;
 pub mod config;
 
 /// Query Execution Context decides to execute your queries either remotely or

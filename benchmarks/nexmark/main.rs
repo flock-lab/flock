@@ -258,11 +258,23 @@ pub async fn create_nexmark_functions(
 
 /// Create an Elastic file system access point for Flock.
 pub async fn create_file_system() -> Result<String> {
-    let efs_id = create_elastic_file_system().await?;
-    let access_point_id = create_efs_access_point(&efs_id).await?;
-    describe_efs_access_point(&access_point_id)
-        .await
-        .map_err(|e| FlockError::AWS(format!("{}", e)))
+    let mut efs_id = create_aws_efs().await?;
+    if efs_id.is_empty() {
+        efs_id = discribe_aws_efs().await?;
+    }
+    info!("Creating AWS Elastic File System: {}", efs_id);
+    let access_point_id = create_aws_efs_access_point(&efs_id).await?;
+    let mut access_point_arn = if access_point_id.is_empty() {
+        describe_aws_efs_access_point(None, Some(efs_id))
+            .await
+            .map_err(|e| FlockError::AWS(format!("{}", e)))?
+    } else {
+        describe_aws_efs_access_point(Some(access_point_id), None)
+            .await
+            .map_err(|e| FlockError::AWS(format!("{}", e)))?
+    };
+    info!("Creating AWS Access Point: {}", access_point_arn);
+    Ok(access_point_arn)
 }
 
 #[allow(dead_code)]

@@ -34,6 +34,7 @@ pub mod encoding;
 pub mod error;
 pub mod prelude;
 pub mod runtime;
+pub mod services;
 pub mod test_util;
 pub mod tests;
 pub mod transmute;

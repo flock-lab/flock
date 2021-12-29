@@ -25,8 +25,8 @@ use log::info;
 use rusoto_core::{Region, RusotoError};
 use rusoto_efs::{
     CreateAccessPointError, CreateAccessPointRequest, CreateFileSystemError,
-    CreateFileSystemRequest, CreationInfo, DescribeAccessPointsRequest, Efs, EfsClient, PosixUser,
-    RootDirectory,
+    CreateFileSystemRequest, CreationInfo, DescribeAccessPointsRequest, DescribeFileSystemsRequest,
+    Efs, EfsClient, PosixUser, RootDirectory,
 };
 use rusoto_lambda::{
     CreateFunctionRequest, FileSystemConfig, FunctionCode, GetFunctionRequest, InvocationRequest,
@@ -280,7 +280,7 @@ pub async fn create_lambda_function(
 ///
 /// # Returns
 /// The ID of the file system.
-pub async fn create_elastic_file_system() -> Result<String> {
+pub async fn create_aws_efs() -> Result<String> {
     let req = CreateFileSystemRequest {
         // A string of up to 64 ASCII characters. Amazon EFS uses this to ensure idempotent
         // creation.
@@ -293,10 +293,28 @@ pub async fn create_elastic_file_system() -> Result<String> {
 
     match FLOCK_EFS_CLIENT.create_file_system(req).await {
         Ok(resp) => Ok(resp.file_system_id),
-        Err(RusotoError::Service(CreateFileSystemError::FileSystemAlreadyExists(id))) => {
-            info!("File system already exists: {}", id);
-            Ok(id)
+        Err(RusotoError::Service(CreateFileSystemError::FileSystemAlreadyExists(_))) => {
+            Ok(String::new())
         }
+        Err(e) => Err(FlockError::AWS(e.to_string())),
+    }
+}
+
+/// Returns the description of a specific Amazon EFS file system if either the
+/// file system `CreationToken` or the `FileSystemId` is provided. Otherwise, it
+/// returns descriptions of all file systems owned by the caller's AWS account
+/// in the AWS Region of the endpoint that you're calling. This operation
+/// requires permissions for the elasticfilesystem:DescribeFileSystems action.
+///
+/// # Returns
+/// The ID of the file system.
+pub async fn discribe_aws_efs() -> Result<String> {
+    let req = DescribeFileSystemsRequest {
+        creation_token: Some(FLOCK_EFS_CREATION_TOKEN.to_string()),
+        ..Default::default()
+    };
+    match FLOCK_EFS_CLIENT.describe_file_systems(req).await {
+        Ok(resp) => Ok(resp.file_systems.unwrap()[0].file_system_id.clone()),
         Err(e) => Err(FlockError::AWS(e.to_string())),
     }
 }
@@ -314,7 +332,7 @@ pub async fn create_elastic_file_system() -> Result<String> {
 ///
 /// # Returns
 /// The ID of the access point.
-pub async fn create_efs_access_point(file_system_id: &str) -> Result<String> {
+pub async fn create_aws_efs_access_point(file_system_id: &str) -> Result<String> {
     let req = CreateAccessPointRequest {
         file_system_id: file_system_id.to_string(),
         client_token: FLOCK_EFS_CREATION_TOKEN.to_string(),
@@ -338,9 +356,8 @@ pub async fn create_efs_access_point(file_system_id: &str) -> Result<String> {
         Ok(resp) => resp
             .access_point_id
             .ok_or_else(|| FlockError::AWS("No access point ID!".to_string())),
-        Err(RusotoError::Service(CreateAccessPointError::AccessPointAlreadyExists(id))) => {
-            info!("Access point already exists: {}", id);
-            Ok(id)
+        Err(RusotoError::Service(CreateAccessPointError::AccessPointAlreadyExists(_))) => {
+            Ok(String::new())
         }
         Err(e) => Err(FlockError::AWS(e.to_string())),
     }
@@ -353,12 +370,17 @@ pub async fn create_efs_access_point(file_system_id: &str) -> Result<String> {
 ///
 /// # Arguments
 /// * `access_point_id` - The ID of the access point.
+/// * `file_system_id` - The ID of the EFS file system.
 ///
 /// # Returns
 /// The unique Amazon Resource Name (ARN) associated with the access point.
-pub async fn describe_efs_access_point(access_point_id: &str) -> Result<String> {
+pub async fn describe_aws_efs_access_point(
+    access_point_id: Option<String>,
+    file_system_id: Option<String>,
+) -> Result<String> {
     let req = DescribeAccessPointsRequest {
-        access_point_id: Some(access_point_id.to_string()),
+        access_point_id,
+        file_system_id,
         ..Default::default()
     };
 
