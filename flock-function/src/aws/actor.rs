@@ -270,6 +270,23 @@ pub fn infer_s3_mode(metadata: &Option<HashMap<String, String>>) -> Option<(Stri
     None
 }
 
+/// Infer group keys for session windows (used in NEXMark Q11 and Q12).
+pub fn infer_session_keys(metadata: &Option<HashMap<String, String>>) -> Result<(String, String)> {
+    if let Some(metadata) = metadata {
+        if let (Some(key), Some(name)) = (metadata.get("session_key"), metadata.get("session_name"))
+        {
+            let key = key.parse::<String>().unwrap();
+            let name = name.parse::<String>().unwrap();
+            if !key.is_empty() && !name.is_empty() {
+                return Ok((key, name));
+            }
+        }
+    }
+    Err(FlockError::Internal(
+        "Failed to infer session group key.".to_string(),
+    ))
+}
+
 /// Infer the actor information for the function invocation.
 pub fn infer_actor_info(
     metadata: &Option<HashMap<String, String>>,

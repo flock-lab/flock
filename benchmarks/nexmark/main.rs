@@ -124,6 +124,7 @@ pub fn create_nexmark_source(opt: &mut NexmarkBenchmarkOpt) -> NEXMarkSource {
         0..=4 | 6 | 9 | 10 | 13 => StreamWindow::ElementWise,
         5 => StreamWindow::HoppingWindow((10, 5)),
         7..=8 => StreamWindow::TumblingWindow(Schedule::Seconds(10)),
+        11 => StreamWindow::SessionWindow(Schedule::Seconds(10)),
         _ => unreachable!(),
     };
 
@@ -298,6 +299,11 @@ async fn benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
         },
     );
 
+    if query_number == 11 || query_number == 12 {
+        metadata.insert("session_key".to_string(), "bidder".to_string());
+        metadata.insert("session_name".to_string(), "bid".to_string());
+    }
+
     let tasks = (0..opt.generators)
         .into_iter()
         .map(|i| {
@@ -363,6 +369,7 @@ pub fn nexmark_query(query_number: usize) -> String {
         8 => include_str!("query/q8.sql"),
         9 => include_str!("query/q9.sql"),
         10 => include_str!("query/q10.sql"),
+        11 => include_str!("query/q11.sql"),
         _ => unreachable!(),
     }
     .to_string()

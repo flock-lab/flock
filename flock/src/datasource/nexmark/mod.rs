@@ -66,7 +66,7 @@
 //! NEXMark – A Benchmark for Queries over Data Streams. June 2010.
 //! <http://datalab.cs.pdx.edu/niagara/pstream/nexmark.pdf>.
 
-mod config;
+pub mod config;
 pub mod event;
 pub mod generator;
 pub mod nexmark;

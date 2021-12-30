@@ -163,8 +163,8 @@ if [ $seconds -gt 60 ]; then
   seconds=60
 fi
 
-if [ $query -gt 10 ]; then
-  echo $(echored "Error: Query number must be between 0 and 10.")
+if [ $query -gt 11 ]; then
+  echo $(echored "Error: Query number must be between 0 and 11.")
   exit
 fi
 

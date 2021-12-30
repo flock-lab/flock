@@ -65,6 +65,9 @@ pub async fn handler(ctx: &ExecutionContext, payload: Payload) -> Result<Value> 
         StreamWindow::ElementWise => {
             elementwise_tasks(payload, events, sec).await?;
         }
+        StreamWindow::SessionWindow(Schedule::Seconds(timeout)) => {
+            session_window_tasks(payload, events, sec, timeout).await?;
+        }
         _ => unimplemented!(),
     };
 
