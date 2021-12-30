@@ -179,8 +179,9 @@ mod tests {
         let batches = init_batches();
         assert_eq!(8, batches.len());
 
-        let uuids = UuidBuilder::new(
+        let uuids = UuidBuilder::new_with_ts(
             "SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836",
+            1024,
             batches.len(),
         );
 

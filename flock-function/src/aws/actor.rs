@@ -214,7 +214,8 @@ fn invoke_next_functions(ctx: &ExecutionContext, batches: &mut Vec<RecordBatch>)
     let next_func = LambdaExecutor::next_function(ctx)?;
 
     // create uuid builder to assign id to each payload
-    let uuid_builder = UuidBuilder::new(&ctx.name, batches.len());
+    let uuid_builder =
+        UuidBuilder::new_with_ts(&ctx.name, chrono::Utc::now().timestamp(), batches.len());
 
     let client = &LambdaClient::new(Region::default());
     batches.into_par_iter().enumerate().for_each(|(i, batch)| {
