@@ -250,7 +250,7 @@ impl DataStream for NEXMarkStream {
 
         let batch_size = *FLOCK_SYNC_GRANULE_SIZE;
         match query_number.expect("Query number is not set.") {
-            0 | 1 | 2 | 5 | 7 => Ok(to_payload(
+            0 | 1 | 2 | 5 | 7 | 10 => Ok(to_payload(
                 &event_bytes_to_batch(&event.bids, NEXMARK_BID.clone(), batch_size),
                 &[],
                 uuid,

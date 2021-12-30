@@ -89,7 +89,7 @@ pub struct NexmarkBenchmarkOpt {
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::init();
-    benchmark(NexmarkBenchmarkOpt::from_args()).await?;
+    benchmark(&mut NexmarkBenchmarkOpt::from_args()).await?;
     Ok(())
 }
 
@@ -119,13 +119,17 @@ pub async fn register_nexmark_tables() -> Result<DataFusionExecutionContext> {
     Ok(ctx)
 }
 
-pub fn create_nexmark_source(opt: &NexmarkBenchmarkOpt) -> NEXMarkSource {
+pub fn create_nexmark_source(opt: &mut NexmarkBenchmarkOpt) -> NEXMarkSource {
     let window = match opt.query_number {
-        0 | 1 | 2 | 3 | 4 | 6 | 9 | 13 => StreamWindow::ElementWise,
+        0..=4 | 6 | 9 | 10 | 13 => StreamWindow::ElementWise,
         5 => StreamWindow::HoppingWindow((10, 5)),
         7..=8 => StreamWindow::TumblingWindow(Schedule::Seconds(10)),
         _ => unreachable!(),
     };
+
+    if opt.query_number == 10 {
+        opt.data_sink_type = 1; // AWS S3
+    }
     NEXMarkSource::new(opt.seconds, opt.generators, opt.events_per_second, window)
 }
 
@@ -267,17 +271,17 @@ async fn create_file_system() -> Result<String> {
 }
 
 #[allow(dead_code)]
-async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
+async fn benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
     info!(
         "Running the NEXMark benchmark with the following options: {:?}",
         opt
     );
     let query_number = opt.query_number;
-    let nexmark_conf = create_nexmark_source(&opt);
+    let nexmark_conf = create_nexmark_source(opt);
 
     let mut ctx = register_nexmark_tables().await?;
     let plan = physical_plan(&mut ctx, &nexmark_query(query_number)).await?;
-    let worker = create_nexmark_functions(&opt, nexmark_conf.window.clone(), plan).await?;
+    let worker = create_nexmark_functions(opt, nexmark_conf.window.clone(), plan).await?;
 
     // The source generator function needs the metadata to determine the type of the
     // workers such as single function or a group. We don't want to keep this info
@@ -372,13 +376,13 @@ mod tests {
 
     #[tokio::test]
     async fn nexmark_sql_queries() -> Result<()> {
-        let opt = NexmarkBenchmarkOpt {
+        let mut opt = NexmarkBenchmarkOpt {
             generators: 1,
             seconds: 5,
             events_per_second: 10_000,
             ..Default::default()
         };
-        let conf = create_nexmark_source(&opt);
+        let conf = create_nexmark_source(&mut opt);
         let (event, _) = Arc::new(conf.generate_data()?)
             .select(1, 0)
             .expect("Failed to select event.");
