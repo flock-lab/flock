@@ -111,7 +111,7 @@ pub fn environment(ctx: &ExecutionContext, debug: bool) -> Option<Environment> {
     if debug {
         map.insert("RUST_LOG".to_owned(), "info".to_owned());
     }
-    map.insert("RUST_BACKTRACE".to_owned(), "1".to_owned());
+    map.insert("RUST_BACKTRACE".to_owned(), "full".to_owned());
     Some(Environment {
         variables: Some(map),
     })

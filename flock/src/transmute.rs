@@ -39,8 +39,20 @@ pub async fn coalesce_batches(
     input_partitions: Vec<Vec<RecordBatch>>,
     target_batch_size: usize,
 ) -> Result<Vec<Vec<RecordBatch>>> {
-    // create physical plan
-    let exec = MemoryExec::try_new(&input_partitions, input_partitions[0][0].schema(), None)?;
+    let mut schema = Arc::new(Schema::new(vec![]));
+    let mut flag = false;
+    for p in input_partitions.iter().filter(|p| !p.is_empty()) {
+        if let Some(b) = p.iter().next() {
+            schema = b.schema();
+            flag = true;
+            break;
+        }
+    }
+    if !flag {
+        return Err(FlockError::Execution("No schema found".to_string()));
+    }
+
+    let exec = MemoryExec::try_new(&input_partitions, schema, None)?;
     let exec: Arc<dyn ExecutionPlan> =
         Arc::new(CoalesceBatchesExec::new(Arc::new(exec), target_batch_size));
 
@@ -66,8 +78,20 @@ pub async fn repartition(
     input_partitions: Vec<Vec<RecordBatch>>,
     partitioning: Partitioning,
 ) -> Result<Vec<Vec<RecordBatch>>> {
-    // create physical plan
-    let exec = MemoryExec::try_new(&input_partitions, input_partitions[0][0].schema(), None)?;
+    let mut schema = Arc::new(Schema::new(vec![]));
+    let mut flag = false;
+    for p in input_partitions.iter().filter(|p| !p.is_empty()) {
+        if let Some(b) = p.iter().next() {
+            schema = b.schema();
+            flag = true;
+            break;
+        }
+    }
+    if !flag {
+        return Err(FlockError::Execution("No schema found".to_string()));
+    }
+
+    let exec = MemoryExec::try_new(&input_partitions, schema, None)?;
     let exec = RepartitionExec::try_new(Arc::new(exec), partitioning)?;
 
     // execute and collect results

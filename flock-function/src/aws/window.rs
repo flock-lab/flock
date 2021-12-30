@@ -392,7 +392,6 @@ pub async fn session_window_tasks(
     seconds: usize,
     timeout: usize,
 ) -> Result<()> {
-    assert!(seconds >= timeout);
     let sync = infer_invocation_type(&payload.metadata)?;
     let (group_key, table_name) = infer_session_keys(&payload.metadata)?;
     let (mut ring, group_name) = infer_actor_info(&payload.metadata)?;
@@ -455,6 +454,7 @@ pub async fn session_window_tasks(
 
         let tasks = sessions
             .into_iter()
+            .filter(|session| !session.is_empty())
             .map(|session| {
                 let function_group = group_name.clone();
                 let invoke_type = invocation_type.clone();
@@ -467,6 +467,7 @@ pub async fn session_window_tasks(
 
                 // Distribute the window data to a single function execution environment.
                 let function_name = ring.get(&tid).expect("hash ring failure.").to_string();
+                info!("Session window -> function name: {}", function_name);
 
                 tokio::spawn(async move {
                     let output = repartition(session, RoundRobinBatch(1)).await?;
