@@ -25,13 +25,13 @@ use log::info;
 use rusoto_core::{Region, RusotoError};
 use rusoto_efs::{
     CreateAccessPointError, CreateAccessPointRequest, CreateFileSystemError,
-    CreateFileSystemRequest, CreationInfo, DescribeAccessPointsRequest, DescribeFileSystemsRequest,
-    Efs, EfsClient, PosixUser, RootDirectory,
+    CreateFileSystemRequest, CreateMountTargetError, CreateMountTargetRequest, CreationInfo,
+    DescribeAccessPointsRequest, DescribeFileSystemsRequest, Efs, EfsClient, PosixUser,
+    RootDirectory,
 };
 use rusoto_lambda::{
-    CreateFunctionRequest, FileSystemConfig, FunctionCode, GetFunctionRequest, InvocationRequest,
-    InvocationResponse, Lambda, LambdaClient, PutFunctionConcurrencyRequest,
-    UpdateFunctionCodeRequest,
+    CreateFunctionRequest, FunctionCode, GetFunctionRequest, InvocationRequest, InvocationResponse,
+    Lambda, LambdaClient, PutFunctionConcurrencyRequest, UpdateFunctionCodeRequest,
 };
 use rusoto_logs::CloudWatchLogsClient;
 use rusoto_s3::S3Client;
@@ -46,6 +46,8 @@ lazy_static! {
     pub static ref FLOCK_LAMBDA_SYNC_CALL: String = "RequestResponse".to_string();
     /// AWS Lambda function maximum error retry.
     pub static ref FLOCK_LAMBDA_MAX_RETRIES: usize = FLOCK_CONF["lambda"]["max_invoke_retries"].parse::<usize>().unwrap();
+    /// AWS Lambda function timeout.
+    pub static ref FLOCK_LAMBDA_TIMEOUT: i64 = FLOCK_CONF["lambda"]["timeout"].parse::<i64>().unwrap();
 
     /// Flock sync invocation granularity.
     pub static ref FLOCK_SYNC_GRANULE_SIZE: usize = FLOCK_CONF["lambda"]["sync_granule"].parse::<usize>().unwrap();
@@ -58,6 +60,10 @@ lazy_static! {
     pub static ref FLOCK_S3_BUCKET: String = FLOCK_CONF["flock"]["s3_bucket"].to_string();
     /// Flock availablity zone.
     pub static ref FLOCK_AVAILABILITY_ZONE: String = FLOCK_CONF["flock"]["availability_zone"].to_string();
+    /// Flock subnet id.
+    pub static ref FLOCK_SUBNET_ID: String = FLOCK_CONF["flock"]["subnet_id"].to_string();
+    /// Flock security group id.
+    pub static ref FLOCK_SECURITY_GROUP_ID: String = FLOCK_CONF["flock"]["security_group_id"].to_string();
 
     /// Flock EFS creation token.
     pub static ref FLOCK_EFS_CREATION_TOKEN: String = FLOCK_CONF["efs"]["creation_token"].to_string();
@@ -69,6 +75,8 @@ lazy_static! {
     pub static ref FLOCK_EFS_PERMISSIONS: String = FLOCK_CONF["efs"]["permissions"].to_string();
     /// Flock EFS root directory.
     pub static ref FLOCK_EFS_ROOT_DIR: String = FLOCK_CONF["efs"]["root_directory"].to_string();
+    /// Flocl EFS local mount point.
+    pub static ref FLOCK_EFS_MOUNT_PATH: String = FLOCK_CONF["efs"]["mount_path"].to_string();
 
     /// Flock associated services.
     /// Flock S3 Client.
@@ -204,7 +212,6 @@ pub async fn invoke_lambda_function(
 pub async fn create_lambda_function(
     ctx: &ExecutionContext,
     memory_size: Option<i64>,
-    efs: String,
     debug: bool,
 ) -> Result<String> {
     let func_name = ctx.name.clone();
@@ -228,7 +235,7 @@ pub async fn create_lambda_function(
         conf.function_name
             .ok_or_else(|| FlockError::Internal("No function name!".to_string()))
     } else {
-        let mount_path = Path::new(&*FLOCK_EFS_ROOT_DIR).join(func_name.clone());
+        let _mount_path = Path::new(&*FLOCK_EFS_MOUNT_PATH);
         let conf = FLOCK_LAMBDA_CLIENT
             .create_function(CreateFunctionRequest {
                 code: FunctionCode {
@@ -242,11 +249,16 @@ pub async fn create_lambda_function(
                 runtime: DeployConfig::runtime(),
                 memory_size,
                 environment: DeployConfig::environment(ctx, debug),
-                timeout: Some(900),
-                file_system_configs: Some(vec![FileSystemConfig {
-                    arn:              efs,
-                    local_mount_path: mount_path.to_str().unwrap().to_string(),
-                }]),
+                timeout: Some(*FLOCK_LAMBDA_TIMEOUT),
+                // FIXME: Disable mount EFS
+                // file_system_configs: Some(vec![FileSystemConfig {
+                //     arn:              efs,
+                //     local_mount_path: mount_path.to_str().unwrap().to_string(),
+                // }]),
+                // vpc_config: Some(VpcConfig {
+                //     subnet_ids:         Some(vec![FLOCK_SUBNET_ID.clone()]),
+                //     security_group_ids: Some(vec![FLOCK_SECURITY_GROUP_ID.clone()]),
+                // }),
                 ..Default::default()
             })
             .await
@@ -395,6 +407,38 @@ pub async fn describe_aws_efs_access_point(
             .access_point_arn
             .clone()
             .ok_or_else(|| FlockError::AWS("No access point arn!".to_string())),
+        Err(e) => Err(FlockError::AWS(e.to_string())),
+    }
+}
+
+/// Creates a mount target for a file system. You can then mount the file system
+/// on EC2 or Lambda instances by using the mount target. All instances in a VPC
+/// within a given Availability Zone share a single mount target for a given
+/// file system. If you have multiple subnets in an Availability Zone, you
+/// create a mount target in one of the subnets. Instances do not need to be
+/// in the same subnet as the mount target in order to access their file system.
+/// You can create only one mount target for an EFS file system using One Zone
+/// storage classes. You must create that mount target in the same Availability
+/// Zone in which the file system is located.
+///
+/// # Arguments
+/// * `file_system_id` - The ID of the EFS file system that the mount target
+///
+/// # Returns
+/// The ID of the mount target.
+pub async fn create_mount_target(file_system_id: &str) -> Result<String> {
+    let req = CreateMountTargetRequest {
+        file_system_id: file_system_id.to_string(),
+        subnet_id: FLOCK_SUBNET_ID.clone(),
+        security_groups: Some(vec![FLOCK_SECURITY_GROUP_ID.clone()]),
+        ..Default::default()
+    };
+
+    match FLOCK_EFS_CLIENT.create_mount_target(req).await {
+        Ok(resp) => Ok(resp.mount_target_id),
+        Err(RusotoError::Service(CreateMountTargetError::MountTargetConflict(_))) => {
+            Ok(String::new())
+        }
         Err(e) => Err(FlockError::AWS(e.to_string())),
     }
 }

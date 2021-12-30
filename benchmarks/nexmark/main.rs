@@ -174,7 +174,6 @@ pub async fn create_nexmark_functions(
     opt: &NexmarkBenchmarkOpt,
     window: StreamWindow,
     physcial_plan: Arc<dyn ExecutionPlan>,
-    efs: String,
 ) -> Result<CloudFunction> {
     let worker_func_name = format!("q{}-00", opt.query_number);
 
@@ -211,25 +210,13 @@ pub async fn create_nexmark_functions(
         "Creating lambda function: {}",
         NEXMARK_SOURCE_FUNC_NAME.clone()
     );
-    create_lambda_function(
-        &nexmark_source_ctx,
-        Some(2048 /* MB */),
-        efs.clone(),
-        opt.debug,
-    )
-    .await?;
+    create_lambda_function(&nexmark_source_ctx, Some(2048 /* MB */), opt.debug).await?;
 
     // Create the function for the nexmark worker.
     match &next_func_name {
         CloudFunction::Lambda(name) => {
             info!("Creating lambda function: {}", name);
-            create_lambda_function(
-                &nexmark_worker_ctx,
-                Some(opt.memory_size),
-                efs.clone(),
-                opt.debug,
-            )
-            .await?;
+            create_lambda_function(&nexmark_worker_ctx, Some(opt.memory_size), opt.debug).await?;
         }
         CloudFunction::Group((name, concurrency)) => {
             info!(
@@ -240,13 +227,8 @@ pub async fn create_nexmark_functions(
                 let group_member_name = format!("{}-{:02}", name.clone(), i);
                 info!("Creating function member: {}", group_member_name);
                 nexmark_worker_ctx.name = group_member_name;
-                create_lambda_function(
-                    &nexmark_worker_ctx,
-                    Some(opt.memory_size),
-                    efs.clone(),
-                    opt.debug,
-                )
-                .await?;
+                create_lambda_function(&nexmark_worker_ctx, Some(opt.memory_size), opt.debug)
+                    .await?;
                 set_lambda_concurrency(nexmark_worker_ctx.name, 1).await?;
             }
         }
@@ -257,14 +239,19 @@ pub async fn create_nexmark_functions(
 }
 
 /// Create an Elastic file system access point for Flock.
-pub async fn create_file_system() -> Result<String> {
+async fn create_file_system() -> Result<String> {
     let mut efs_id = create_aws_efs().await?;
     if efs_id.is_empty() {
         efs_id = discribe_aws_efs().await?;
     }
-    info!("Creating AWS Elastic File System: {}", efs_id);
+    info!("[OK] Creating AWS Elastic File System: {}", efs_id);
+
+    create_mount_target(&efs_id).await?;
+    info!("[OK] Creating AWS EFS Mount Target");
+
     let access_point_id = create_aws_efs_access_point(&efs_id).await?;
-    let mut access_point_arn = if access_point_id.is_empty() {
+
+    let access_point_arn = if access_point_id.is_empty() {
         describe_aws_efs_access_point(None, Some(efs_id))
             .await
             .map_err(|e| FlockError::AWS(format!("{}", e)))?
@@ -273,7 +260,8 @@ pub async fn create_file_system() -> Result<String> {
             .await
             .map_err(|e| FlockError::AWS(format!("{}", e)))?
     };
-    info!("Creating AWS Access Point: {}", access_point_arn);
+    info!("[OK] Creating AWS EFS Access Point: {}", access_point_arn);
+
     Ok(access_point_arn)
 }
 
@@ -285,11 +273,10 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
     );
     let query_number = opt.query_number;
     let nexmark_conf = create_nexmark_source(&opt);
-    let efs = create_file_system().await?;
 
     let mut ctx = register_nexmark_tables().await?;
     let plan = physical_plan(&mut ctx, &nexmark_query(query_number)).await?;
-    let worker = create_nexmark_functions(&opt, nexmark_conf.window.clone(), plan, efs).await?;
+    let worker = create_nexmark_functions(&opt, nexmark_conf.window.clone(), plan).await?;
 
     // The source generator function needs the metadata to determine the type of the
     // workers such as single function or a group. We don't want to keep this info

@@ -290,7 +290,7 @@ impl DataSink {
     }
 
     async fn write_to_efs(&mut self, sink_format: DataSinkFormat) -> Result<()> {
-        let fs_path = Path::new(&*FLOCK_EFS_ROOT_DIR).join(self.function_name.clone());
+        let fs_path = Path::new(&*FLOCK_EFS_MOUNT_PATH).join(self.function_name.clone());
         let mut tasks = vec![];
 
         match sink_format {
@@ -388,7 +388,7 @@ impl DataSink {
     }
 
     async fn read_from_efs(function_name: String, sink_format: DataSinkFormat) -> Result<DataSink> {
-        let fs_path = Path::new(&*FLOCK_EFS_ROOT_DIR).join(function_name.clone());
+        let fs_path = Path::new(&*FLOCK_EFS_MOUNT_PATH).join(function_name.clone());
         let ctx = Box::new(ExecutionContext::new());
 
         let mut tasks = vec![];

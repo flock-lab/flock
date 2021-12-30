@@ -11,6 +11,12 @@ s3_key = "flock"
 # Availability zone
 availability_zone = "us-east-1a"
 
+# Subnet ID
+subnet_id = "subnet-c4cc0f9b"
+
+# Security group ID
+security_group_id = "sg-00e4f30f882ad9150"
+
 [lambda]
 
 environment = "execution_context"
@@ -35,6 +41,9 @@ sync_granule = 74304
 # Error retries and exponential backoff in AWS Lambda
 max_invoke_retries = 10
 
+# Timeout for the function
+timeout = "300"
+
 [efs]
 
 # A string of up to 64 ASCII characters that Amazon EFS uses to ensure idempotent creation.
@@ -42,6 +51,9 @@ creation_token = "flock-efs"
 
 # The clients using the access point can only access the root directory and below.
 root_directory = "/flock"
+
+# local mount directory
+mount_path = "/mnt/flock"
 
 # The operating system user and group applied to all file system requests made using the access point.
 group_id = 1000
