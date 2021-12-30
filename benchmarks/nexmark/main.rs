@@ -239,6 +239,7 @@ pub async fn create_nexmark_functions(
 }
 
 /// Create an Elastic file system access point for Flock.
+#[allow(dead_code)]
 async fn create_file_system() -> Result<String> {
     let mut efs_id = create_aws_efs().await?;
     if efs_id.is_empty() {
