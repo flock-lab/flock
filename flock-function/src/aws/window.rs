@@ -26,7 +26,6 @@ use flock::prelude::*;
 use log::info;
 use std::collections::HashMap;
 use std::sync::Arc;
-use text_io::scan;
 
 /// Generate tumble windows workloads for the benchmark on cloud
 /// function services.
@@ -459,11 +458,10 @@ pub async fn session_window_tasks(
                 let function_group = group_name.clone();
                 let invoke_type = invocation_type.clone();
 
-                let query_code: String;
-                let plan_index: String;
+                let query_code = group_name.split('-').next().unwrap();
                 let timestamp = Utc::now().timestamp();
-                scan!(group_name.bytes() => "{}-{}", query_code, plan_index);
-                let tid = format!("{}-{}", query_code, timestamp);
+                let rand_id = uuid::Uuid::new_v4().as_u128();
+                let tid = format!("{}-{}-{}", query_code, timestamp, rand_id);
 
                 // Distribute the window data to a single function execution environment.
                 let function_name = ring.get(&tid).expect("hash ring failure.").to_string();
@@ -474,7 +472,7 @@ pub async fn session_window_tasks(
                     let window = coalesce_batches(output, granule_size * 2).await?;
                     let size = window[0].len();
                     let mut uuid_builder =
-                        UuidBuilder::new_with_ts(&function_group, timestamp, size);
+                        UuidBuilder::new_with_ts_uuid(&function_group, timestamp, rand_id, size);
 
                     // Call the next stage of the dataflow graph.
                     info!(

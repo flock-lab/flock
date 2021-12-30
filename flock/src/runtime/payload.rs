@@ -27,7 +27,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use text_io::scan;
+use uuid::Uuid as RandomId;
 
 /// A helper struct for building uuids of payloads.
 #[derive(Default, Debug)]
@@ -42,25 +42,25 @@ pub struct UuidBuilder {
 
 impl UuidBuilder {
     /// Returns a new UuidBuilder.
-    pub fn new(function_name: &str, len: usize) -> Self {
-        let query_code: String;
-        let plan_index: String;
-        let timestamp: String;
-        scan!(function_name.bytes() => "{}-{}-{}", query_code, plan_index, timestamp);
+    pub fn new_with_ts(function_name: &str, timestamp: i64, len: usize) -> Self {
+        let query_code = function_name.split('-').next().unwrap();
         Self {
-            tid: format!("{}-{}", query_code, timestamp),
+            tid: format!(
+                "{}-{}-{}",
+                query_code,
+                timestamp,
+                RandomId::new_v4().as_u128()
+            ),
             pos: 0,
             len,
         }
     }
 
     /// Returns a new UuidBuilder.
-    pub fn new_with_ts(function_name: &str, timestamp: i64, len: usize) -> Self {
-        let query_code: String;
-        let plan_index: String;
-        scan!(function_name.bytes() => "{}-{}", query_code, plan_index);
+    pub fn new_with_ts_uuid(function_name: &str, timestamp: i64, uuid: u128, len: usize) -> Self {
+        let query_code = function_name.split('-').next().unwrap();
         Self {
-            tid: format!("{}-{}", query_code, timestamp),
+            tid: format!("{}-{}-{}", query_code, timestamp, uuid),
             pos: 0,
             len,
         }
@@ -207,12 +207,15 @@ mod tests {
 
     #[test]
     fn uuid_builder() {
-        let function_name = "SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836";
+        let function_name = "SX72HzqFz1Qij4bP-00-01";
+        let timestamp: i64 = 1;
+        let uuid: u128 = 2;
         let payload_num = 10;
 
-        let mut uuid_builder = UuidBuilder::new(function_name, payload_num);
+        let mut uuid_builder =
+            UuidBuilder::new_with_ts_uuid(function_name, timestamp, uuid, payload_num);
         assert_eq!(
-            "SX72HzqFz1Qij4bP-2021-01-28T19:27:50.298504836",
+            format!("SX72HzqFz1Qij4bP-{}-{}", timestamp, uuid),
             uuid_builder.tid
         );
 
@@ -220,7 +223,7 @@ mod tests {
             assert_eq!(
                 uuid_builder.next_uuid(),
                 Uuid {
-                    tid:     "SX72HzqFz1Qij4bP-2021-01-28T19:27:50.298504836".to_owned(),
+                    tid:     format!("SX72HzqFz1Qij4bP-{}-{}", timestamp, uuid),
                     seq_num: i,
                     seq_len: payload_num,
                 }
@@ -422,8 +425,7 @@ mod tests {
     #[tokio::test]
     async fn serde_payload() -> Result<()> {
         let batches = init_batches();
-        let mut uuid_builder =
-            UuidBuilder::new("SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836", 10);
+        let mut uuid_builder = UuidBuilder::new_with_ts("SX72HzqFz1Qij4bP-00-01", 1, 10);
         let uuid = uuid_builder.next_uuid();
 
         let now = Instant::now();
@@ -491,7 +493,7 @@ mod tests {
     #[tokio::test]
     async fn uuid() -> Result<()> {
         let mut uuid_builder =
-            UuidBuilder::new("SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836", 10);
+            UuidBuilder::new_with_ts("SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836", 1, 10);
         (0..10).for_each(|i| assert_eq!(uuid_builder.get(i).seq_num, i));
 
         let batches = init_batches();
