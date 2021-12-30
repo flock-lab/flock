@@ -16,7 +16,8 @@
 use crate::datasource::config::Config;
 use std::f64::consts::PI;
 
-const BASE_TIME: usize = 1_436_918_400_000;
+/// Base time unit for the NexMark benchmark.
+pub const BASE_TIME: usize = 1_436_918_400_000;
 
 fn split_string_arg(string: String) -> Vec<String> {
     string.split(',').map(String::from).collect::<Vec<String>>()

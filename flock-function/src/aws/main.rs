@@ -13,6 +13,8 @@
 
 //! The main entry point for the generic lambda function.
 
+#![feature(get_mut_unchecked)]
+
 mod actor;
 mod nexmark;
 mod s3;
