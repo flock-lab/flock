@@ -171,7 +171,7 @@ pub async fn plan_placement(
 /// The returned function is the worker group as a whole which will be executed
 /// by the NexmarkBenchmark data generator function.
 pub async fn create_nexmark_functions(
-    opt: NexmarkBenchmarkOpt,
+    opt: &NexmarkBenchmarkOpt,
     window: StreamWindow,
     physcial_plan: Arc<dyn ExecutionPlan>,
 ) -> Result<CloudFunction> {
@@ -238,26 +238,53 @@ pub async fn create_nexmark_functions(
     Ok(next_func_name)
 }
 
+/// Create an Elastic file system access point for Flock.
+#[allow(dead_code)]
+async fn create_file_system() -> Result<String> {
+    let mut efs_id = create_aws_efs().await?;
+    if efs_id.is_empty() {
+        efs_id = discribe_aws_efs().await?;
+    }
+    info!("[OK] Creating AWS Elastic File System: {}", efs_id);
+
+    create_mount_target(&efs_id).await?;
+    info!("[OK] Creating AWS EFS Mount Target");
+
+    let access_point_id = create_aws_efs_access_point(&efs_id).await?;
+
+    let access_point_arn = if access_point_id.is_empty() {
+        describe_aws_efs_access_point(None, Some(efs_id))
+            .await
+            .map_err(|e| FlockError::AWS(format!("{}", e)))?
+    } else {
+        describe_aws_efs_access_point(Some(access_point_id), None)
+            .await
+            .map_err(|e| FlockError::AWS(format!("{}", e)))?
+    };
+    info!("[OK] Creating AWS EFS Access Point: {}", access_point_arn);
+
+    Ok(access_point_arn)
+}
+
 #[allow(dead_code)]
 async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
     info!(
         "Running the NEXMark benchmark with the following options: {:?}",
         opt
     );
-    let nexmark_conf = create_nexmark_source(&opt);
     let query_number = opt.query_number;
+    let nexmark_conf = create_nexmark_source(&opt);
 
     let mut ctx = register_nexmark_tables().await?;
     let plan = physical_plan(&mut ctx, &nexmark_query(query_number)).await?;
-    let root_actor =
-        create_nexmark_functions(opt.clone(), nexmark_conf.window.clone(), plan).await?;
+    let worker = create_nexmark_functions(&opt, nexmark_conf.window.clone(), plan).await?;
 
     // The source generator function needs the metadata to determine the type of the
     // workers such as single function or a group. We don't want to keep this info
     // in the environment as part of the source function. Otherwise, we have to
     // *delete* and **recreate** the source function every time we change the query.
     let mut metadata = HashMap::new();
-    metadata.insert("workers".to_string(), serde_json::to_string(&root_actor)?);
+    metadata.insert("workers".to_string(), serde_json::to_string(&worker)?);
     metadata.insert(
         "invocation_type".to_string(),
         if opt.async_type {
@@ -299,16 +326,20 @@ async fn benchmark(opt: NexmarkBenchmarkOpt) -> Result<()> {
 
     let sink_type = DataSinkType::new(opt.data_sink_type)?;
     if sink_type != DataSinkType::Blackhole {
-        let data_sink = DataSink::read(format!("q{}", opt.query_number), sink_type).await?;
-        let (last_function, batches) = data_sink.to_record_batch()?;
+        let data_sink = DataSink::read(
+            format!("q{}", opt.query_number),
+            sink_type,
+            DataSinkFormat::default(),
+        )
+        .await?;
         info!(
             "[OK] Received {} batches from the data sink.",
-            batches.len()
+            data_sink.record_batches.len()
         );
-        info!("[OK] Last data sink function: {}", last_function);
-        let function_log_group = format!("/aws/lambda/{}", last_function);
+        info!("[OK] Last data sink function: {}", data_sink.function_name);
+        let function_log_group = format!("/aws/lambda/{}", data_sink.function_name);
         fetch_aws_watchlogs(&function_log_group, parse_duration("1min").unwrap()).await?;
-        println!("{}", pretty_format_batches(&batches)?);
+        println!("{}", pretty_format_batches(&data_sink.record_batches)?);
     }
 
     Ok(())
@@ -327,6 +358,7 @@ pub fn nexmark_query(query_number: usize) -> String {
         7 => include_str!("query/q7.sql"),
         8 => include_str!("query/q8.sql"),
         9 => include_str!("query/q9.sql"),
+        10 => include_str!("query/q10.sql"),
         _ => unreachable!(),
     }
     .to_string()
@@ -360,6 +392,7 @@ mod tests {
             nexmark_query(7),
             nexmark_query(8),
             nexmark_query(9),
+            nexmark_query(10),
         ];
         let mut ctx = register_nexmark_tables().await?;
         for sql in sqls {

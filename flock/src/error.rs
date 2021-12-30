@@ -15,6 +15,7 @@
 
 use arrow::error::ArrowError;
 use datafusion::error::DataFusionError;
+use parquet::errors::ParquetError;
 
 use std::error;
 use std::fmt::{Display, Formatter};
@@ -33,6 +34,8 @@ pub enum FlockError {
     LambdaError(Box<dyn std::error::Error + Send + Sync>),
     /// Error associated to I/O operations and associated traits.
     IoError(io::Error),
+    /// Wraps an error from the Parquet crate
+    Parquet(ParquetError),
     /// Error returned when SQL is syntatically incorrect.
     SQL(ParserError),
     /// Error returned when Arrow is unexpectedly executed.
@@ -96,6 +99,12 @@ impl From<ArrowError> for FlockError {
     }
 }
 
+impl From<ParquetError> for FlockError {
+    fn from(e: ParquetError) -> Self {
+        FlockError::Parquet(e)
+    }
+}
+
 impl From<serde_json::Error> for FlockError {
     fn from(e: serde_json::Error) -> Self {
         FlockError::SerdeJson(e)
@@ -128,6 +137,7 @@ impl Display for FlockError {
             FlockError::IoError(ref desc) => write!(f, "IO error: {}", desc),
             FlockError::SQL(ref desc) => write!(f, "SQL error: {:?}", desc),
             FlockError::Arrow(ref desc) => write!(f, "Arrow error: {}", desc),
+            FlockError::Parquet(ref desc) => write!(f, "Parquet error: {}", desc),
             FlockError::DataFusion(ref desc) => write!(f, "DataFusion error: {:?}", desc),
             FlockError::SerdeJson(ref desc) => write!(f, "serde_json error: {:?}", desc),
             FlockError::NotImplemented(ref desc) => {

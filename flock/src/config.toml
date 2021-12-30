@@ -4,39 +4,69 @@ discription = "Flock: A Practical Serverless Streaming SQL Query Engine"
 license = "Copyright (c) 2020-present, UMD Database Group. The library, examples, and all source code are released AGPL-3.0 License."
 production = false
 
-# default s3 address to store the generic function code
+# Default s3 address to store the generic function code
 s3_bucket = "flock-lab"
 s3_key = "flock"
+
+# Availability zone
+availability_zone = "us-east-1a"
+
+# Subnet ID
+subnet_id = "subnet-c4cc0f9b"
+
+# Security group ID
+security_group_id = "sg-00e4f30f882ad9150"
 
 [lambda]
 
 environment = "execution_context"
 
-# default target batch size (16 KB)
+# Default target batch size (16 KB)
 target_batch_size = 16384
 
-# default raw record batch size in the payload (512 KB)
+# Default raw record batch size in the payload (512 KB)
 payload_batch_size = 524288
 
-# lambda function concurrency
+# Lambda function concurrency
 concurrency = 8
 
-join_threshold = 5242880
 aggregate_threshold = 10485760
+join_threshold = 5242880
 regular_threshold = 20971520
 
-# the granularity of each type of data in the payload
+# The granularity of each type of data in the payload
 async_granule = 3096
 sync_granule = 74304
 
-# error retries and exponential backoff in AWS Lambda
+# Error retries and exponential backoff in AWS Lambda
 max_invoke_retries = 10
+
+# Timeout for the function
+timeout = "300"
+
+[efs]
+
+# A string of up to 64 ASCII characters that Amazon EFS uses to ensure idempotent creation.
+creation_token = "flock-efs"
+
+# The clients using the access point can only access the root directory and below.
+root_directory = "/flock"
+
+# local mount directory
+mount_path = "/mnt/flock"
+
+# The operating system user and group applied to all file system requests made using the access point.
+group_id = 1000
+user_id = 1000
+
+# The access point permissions for the root directory.
+permissions = "0777"
 
 [nexmark]
 
-s3_key = "nexmark"
 q4_s3_key = "nexmark_q4_plan"
 q6_s3_key = "nexmark_q6_plan"
+s3_key = "nexmark"
 
 [ysb]
 

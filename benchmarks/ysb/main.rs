@@ -105,7 +105,7 @@ fn create_ysb_source(opt: &YSBBenchmarkOpt) -> YSBSource {
 /// The returned function is the worker group as a whole which will be executed
 /// by the YSB data generator function.
 async fn create_ysb_functions(
-    opt: YSBBenchmarkOpt,
+    opt: &YSBBenchmarkOpt,
     physcial_plan: Arc<dyn ExecutionPlan>,
 ) -> Result<CloudFunction> {
     let worker_func_name = "ysb-00".to_string();
@@ -153,10 +153,9 @@ async fn benchmark(opt: YSBBenchmarkOpt) -> Result<()> {
         opt
     );
     let ysb_conf = create_ysb_source(&opt);
-
     let mut ctx = register_ysb_tables().await?;
     let plan = physical_plan(&mut ctx, &ysb_query()).await?;
-    let root_actor = create_ysb_functions(opt.clone(), plan).await?;
+    let root_actor = create_ysb_functions(&opt, plan).await?;
 
     // The source generator function needs the metadata to determine the type of the
     // workers such as single function or a group. We don't want to keep this info
