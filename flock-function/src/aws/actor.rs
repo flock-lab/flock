@@ -335,3 +335,17 @@ pub fn infer_actor_info(
 
     Ok((ring, group_name))
 }
+
+/// This function is only used for NEXMark Q12 to add the process time field to
+/// the input data.
+pub fn infer_add_process_time_query(metadata: &Option<HashMap<String, String>>) -> Result<String> {
+    if let Some(metadata) = metadata {
+        if let Some(plan) = metadata.get("add_process_time_query") {
+            let plan = plan.parse::<String>().unwrap();
+            return Ok(plan);
+        }
+    }
+    Err(FlockError::Execution(
+        "Failed to infer plan for adding process time field to the input data.".to_string(),
+    ))
+}

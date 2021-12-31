@@ -11,7 +11,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use arrow::datatypes::{Schema, SchemaRef};
+use arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
 use arrow::record_batch::RecordBatch;
 use arrow::util::pretty::pretty_format_batches;
 use datafusion::datasource::MemTable;
@@ -125,6 +125,7 @@ pub fn create_nexmark_source(opt: &mut NexmarkBenchmarkOpt) -> NEXMarkSource {
         5 => StreamWindow::HoppingWindow((10, 5)),
         7..=8 => StreamWindow::TumblingWindow(Schedule::Seconds(10)),
         11 => StreamWindow::SessionWindow(Schedule::Seconds(10)),
+        12 => StreamWindow::GlobalWindow(Schedule::Seconds(10)),
         _ => unreachable!(),
     };
 
@@ -203,7 +204,7 @@ pub async fn create_nexmark_functions(
         next:        next_func_name.clone(),
     };
 
-    let mut nexmark_worker_ctx = ExecutionContext {
+    let nexmark_worker_ctx = ExecutionContext {
         plan,
         plan_s3_idx: s3.clone(),
         name: worker_func_name.clone(),
@@ -218,7 +219,7 @@ pub async fn create_nexmark_functions(
     create_lambda_function(&nexmark_source_ctx, Some(2048 /* MB */), opt.debug).await?;
 
     // Create the function for the nexmark worker.
-    match &next_func_name {
+    match next_func_name.clone() {
         CloudFunction::Lambda(name) => {
             info!("Creating lambda function: {}", name);
             create_lambda_function(&nexmark_worker_ctx, Some(opt.memory_size), opt.debug).await?;
@@ -228,14 +229,23 @@ pub async fn create_nexmark_functions(
                 "Creating lambda function group: {:?}",
                 nexmark_source_ctx.next
             );
-            for i in 0..*concurrency {
-                let group_member_name = format!("{}-{:02}", name.clone(), i);
-                info!("Creating function member: {}", group_member_name);
-                nexmark_worker_ctx.name = group_member_name;
-                create_lambda_function(&nexmark_worker_ctx, Some(opt.memory_size), opt.debug)
-                    .await?;
-                set_lambda_concurrency(nexmark_worker_ctx.name, 1).await?;
-            }
+
+            let tasks = (0..concurrency)
+                .into_iter()
+                .map(|i| {
+                    let mut worker_ctx = nexmark_worker_ctx.clone();
+                    let group_name = name.clone();
+                    let memory_size = opt.memory_size;
+                    let debug = opt.debug;
+                    tokio::spawn(async move {
+                        worker_ctx.name = format!("{}-{}", group_name, i);
+                        info!("Creating function member: {}", worker_ctx.name);
+                        create_lambda_function(&worker_ctx, Some(memory_size), debug).await?;
+                        set_lambda_concurrency(worker_ctx.name, 1).await
+                    })
+                })
+                .collect::<Vec<JoinHandle<Result<()>>>>();
+            futures::future::join_all(tasks).await;
         }
         CloudFunction::Sink(_) => unreachable!(),
     }
@@ -271,6 +281,42 @@ async fn create_file_system() -> Result<String> {
     Ok(access_point_arn)
 }
 
+/// Create the physical plans according to the given query number.
+pub async fn create_physical_plans(
+    ctx: &mut DataFusionExecutionContext,
+    query_number: usize,
+) -> Result<Vec<Arc<dyn ExecutionPlan>>> {
+    let mut plans = vec![];
+    plans.push(physical_plan(ctx, &nexmark_query(query_number)[0]).await?);
+
+    if query_number == 12 {
+        ctx.deregister_table("bid")?;
+        let bid_schema = Arc::new(Schema::new(vec![
+            Field::new("auction", DataType::Int32, false),
+            Field::new("bidder", DataType::Int32, false),
+            Field::new("price", DataType::Int32, false),
+            Field::new(
+                "b_date_time",
+                DataType::Timestamp(TimeUnit::Millisecond, None),
+                false,
+            ),
+            Field::new(
+                "p_time",
+                DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".to_string())),
+                false,
+            ),
+        ]));
+        let bid_table = MemTable::try_new(
+            bid_schema.clone(),
+            vec![vec![RecordBatch::new_empty(bid_schema)]],
+        )?;
+        ctx.register_table("bid", Arc::new(bid_table))?;
+        plans.push(physical_plan(ctx, &nexmark_query(query_number)[1]).await?);
+    }
+
+    Ok(plans)
+}
+
 #[allow(dead_code)]
 async fn benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
     info!(
@@ -281,8 +327,13 @@ async fn benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
     let nexmark_conf = create_nexmark_source(opt);
 
     let mut ctx = register_nexmark_tables().await?;
-    let plan = physical_plan(&mut ctx, &nexmark_query(query_number)).await?;
-    let worker = create_nexmark_functions(opt, nexmark_conf.window.clone(), plan).await?;
+    let plans = create_physical_plans(&mut ctx, query_number).await?;
+    let worker = create_nexmark_functions(
+        opt,
+        nexmark_conf.window.clone(),
+        plans.last().unwrap().clone(),
+    )
+    .await?;
 
     // The source generator function needs the metadata to determine the type of the
     // workers such as single function or a group. We don't want to keep this info
@@ -298,6 +349,13 @@ async fn benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
             "sync".to_string()
         },
     );
+
+    if query_number == 12 {
+        metadata.insert(
+            "add_process_time_query".to_string(),
+            nexmark_query(query_number)[0].clone(),
+        );
+    }
 
     if query_number == 11 || query_number == 12 {
         metadata.insert("session_key".to_string(), "bidder".to_string());
@@ -356,23 +414,26 @@ async fn benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
 }
 
 /// Returns Nextmark query strings based on the query number.
-pub fn nexmark_query(query_number: usize) -> String {
+pub fn nexmark_query(query_number: usize) -> Vec<String> {
     match query_number {
-        0 => include_str!("query/q0.sql"),
-        1 => include_str!("query/q1.sql"),
-        2 => include_str!("query/q2.sql"),
-        3 => include_str!("query/q3.sql"),
-        4 => include_str!("query/q4.sql"),
-        5 => include_str!("query/q5.sql"),
-        6 => include_str!("query/q6.sql"),
-        7 => include_str!("query/q7.sql"),
-        8 => include_str!("query/q8.sql"),
-        9 => include_str!("query/q9.sql"),
-        10 => include_str!("query/q10.sql"),
-        11 => include_str!("query/q11.sql"),
+        0 => vec![include_str!("query/q0.sql")],
+        1 => vec![include_str!("query/q1.sql")],
+        2 => vec![include_str!("query/q2.sql")],
+        3 => vec![include_str!("query/q3.sql")],
+        4 => vec![include_str!("query/q4.sql")],
+        5 => vec![include_str!("query/q5.sql")],
+        6 => vec![include_str!("query/q6.sql")],
+        7 => vec![include_str!("query/q7.sql")],
+        8 => vec![include_str!("query/q8.sql")],
+        9 => vec![include_str!("query/q9.sql")],
+        10 => vec![include_str!("query/q10.sql")],
+        11 => vec![include_str!("query/q11.sql")],
+        12 => include_str!("query/q12.sql").split(';').collect(),
         _ => unreachable!(),
     }
-    .to_string()
+    .into_iter()
+    .map(String::from)
+    .collect()
 }
 
 #[cfg(test)]
@@ -386,7 +447,7 @@ mod tests {
         let mut opt = NexmarkBenchmarkOpt {
             generators: 1,
             seconds: 5,
-            events_per_second: 10_000,
+            events_per_second: 1000,
             ..Default::default()
         };
         let conf = create_nexmark_source(&mut opt);
@@ -404,10 +465,12 @@ mod tests {
             nexmark_query(8),
             nexmark_query(9),
             nexmark_query(10),
+            nexmark_query(11),
+            nexmark_query(12),
         ];
-        let mut ctx = register_nexmark_tables().await?;
+        let ctx = register_nexmark_tables().await?;
         for sql in sqls {
-            let plan = physical_plan(&mut ctx, &sql).await?;
+            let plan = physical_plan(&ctx, &sql[0]).await?;
             let mut flock_ctx = ExecutionContext {
                 plan,
                 ..Default::default()

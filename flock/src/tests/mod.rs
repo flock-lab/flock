@@ -209,8 +209,8 @@ pub async fn physical_plan(
     sql: &str,
     table_name: &str,
 ) -> Arc<dyn ExecutionPlan> {
-    let mut ctx = register_table(schema, table_name);
-    executor::plan::physical_plan(&mut ctx, sql).await.unwrap()
+    let ctx = register_table(schema, table_name);
+    executor::plan::physical_plan(&ctx, sql).await.unwrap()
 }
 
 /// Set the cloud environment context to a specific cloud function in the query.

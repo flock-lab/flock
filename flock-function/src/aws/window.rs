@@ -12,20 +12,21 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use crate::actor::*;
-use arrow::array::{Int32Array, TimestampMillisecondArray, UInt64Array};
+use arrow::array::{Int32Array, TimestampMillisecondArray, TimestampNanosecondArray, UInt64Array};
 use arrow::record_batch::RecordBatch;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use datafusion::datasource::MemTable;
-use datafusion::execution::context::ExecutionContext;
+use datafusion::execution::context::ExecutionContext as DataFusionExecutionContext;
 use datafusion::logical_plan::{col, count_distinct};
+use datafusion::physical_plan::collect_partitioned;
 use datafusion::physical_plan::expressions::col as expr_col;
-use datafusion::physical_plan::Partitioning;
-use datafusion::physical_plan::Partitioning::RoundRobinBatch;
+use datafusion::physical_plan::Partitioning::{HashDiff, RoundRobinBatch};
 use flock::datasource::nexmark::config::BASE_TIME;
 use flock::prelude::*;
 use log::info;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Instant;
 
 /// Generate tumble windows workloads for the benchmark on cloud
 /// function services.
@@ -234,7 +235,7 @@ pub async fn hopping_window_tasks(
 /// Get back the input data from the registered table after the query is
 /// executed to avoid copying the input data.
 fn get_input_from_registered_table(
-    ctx: &mut ExecutionContext,
+    ctx: &mut DataFusionExecutionContext,
     table_name: &str,
 ) -> Result<Vec<Vec<RecordBatch>>> {
     Ok(unsafe {
@@ -395,31 +396,37 @@ pub async fn session_window_tasks(
     let (group_key, table_name) = infer_session_keys(&payload.metadata)?;
     let (mut ring, group_name) = infer_actor_info(&payload.metadata)?;
 
-    let invocation_type = if sync {
-        FLOCK_LAMBDA_SYNC_CALL.to_string()
+    let (invocation_type, granule_size) = if sync {
+        (FLOCK_LAMBDA_SYNC_CALL.to_string(), *FLOCK_SYNC_GRANULE_SIZE)
     } else {
-        FLOCK_LAMBDA_ASYNC_CALL.to_string()
+        (
+            FLOCK_LAMBDA_ASYNC_CALL.to_string(),
+            *FLOCK_ASYNC_GRANULE_SIZE,
+        )
     };
 
-    let granule_size = if sync {
-        *FLOCK_SYNC_GRANULE_SIZE
-    } else {
-        *FLOCK_ASYNC_GRANULE_SIZE
-    };
-
-    let mut ctx = ExecutionContext::new();
+    let mut ctx = DataFusionExecutionContext::new();
     let mut windows: HashMap<usize, Vec<Vec<RecordBatch>>> = HashMap::new();
 
-    for time in 0..seconds {
-        let (r1, _) = stream.select_event_to_batches(
-            time,
-            0, // generator id
-            payload.query_number,
-            sync,
-        )?;
-        let schema = r1[0][0].schema();
+    let events = (0..seconds)
+        .map(|t| {
+            let (r1, _) = stream
+                .select_event_to_batches(
+                    t,
+                    0, // generator id
+                    payload.query_number,
+                    sync,
+                )
+                .unwrap();
+            r1.to_vec()
+        })
+        .collect::<Vec<Vec<Vec<RecordBatch>>>>();
 
-        let table = MemTable::try_new(schema.clone(), r1.to_vec())?;
+    let schema = events[0][0][0].schema();
+
+    for (time, batches) in events.into_iter().enumerate() {
+        info!("Processing events in epoch: {}", time);
+        let table = MemTable::try_new(schema.clone(), batches)?;
         ctx.deregister_table(&*table_name)?;
         ctx.register_table(&*table_name, Arc::new(table))?;
 
@@ -440,7 +447,7 @@ pub async fn session_window_tasks(
         // Each partition has a unique key after `repartition` execution.
         let partitions = repartition(
             get_input_from_registered_table(&mut ctx, &table_name)?,
-            Partitioning::HashDiff(vec![expr_col(&group_key, &schema)?], distinct_keys as usize),
+            HashDiff(vec![expr_col(&group_key, &schema)?], distinct_keys as usize),
         )
         .await?;
 
@@ -451,7 +458,7 @@ pub async fn session_window_tasks(
             sessions.push(windows.remove(bidder).unwrap());
         });
 
-        let tasks = sessions
+        let tasks = coalesce_windows(sessions, granule_size)?
             .into_iter()
             .filter(|session| !session.is_empty())
             .map(|session| {
@@ -504,6 +511,311 @@ pub async fn session_window_tasks(
             })
             .collect::<Vec<tokio::task::JoinHandle<Result<()>>>>();
         futures::future::join_all(tasks).await;
+    }
+
+    Ok(())
+}
+
+/// Add each unique partition to a distinct tumbling window.
+///
+/// # Arguments
+/// * `partitions` - the partitions to be added.
+/// * `windows` - the current tumbling windows.
+/// * `window_size` - the size of the window.
+///
+/// # Return
+/// The updated session windows.
+fn add_partitions_to_tumbling_windows(
+    partitions: Vec<Vec<RecordBatch>>,
+    windows: &mut HashMap<usize, Vec<Vec<RecordBatch>>>,
+    window_size: usize,
+) -> Result<Vec<Vec<Vec<RecordBatch>>>> {
+    Ok(partitions
+        .into_iter()
+        .filter(|p| !p.is_empty())
+        .map(|p| {
+            let mut window = vec![];
+            let bidder = p[0]
+                .column(1 /* bidder field */)
+                .as_any()
+                .downcast_ref::<Int32Array>()
+                .unwrap()
+                .value(0);
+            let current_timestamp = p[0]
+                .column(4 /* p_time field */)
+                .as_any()
+                .downcast_ref::<TimestampNanosecondArray>()
+                .unwrap()
+                .value(0);
+            let current_process_time = DateTime::<Utc>::from_utc(
+                NaiveDateTime::from_timestamp(current_timestamp / 1000 / 1000 / 1000, 0),
+                Utc,
+            );
+
+            if !windows.contains_key(&(bidder as usize)) {
+                windows
+                    .entry(bidder as usize)
+                    .or_insert_with(Vec::new)
+                    .push(p);
+            } else {
+                // get the first batch in the window.
+                let batch = windows
+                    .get(&(bidder as usize))
+                    .unwrap()
+                    .first()
+                    .unwrap()
+                    .first()
+                    .unwrap();
+                // get the first bid's process time.
+                let first_timestamp = batch
+                    .column(4 /* p_time field */)
+                    .as_any()
+                    .downcast_ref::<TimestampNanosecondArray>()
+                    .unwrap()
+                    .value(0);
+                let first_process_time = DateTime::<Utc>::from_utc(
+                    NaiveDateTime::from_timestamp(first_timestamp / 1000 / 1000 / 1000, 0),
+                    Utc,
+                );
+
+                // If the current process time isn't 10 seconds later than the beginning of
+                // the entry, then we can add the current batch to the map. Otherwise, we
+                // have a new tumbling window.
+                if current_process_time.signed_duration_since(first_process_time)
+                    > chrono::Duration::seconds(window_size as i64)
+                {
+                    window = windows.remove(&(bidder as usize)).unwrap();
+                }
+                windows
+                    .entry(bidder as usize)
+                    .or_insert_with(Vec::new)
+                    .push(p);
+            }
+            window
+        })
+        .collect::<Vec<Vec<Vec<RecordBatch>>>>())
+}
+
+/// Find new tumbling windows after timeout.
+///
+/// # Arguments
+/// * `windows` - the tumbling windows.
+/// * `timeout` - the tumbling timeout.
+///
+/// # Return
+/// The keys of the new tumbling windows.
+fn find_timeout_tumbling_windows(
+    windows: &HashMap<usize, Vec<Vec<RecordBatch>>>,
+    timeout: usize,
+) -> Result<Vec<usize>> {
+    let mut to_remove = vec![];
+
+    windows.iter().for_each(|(bidder, batches)| {
+        // get the first bid's prcessing time
+        let first_timestamp = batches[0][0]
+            .column(4 /* p_time field */)
+            .as_any()
+            .downcast_ref::<TimestampNanosecondArray>()
+            .unwrap()
+            .value(0);
+
+        let first_process_time = DateTime::<Utc>::from_utc(
+            NaiveDateTime::from_timestamp(first_timestamp / 1000 / 1000 / 1000, 0),
+            Utc,
+        );
+        if Utc::now().signed_duration_since(first_process_time)
+            > chrono::Duration::seconds(timeout as i64)
+        {
+            to_remove.push(bidder.to_owned());
+        }
+    });
+
+    Ok(to_remove)
+}
+
+/// This function is used to coalesce smaller session windows or global windows
+/// to bigger ones so that the number of events in each payload is greater than
+/// the granule size, and close to the payload limit.
+fn coalesce_windows(
+    windows: Vec<Vec<Vec<RecordBatch>>>,
+    granule_size: usize,
+) -> Result<Vec<Vec<Vec<RecordBatch>>>> {
+    #[allow(unused_assignments)]
+    let mut curr_size = 0;
+    let mut total_size = 0;
+    let mut res = vec![];
+    let mut tmp = vec![];
+    for window in windows {
+        curr_size = window
+            .iter()
+            .map(|v| v.iter().map(|b| b.num_rows()).sum::<usize>())
+            .sum::<usize>();
+        total_size += curr_size;
+        if total_size <= granule_size * 2 || tmp.is_empty() {
+            tmp.push(window);
+        } else {
+            res.push(tmp.into_iter().flatten().collect::<Vec<Vec<RecordBatch>>>());
+            tmp = vec![window];
+            total_size = curr_size;
+        }
+    }
+    if !tmp.is_empty() {
+        res.push(tmp.into_iter().flatten().collect::<Vec<Vec<RecordBatch>>>());
+    }
+    Ok(res)
+}
+
+/// A global windows assigner assigns all elements with the same key to the same
+/// single global window. This windowing scheme is only useful if you also
+/// specify a custom trigger. Otherwise, no computation will be performed, as
+/// the global window does not have a natural end at which we could process the
+/// aggregated elements.
+///
+/// # Arguments
+/// * `payload` - The payload of the function invocation.
+/// * `stream` - The data stream.
+/// * `seconds` - The number of seconds to group events into.
+/// * `window_size` - The size of the window.
+pub async fn global_window_tasks(
+    payload: Payload,
+    stream: Arc<dyn DataStream>,
+    seconds: usize,
+    window_size: usize,
+) -> Result<()> {
+    let sync = infer_invocation_type(&payload.metadata)?;
+    let (group_key, table_name) = infer_session_keys(&payload.metadata)?;
+    let (mut ring, group_name) = infer_actor_info(&payload.metadata)?;
+    let add_process_time_sql = infer_add_process_time_query(&payload.metadata)?;
+
+    let (invocation_type, granule_size) = if sync {
+        (FLOCK_LAMBDA_SYNC_CALL.to_string(), *FLOCK_SYNC_GRANULE_SIZE)
+    } else {
+        (
+            FLOCK_LAMBDA_ASYNC_CALL.to_string(),
+            *FLOCK_ASYNC_GRANULE_SIZE,
+        )
+    };
+
+    let mut ctx = DataFusionExecutionContext::new();
+    let mut windows: HashMap<usize, Vec<Vec<RecordBatch>>> = HashMap::new();
+
+    let events = (0..seconds)
+        .map(|t| {
+            let (r1, _) = stream
+                .select_event_to_batches(
+                    t,
+                    0, // generator id
+                    payload.query_number,
+                    sync,
+                )
+                .unwrap();
+            r1.to_vec()
+        })
+        .collect::<Vec<Vec<Vec<RecordBatch>>>>();
+
+    let schema = events[0][0][0].schema();
+
+    for (time, batches) in events.into_iter().enumerate() {
+        info!("Processing events in epoch: {}", time);
+        let now = Instant::now();
+        let table = MemTable::try_new(schema.clone(), batches)?;
+        ctx.deregister_table(&*table_name)?;
+        ctx.register_table(&*table_name, Arc::new(table))?;
+
+        // Equivalent to `SELECT COUNT(DISTINCT group_key) FROM table_name;`
+        let output = ctx
+            .table(&*table_name)?
+            .aggregate(vec![], vec![count_distinct(col(&group_key))])?
+            .collect()
+            .await?;
+
+        let distinct_keys = output[0]
+            .column(0)
+            .as_any()
+            .downcast_ref::<UInt64Array>()
+            .unwrap()
+            .value(0);
+
+        // Equivalent to `SELECT *, now() as p_time FROM table_name;`
+        let output = collect_partitioned(physical_plan(&ctx, &add_process_time_sql).await?).await?;
+        let schema_with_ptime = output[0][0].schema();
+
+        // Each partition has a unique key after `repartition` execution.
+        let partitions = repartition(
+            output,
+            HashDiff(
+                vec![expr_col(&group_key, &schema_with_ptime)?],
+                distinct_keys as usize,
+            ),
+        )
+        .await?;
+
+        // Update the window.
+        let mut tumblings =
+            add_partitions_to_tumbling_windows(partitions, &mut windows, window_size)?;
+        let to_remove = find_timeout_tumbling_windows(&windows, window_size)?;
+        to_remove.iter().for_each(|bidder| {
+            tumblings.push(windows.remove(bidder).unwrap());
+        });
+
+        let tasks = coalesce_windows(tumblings, granule_size)?
+            .into_iter()
+            .filter(|window| !window.is_empty())
+            .map(|window| {
+                let function_group = group_name.clone();
+                let invoke_type = invocation_type.clone();
+
+                let query_code = group_name.split('-').next().unwrap();
+                let timestamp = Utc::now().timestamp();
+                let rand_id = uuid::Uuid::new_v4().as_u128();
+                let tid = format!("{}-{}-{}", query_code, timestamp, rand_id);
+
+                // Distribute the window data to a single function execution environment.
+                let function_name = ring.get(&tid).expect("hash ring failure.").to_string();
+                info!("Tumbling window -> function name: {}", function_name);
+
+                tokio::spawn(async move {
+                    let window = repartition(window, RoundRobinBatch(1)).await?;
+                    let window = coalesce_batches(window, granule_size * 2).await?;
+                    let size = window[0].len();
+                    let mut uuid_builder =
+                        UuidBuilder::new_with_ts_uuid(&function_group, timestamp, rand_id, size);
+
+                    // Call the next stage of the dataflow graph.
+                    info!(
+                        "[OK] Send {} events from a tumbling window to function: {}.",
+                        size, function_name
+                    );
+
+                    for (eid, partition) in window.iter().enumerate() {
+                        let payload = serde_json::to_vec(&to_payload(
+                            partition,
+                            &[],
+                            uuid_builder.next_uuid(),
+                            sync,
+                        ))?;
+                        info!(
+                            "[OK] Event {} - function payload bytes: {}",
+                            eid,
+                            payload.len()
+                        );
+                        invoke_lambda_function(
+                            function_name.clone(),
+                            Some(payload.into()),
+                            invoke_type.clone(),
+                        )
+                        .await?;
+                    }
+                    Ok(())
+                })
+            })
+            .collect::<Vec<tokio::task::JoinHandle<Result<()>>>>();
+        futures::future::join_all(tasks).await;
+
+        let elapsed = now.elapsed().as_millis() as u64;
+        if elapsed < 1000 {
+            std::thread::sleep(std::time::Duration::from_millis(1000 - elapsed));
+        }
     }
 
     Ok(())

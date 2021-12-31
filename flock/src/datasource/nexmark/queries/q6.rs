@@ -115,7 +115,7 @@ mod tests {
             // optimize query plan and execute it
 
             // 1. get the total distinct sellers during the epoch
-            let plan = physical_plan(&mut ctx, sql1).await?;
+            let plan = physical_plan(&ctx, sql1).await?;
             let batches = collect(plan).await?;
             let total_distinct_sellers = batches[0]
                 .column(0)
@@ -125,7 +125,7 @@ mod tests {
                 .value(0);
 
             // 2. get the max price of auctions for each seller
-            let plan = physical_plan(&mut ctx, sql2).await?;
+            let plan = physical_plan(&ctx, sql2).await?;
             let batches = collect_partitioned(plan).await?;
             let batches = repartition(
                 batches,
@@ -150,7 +150,7 @@ mod tests {
                 MemTable::try_new(output_partitions[0].schema(), vec![output_partitions])?;
             ctx.deregister_table("Q")?;
             ctx.register_table("Q", Arc::new(q_table))?;
-            let plan = physical_plan(&mut ctx, sql3).await?;
+            let plan = physical_plan(&ctx, sql3).await?;
             let output_partitions = collect(plan).await?;
 
             // show output

@@ -115,7 +115,7 @@ mod tests {
         let events = nex.generate_data()?;
 
         // let sql1 = "SELECT COUNT(DISTINCT bidder) FROM bid;";
-        // let plan = physical_plan(&mut ctx, sql1).await?;
+        // let plan = physical_plan(&ctx, sql1).await?;
         // let output = collect(plan).await?;
 
         let sql2 = indoc! {"
@@ -247,7 +247,7 @@ mod tests {
                 let table = MemTable::try_new(schema.clone(), sessions)?;
                 ctx.deregister_table("bid")?;
                 ctx.register_table("bid", Arc::new(table))?;
-                let output = collect(physical_plan(&mut ctx, sql2).await?).await?;
+                let output = collect(physical_plan(&ctx, sql2).await?).await?;
                 println!("{}", pretty_format_batches(&output).unwrap());
             }
         }

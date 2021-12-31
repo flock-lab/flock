@@ -53,8 +53,13 @@ async fn benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
     let query_number = opt.query_number;
 
     let mut ctx = register_nexmark_tables().await?;
-    let plan = physical_plan(&mut ctx, &nexmark_query(query_number)).await?;
-    let worker = create_nexmark_functions(opt, nexmark_conf.window.clone(), plan).await?;
+    let plans = create_physical_plans(&mut ctx, query_number).await?;
+    let worker = create_nexmark_functions(
+        opt,
+        nexmark_conf.window.clone(),
+        plans.last().unwrap().clone(),
+    )
+    .await?;
 
     // The source generator function needs the metadata to determine the type of the
     // workers such as single function or a group. We don't want to keep this info
