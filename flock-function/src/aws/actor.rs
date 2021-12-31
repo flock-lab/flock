@@ -12,6 +12,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use arrow::record_batch::RecordBatch;
+use datafusion::physical_plan::ExecutionPlan;
 use datafusion::physical_plan::Partitioning::RoundRobinBatch;
 use flock::prelude::*;
 use futures::executor::block_on;
@@ -334,4 +335,19 @@ pub fn infer_actor_info(
     }
 
     Ok((ring, group_name))
+}
+
+/// This function is only used for NEXMark Q12 to add the process time field to
+/// the input data.
+pub fn infer_plan_for_process_time(
+    metadata: &Option<HashMap<String, String>>,
+) -> Result<Arc<dyn ExecutionPlan>> {
+    if let Some(metadata) = metadata {
+        if let Some(plan) = metadata.get("plan_for_process_time") {
+            return Ok(serde_json::from_str(plan)?);
+        }
+    }
+    Err(FlockError::Execution(
+        "Failed to infer plan for adding process time field to the input data.".to_string(),
+    ))
 }

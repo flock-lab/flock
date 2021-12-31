@@ -19,10 +19,10 @@ use crate::encoding::Encoding;
 use crate::error::{FlockError, Result};
 use arrow::datatypes::{Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
-use datafusion::physical_plan::collect;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::{collect, collect_partitioned};
 use rusoto_core::Region;
 use rusoto_s3::GetObjectRequest;
 use rusoto_s3::{S3Client, S3};
@@ -87,7 +87,7 @@ impl Default for CloudFunction {
 /// Lambda execution context.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ExecutionContext {
-    /// The execution plan of the lambda function.
+    /// The execution plans of the lambda function.
     pub plan:        Arc<dyn ExecutionPlan>,
     /// The S3 URL of the physical plan. If the plan is too large to be
     /// serialized and stored in the environment variable, the system will
@@ -184,9 +184,22 @@ impl ExecutionContext {
 
     /// Executes the physical plan.
     /// `execute` must be called after the execution of `feed_one_source` or
-    /// `feed_two_source`.
+    /// `feed_two_source` or `feed_data_sources`.
     pub async fn execute(&mut self) -> Result<Vec<RecordBatch>> {
         match collect(self.plan().await?.clone()).await {
+            Ok(b) => Ok(b),
+            Err(e) => Err(FlockError::Plan(format!(
+                "{}. Failed to execute the plan '{:?}'",
+                e, self.plan
+            ))),
+        }
+    }
+
+    /// Executes the physical plan.
+    /// `execute_partitioned` must be called after the execution of
+    /// `feed_one_source` or `feed_two_source` or `feed_data_sources`.
+    pub async fn execute_partitioned(&mut self) -> Result<Vec<Vec<RecordBatch>>> {
+        match collect_partitioned(self.plan().await?.clone()).await {
             Ok(b) => Ok(b),
             Err(e) => Err(FlockError::Plan(format!(
                 "{}. Failed to execute the plan '{:?}'",

@@ -134,7 +134,7 @@ mod tests {
             let partitions = repartition(
                 output,
                 Partitioning::HashDiff(
-                    vec![expr_col("bidder", &schema)?],
+                    vec![expr_col("bidder", &new_schema)?],
                     total_distinct_bidders as usize,
                 ),
             )

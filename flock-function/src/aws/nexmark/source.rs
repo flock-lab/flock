@@ -68,6 +68,9 @@ pub async fn handler(ctx: &ExecutionContext, payload: Payload) -> Result<Value> 
         StreamWindow::SessionWindow(Schedule::Seconds(timeout)) => {
             session_window_tasks(payload, events, sec, timeout).await?;
         }
+        StreamWindow::GlobalWindow(Schedule::Seconds(window_size)) => {
+            global_window_tasks(payload, events, sec, window_size).await?;
+        }
         _ => unimplemented!(),
     };
 

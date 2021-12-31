@@ -101,6 +101,12 @@ pub enum StreamWindow {
     /// Session windows group events that arrive at similar times, filtering out
     /// periods of time where there is no data.
     SessionWindow(Schedule),
+    /// A global windows assigner assigns all elements with the same key to the
+    /// same single global window. This windowing scheme is only useful if you
+    /// also specify a custom trigger. Otherwise, no computation will be
+    /// performed, as the global window does not have a natural end at which we
+    /// could process the aggregated elements.
+    GlobalWindow(Schedule),
     /// Stagger window is a windowing method that is suited for analyzing
     /// groups of data that arrive at inconsistent times. It is well suited for
     /// any time-series analytics use case, such as a set of related sales or
