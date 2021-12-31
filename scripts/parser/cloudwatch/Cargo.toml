@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.51"
-clap = "2.33.3"
+clap = "3.0.0"
 env_logger = "^0.9"
 humantime = "2.1.0"
 itertools = "0.10.0"
