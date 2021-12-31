@@ -19,14 +19,14 @@ use datafusion::datasource::MemTable;
 use datafusion::execution::context::ExecutionContext as DataFusionExecutionContext;
 use datafusion::logical_plan::{col, count_distinct};
 use datafusion::physical_plan::expressions::col as expr_col;
-use datafusion::physical_plan::Partitioning;
-use datafusion::physical_plan::Partitioning::RoundRobinBatch;
+use datafusion::physical_plan::Partitioning::{HashDiff, RoundRobinBatch};
 use flock::datasource::nexmark::config::BASE_TIME;
 use flock::prelude::*;
 use flock::runtime::context::ExecutionContext as FlockExecutionContext;
 use log::info;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Instant;
 
 /// Generate tumble windows workloads for the benchmark on cloud
 /// function services.
@@ -441,7 +441,7 @@ pub async fn session_window_tasks(
         // Each partition has a unique key after `repartition` execution.
         let partitions = repartition(
             get_input_from_registered_table(&mut ctx, &table_name)?,
-            Partitioning::HashDiff(vec![expr_col(&group_key, &schema)?], distinct_keys as usize),
+            HashDiff(vec![expr_col(&group_key, &schema)?], distinct_keys as usize),
         )
         .await?;
 
@@ -668,16 +668,25 @@ pub async fn global_window_tasks(
     };
     let mut windows: HashMap<usize, Vec<Vec<RecordBatch>>> = HashMap::new();
 
-    for time in 0..seconds {
-        let (r1, _) = stream.select_event_to_batches(
-            time,
-            0, // generator id
-            payload.query_number,
-            sync,
-        )?;
-        let schema = r1[0][0].schema();
+    let events = (0..seconds)
+        .map(|t| {
+            let (r1, _) = stream
+                .select_event_to_batches(
+                    t,
+                    0, // generator id
+                    payload.query_number,
+                    sync,
+                )
+                .unwrap();
+            r1.to_vec()
+        })
+        .collect::<Vec<Vec<Vec<RecordBatch>>>>();
 
-        let table = MemTable::try_new(schema.clone(), r1.to_vec())?;
+    let schema = events[0][0][0].schema();
+
+    for event in events.into_iter() {
+        let now = Instant::now();
+        let table = MemTable::try_new(schema.clone(), event)?;
         datafusion_ctx.deregister_table(&*table_name)?;
         datafusion_ctx.register_table(&*table_name, Arc::new(table))?;
 
@@ -708,7 +717,7 @@ pub async fn global_window_tasks(
         // Each partition has a unique key after `repartition` execution.
         let partitions = repartition(
             output,
-            Partitioning::HashDiff(
+            HashDiff(
                 vec![expr_col(&group_key, &schema_with_ptime)?],
                 distinct_keys as usize,
             ),
@@ -776,6 +785,11 @@ pub async fn global_window_tasks(
             })
             .collect::<Vec<tokio::task::JoinHandle<Result<()>>>>();
         futures::future::join_all(tasks).await;
+
+        let elapsed = now.elapsed().as_millis() as u64;
+        if elapsed < 1000 {
+            std::thread::sleep(std::time::Duration::from_millis(1000 - elapsed));
+        }
     }
 
     Ok(())
