@@ -18,11 +18,11 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use datafusion::datasource::MemTable;
 use datafusion::execution::context::ExecutionContext as DataFusionExecutionContext;
 use datafusion::logical_plan::{col, count_distinct};
+use datafusion::physical_plan::collect_partitioned;
 use datafusion::physical_plan::expressions::col as expr_col;
 use datafusion::physical_plan::Partitioning::{HashDiff, RoundRobinBatch};
 use flock::datasource::nexmark::config::BASE_TIME;
 use flock::prelude::*;
-use flock::runtime::context::ExecutionContext as FlockExecutionContext;
 use log::info;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -396,31 +396,37 @@ pub async fn session_window_tasks(
     let (group_key, table_name) = infer_session_keys(&payload.metadata)?;
     let (mut ring, group_name) = infer_actor_info(&payload.metadata)?;
 
-    let invocation_type = if sync {
-        FLOCK_LAMBDA_SYNC_CALL.to_string()
+    let (invocation_type, granule_size) = if sync {
+        (FLOCK_LAMBDA_SYNC_CALL.to_string(), *FLOCK_SYNC_GRANULE_SIZE)
     } else {
-        FLOCK_LAMBDA_ASYNC_CALL.to_string()
-    };
-
-    let granule_size = if sync {
-        *FLOCK_SYNC_GRANULE_SIZE
-    } else {
-        *FLOCK_ASYNC_GRANULE_SIZE
+        (
+            FLOCK_LAMBDA_ASYNC_CALL.to_string(),
+            *FLOCK_ASYNC_GRANULE_SIZE,
+        )
     };
 
     let mut ctx = DataFusionExecutionContext::new();
     let mut windows: HashMap<usize, Vec<Vec<RecordBatch>>> = HashMap::new();
 
-    for time in 0..seconds {
-        let (r1, _) = stream.select_event_to_batches(
-            time,
-            0, // generator id
-            payload.query_number,
-            sync,
-        )?;
-        let schema = r1[0][0].schema();
+    let events = (0..seconds)
+        .map(|t| {
+            let (r1, _) = stream
+                .select_event_to_batches(
+                    t,
+                    0, // generator id
+                    payload.query_number,
+                    sync,
+                )
+                .unwrap();
+            r1.to_vec()
+        })
+        .collect::<Vec<Vec<Vec<RecordBatch>>>>();
 
-        let table = MemTable::try_new(schema.clone(), r1.to_vec())?;
+    let schema = events[0][0][0].schema();
+
+    for (time, batches) in events.into_iter().enumerate() {
+        info!("Processing events in epoch: {}", time);
+        let table = MemTable::try_new(schema.clone(), batches)?;
         ctx.deregister_table(&*table_name)?;
         ctx.register_table(&*table_name, Arc::new(table))?;
 
@@ -452,7 +458,7 @@ pub async fn session_window_tasks(
             sessions.push(windows.remove(bidder).unwrap());
         });
 
-        let tasks = sessions
+        let tasks = coalesce_windows(sessions, granule_size)?
             .into_iter()
             .filter(|session| !session.is_empty())
             .map(|session| {
@@ -627,6 +633,38 @@ fn find_timeout_tumbling_windows(
     Ok(to_remove)
 }
 
+/// This function is used to coalesce smaller session windows or global windows
+/// to bigger ones so that the number of events in each payload is greater than
+/// the granule size, and close to the payload limit.
+fn coalesce_windows(
+    windows: Vec<Vec<Vec<RecordBatch>>>,
+    granule_size: usize,
+) -> Result<Vec<Vec<Vec<RecordBatch>>>> {
+    #[allow(unused_assignments)]
+    let mut curr_size = 0;
+    let mut total_size = 0;
+    let mut res = vec![];
+    let mut tmp = vec![];
+    for window in windows {
+        curr_size = window
+            .iter()
+            .map(|v| v.iter().map(|b| b.num_rows()).sum::<usize>())
+            .sum::<usize>();
+        total_size += curr_size;
+        if total_size <= granule_size * 2 || tmp.is_empty() {
+            tmp.push(window);
+        } else {
+            res.push(tmp.into_iter().flatten().collect::<Vec<Vec<RecordBatch>>>());
+            tmp = vec![window];
+            total_size = curr_size;
+        }
+    }
+    if !tmp.is_empty() {
+        res.push(tmp.into_iter().flatten().collect::<Vec<Vec<RecordBatch>>>());
+    }
+    Ok(res)
+}
+
 /// A global windows assigner assigns all elements with the same key to the same
 /// single global window. This windowing scheme is only useful if you also
 /// specify a custom trigger. Otherwise, no computation will be performed, as
@@ -647,25 +685,18 @@ pub async fn global_window_tasks(
     let sync = infer_invocation_type(&payload.metadata)?;
     let (group_key, table_name) = infer_session_keys(&payload.metadata)?;
     let (mut ring, group_name) = infer_actor_info(&payload.metadata)?;
-    let init_plan = infer_plan_for_process_time(&payload.metadata)?;
+    let add_process_time_sql = infer_add_process_time_query(&payload.metadata)?;
 
-    let invocation_type = if sync {
-        FLOCK_LAMBDA_SYNC_CALL.to_string()
+    let (invocation_type, granule_size) = if sync {
+        (FLOCK_LAMBDA_SYNC_CALL.to_string(), *FLOCK_SYNC_GRANULE_SIZE)
     } else {
-        FLOCK_LAMBDA_ASYNC_CALL.to_string()
+        (
+            FLOCK_LAMBDA_ASYNC_CALL.to_string(),
+            *FLOCK_ASYNC_GRANULE_SIZE,
+        )
     };
 
-    let granule_size = if sync {
-        *FLOCK_SYNC_GRANULE_SIZE
-    } else {
-        *FLOCK_ASYNC_GRANULE_SIZE
-    };
-
-    let mut datafusion_ctx = DataFusionExecutionContext::new();
-    let mut flock_ctx = FlockExecutionContext {
-        plan: init_plan,
-        ..Default::default()
-    };
+    let mut ctx = DataFusionExecutionContext::new();
     let mut windows: HashMap<usize, Vec<Vec<RecordBatch>>> = HashMap::new();
 
     let events = (0..seconds)
@@ -684,14 +715,15 @@ pub async fn global_window_tasks(
 
     let schema = events[0][0][0].schema();
 
-    for event in events.into_iter() {
+    for (time, batches) in events.into_iter().enumerate() {
+        info!("Processing events in epoch: {}", time);
         let now = Instant::now();
-        let table = MemTable::try_new(schema.clone(), event)?;
-        datafusion_ctx.deregister_table(&*table_name)?;
-        datafusion_ctx.register_table(&*table_name, Arc::new(table))?;
+        let table = MemTable::try_new(schema.clone(), batches)?;
+        ctx.deregister_table(&*table_name)?;
+        ctx.register_table(&*table_name, Arc::new(table))?;
 
         // Equivalent to `SELECT COUNT(DISTINCT group_key) FROM table_name;`
-        let output = datafusion_ctx
+        let output = ctx
             .table(&*table_name)?
             .aggregate(vec![], vec![count_distinct(col(&group_key))])?
             .collect()
@@ -704,14 +736,8 @@ pub async fn global_window_tasks(
             .unwrap()
             .value(0);
 
-        // Equivalent to `SELECT *, now() as p_time FROM bid;`
-        flock_ctx
-            .feed_data_sources(&[get_input_from_registered_table(
-                &mut datafusion_ctx,
-                &table_name,
-            )?])
-            .await?;
-        let output = flock_ctx.execute_partitioned().await?;
+        // Equivalent to `SELECT *, now() as p_time FROM table_name;`
+        let output = collect_partitioned(physical_plan(&ctx, &add_process_time_sql).await?).await?;
         let schema_with_ptime = output[0][0].schema();
 
         // Each partition has a unique key after `repartition` execution.
@@ -732,7 +758,7 @@ pub async fn global_window_tasks(
             tumblings.push(windows.remove(bidder).unwrap());
         });
 
-        let tasks = tumblings
+        let tasks = coalesce_windows(tumblings, granule_size)?
             .into_iter()
             .filter(|window| !window.is_empty())
             .map(|window| {

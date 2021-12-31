@@ -114,7 +114,7 @@ mod tests {
             ctx.register_table("bid", Arc::new(table))?;
 
             // 0. add process time field to the input
-            let plan = physical_plan(&mut ctx, sql1).await?;
+            let plan = physical_plan(&ctx, sql1).await?;
             let output = collect_partitioned(plan).await?;
             new_schema = output[0][0].schema().clone();
 
@@ -215,7 +215,7 @@ mod tests {
                 let table = MemTable::try_new(new_schema.clone(), windows)?;
                 ctx.deregister_table("bid")?;
                 ctx.register_table("bid", Arc::new(table))?;
-                let output = collect(physical_plan(&mut ctx, sql2).await?).await?;
+                let output = collect(physical_plan(&ctx, sql2).await?).await?;
                 println!("{}", pretty_format_batches(&output).unwrap());
             }
 

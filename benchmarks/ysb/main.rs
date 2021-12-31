@@ -153,8 +153,8 @@ async fn benchmark(opt: YSBBenchmarkOpt) -> Result<()> {
         opt
     );
     let ysb_conf = create_ysb_source(&opt);
-    let mut ctx = register_ysb_tables().await?;
-    let plan = physical_plan(&mut ctx, &ysb_query()).await?;
+    let ctx = register_ysb_tables().await?;
+    let plan = physical_plan(&ctx, &ysb_query()).await?;
     let root_actor = create_ysb_functions(&opt, plan).await?;
 
     // The source generator function needs the metadata to determine the type of the
@@ -230,8 +230,8 @@ mod tests {
         let (event, _) = stream.select(0, 0).expect("Failed to select event.");
 
         let sql = ysb_query();
-        let mut ctx = register_ysb_tables().await?;
-        let plan = physical_plan(&mut ctx, &sql).await?;
+        let ctx = register_ysb_tables().await?;
+        let plan = physical_plan(&ctx, &sql).await?;
         let mut flock_ctx = ExecutionContext {
             plan,
             ..Default::default()

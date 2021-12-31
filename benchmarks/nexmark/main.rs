@@ -352,8 +352,8 @@ async fn benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
 
     if query_number == 12 {
         metadata.insert(
-            "plan_for_process_time".to_string(),
-            serde_json::to_string(&plans[0])?,
+            "add_process_time_query".to_string(),
+            nexmark_query(query_number)[0].clone(),
         );
     }
 
@@ -468,9 +468,9 @@ mod tests {
             nexmark_query(11),
             nexmark_query(12),
         ];
-        let mut ctx = register_nexmark_tables().await?;
+        let ctx = register_nexmark_tables().await?;
         for sql in sqls {
-            let plan = physical_plan(&mut ctx, &sql[0]).await?;
+            let plan = physical_plan(&ctx, &sql[0]).await?;
             let mut flock_ctx = ExecutionContext {
                 plan,
                 ..Default::default()

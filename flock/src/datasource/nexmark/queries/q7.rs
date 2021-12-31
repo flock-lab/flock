@@ -80,7 +80,7 @@ mod tests {
             ctx.register_table("bid", Arc::new(table))?;
 
             // optimize query plan and execute it
-            let physical_plan = physical_plan(&mut ctx, sql).await?;
+            let physical_plan = physical_plan(&ctx, sql).await?;
             let batches = collect(physical_plan).await?;
 
             // show output

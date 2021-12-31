@@ -91,7 +91,7 @@ mod tests {
             ctx.register_table("bid", Arc::new(bid_table))?;
 
             // optimize query plan and execute it
-            let plan = physical_plan(&mut ctx, sql).await?;
+            let plan = physical_plan(&ctx, sql).await?;
             let output_partitions = collect(plan).await?;
 
             // show output
