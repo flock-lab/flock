@@ -15,8 +15,48 @@
 
 use crate::rainbow::rainbow_println;
 use anyhow::{Ok, Result};
+use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use rusoto_core::Region;
 use rusoto_lambda::{DeleteFunctionRequest, Lambda, LambdaClient, ListFunctionsRequest};
+
+pub fn command(matches: &ArgMatches) -> Result<()> {
+    if let Some(function_name) = matches.value_of("delete function") {
+        futures::executor::block_on(delete_function(function_name))?;
+    } else if matches.is_present("list functions") {
+        futures::executor::block_on(list_functions(matches.value_of("list functions")))?;
+    } else if matches.is_present("delete all functions") {
+        futures::executor::block_on(delete_all_functions(
+            matches.value_of("delete all functions"),
+        ))?;
+    }
+    Ok(())
+}
+
+pub fn command_args() -> App<'static, 'static> {
+    SubCommand::with_name("lambda")
+        .about("The AWS Lambda Tool for Flock")
+        .setting(AppSettings::DisableVersion)
+        .arg(
+            Arg::with_name("delete function")
+                .short("d")
+                .long("delete")
+                .value_name("FUNCTION_NAME")
+                .help("Deletes a lambda function")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("delete all functions")
+                .short("D")
+                .long("delete-all")
+                .help("Deletes all lambda functions"),
+        )
+        .arg(
+            Arg::with_name("list functions")
+                .short("l")
+                .long("list")
+                .help("Lists all lambda functions (all, *, or a single function)"),
+        )
+}
 
 /// Delete a Lambda function.
 ///
@@ -38,8 +78,12 @@ pub async fn delete_function(name: &str) -> Result<()> {
 }
 
 /// Deletes all AWS Lambda functions.
-pub async fn delete_all_functions() -> Result<()> {
-    let tasks = list_functions(None)
+///
+/// # Arguments
+/// * `pattern` - The pattern to match the function names. If None, all
+///   functions are deleted. `*` and `ALL` are wildcards for all functions.
+pub async fn delete_all_functions(pattern: Option<&str>) -> Result<()> {
+    let tasks = list_functions(pattern)
         .await?
         .into_iter()
         .map(|name| tokio::spawn(async move { delete_function(&name).await }))

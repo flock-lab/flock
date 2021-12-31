@@ -15,12 +15,56 @@
 
 use crate::rainbow::rainbow_println;
 use anyhow::{bail, Result};
+use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
+use ini::Ini;
+use lazy_static::lazy_static;
 use rusoto_core::Region;
 use rusoto_s3::PutObjectRequest;
 use rusoto_s3::{S3Client, S3};
 use std::fs;
 use std::io::Write;
 use std::path::Path;
+
+lazy_static! {
+    /// Global settings.
+    pub static ref FLOCK_CONF: Ini = Ini::load_from_str(include_str!("../../flock/src/config.toml")).unwrap();
+    pub static ref FLOCK_S3_BUCKET: String = FLOCK_CONF["flock"]["s3_bucket"].to_string();
+}
+
+pub fn command(matches: &ArgMatches) -> Result<()> {
+    futures::executor::block_on(put_function_object(
+        &FLOCK_S3_BUCKET,
+        matches
+            .value_of("s3 key")
+            .expect("No function s3 key provided"),
+        matches
+            .value_of("code path")
+            .expect("No function code path provided"),
+    ))?;
+    Ok(())
+}
+
+pub fn command_args() -> App<'static, 'static> {
+    SubCommand::with_name("upload")
+        .about("Uploads a function code to AWS S3")
+        .setting(AppSettings::DisableVersion)
+        .arg(
+            Arg::with_name("code path")
+                .short("p")
+                .long("path")
+                .value_name("FILE")
+                .help("Sets the path to the function code")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("s3 key")
+                .short("k")
+                .long("key")
+                .value_name("S3_KEY")
+                .help("Sets the S3 key to upload the function code to")
+                .takes_value(true),
+        )
+}
 
 /// Puts a lambda function code to AWS S3.
 ///
