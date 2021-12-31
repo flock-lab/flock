@@ -12,6 +12,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use crate::fsql::fsql;
+use crate::lambda;
 use crate::nexmark;
 use crate::rainbow::rainbow_println;
 use crate::s3;
@@ -76,6 +77,31 @@ pub async fn main() -> Result<()> {
                 ),
         )
         .subcommand(
+            SubCommand::with_name("lambda")
+                .about("The AWS Lambda Tool for Flock")
+                .setting(AppSettings::DisableVersion)
+                .arg(
+                    Arg::with_name("delete function")
+                        .short("d")
+                        .long("delete")
+                        .value_name("FUNCTION_NAME")
+                        .help("Deletes a lambda function")
+                        .takes_value(true),
+                )
+                .arg(
+                    Arg::with_name("delete all functions")
+                        .short("D")
+                        .long("delete-all")
+                        .help("Deletes all lambda functions"),
+                )
+                .arg(
+                    Arg::with_name("list functions")
+                        .short("l")
+                        .long("list")
+                        .help("Lists all lambda functions (all, *, or a single function)"),
+                ),
+        )
+        .subcommand(
             SubCommand::with_name("fsql")
                 .about("The terminal-based front-end to Flock")
                 .setting(AppSettings::DisableVersion),
@@ -101,6 +127,15 @@ pub async fn main() -> Result<()> {
                     .expect("No function code path provided"),
             )
             .await?;
+        }
+        ("lambda", Some(lambda_matches)) => {
+            if let Some(function_name) = lambda_matches.value_of("delete function") {
+                lambda::delete_function(function_name).await?;
+            } else if lambda_matches.is_present("list functions") {
+                lambda::list_functions(lambda_matches.value_of("list functions")).await?;
+            } else if lambda_matches.is_present("delete all functions") {
+                lambda::delete_all_functions().await?;
+            }
         }
         ("fsql", Some(_)) => {
             fsql().await?;

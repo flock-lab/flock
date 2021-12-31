@@ -12,6 +12,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 mod fsql;
+mod lambda;
 mod nexmark;
 mod rainbow;
 #[cfg(feature = "cli")]
