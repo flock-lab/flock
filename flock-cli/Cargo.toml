@@ -1,21 +1,22 @@
 [package]
+authors = [ "Gang Liao <gangliao@cs.umd.edu>" ]
+categories = [ "command-line-interface", "command-line-utilities" ]
+description = "A command-line REPL for Flock that integrates into existing cli workflows"
+edition = "2021"
+keywords = [ "Flock", "repl", "client", "cli" ]
+license = "AGPL-3.0"
 name = "flock-cli"
 version = "0.2.0"
-description = "A command-line REPL for Flock that integrates into existing cli workflows"
-authors = [ "Gang Liao <gangliao@cs.umd.edu>" ]
-license = "AGPL-3.0"
-keywords = [ "Flock", "repl", "client", "cli" ]
-categories = [ "command-line-interface", "command-line-utilities" ]
-edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = [ "cli" ]
 cli = [ "rustyline" ]
+default = [ "cli" ]
 
 [dependencies]
 anyhow = "1.0.51"
+benchmarks = { path = "../benchmarks" }
 clap = "2.33.3"
 ctrlc = "3.1.1"
 env_logger = "^0.9"

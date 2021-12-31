@@ -68,15 +68,15 @@ impl Default for DataSinkFormat {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum DataSinkType {
     /// No data sink.
-    Blackhole = 0,
+    Blackhole,
     /// Write to AWS S3.
-    S3        = 1,
+    S3,
     /// Write to AWS DynamoDB.
-    DynamoDB  = 2,
+    DynamoDB,
     /// Write to AWS SQS.
-    SQS       = 3,
+    SQS,
     /// Write to AWS EFS.
-    EFS       = 4,
+    EFS,
 }
 
 impl Default for DataSinkType {
@@ -87,13 +87,13 @@ impl Default for DataSinkType {
 
 impl DataSinkType {
     /// Convert the user input to the corresponding data sink type.
-    pub fn new(data_sink: usize) -> Result<DataSinkType> {
+    pub fn new(data_sink: &str) -> Result<DataSinkType> {
         match data_sink {
-            0 => Ok(DataSinkType::Blackhole),
-            1 => Ok(DataSinkType::S3),
-            2 => Ok(DataSinkType::DynamoDB),
-            3 => Ok(DataSinkType::SQS),
-            4 => Ok(DataSinkType::EFS),
+            "blackhole" => Ok(DataSinkType::Blackhole),
+            "s3" => Ok(DataSinkType::S3),
+            "dynamodb" => Ok(DataSinkType::DynamoDB),
+            "sqs" => Ok(DataSinkType::SQS),
+            "efs" => Ok(DataSinkType::EFS),
             _ => Err(FlockError::DataSink(format!(
                 "Unknown data sink type: {}",
                 data_sink

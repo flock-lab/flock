@@ -15,7 +15,6 @@ use crate::args;
 use crate::fsql;
 use crate::lambda;
 use crate::nexmark;
-use crate::rainbow::rainbow_println;
 use crate::s3;
 use anyhow::Context as _;
 use anyhow::{anyhow, bail, Result};
@@ -36,8 +35,6 @@ pub async fn main() -> Result<()> {
         .subcommand(s3::command_args())
         .subcommand(lambda::command_args())
         .subcommand(fsql::command_args());
-
-    rainbow_println(include_str!("./flock"));
 
     let global_matches = app_cli.get_matches();
     let (command, matches) = match global_matches.subcommand() {

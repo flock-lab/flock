@@ -20,15 +20,16 @@ use rusoto_core::Region;
 use rusoto_lambda::{DeleteFunctionRequest, Lambda, LambdaClient, ListFunctionsRequest};
 
 pub fn command(matches: &ArgMatches) -> Result<()> {
-    if let Some(function_name) = matches.value_of("delete function") {
-        futures::executor::block_on(delete_function(function_name))?;
+    if matches.is_present("delete function") {
+        futures::executor::block_on(delete_function(matches.value_of("delete function")))?;
     } else if matches.is_present("list functions") {
         futures::executor::block_on(list_functions(matches.value_of("list functions")))?;
     } else if matches.is_present("delete all functions") {
-        futures::executor::block_on(delete_all_functions(
-            matches.value_of("delete all functions"),
-        ))?;
+        futures::executor::block_on(delete_all_functions())?;
+    } else if matches.is_present("list all functions") {
+        futures::executor::block_on(list_all_functions())?;
     }
+
     Ok(())
 }
 
@@ -53,25 +54,45 @@ pub fn command_args() -> App<'static, 'static> {
             Arg::with_name("list functions")
                 .short("l")
                 .long("list")
-                .help("Lists all lambda functions (all, *, or a single function)"),
+                .help("Lists all lambda functions (-l all, or a function name)")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("list all functions")
+                .short("L")
+                .long("list-all")
+                .help("Lists all lambda functions"),
         )
 }
 
-/// Delete a Lambda function.
+/// Delete Lambda functions matching the given pattern.
 ///
 /// # Arguments
-/// * `name` - The name of the function to delete.
-pub async fn delete_function(name: &str) -> Result<()> {
-    let request = DeleteFunctionRequest {
-        function_name: name.to_string(),
-        ..Default::default()
-    };
+/// * `pattern` - The pattern to match the function names. If None, all
+///   functions are deleted.
+async fn delete_function(pattern: Option<&str>) -> Result<()> {
+    let tasks = list_functions(pattern)
+        .await?
+        .into_iter()
+        .map(|name| {
+            tokio::spawn(async move {
+                let request = DeleteFunctionRequest {
+                    function_name: name,
+                    ..Default::default()
+                };
+                LambdaClient::new(Region::default())
+                    .delete_function(request)
+                    .await
+            })
+        })
+        .collect::<Vec<_>>();
 
-    LambdaClient::new(Region::default())
-        .delete_function(request)
-        .await?;
+    futures::future::join_all(tasks).await;
 
-    rainbow_println(&format!("[OK] deleted function {}", name));
+    rainbow_println(&format!(
+        "[OK] deleted all functions matching the pattern: {:?}",
+        pattern
+    ));
 
     Ok(())
 }
@@ -80,30 +101,22 @@ pub async fn delete_function(name: &str) -> Result<()> {
 ///
 /// # Arguments
 /// * `pattern` - The pattern to match the function names. If None, all
-///   functions are deleted. `*` and `ALL` are wildcards for all functions.
-pub async fn delete_all_functions(pattern: Option<&str>) -> Result<()> {
-    let tasks = list_functions(pattern)
-        .await?
-        .into_iter()
-        .map(|name| tokio::spawn(async move { delete_function(&name).await }))
-        .collect::<Vec<_>>();
-
-    futures::future::join_all(tasks).await;
-
+///   functions are deleted.
+async fn delete_all_functions() -> Result<()> {
+    delete_function(None).await?;
     rainbow_println("[OK] deleted all functions");
-
     Ok(())
 }
 
-/// Lists all Lambda functions.
+/// Lists Lambda functions matching the pattern.
 ///
 /// # Arguments
 /// * `pattern` - A pattern to filter the function names. If `None`, all
-///   functions are listed. `*` and  `all` are wildcards for all functions.
+///   functions are listed.
 ///
 /// # Returns
 /// A vector of function names.
-pub async fn list_functions(pattern: Option<&str>) -> Result<Vec<String>> {
+async fn list_functions(pattern: Option<&str>) -> Result<Vec<String>> {
     let client = LambdaClient::new(Region::default());
     let mut request = ListFunctionsRequest {
         ..Default::default()
@@ -139,7 +152,7 @@ pub async fn list_functions(pattern: Option<&str>) -> Result<Vec<String>> {
 
     match pattern {
         Some(pattern) => {
-            if pattern == "*" || pattern == "all" || pattern == "ALL" {
+            if pattern == "all" || pattern == "ALL" {
                 rainbow_println(&function_names.join("\n"));
             } else {
                 let mut matching_functions = vec![];
@@ -164,4 +177,9 @@ pub async fn list_functions(pattern: Option<&str>) -> Result<Vec<String>> {
     }
 
     Ok(function_names)
+}
+
+/// Lists all AWS Lambda functions.
+async fn list_all_functions() -> Result<Vec<String>> {
+    list_functions(None).await
 }
