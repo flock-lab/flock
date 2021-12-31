@@ -28,7 +28,6 @@ pub fn get_args() -> Vec<Arg<'static, 'static>> {
 fn get_logging_args() -> Vec<Arg<'static, 'static>> {
     [
         Arg::with_name("log-level")
-            .short("L")
             .long("log-level")
             .possible_values(&["error", "warn", "info", "debug", "trace", "off"])
             .help("Log level [default: info]")

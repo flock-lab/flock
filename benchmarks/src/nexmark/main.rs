@@ -53,7 +53,7 @@ lazy_static! {
 #[derive(Default, Clone, Debug, StructOpt)]
 pub struct NexmarkBenchmarkOpt {
     /// Query number
-    #[structopt(short = "q", long = "query_number", default_value = "1")]
+    #[structopt(short = "q", long = "query_number", default_value = "3")]
     pub query_number: usize,
 
     /// Activate debug mode to see query results
@@ -61,7 +61,7 @@ pub struct NexmarkBenchmarkOpt {
     pub debug: bool,
 
     /// Number of threads or generators of each test run
-    #[structopt(short = "g", long = "generators", default_value = "100")]
+    #[structopt(short = "g", long = "generators", default_value = "1")]
     pub generators: usize,
 
     /// Number of threads to use for parallel execution
@@ -69,12 +69,12 @@ pub struct NexmarkBenchmarkOpt {
     pub seconds: usize,
 
     /// Number of events generated among generators per second
-    #[structopt(short = "e", long = "events_per_second", default_value = "100000")]
+    #[structopt(short = "e", long = "events_per_second", default_value = "1000")]
     pub events_per_second: usize,
 
     /// The data sink type to use
-    #[structopt(short = "d", long = "data_sink_type", default_value = "0")]
-    pub data_sink_type: usize,
+    #[structopt(short = "d", long = "data_sink_type", default_value = "blackhole")]
+    pub data_sink_type: String,
 
     /// The function invocation mode to use
     #[structopt(long = "async")]
@@ -89,7 +89,7 @@ pub struct NexmarkBenchmarkOpt {
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::init();
-    benchmark(&mut NexmarkBenchmarkOpt::from_args()).await?;
+    nexmark_benchmark(&mut NexmarkBenchmarkOpt::from_args()).await?;
     Ok(())
 }
 
@@ -130,7 +130,7 @@ pub fn create_nexmark_source(opt: &mut NexmarkBenchmarkOpt) -> NEXMarkSource {
     };
 
     if opt.query_number == 10 {
-        opt.data_sink_type = 1; // AWS S3
+        opt.data_sink_type = "s3".to_string();
     }
     NEXMarkSource::new(opt.seconds, opt.generators, opt.events_per_second, window)
 }
@@ -208,7 +208,7 @@ pub async fn create_nexmark_functions(
         plan,
         plan_s3_idx: s3.clone(),
         name: worker_func_name.clone(),
-        next: CloudFunction::Sink(DataSinkType::new(opt.data_sink_type)?),
+        next: CloudFunction::Sink(DataSinkType::new(&opt.data_sink_type)?),
     };
 
     // Create the function for the nexmark source generator.
@@ -317,10 +317,9 @@ pub async fn create_physical_plans(
     Ok(plans)
 }
 
-#[allow(dead_code)]
-async fn benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
+pub async fn nexmark_benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
     info!(
-        "Running the NEXMark benchmark with the following options: {:?}",
+        "Running the NEXMark benchmark with the following options:\n{:#?}",
         opt
     );
     let query_number = opt.query_number;
@@ -392,7 +391,7 @@ async fn benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
     tokio::time::sleep(parse_duration("5s").unwrap()).await;
     fetch_aws_watchlogs(&NEXMARK_SOURCE_LOG_GROUP, parse_duration("1min").unwrap()).await?;
 
-    let sink_type = DataSinkType::new(opt.data_sink_type)?;
+    let sink_type = DataSinkType::new(&opt.data_sink_type)?;
     if sink_type != DataSinkType::Blackhole {
         let data_sink = DataSink::read(
             format!("q{}", opt.query_number),
