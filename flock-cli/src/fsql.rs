@@ -15,7 +15,16 @@
 
 use crate::rainbow::rainbow_println;
 use anyhow::{anyhow, Result};
+use clap::{App, ArgMatches, SubCommand};
 use rustyline::Editor;
+
+pub fn command(_: &ArgMatches) -> Result<()> {
+    futures::executor::block_on(fsql())
+}
+
+pub fn command_args() -> App<'static, 'static> {
+    SubCommand::with_name("fsql").about("The terminal-based front-end to Flock")
+}
 
 /// The main entry point for fsql.
 pub async fn fsql() -> Result<()> {

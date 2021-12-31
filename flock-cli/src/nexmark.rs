@@ -14,6 +14,25 @@
 //! This crate runs the NexMark Benchmark on cloud function services.
 
 use anyhow::Result;
+use clap::{App, Arg, ArgMatches, SubCommand};
+
+pub fn command(matches: &ArgMatches) -> Result<()> {
+    if matches.is_present("run") {
+        run()?;
+    }
+    Ok(())
+}
+
+pub fn command_args() -> App<'static, 'static> {
+    SubCommand::with_name("nexmark")
+        .about("The NEXMark Benchmark Tool")
+        .arg(
+            Arg::with_name("run")
+                .short("r")
+                .long("run")
+                .help("Runs the nexmark lambda function"),
+        )
+}
 
 pub fn run() -> Result<()> {
     unimplemented!();

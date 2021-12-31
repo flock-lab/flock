@@ -39,3 +39,14 @@ fn rgb(freq: f64, spread: f64, i: f64) -> (u8, u8, u8) {
 
     (red as u8, green as u8, blue as u8)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rainbow_print() {
+        let text = include_str!("./flock");
+        rainbow_println(text);
+    }
+}
