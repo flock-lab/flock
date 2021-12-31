@@ -292,8 +292,8 @@ pub async fn create_physical_plans(
                 false,
             ),
             Field::new(
-                "b_date_time",
-                DataType::Timestamp(TimeUnit::Nanosecond, None),
+                "p_time",
+                DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".to_string())),
                 false,
             ),
         ]));
