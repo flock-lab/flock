@@ -11,6 +11,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+mod args;
 mod fsql;
 mod lambda;
 mod nexmark;
@@ -22,11 +23,6 @@ mod s3;
 use anyhow::Result;
 
 pub fn main() -> Result<()> {
-    if std::env::var("RUST_LOG").is_err() {
-        std::env::set_var("RUST_LOG", "info");
-    }
-    pretty_env_logger::init();
-
     #[cfg(feature = "cli")]
     repl::main()
 }

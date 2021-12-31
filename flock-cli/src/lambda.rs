@@ -15,7 +15,7 @@
 
 use crate::rainbow::rainbow_println;
 use anyhow::{Ok, Result};
-use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
+use clap::{App, Arg, ArgMatches, SubCommand};
 use rusoto_core::Region;
 use rusoto_lambda::{DeleteFunctionRequest, Lambda, LambdaClient, ListFunctionsRequest};
 
@@ -35,7 +35,6 @@ pub fn command(matches: &ArgMatches) -> Result<()> {
 pub fn command_args() -> App<'static, 'static> {
     SubCommand::with_name("lambda")
         .about("The AWS Lambda Tool for Flock")
-        .setting(AppSettings::DisableVersion)
         .arg(
             Arg::with_name("delete function")
                 .short("d")

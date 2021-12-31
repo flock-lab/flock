@@ -11,6 +11,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use crate::args;
 use crate::fsql;
 use crate::lambda;
 use crate::nexmark;
@@ -18,7 +19,7 @@ use crate::rainbow::rainbow_println;
 use crate::s3;
 use anyhow::Context as _;
 use anyhow::{anyhow, bail, Result};
-use clap::{crate_version, App, Arg};
+use clap::{crate_version, App, AppSettings};
 
 #[tokio::main]
 pub async fn main() -> Result<()> {
@@ -27,15 +28,10 @@ pub async fn main() -> Result<()> {
         .version(crate_version!())
         .about("Command Line Interactive Contoller for Flock")
         .version(crate_version!())
+        .setting(AppSettings::SubcommandRequired)
+        .setting(AppSettings::GlobalVersion)
         .author("UMD Database Group")
-        .arg(
-            Arg::with_name("config")
-                .short("c")
-                .long("config")
-                .value_name("FILE")
-                .help("Sets a custom config file")
-                .takes_value(true),
-        )
+        .args(&args::get_args())
         .subcommand(nexmark::command_args())
         .subcommand(s3::command_args())
         .subcommand(lambda::command_args())
@@ -48,6 +44,8 @@ pub async fn main() -> Result<()> {
         (command, Some(matches)) => (command, matches),
         (_, None) => unreachable!(),
     };
+
+    args::get_logging(&global_matches, matches)?.init();
 
     match command {
         "nexmark" => nexmark::command(matches),

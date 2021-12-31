@@ -15,7 +15,7 @@
 
 use crate::rainbow::rainbow_println;
 use anyhow::{bail, Result};
-use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
+use clap::{App, Arg, ArgMatches, SubCommand};
 use ini::Ini;
 use lazy_static::lazy_static;
 use rusoto_core::Region;
@@ -47,7 +47,6 @@ pub fn command(matches: &ArgMatches) -> Result<()> {
 pub fn command_args() -> App<'static, 'static> {
     SubCommand::with_name("upload")
         .about("Uploads a function code to AWS S3")
-        .setting(AppSettings::DisableVersion)
         .arg(
             Arg::with_name("code path")
                 .short("p")

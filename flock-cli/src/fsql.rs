@@ -15,7 +15,7 @@
 
 use crate::rainbow::rainbow_println;
 use anyhow::{anyhow, Result};
-use clap::{App, AppSettings, ArgMatches, SubCommand};
+use clap::{App, ArgMatches, SubCommand};
 use rustyline::Editor;
 
 pub fn command(_: &ArgMatches) -> Result<()> {
@@ -23,9 +23,7 @@ pub fn command(_: &ArgMatches) -> Result<()> {
 }
 
 pub fn command_args() -> App<'static, 'static> {
-    SubCommand::with_name("fsql")
-        .about("The terminal-based front-end to Flock")
-        .setting(AppSettings::DisableVersion)
+    SubCommand::with_name("fsql").about("The terminal-based front-end to Flock")
 }
 
 /// The main entry point for fsql.

@@ -14,7 +14,7 @@
 //! This crate runs the NexMark Benchmark on cloud function services.
 
 use anyhow::Result;
-use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
+use clap::{App, Arg, ArgMatches, SubCommand};
 
 pub fn command(matches: &ArgMatches) -> Result<()> {
     if matches.is_present("run") {
@@ -26,7 +26,6 @@ pub fn command(matches: &ArgMatches) -> Result<()> {
 pub fn command_args() -> App<'static, 'static> {
     SubCommand::with_name("nexmark")
         .about("The NEXMark Benchmark Tool")
-        .setting(AppSettings::DisableVersion)
         .arg(
             Arg::with_name("run")
                 .short("r")
