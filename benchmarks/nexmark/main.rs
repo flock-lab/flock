@@ -204,7 +204,7 @@ pub async fn create_nexmark_functions(
         next:        next_func_name.clone(),
     };
 
-    let mut nexmark_worker_ctx = ExecutionContext {
+    let nexmark_worker_ctx = ExecutionContext {
         plan,
         plan_s3_idx: s3.clone(),
         name: worker_func_name.clone(),
@@ -219,7 +219,7 @@ pub async fn create_nexmark_functions(
     create_lambda_function(&nexmark_source_ctx, Some(2048 /* MB */), opt.debug).await?;
 
     // Create the function for the nexmark worker.
-    match &next_func_name {
+    match next_func_name.clone() {
         CloudFunction::Lambda(name) => {
             info!("Creating lambda function: {}", name);
             create_lambda_function(&nexmark_worker_ctx, Some(opt.memory_size), opt.debug).await?;
@@ -229,14 +229,23 @@ pub async fn create_nexmark_functions(
                 "Creating lambda function group: {:?}",
                 nexmark_source_ctx.next
             );
-            for i in 0..*concurrency {
-                let group_member_name = format!("{}-{:02}", name.clone(), i);
-                info!("Creating function member: {}", group_member_name);
-                nexmark_worker_ctx.name = group_member_name;
-                create_lambda_function(&nexmark_worker_ctx, Some(opt.memory_size), opt.debug)
-                    .await?;
-                set_lambda_concurrency(nexmark_worker_ctx.name, 1).await?;
-            }
+
+            let tasks = (0..concurrency)
+                .into_iter()
+                .map(|i| {
+                    let mut worker_ctx = nexmark_worker_ctx.clone();
+                    let group_name = name.clone();
+                    let memory_size = opt.memory_size;
+                    let debug = opt.debug;
+                    tokio::spawn(async move {
+                        worker_ctx.name = format!("{}-{}", group_name, i);
+                        info!("Creating function member: {}", worker_ctx.name);
+                        create_lambda_function(&worker_ctx, Some(memory_size), debug).await?;
+                        set_lambda_concurrency(worker_ctx.name, 1).await
+                    })
+                })
+                .collect::<Vec<JoinHandle<Result<()>>>>();
+            futures::future::join_all(tasks).await;
         }
         CloudFunction::Sink(_) => unreachable!(),
     }
