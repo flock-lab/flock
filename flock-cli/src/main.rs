@@ -15,7 +15,6 @@ mod args;
 mod fsql;
 mod lambda;
 mod nexmark;
-mod rainbow;
 #[cfg(feature = "cli")]
 mod repl;
 mod s3;

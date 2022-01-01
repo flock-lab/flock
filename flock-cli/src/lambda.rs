@@ -13,8 +13,8 @@
 
 //! Flock CLI creates/lists/deletes AWS Lambda functions.
 
-use crate::rainbow::rainbow_println;
 use anyhow::{Ok, Result};
+use benchmarks::rainbow_println;
 use clap::{App, Arg, ArgMatches, SubCommand};
 use rusoto_core::Region;
 use rusoto_lambda::{DeleteFunctionRequest, Lambda, LambdaClient, ListFunctionsRequest};
@@ -89,7 +89,7 @@ async fn delete_function(pattern: Option<&str>) -> Result<()> {
 
     futures::future::join_all(tasks).await;
 
-    rainbow_println(&format!(
+    rainbow_println(format!(
         "[OK] deleted all functions matching the pattern: {:?}",
         pattern
     ));
@@ -153,7 +153,7 @@ async fn list_functions(pattern: Option<&str>) -> Result<Vec<String>> {
     match pattern {
         Some(pattern) => {
             if pattern == "all" || pattern == "ALL" {
-                rainbow_println(&function_names.join("\n"));
+                rainbow_println(function_names.join("\n"));
             } else {
                 let mut matching_functions = vec![];
                 for function_name in function_names {
@@ -162,7 +162,7 @@ async fn list_functions(pattern: Option<&str>) -> Result<Vec<String>> {
                     }
                 }
                 if matching_functions.is_empty() {
-                    rainbow_println(&format!("No functions found matching {}", pattern));
+                    rainbow_println(format!("No functions found matching {}", pattern));
                 } else {
                     for function_name in &matching_functions {
                         rainbow_println(function_name);
@@ -172,7 +172,7 @@ async fn list_functions(pattern: Option<&str>) -> Result<Vec<String>> {
             }
         }
         None => {
-            rainbow_println(&function_names.join("\n"));
+            rainbow_println(function_names.join("\n"));
         }
     }
 

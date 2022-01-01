@@ -12,6 +12,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use anyhow::Result;
+use benchmarks::rainbow_string;
 use clap::{Arg, ArgMatches};
 use std::io::Write;
 
@@ -71,7 +72,7 @@ pub fn get_logging(
         }
     };
     builder.filter(None, level);
-    builder.filter_module("ws", log::LevelFilter::Warn);
+    builder.filter_module("test", log::LevelFilter::Warn);
 
     if level == log::LevelFilter::Trace {
         builder.format_timestamp_secs();
@@ -80,7 +81,7 @@ pub fn get_logging(
             writeln!(
                 f,
                 "[{}] {}",
-                record.level().to_string().to_lowercase(),
+                rainbow_string(record.level().to_string().to_lowercase()),
                 record.args()
             )
         });
