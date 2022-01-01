@@ -11,6 +11,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+#[path = "../rainbow.rs"]
+mod rainbow;
 use arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
 use arrow::record_batch::RecordBatch;
 use arrow::util::pretty::pretty_format_batches;
@@ -24,6 +26,7 @@ use lazy_static::lazy_static;
 use log::info;
 use nexmark::event::{Auction, Bid, Person};
 use nexmark::NEXMarkSource;
+use rainbow::{rainbow_println, rainbow_string};
 use rusoto_core::{ByteStream, Region};
 use rusoto_lambda::InvocationResponse;
 use rusoto_s3::{ListObjectsV2Request, PutObjectRequest, S3Client, S3};
@@ -210,20 +213,20 @@ pub async fn create_nexmark_functions(
     // Create the function for the nexmark source generator.
     info!(
         "Creating lambda function: {}",
-        NEXMARK_SOURCE_FUNC_NAME.clone()
+        rainbow_string(NEXMARK_SOURCE_FUNC_NAME.clone())
     );
     create_lambda_function(&nexmark_source_ctx, Some(2048 /* MB */)).await?;
 
     // Create the function for the nexmark worker.
     match next_func_name.clone() {
         CloudFunction::Lambda(name) => {
-            info!("Creating lambda function: {}", name);
+            info!("Creating lambda function: {}", rainbow_string(name));
             create_lambda_function(&nexmark_worker_ctx, Some(opt.memory_size)).await?;
         }
         CloudFunction::Group((name, concurrency)) => {
             info!(
-                "Creating lambda function group: {:?}",
-                nexmark_source_ctx.next
+                "Creating lambda function group: {}",
+                rainbow_string(format!("{:?}", nexmark_source_ctx.next))
             );
 
             let tasks = (0..concurrency)
@@ -234,7 +237,10 @@ pub async fn create_nexmark_functions(
                     let memory_size = opt.memory_size;
                     tokio::spawn(async move {
                         worker_ctx.name = format!("{}-{:02}", group_name, i);
-                        info!("Creating function member: {}", worker_ctx.name);
+                        info!(
+                            "Creating function member: {}",
+                            rainbow_string(&worker_ctx.name)
+                        );
                         create_lambda_function(&worker_ctx, Some(memory_size)).await?;
                         set_lambda_concurrency(worker_ctx.name, 1).await
                     })
@@ -313,10 +319,12 @@ pub async fn create_physical_plans(
 }
 
 pub async fn nexmark_benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
-    info!(
-        "Running the NEXMark benchmark with the following options:\n{:#?}",
-        opt
-    );
+    rainbow_println("================================================================");
+    rainbow_println("                    Running the benchmark                       ");
+    rainbow_println("================================================================");
+    info!("Running the NEXMark benchmark with the following options:\n");
+    rainbow_println(format!("{:#?}\n", opt));
+
     let query_number = opt.query_number;
     let nexmark_conf = create_nexmark_source(opt);
 
@@ -364,8 +372,9 @@ pub async fn nexmark_benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
             let m = metadata.clone();
             tokio::spawn(async move {
                 info!(
-                    "[OK] Invoking NEXMark source function: {} by generator {}",
-                    f, i
+                    "[OK] Invoking NEXMark source function: {} by generator {}\n",
+                    rainbow_string(&f),
+                    i
                 );
                 let p = serde_json::to_vec(&Payload {
                     datasource: DataSource::NEXMarkEvent(s),

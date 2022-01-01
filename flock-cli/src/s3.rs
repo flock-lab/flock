@@ -13,8 +13,8 @@
 
 //! Flock CLI reads/writes objects from/to AWS S3.
 
-use crate::rainbow::rainbow_println;
 use anyhow::{bail, Result};
+use benchmarks::rainbow_println;
 use clap::{App, Arg, ArgMatches, SubCommand};
 use ini::Ini;
 use lazy_static::lazy_static;

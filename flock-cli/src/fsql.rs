@@ -13,8 +13,8 @@
 
 //! fsql is a terminal-based front-end to Flock.
 
-use crate::rainbow::rainbow_println;
 use anyhow::{anyhow, Result};
+use benchmarks::rainbow_println;
 use clap::{App, ArgMatches, SubCommand};
 use rustyline::Editor;
 

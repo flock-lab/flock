@@ -16,10 +16,10 @@
 use std::f64::consts::PI;
 
 /// Prints the text in the rainbow fansion.
-pub fn rainbow_println(line: &str) {
+pub fn rainbow_println<S: Into<String>>(line: S) {
     let frequency: f64 = 0.1;
     let spread: f64 = 3.0;
-    for (i, c) in line.char_indices() {
+    for (i, c) in line.into().char_indices() {
         let (r, g, b) = rgb(frequency, spread, i as f64);
         if c == ' ' {
             print!("{}", c);
@@ -28,6 +28,22 @@ pub fn rainbow_println(line: &str) {
         }
     }
     println!();
+}
+
+/// Converts a line to a rainbow-colored string.
+pub fn rainbow_string<S: Into<String>>(line: S) -> String {
+    let frequency: f64 = 0.1;
+    let spread: f64 = 3.0;
+    let mut result = String::new();
+    for (i, c) in line.into().char_indices() {
+        let (r, g, b) = rgb(frequency, spread, i as f64);
+        if c == ' ' {
+            result.push(c);
+        } else {
+            result.push_str(&format!("\x1b[38;2;{};{};{}m{}\x1b[0m", r, g, b, c));
+        }
+    }
+    result
 }
 
 /// Generates RGB for rainbow print.
@@ -46,7 +62,7 @@ mod tests {
 
     #[test]
     fn test_rainbow_print() {
-        let text = include_str!("./flock");
+        let text = include_str!("../Cargo.toml");
         rainbow_println(text);
     }
 }

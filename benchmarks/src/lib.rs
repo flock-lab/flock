@@ -18,3 +18,6 @@ pub use nexmark::{nexmark_benchmark, NexmarkBenchmarkOpt};
 #[path = "./ysb/main.rs"]
 pub mod ysb;
 pub use ysb::{ysb_benchmark, YSBBenchmarkOpt};
+
+pub mod rainbow;
+pub use rainbow::{rainbow_println, rainbow_string};

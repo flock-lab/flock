@@ -23,7 +23,7 @@ use datafusion::physical_plan::expressions::col as expr_col;
 use datafusion::physical_plan::Partitioning::{HashDiff, RoundRobinBatch};
 use flock::datasource::nexmark::config::BASE_TIME;
 use flock::prelude::*;
-use log::info;
+use log::{info, warn};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
@@ -42,7 +42,12 @@ pub async fn tumbling_window_tasks(
     seconds: usize,
     window_size: usize,
 ) -> Result<()> {
-    assert!(seconds >= window_size);
+    if seconds < window_size {
+        warn!(
+            "seconds: {} is less than window_size: {}",
+            seconds, window_size
+        );
+    }
     let sync = infer_invocation_type(&payload.metadata)?;
     let invocation_type = if sync {
         FLOCK_LAMBDA_SYNC_CALL.to_string()
@@ -146,7 +151,12 @@ pub async fn hopping_window_tasks(
     window_size: usize,
     hop_size: usize,
 ) -> Result<()> {
-    assert!(seconds >= window_size);
+    if seconds < window_size {
+        warn!(
+            "seconds: {} is less than window_size: {}",
+            seconds, window_size
+        );
+    }
     let sync = infer_invocation_type(&payload.metadata)?;
     let invocation_type = if sync {
         FLOCK_LAMBDA_SYNC_CALL.to_string()
@@ -392,6 +402,9 @@ pub async fn session_window_tasks(
     seconds: usize,
     timeout: usize,
 ) -> Result<()> {
+    if seconds < timeout {
+        warn!("seconds: {} is less than timeout: {}", seconds, timeout);
+    }
     let sync = infer_invocation_type(&payload.metadata)?;
     let (group_key, table_name) = infer_session_keys(&payload.metadata)?;
     let (mut ring, group_name) = infer_actor_info(&payload.metadata)?;
@@ -682,6 +695,12 @@ pub async fn global_window_tasks(
     seconds: usize,
     window_size: usize,
 ) -> Result<()> {
+    if seconds < window_size {
+        warn!(
+            "seconds: {} is less than window_size: {}",
+            seconds, window_size
+        );
+    }
     let sync = infer_invocation_type(&payload.metadata)?;
     let (group_key, table_name) = infer_session_keys(&payload.metadata)?;
     let (mut ring, group_name) = infer_actor_info(&payload.metadata)?;

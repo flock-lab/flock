@@ -13,9 +13,8 @@
 
 //! This crate runs the NexMark Benchmark on cloud function services.
 
-use crate::rainbow::rainbow_println;
 use anyhow::{anyhow, bail, Context as _, Result};
-use benchmarks::{nexmark_benchmark, NexmarkBenchmarkOpt};
+use benchmarks::{nexmark_benchmark, rainbow_println, NexmarkBenchmarkOpt};
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 
 pub fn command(matches: &ArgMatches) -> Result<()> {

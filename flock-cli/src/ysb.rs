@@ -13,9 +13,8 @@
 
 //! This crate runs the Yahoo! Streaming Benchmarks on cloud function services.
 
-use crate::rainbow::rainbow_println;
 use anyhow::{anyhow, bail, Context as _, Result};
-use benchmarks::{ysb_benchmark, YSBBenchmarkOpt};
+use benchmarks::{rainbow_println, ysb_benchmark, YSBBenchmarkOpt};
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 
 pub fn command(matches: &ArgMatches) -> Result<()> {
