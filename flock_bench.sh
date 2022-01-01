@@ -77,11 +77,22 @@ Build_and_Deploy() {
   echo
   echo $(echogreen "[OK] Flock Completed Deployment.")
   echo
-  echo $(echored "If you want to run the benchmark, please use `flock-cli nexmark run`")
+}
+
+############################################################
+# Run Benchmarks                                           #
+############################################################
+Run() {
+  echo $(echogreen "============================================================")
+  echo $(echogreen "                   Runing the benchmarks                    ")
+  echo $(echogreen "============================================================")
+  echo 
+  echo $(echored "[Error] If you want to run the benchmark, please use \"flock-cli [nexmark|ysb] run\".")
   echo
   echo $(echoblue "$ ./target/x86_64-unknown-linux-gnu/release/flock-cli nexmark run -h")
   echo
   ./target/x86_64-unknown-linux-gnu/release/flock-cli nexmark run -h
+  echo
 }
 
 ############################################################
@@ -104,7 +115,7 @@ while getopts "hgcr" option; do
     exit
     ;;
   r) # run the benchmark
-    run="true"
+    Run
     exit
     ;;
   \?) # Invalid option
