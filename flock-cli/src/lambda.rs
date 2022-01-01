@@ -15,7 +15,7 @@
 
 use anyhow::{Ok, Result};
 use benchmarks::rainbow_println;
-use clap::{App, Arg, ArgMatches, SubCommand};
+use clap::{App, Arg, ArgMatches};
 use rusoto_core::Region;
 use rusoto_lambda::{DeleteFunctionRequest, Lambda, LambdaClient, ListFunctionsRequest};
 
@@ -33,33 +33,34 @@ pub fn command(matches: &ArgMatches) -> Result<()> {
     Ok(())
 }
 
-pub fn command_args() -> App<'static, 'static> {
-    SubCommand::with_name("lambda")
+pub fn command_args() -> App<'static> {
+    App::new("lambda")
         .about("The AWS Lambda Tool for Flock")
         .arg(
-            Arg::with_name("delete function")
-                .short("d")
+            Arg::new("delete function")
+                .short('d')
                 .long("delete")
-                .value_name("FUNCTION_NAME")
+                .value_name("function name")
                 .help("Deletes a lambda function")
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("delete all functions")
-                .short("D")
+            Arg::new("delete all functions")
+                .short('D')
                 .long("delete-all")
                 .help("Deletes all lambda functions"),
         )
         .arg(
-            Arg::with_name("list functions")
-                .short("l")
+            Arg::new("list functions")
+                .short('l')
                 .long("list")
+                .value_name("function name's substring/pattern")
                 .help("Lists all lambda functions (-l all, or a function name)")
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("list all functions")
-                .short("L")
+            Arg::new("list all functions")
+                .short('L')
                 .long("list-all")
                 .help("Lists all lambda functions"),
         )
