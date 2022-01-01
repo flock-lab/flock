@@ -342,7 +342,6 @@ pub async fn create_physical_plans(
 
 pub async fn add_extra_metadata(
     opt: &NexmarkBenchmarkOpt,
-    ctx: &DataFusionExecutionContext,
     metadata: &mut HashMap<String, String>,
 ) -> Result<()> {
     metadata.insert(
@@ -408,7 +407,7 @@ pub async fn nexmark_benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
     // *delete* and **recreate** the source function every time we change the query.
     let mut metadata = HashMap::new();
     metadata.insert("workers".to_string(), serde_json::to_string(&worker)?);
-    add_extra_metadata(opt, &ctx, &mut metadata).await?;
+    add_extra_metadata(opt, &mut metadata).await?;
 
     let tasks = (0..opt.generators)
         .into_iter()
