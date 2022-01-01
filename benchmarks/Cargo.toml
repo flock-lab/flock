@@ -9,6 +9,7 @@ publish = false
 
 [dependencies]
 arrow = { git = "https://github.com/flock-lab/arrow-rs", branch = "flock", features = [ "simd" ] }
+base64 = "0.13.0"
 chrono = "0.4.19"
 datafusion = { git = "https://github.com/flock-lab/arrow-datafusion", branch = "flock" }
 env_logger = "^0.9"
@@ -19,7 +20,6 @@ itertools = "0.10.0"
 lazy_static = "1.4"
 log = "0.4.14"
 reqwest = "0.11.7"
-
 rusoto_core = "0.47.0"
 rusoto_lambda = "0.47.0"
 rusoto_logs = "0.47.0"

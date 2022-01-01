@@ -310,12 +310,12 @@ pub async fn infer_side_input(
                 .expect("side_input_format is missing")
                 .as_str();
 
-            let schema = schema_from_bytes(
+            let schema = schema_from_bytes(&base64::decode(
                 metadata
                     .get("side_input_schema")
                     .expect("side_input_schema is missing")
-                    .as_bytes(),
-            )?;
+                    .as_str(),
+            )?)?;
 
             let mut batches = vec![];
             match format {

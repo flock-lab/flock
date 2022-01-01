@@ -375,7 +375,7 @@ pub async fn add_extra_metadata(
         let side_input_schema = Arc::new(side_input_schema());
         metadata.insert(
             "side_input_schema".to_string(),
-            String::from_utf8(schema_to_bytes(side_input_schema)).expect("schema to be utf8"),
+            base64::encode(schema_to_bytes(side_input_schema)),
         );
     }
 
