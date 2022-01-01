@@ -22,7 +22,7 @@ use bytes::Bytes;
 use humantime::parse_duration;
 use lazy_static::lazy_static;
 use log::info;
-use rusoto_core::{Region, RusotoError};
+use rusoto_core::{ByteStream, Region, RusotoError};
 use rusoto_efs::{
     CreateAccessPointError, CreateAccessPointRequest, CreateFileSystemError,
     CreateFileSystemRequest, CreateMountTargetError, CreateMountTargetRequest, CreationInfo,
@@ -34,7 +34,7 @@ use rusoto_lambda::{
     Lambda, LambdaClient, PutFunctionConcurrencyRequest, UpdateFunctionCodeRequest,
 };
 use rusoto_logs::CloudWatchLogsClient;
-use rusoto_s3::S3Client;
+use rusoto_s3::{ListObjectsV2Request, PutObjectRequest, S3Client, S3};
 use rusoto_sqs::SqsClient;
 use std::path::Path;
 use std::time::Duration;
@@ -440,4 +440,36 @@ pub async fn create_mount_target(file_system_id: &str) -> Result<String> {
         }
         Err(e) => Err(FlockError::AWS(e.to_string())),
     }
+}
+
+/// Puts an object to AWS S3 if the object does not exist. If the object exists,
+/// it isn't modified.
+///
+/// # Arguments
+/// * `bucket` - The name of the bucket to put the object in.
+/// * `key` - The key of the object to put.
+/// * `body` - The body of the object to put.
+pub async fn put_object_to_s3_if_missing(bucket: String, key: String, body: Vec<u8>) -> Result<()> {
+    if let Some(0) = FLOCK_S3_CLIENT
+        .list_objects_v2(ListObjectsV2Request {
+            bucket: bucket.clone(),
+            prefix: Some(key.clone()),
+            max_keys: Some(1),
+            ..Default::default()
+        })
+        .await
+        .map_err(|e| FlockError::Internal(e.to_string()))?
+        .key_count
+    {
+        FLOCK_S3_CLIENT
+            .put_object(PutObjectRequest {
+                bucket: bucket.clone(),
+                key: key.clone(),
+                body: Some(ByteStream::from(body)),
+                ..Default::default()
+            })
+            .await
+            .map_err(|e| FlockError::AWS(e.to_string()))?;
+    }
+    Ok(())
 }

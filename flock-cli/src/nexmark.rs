@@ -50,8 +50,11 @@ fn run_args() -> App<'static> {
             Arg::new("query number")
                 .short('q')
                 .long("query")
-                .help("Sets the NEXMark benchmark query number [0-12]")
+                .help("Sets the NEXMark benchmark query number")
                 .takes_value(true)
+                .possible_values(&[
+                    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13",
+                ])
                 .default_value("3"),
         )
         .arg(

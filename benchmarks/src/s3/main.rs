@@ -49,7 +49,7 @@ async fn benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
         "Running the NEXMark benchmark [S3] with the following options: {:?}",
         opt
     );
-    let nexmark_conf = create_nexmark_source(opt);
+    let nexmark_conf = create_nexmark_source(opt).await?;
     let query_number = opt.query_number;
 
     let mut ctx = register_nexmark_tables().await?;

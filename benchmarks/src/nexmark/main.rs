@@ -24,16 +24,23 @@ use flock::prelude::*;
 use humantime::parse_duration;
 use lazy_static::lazy_static;
 use log::info;
-use nexmark::event::{Auction, Bid, Person};
+use nexmark::event::{side_input_schema, Auction, Bid, Person};
 use nexmark::NEXMarkSource;
 use rainbow::{rainbow_println, rainbow_string};
-use rusoto_core::{ByteStream, Region};
+use rusoto_core::Region;
 use rusoto_lambda::InvocationResponse;
-use rusoto_s3::{ListObjectsV2Request, PutObjectRequest, S3Client, S3};
+use rusoto_s3::S3Client;
 use std::collections::HashMap;
 use std::sync::Arc;
 use structopt::StructOpt;
 use tokio::task::JoinHandle;
+
+static SIDE_INPUT_DOWNLOAD_URL: &str = concat!(
+    "https://gist.githubusercontent.com/gangliao/",
+    "de6f544b8a93f26081036e0a7f8c1715/raw/",
+    "586c88ad6f89d12c9f1753622eddf4788f6f0f9d/",
+    "nexmark_q13_side_input.csv"
+);
 
 lazy_static! {
     pub static ref FLOCK_S3_KEY: String = FLOCK_CONF["flock"]["s3_key"].to_string();
@@ -51,6 +58,7 @@ lazy_static! {
     pub static ref NEXMARK_SOURCE_LOG_GROUP: String = "/aws/lambda/flock_datasource".to_string();
     pub static ref NEXMARK_Q4_S3_KEY: String = FLOCK_CONF["nexmark"]["q4_s3_key"].to_string();
     pub static ref NEXMARK_Q6_S3_KEY: String = FLOCK_CONF["nexmark"]["q6_s3_key"].to_string();
+    pub static ref NEXMARK_Q13_S3_SIDE_INPUT_KEY: String = FLOCK_CONF["nexmark"]["q13_s3_side_input_key"].to_string();
 }
 
 #[derive(Default, Clone, Debug, StructOpt)]
@@ -115,10 +123,18 @@ pub async fn register_nexmark_tables() -> Result<DataFusionExecutionContext> {
     )?;
     ctx.register_table("bid", Arc::new(bid_table))?;
 
+    // For NEXMark Q13
+    let side_input_schema = Arc::new(side_input_schema());
+    let side_input_table = MemTable::try_new(
+        side_input_schema.clone(),
+        vec![vec![RecordBatch::new_empty(side_input_schema)]],
+    )?;
+    ctx.register_table("side_input", Arc::new(side_input_table))?;
+
     Ok(ctx)
 }
 
-pub fn create_nexmark_source(opt: &mut NexmarkBenchmarkOpt) -> NEXMarkSource {
+pub async fn create_nexmark_source(opt: &mut NexmarkBenchmarkOpt) -> Result<NEXMarkSource> {
     let window = match opt.query_number {
         0..=4 | 6 | 9 | 10 | 13 => StreamWindow::ElementWise,
         5 => StreamWindow::HoppingWindow((10, 5)),
@@ -131,7 +147,28 @@ pub fn create_nexmark_source(opt: &mut NexmarkBenchmarkOpt) -> NEXMarkSource {
     if opt.query_number == 10 {
         opt.data_sink_type = "s3".to_string();
     }
-    NEXMarkSource::new(opt.seconds, opt.generators, opt.events_per_second, window)
+
+    if opt.query_number == 13 {
+        let data = reqwest::get(SIDE_INPUT_DOWNLOAD_URL)
+            .await
+            .map_err(|_| "Failed to download side input data")?
+            .text_with_charset("utf-8")
+            .await
+            .map_err(|_| "Failed to read side input data")?;
+        put_object_to_s3_if_missing(
+            FLOCK_S3_BUCKET.clone(),
+            NEXMARK_Q13_S3_SIDE_INPUT_KEY.clone(),
+            data.as_bytes().to_vec(),
+        )
+        .await?;
+    }
+
+    Ok(NEXMarkSource::new(
+        opt.seconds,
+        opt.generators,
+        opt.events_per_second,
+        window,
+    ))
 }
 
 pub async fn plan_placement(
@@ -145,27 +182,12 @@ pub async fn plan_placement(
                 6 => (FLOCK_S3_BUCKET.clone(), NEXMARK_Q6_S3_KEY.clone()),
                 _ => unreachable!(),
             };
-            if let Some(0) = FLOCK_S3_CLIENT
-                .list_objects_v2(ListObjectsV2Request {
-                    bucket: s3_bucket.clone(),
-                    prefix: Some(s3_key.clone()),
-                    max_keys: Some(1),
-                    ..Default::default()
-                })
-                .await
-                .map_err(|e| FlockError::Internal(e.to_string()))?
-                .key_count
-            {
-                FLOCK_S3_CLIENT
-                    .put_object(PutObjectRequest {
-                        bucket: s3_bucket.clone(),
-                        key: s3_key.clone(),
-                        body: Some(ByteStream::from(serde_json::to_vec(&physcial_plan)?)),
-                        ..Default::default()
-                    })
-                    .await
-                    .map_err(|e| FlockError::Internal(e.to_string()))?;
-            }
+            put_object_to_s3_if_missing(
+                s3_bucket.clone(),
+                s3_key.clone(),
+                serde_json::to_vec(&physcial_plan)?,
+            )
+            .await?;
             Ok((FLOCK_EMPTY_PLAN.clone(), Some((s3_bucket, s3_key))))
         }
         _ => Ok((physcial_plan, None)),
@@ -318,6 +340,48 @@ pub async fn create_physical_plans(
     Ok(plans)
 }
 
+pub async fn add_extra_metadata(
+    opt: &NexmarkBenchmarkOpt,
+    metadata: &mut HashMap<String, String>,
+) -> Result<()> {
+    metadata.insert(
+        "invocation_type".to_string(),
+        if opt.async_type {
+            "async".to_string()
+        } else {
+            "sync".to_string()
+        },
+    );
+
+    if opt.query_number == 12 {
+        metadata.insert(
+            "add_process_time_query".to_string(),
+            nexmark_query(opt.query_number)[0].clone(),
+        );
+    }
+
+    if opt.query_number == 11 || opt.query_number == 12 {
+        metadata.insert("session_key".to_string(), "bidder".to_string());
+        metadata.insert("session_name".to_string(), "bid".to_string());
+    }
+
+    if opt.query_number == 13 {
+        metadata.insert(
+            "side_input_s3_key".to_string(),
+            NEXMARK_Q13_S3_SIDE_INPUT_KEY.clone(),
+        );
+        metadata.insert("side_input_format".to_string(), "csv".to_string());
+
+        let side_input_schema = Arc::new(side_input_schema());
+        metadata.insert(
+            "side_input_schema".to_string(),
+            base64::encode(schema_to_bytes(side_input_schema)),
+        );
+    }
+
+    Ok(())
+}
+
 pub async fn nexmark_benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
     rainbow_println("================================================================");
     rainbow_println("                    Running the benchmark                       ");
@@ -326,7 +390,7 @@ pub async fn nexmark_benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
     rainbow_println(format!("{:#?}\n", opt));
 
     let query_number = opt.query_number;
-    let nexmark_conf = create_nexmark_source(opt);
+    let nexmark_conf = create_nexmark_source(opt).await?;
 
     let mut ctx = register_nexmark_tables().await?;
     let plans = create_physical_plans(&mut ctx, query_number).await?;
@@ -343,26 +407,7 @@ pub async fn nexmark_benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
     // *delete* and **recreate** the source function every time we change the query.
     let mut metadata = HashMap::new();
     metadata.insert("workers".to_string(), serde_json::to_string(&worker)?);
-    metadata.insert(
-        "invocation_type".to_string(),
-        if opt.async_type {
-            "async".to_string()
-        } else {
-            "sync".to_string()
-        },
-    );
-
-    if query_number == 12 {
-        metadata.insert(
-            "add_process_time_query".to_string(),
-            nexmark_query(query_number)[0].clone(),
-        );
-    }
-
-    if query_number == 11 || query_number == 12 {
-        metadata.insert("session_key".to_string(), "bidder".to_string());
-        metadata.insert("session_name".to_string(), "bid".to_string());
-    }
+    add_extra_metadata(opt, &mut metadata).await?;
 
     let tasks = (0..opt.generators)
         .into_iter()
@@ -432,6 +477,7 @@ pub fn nexmark_query(query_number: usize) -> Vec<String> {
         10 => vec![include_str!("query/q10.sql")],
         11 => vec![include_str!("query/q11.sql")],
         12 => include_str!("query/q12.sql").split(';').collect(),
+        13 => vec![include_str!("query/q13.sql")],
         _ => unreachable!(),
     }
     .into_iter()
@@ -453,7 +499,7 @@ mod tests {
             events_per_second: 1000,
             ..Default::default()
         };
-        let conf = create_nexmark_source(&mut opt);
+        let conf = create_nexmark_source(&mut opt).await?;
         let (event, _) = Arc::new(conf.generate_data()?)
             .select(1, 0)
             .expect("Failed to select event.");
@@ -470,6 +516,7 @@ mod tests {
             nexmark_query(10),
             nexmark_query(11),
             nexmark_query(12),
+            nexmark_query(13),
         ];
         let ctx = register_nexmark_tables().await?;
         for sql in sqls {

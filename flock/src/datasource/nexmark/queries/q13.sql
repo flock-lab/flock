@@ -4,6 +4,9 @@
 -- Joins a stream to a bounded side input, modeling basic stream enrichment.
 -- -------------------------------------------------------------------------------------------------
 
+-- https://nightlies.apache.org/flink/flink-docs-release-1.11/dev/table/streaming/temporal_tables.html
+-- https://nightlies.apache.org/flink/flink-docs-release-1.11/dev/table/streaming/joins.html#join-with-a-temporal-table
+
 CREATE TABLE side_input (
   key BIGINT,
   `value` VARCHAR

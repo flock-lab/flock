@@ -86,7 +86,7 @@ Run() {
   echo $(echogreen "============================================================")
   echo $(echogreen "                   Running the benchmarks                   ")
   echo $(echogreen "============================================================")
-  echo 
+  echo
   echo $(echored "[Error] If you want to run the benchmark, please use \"flock-cli [nexmark|ysb] run\".")
   echo
   echo $(echoblue "$ ./target/x86_64-unknown-linux-gnu/release/flock-cli nexmark run -h")
