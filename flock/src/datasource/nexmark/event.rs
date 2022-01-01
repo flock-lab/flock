@@ -371,6 +371,19 @@ impl Bid {
     }
 }
 
+/// Returns the side input schema for the NEXMark benchmark (Q13).
+pub fn side_input_schema() -> Schema {
+    let mut metadata = HashMap::new();
+    metadata.insert("name".to_string(), "side_input".to_string());
+    Schema::new_with_metadata(
+        vec![
+            Field::new("key", DataType::Int32, false),
+            Field::new("value", DataType::Int32, false),
+        ],
+        metadata,
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

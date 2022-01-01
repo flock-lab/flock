@@ -24,7 +24,7 @@ use flock::prelude::*;
 use humantime::parse_duration;
 use lazy_static::lazy_static;
 use log::info;
-use nexmark::event::{Auction, Bid, Person};
+use nexmark::event::{side_input_schema, Auction, Bid, Person};
 use nexmark::NEXMarkSource;
 use rainbow::{rainbow_println, rainbow_string};
 use rusoto_core::Region;
@@ -124,10 +124,7 @@ pub async fn register_nexmark_tables() -> Result<DataFusionExecutionContext> {
     ctx.register_table("bid", Arc::new(bid_table))?;
 
     // For NEXMark Q13
-    let side_input_schema = Arc::new(Schema::new(vec![
-        Field::new("key", DataType::Int32, false),
-        Field::new("value", DataType::Int32, false),
-    ]));
+    let side_input_schema = Arc::new(side_input_schema());
     let side_input_table = MemTable::try_new(
         side_input_schema.clone(),
         vec![vec![RecordBatch::new_empty(side_input_schema)]],
@@ -376,10 +373,10 @@ pub async fn add_extra_metadata(
         );
         metadata.insert("side_input_format".to_string(), "csv".to_string());
 
-        let schema: SchemaRef = ctx.table("bid")?.collect().await?[0].schema();
+        let side_input_schema = Arc::new(side_input_schema());
         metadata.insert(
             "side_input_schema".to_string(),
-            String::from_utf8(schema_to_bytes(schema)).expect("schema to be utf8"),
+            String::from_utf8(schema_to_bytes(side_input_schema)).expect("schema to be utf8"),
         );
     }
 
