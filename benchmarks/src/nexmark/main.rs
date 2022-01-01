@@ -56,10 +56,6 @@ pub struct NexmarkBenchmarkOpt {
     #[structopt(short = "q", long = "query_number", default_value = "3")]
     pub query_number: usize,
 
-    /// Activate debug mode to see query results
-    #[structopt(short, long)]
-    pub debug: bool,
-
     /// Number of threads or generators of each test run
     #[structopt(short = "g", long = "generators", default_value = "1")]
     pub generators: usize,
@@ -216,13 +212,13 @@ pub async fn create_nexmark_functions(
         "Creating lambda function: {}",
         NEXMARK_SOURCE_FUNC_NAME.clone()
     );
-    create_lambda_function(&nexmark_source_ctx, Some(2048 /* MB */), opt.debug).await?;
+    create_lambda_function(&nexmark_source_ctx, Some(2048 /* MB */)).await?;
 
     // Create the function for the nexmark worker.
     match next_func_name.clone() {
         CloudFunction::Lambda(name) => {
             info!("Creating lambda function: {}", name);
-            create_lambda_function(&nexmark_worker_ctx, Some(opt.memory_size), opt.debug).await?;
+            create_lambda_function(&nexmark_worker_ctx, Some(opt.memory_size)).await?;
         }
         CloudFunction::Group((name, concurrency)) => {
             info!(
@@ -236,11 +232,10 @@ pub async fn create_nexmark_functions(
                     let mut worker_ctx = nexmark_worker_ctx.clone();
                     let group_name = name.clone();
                     let memory_size = opt.memory_size;
-                    let debug = opt.debug;
                     tokio::spawn(async move {
-                        worker_ctx.name = format!("{}-{}", group_name, i);
+                        worker_ctx.name = format!("{}-{:02}", group_name, i);
                         info!("Creating function member: {}", worker_ctx.name);
-                        create_lambda_function(&worker_ctx, Some(memory_size), debug).await?;
+                        create_lambda_function(&worker_ctx, Some(memory_size)).await?;
                         set_lambda_concurrency(worker_ctx.name, 1).await
                     })
                 })

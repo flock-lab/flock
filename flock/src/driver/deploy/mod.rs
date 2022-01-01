@@ -74,7 +74,7 @@ impl ExecutionEnvironment {
                     client
                         .create_function(CreateFunctionRequest {
                             code: config::function_code(),
-                            environment: config::environment(ctx, true),
+                            environment: config::environment(ctx),
                             function_name: name.to_owned(),
                             handler: config::handler(),
                             memory_size: config::memory_size(ctx),

@@ -11,11 +11,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-//! This crate runs the NexMark Benchmark on cloud function services.
+//! This crate runs the Yahoo! Streaming Benchmarks on cloud function services.
 
 use crate::rainbow::rainbow_println;
 use anyhow::{anyhow, bail, Context as _, Result};
-use benchmarks::{nexmark_benchmark, NexmarkBenchmarkOpt};
+use benchmarks::{ysb_benchmark, YSBBenchmarkOpt};
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 
 pub fn command(matches: &ArgMatches) -> Result<()> {
@@ -34,28 +34,20 @@ pub fn command(matches: &ArgMatches) -> Result<()> {
 }
 
 pub fn command_args() -> App<'static, 'static> {
-    SubCommand::with_name("nexmark")
-        .about("The NEXMark Benchmark Tool")
+    SubCommand::with_name("ysb")
+        .about("The Yahoo! Streaming Benchmarks Tool")
         .setting(AppSettings::SubcommandRequired)
         .subcommand(run_args())
 }
 
 fn run_args() -> App<'static, 'static> {
     SubCommand::with_name("run")
-        .about("Runs the NEXMark Benchmark")
-        .arg(
-            Arg::with_name("query number")
-                .short("q")
-                .long("query")
-                .help("Sets the NEXMark benchmark query number [0-12]")
-                .takes_value(true)
-                .default_value("3"),
-        )
+        .about("Runs the YSB Benchmark")
         .arg(
             Arg::with_name("duration")
                 .short("s")
                 .long("seconds")
-                .help("Runs the NEXMark benchmark for a number of seconds")
+                .help("Runs the YSB benchmark for a number of seconds")
                 .takes_value(true)
                 .default_value("20"),
         )
@@ -63,7 +55,7 @@ fn run_args() -> App<'static, 'static> {
             Arg::with_name("data generators")
                 .short("g")
                 .long("generators")
-                .help("Runs the NEXMark benchmark with a number of data generators")
+                .help("Runs the YSB benchmark with a number of data generators")
                 .takes_value(true)
                 .default_value("1"),
         )
@@ -71,7 +63,7 @@ fn run_args() -> App<'static, 'static> {
             Arg::with_name("events per second")
                 .short("e")
                 .long("events-per-second")
-                .help("Runs the NEXMark benchmark with a number of events per second")
+                .help("Runs the YSB benchmark with a number of events per second")
                 .takes_value(true)
                 .default_value("1000"),
         )
@@ -79,7 +71,7 @@ fn run_args() -> App<'static, 'static> {
             Arg::with_name("data sink type")
                 .short("t")
                 .long("data-sink-type")
-                .help("Runs the NEXMark benchmark with a data sink type")
+                .help("Runs the YSB benchmark with a data sink type")
                 .takes_value(true)
                 .possible_values(&["sqs", "s3", "dynamodb", "efs", "blackhole"])
                 .default_value("blackhole"),
@@ -88,7 +80,7 @@ fn run_args() -> App<'static, 'static> {
             Arg::with_name("async type")
                 .short("a")
                 .long("async-type")
-                .help("Runs the NEXMark benchmark with async function invocations"),
+                .help("Runs the YSB benchmark with async function invocations"),
         )
         .arg(
             Arg::with_name("memory size")
@@ -101,15 +93,7 @@ fn run_args() -> App<'static, 'static> {
 }
 
 pub fn run(matches: &ArgMatches) -> Result<()> {
-    let mut opt = NexmarkBenchmarkOpt::default();
-
-    if matches.is_present("query number") {
-        opt.query_number = matches
-            .value_of("query number")
-            .unwrap()
-            .parse::<usize>()
-            .with_context(|| anyhow!("invalid query number"))?;
-    }
+    let mut opt = YSBBenchmarkOpt::default();
 
     if matches.is_present("duration") {
         opt.seconds = matches
@@ -161,5 +145,5 @@ pub fn run(matches: &ArgMatches) -> Result<()> {
 
     rainbow_println(include_str!("./flock"));
 
-    futures::executor::block_on(nexmark_benchmark(&mut opt)).map_err(|e| e.into())
+    futures::executor::block_on(ysb_benchmark(opt)).map_err(|e| e.into())
 }

@@ -100,7 +100,7 @@ pub fn function_code() -> FunctionCode {
 
 /// Environment variables that are accessible from function code during
 /// execution.
-pub fn environment(ctx: &ExecutionContext, debug: bool) -> Option<Environment> {
+pub fn environment(ctx: &ExecutionContext) -> Option<Environment> {
     let mut map = HashMap::new();
     map.insert(
         (&FLOCK_CONF["lambda"]["environment"]).to_owned(),
@@ -108,9 +108,7 @@ pub fn environment(ctx: &ExecutionContext, debug: bool) -> Option<Environment> {
     );
     // Enable crate `env_logger`
     // https://docs.rs/env_logger/latest/env_logger/
-    if debug {
-        map.insert("RUST_LOG".to_owned(), "info".to_owned());
-    }
+    map.insert("RUST_LOG".to_owned(), "info".to_owned());
     map.insert("RUST_BACKTRACE".to_owned(), "full".to_owned());
     Some(Environment {
         variables: Some(map),

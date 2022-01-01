@@ -212,7 +212,6 @@ pub async fn invoke_lambda_function(
 pub async fn create_lambda_function(
     ctx: &ExecutionContext,
     memory_size: Option<i64>,
-    debug: bool,
 ) -> Result<String> {
     let func_name = ctx.name.clone();
     if FLOCK_LAMBDA_CLIENT
@@ -248,7 +247,7 @@ pub async fn create_lambda_function(
                 role: DeployConfig::role().await,
                 runtime: DeployConfig::runtime(),
                 memory_size,
-                environment: DeployConfig::environment(ctx, debug),
+                environment: DeployConfig::environment(ctx),
                 timeout: Some(*FLOCK_LAMBDA_TIMEOUT),
                 // FIXME: Disable mount EFS
                 // file_system_configs: Some(vec![FileSystemConfig {

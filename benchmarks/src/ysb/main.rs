@@ -13,6 +13,7 @@
 
 use arrow::datatypes::{Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
+use arrow::util::pretty::pretty_format_batches;
 use datafusion::datasource::MemTable;
 use datafusion::execution::context::ExecutionContext as DataFusionExecutionContext;
 use datafusion::physical_plan::empty::EmptyExec;
@@ -44,26 +45,26 @@ lazy_static! {
 }
 
 #[derive(Default, Clone, Debug, StructOpt)]
-struct YSBBenchmarkOpt {
-    /// Activate debug mode to see query results
-    #[structopt(short, long)]
-    debug: bool,
-
+pub struct YSBBenchmarkOpt {
     /// Number of threads or generators of each test run
-    #[structopt(short = "g", long = "generators", default_value = "100")]
-    generators: usize,
+    #[structopt(short = "g", long = "generators", default_value = "1")]
+    pub generators: usize,
 
     /// Number of threads to use for parallel execution
-    #[structopt(short = "s", long = "seconds", default_value = "10")]
-    seconds: usize,
+    #[structopt(short = "s", long = "seconds", default_value = "20")]
+    pub seconds: usize,
 
     /// Number of events generated among generators per second
-    #[structopt(short = "e", long = "events_per_second", default_value = "100000")]
-    events_per_second: usize,
+    #[structopt(short = "e", long = "events_per_second", default_value = "1000")]
+    pub events_per_second: usize,
+
+    /// The data sink type to use
+    #[structopt(short = "d", long = "data_sink_type", default_value = "blackhole")]
+    pub data_sink_type: String,
 
     /// The function invocation mode to use
     #[structopt(long = "async")]
-    async_type: bool,
+    pub async_type: bool,
 
     /// The worker function's memory size
     #[structopt(short = "m", long = "memory_size", default_value = "128")]
@@ -71,9 +72,10 @@ struct YSBBenchmarkOpt {
 }
 
 #[tokio::main]
+#[allow(dead_code)]
 async fn main() -> Result<()> {
     env_logger::init();
-    benchmark(YSBBenchmarkOpt::from_args()).await?;
+    ysb_benchmark(YSBBenchmarkOpt::from_args()).await?;
     Ok(())
 }
 
@@ -118,28 +120,37 @@ async fn create_ysb_functions(
         next:        next_func_name.clone(),
     };
 
-    let mut ysb_worker_ctx = ExecutionContext {
+    let ysb_worker_ctx = ExecutionContext {
         plan:        physcial_plan,
         plan_s3_idx: None,
         name:        worker_func_name.clone(),
-        next:        CloudFunction::Sink(DataSinkType::Blackhole),
+        next:        CloudFunction::Sink(DataSinkType::new(&opt.data_sink_type)?),
     };
 
     // Create the function for the ysb source generator.
     info!("Creating lambda function: {}", YSB_SOURCE_FUNC_NAME.clone());
-    create_lambda_function(&ysb_source_ctx, Some(1024), opt.debug).await?;
+    create_lambda_function(&ysb_source_ctx, Some(1024)).await?;
 
     // Create the function for the ysb worker.
-    match &next_func_name {
+    match next_func_name.clone() {
         CloudFunction::Group((name, concurrency)) => {
             info!("Creating lambda function group: {:?}", ysb_source_ctx.next);
-            for i in 0..*concurrency {
-                let group_member_name = format!("{}-{:02}", name.clone(), i);
-                info!("Creating function member: {}", group_member_name);
-                ysb_worker_ctx.name = group_member_name;
-                create_lambda_function(&ysb_worker_ctx, Some(opt.memory_size), opt.debug).await?;
-                set_lambda_concurrency(ysb_worker_ctx.name, 1).await?;
-            }
+
+            let tasks = (0..concurrency)
+                .into_iter()
+                .map(|i| {
+                    let mut worker_ctx = ysb_worker_ctx.clone();
+                    let group_name = name.clone();
+                    let memory_size = opt.memory_size;
+                    tokio::spawn(async move {
+                        worker_ctx.name = format!("{}-{:02}", group_name, i);
+                        info!("Creating function member: {}", worker_ctx.name);
+                        create_lambda_function(&worker_ctx, Some(memory_size)).await?;
+                        set_lambda_concurrency(worker_ctx.name, 1).await
+                    })
+                })
+                .collect::<Vec<JoinHandle<Result<()>>>>();
+            futures::future::join_all(tasks).await;
         }
         _ => unreachable!(),
     }
@@ -147,9 +158,9 @@ async fn create_ysb_functions(
     Ok(next_func_name)
 }
 
-async fn benchmark(opt: YSBBenchmarkOpt) -> Result<()> {
+pub async fn ysb_benchmark(opt: YSBBenchmarkOpt) -> Result<()> {
     info!(
-        "Running the YSB benchmark with the following options: {:?}",
+        "Running the YSB benchmark with the following options:\n{:#?}",
         opt
     );
     let ysb_conf = create_ysb_source(&opt);
@@ -201,6 +212,20 @@ async fn benchmark(opt: YSBBenchmarkOpt) -> Result<()> {
     tokio::time::sleep(parse_duration("5s").unwrap()).await;
     fetch_aws_watchlogs(&YSB_SOURCE_LOG_GROUP, parse_duration("1min").unwrap()).await?;
 
+    let sink_type = DataSinkType::new(&opt.data_sink_type)?;
+    if sink_type != DataSinkType::Blackhole {
+        let data_sink =
+            DataSink::read("ysb".to_string(), sink_type, DataSinkFormat::default()).await?;
+        info!(
+            "[OK] Received {} batches from the data sink.",
+            data_sink.record_batches.len()
+        );
+        info!("[OK] Last data sink function: {}", data_sink.function_name);
+        let function_log_group = format!("/aws/lambda/{}", data_sink.function_name);
+        fetch_aws_watchlogs(&function_log_group, parse_duration("1min").unwrap()).await?;
+        println!("{}", pretty_format_batches(&data_sink.record_batches)?);
+    }
+
     Ok(())
 }
 
@@ -212,7 +237,6 @@ fn ysb_query() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arrow::util::pretty::pretty_format_batches;
     use flock::transmute::event_bytes_to_batch;
 
     #[tokio::test]
