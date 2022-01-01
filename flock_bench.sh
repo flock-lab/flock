@@ -84,7 +84,7 @@ Build_and_Deploy() {
 ############################################################
 Run() {
   echo $(echogreen "============================================================")
-  echo $(echogreen "                   Runing the benchmarks                    ")
+  echo $(echogreen "                   Running the benchmarks                   ")
   echo $(echogreen "============================================================")
   echo 
   echo $(echored "[Error] If you want to run the benchmark, please use \"flock-cli [nexmark|ysb] run\".")
