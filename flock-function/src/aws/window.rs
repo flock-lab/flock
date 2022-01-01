@@ -852,6 +852,7 @@ pub async fn elementwise_tasks(
     stream: Arc<dyn DataStream + Send + Sync>,
     seconds: usize,
 ) -> Result<()> {
+    let query_number = payload.query_number;
     let (mut ring, group_name) = infer_actor_info(&payload.metadata)?;
     let sync = infer_invocation_type(&payload.metadata)?;
     let invocation_type = if sync {
@@ -871,7 +872,7 @@ pub async fn elementwise_tasks(
             let payload = serde_json::to_vec(&events.select_event_to_payload(
                 epoch,
                 0,
-                payload.query_number,
+                query_number,
                 uuid,
                 sync,
             )?)?;
@@ -906,20 +907,19 @@ pub async fn elementwise_tasks(
 
             let empty = vec![];
             for i in 0..size {
-                let payload = serde_json::to_vec(&to_payload(
+                let mut payload = to_payload(
                     if i < a.len() { &a[i] } else { &empty },
                     if i < b.len() { &b[i] } else { &empty },
                     uuid_builder.next_uuid(),
                     sync,
-                ))?;
-                info!(
-                    "[OK] Event {} - function payload bytes: {}",
-                    i,
-                    payload.len()
                 );
+                payload.query_number = query_number;
+
+                let bytes = serde_json::to_vec(&payload)?;
+                info!("[OK] Event {} - function payload bytes: {}", i, bytes.len());
                 invoke_lambda_function(
                     function_name.clone(),
-                    Some(payload.into()),
+                    Some(bytes.into()),
                     invocation_type.clone(),
                 )
                 .await?;

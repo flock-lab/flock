@@ -178,7 +178,7 @@ impl DataStream for NEXMarkStream {
             *FLOCK_ASYNC_GRANULE_SIZE
         };
         let (r1, r2) = match query_number.expect("Query number is not set.") {
-            0 | 1 | 2 | 5 | 7 | 10 | 11 | 12 => (
+            0 | 1 | 2 | 5 | 7 | 10..=13 => (
                 event_bytes_to_batch(&event.bids, NEXMARK_BID.clone(), granule_size * 2),
                 vec![],
             ),
@@ -249,27 +249,30 @@ impl DataStream for NEXMarkStream {
         );
 
         let batch_size = *FLOCK_SYNC_GRANULE_SIZE;
-        match query_number.expect("Query number is not set.") {
-            0 | 1 | 2 | 5 | 7 | 10 | 11 | 12 => Ok(to_payload(
+        let mut payload = match query_number.expect("Query number is not set.") {
+            0 | 1 | 2 | 5 | 7 | 10..=13 => to_payload(
                 &event_bytes_to_batch(&event.bids, NEXMARK_BID.clone(), batch_size),
                 &[],
                 uuid,
                 sync,
-            )),
-            3 | 8 => Ok(to_payload(
+            ),
+            3 | 8 => to_payload(
                 &event_bytes_to_batch(&event.persons, NEXMARK_PERSON.clone(), batch_size),
                 &event_bytes_to_batch(&event.auctions, NEXMARK_AUCTION.clone(), batch_size),
                 uuid,
                 sync,
-            )),
-            4 | 6 | 9 => Ok(to_payload(
+            ),
+            4 | 6 | 9 => to_payload(
                 &event_bytes_to_batch(&event.auctions, NEXMARK_AUCTION.clone(), batch_size),
                 &event_bytes_to_batch(&event.bids, NEXMARK_BID.clone(), batch_size),
                 uuid,
                 sync,
-            )),
+            ),
             _ => unimplemented!(),
-        }
+        };
+        payload.query_number = query_number;
+
+        Ok(payload)
     }
 }
 

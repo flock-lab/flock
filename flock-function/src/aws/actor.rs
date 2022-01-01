@@ -11,6 +11,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use arrow::csv::reader::ReaderBuilder;
 use arrow::record_batch::RecordBatch;
 use datafusion::physical_plan::Partitioning::RoundRobinBatch;
 use flock::prelude::*;
@@ -25,7 +26,7 @@ use rusoto_s3::{GetObjectRequest, S3};
 use serde_json::json;
 use serde_json::Value;
 use std::collections::HashMap;
-use std::io::Read;
+use std::io::{Cursor, Read};
 use std::sync::{Arc, Mutex};
 
 lazy_static! {
@@ -147,39 +148,47 @@ pub async fn handler(
     info!("Receiving a data packet: {:?}", event.uuid);
     let tid = event.uuid.tid.clone();
 
-    let input_partitions = {
-        if let Some((bucket, key)) = infer_s3_mode(&event.metadata) {
-            info!("Reading payload from S3...");
-            let payload = read_payload_from_s3(bucket, key).await?;
-            info!("[OK] Received payload from S3.");
+    let mut input = vec![];
+    if let Ok(batch) = infer_side_input(&event.metadata).await {
+        input.push(vec![batch]);
+    }
 
-            info!("Parsing payload to input partitions...");
-            let (r1, r2, _) = payload.to_record_batch();
-            info!("[OK] Parsed payload.");
+    if let Some((bucket, key)) = infer_s3_mode(&event.metadata) {
+        info!("Reading payload from S3...");
+        let payload = read_payload_from_s3(bucket, key).await?;
+        info!("[OK] Received payload from S3.");
 
-            vec![vec![r1], vec![r2]]
-        } else if match &ctx.next {
-            CloudFunction::Sink(..) | CloudFunction::Lambda(..) => true,
-            CloudFunction::Group(..) => false,
-        } {
-            // ressemble data packets to a single window.
-            let (ready, uuid) = arena.reassemble(event);
-            if ready {
-                info!("Received all data packets for the window: {:?}", uuid.tid);
-                arena.batches(uuid.tid)
-            } else {
-                let response = "Window data collection has not been completed.".to_string();
-                info!("{}", response);
-                return Ok(json!({ "response": response }));
-            }
+        info!("Parsing payload to input partitions...");
+        let (r1, r2, _) = payload.to_record_batch();
+        info!("[OK] Parsed payload.");
+
+        input.push(vec![r1]);
+        input.push(vec![r2]);
+    } else if match &ctx.next {
+        CloudFunction::Sink(..) | CloudFunction::Lambda(..) => true,
+        CloudFunction::Group(..) => false,
+    } {
+        // ressemble data packets to a single window.
+        let (ready, uuid) = arena.reassemble(event);
+        if ready {
+            info!("Received all data packets for the window: {:?}", uuid.tid);
+            arena
+                .batches(uuid.tid)
+                .into_iter()
+                .for_each(|b| input.push(b));
         } else {
-            // data packet is an individual event for the current function.
-            let (r1, r2, _) = event.to_record_batch();
-            vec![vec![r1], vec![r2]]
+            let response = "Window data collection has not been completed.".to_string();
+            info!("{}", response);
+            return Ok(json!({ "response": response }));
         }
-    };
+    } else {
+        // data packet is an individual event for the current function.
+        let (r1, r2, _) = event.to_record_batch();
+        input.push(vec![r1]);
+        input.push(vec![r2]);
+    }
 
-    let output = collect(ctx, input_partitions).await?;
+    let output = collect(ctx, input).await?;
 
     match &ctx.next {
         CloudFunction::Sink(sink_type) => {
@@ -269,6 +278,72 @@ pub fn infer_s3_mode(metadata: &Option<HashMap<String, String>>) -> Option<(Stri
         }
     }
     None
+}
+
+pub async fn infer_side_input(
+    metadata: &Option<HashMap<String, String>>,
+) -> Result<Vec<RecordBatch>> {
+    if let Some(metadata) = metadata {
+        if let Some(key) = metadata.get("side_input_s3_key") {
+            let body = FLOCK_S3_CLIENT
+                .get_object(GetObjectRequest {
+                    bucket: FLOCK_S3_BUCKET.clone(),
+                    key: key.parse::<String>().unwrap(),
+                    ..Default::default()
+                })
+                .await
+                .map_err(|e| FlockError::AWS(e.to_string()))?
+                .body
+                .take()
+                .expect("body is empty");
+
+            let bytes: Vec<u8> = tokio::task::spawn_blocking(move || {
+                let mut buf = Vec::new();
+                body.into_blocking_read().read_to_end(&mut buf).unwrap();
+                buf
+            })
+            .await
+            .expect("failed to load side input from S3");
+
+            let format = metadata
+                .get("side_input_format")
+                .expect("side_input_format is missing")
+                .as_str();
+
+            let mut batches = vec![];
+            match format {
+                "csv" => {
+                    let mut batch_reader = ReaderBuilder::new()
+                        .infer_schema(Some(10))
+                        .has_header(true)
+                        .with_delimiter(b',')
+                        .with_batch_size(1024)
+                        .build(Cursor::new(bytes))?;
+                    loop {
+                        match batch_reader.next() {
+                            Some(Ok(batch)) => {
+                                batches.push(batch);
+                            }
+                            None => {
+                                break;
+                            }
+                            Some(Err(e)) => {
+                                return Err(FlockError::Execution(format!(
+                                    "Error reading batch from side input: {}",
+                                    e
+                                )));
+                            }
+                        }
+                    }
+                }
+                _ => unimplemented!(),
+            }
+            return Ok(batches);
+        }
+    }
+    Err(FlockError::AWS(
+        "Side Input's S3 key is not specified".to_string(),
+    ))
 }
 
 /// Infer group keys for session windows (used in NEXMark Q11 and Q12).
