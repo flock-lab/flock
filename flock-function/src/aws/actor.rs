@@ -310,11 +310,18 @@ pub async fn infer_side_input(
                 .expect("side_input_format is missing")
                 .as_str();
 
+            let schema = schema_from_bytes(
+                metadata
+                    .get("side_input_schema")
+                    .expect("side_input_schema is missing")
+                    .as_bytes(),
+            )?;
+
             let mut batches = vec![];
             match format {
                 "csv" => {
                     let mut batch_reader = ReaderBuilder::new()
-                        .infer_schema(Some(10))
+                        .with_schema(schema)
                         .has_header(true)
                         .with_delimiter(b',')
                         .with_batch_size(1024)

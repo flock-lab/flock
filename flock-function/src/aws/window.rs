@@ -853,8 +853,9 @@ pub async fn elementwise_tasks(
     seconds: usize,
 ) -> Result<()> {
     let query_number = payload.query_number;
-    let (mut ring, group_name) = infer_actor_info(&payload.metadata)?;
-    let sync = infer_invocation_type(&payload.metadata)?;
+    let metadata = payload.metadata;
+    let (mut ring, group_name) = infer_actor_info(&metadata)?;
+    let sync = infer_invocation_type(&metadata)?;
     let invocation_type = if sync {
         FLOCK_LAMBDA_SYNC_CALL.to_string()
     } else {
@@ -869,15 +870,11 @@ pub async fn elementwise_tasks(
             let function_name = group_name.clone();
             let uuid =
                 UuidBuilder::new_with_ts(&function_name, Utc::now().timestamp(), 1).next_uuid();
-            let payload = serde_json::to_vec(&events.select_event_to_payload(
-                epoch,
-                0,
-                query_number,
-                uuid,
-                sync,
-            )?)?;
-            info!("[OK] function payload bytes: {}", payload.len());
-            invoke_lambda_function(function_name, Some(payload.into()), invocation_type.clone())
+            let mut payload = events.select_event_to_payload(epoch, 0, query_number, uuid, sync)?;
+            payload.metadata = metadata.clone();
+            let bytes = serde_json::to_vec(&payload)?;
+            info!("[OK] function payload bytes: {}", bytes.len());
+            invoke_lambda_function(function_name, Some(bytes.into()), invocation_type.clone())
                 .await?;
         } else {
             // Calculate the total data packets to be sent.
@@ -914,6 +911,7 @@ pub async fn elementwise_tasks(
                     sync,
                 );
                 payload.query_number = query_number;
+                payload.metadata = metadata.clone();
 
                 let bytes = serde_json::to_vec(&payload)?;
                 info!("[OK] Event {} - function payload bytes: {}", i, bytes.len());

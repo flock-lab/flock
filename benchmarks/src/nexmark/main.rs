@@ -343,7 +343,11 @@ pub async fn create_physical_plans(
     Ok(plans)
 }
 
-pub fn add_extra_metadata(opt: &NexmarkBenchmarkOpt, metadata: &mut HashMap<String, String>) {
+pub async fn add_extra_metadata(
+    opt: &NexmarkBenchmarkOpt,
+    ctx: &DataFusionExecutionContext,
+    metadata: &mut HashMap<String, String>,
+) -> Result<()> {
     metadata.insert(
         "invocation_type".to_string(),
         if opt.async_type {
@@ -371,7 +375,15 @@ pub fn add_extra_metadata(opt: &NexmarkBenchmarkOpt, metadata: &mut HashMap<Stri
             NEXMARK_Q13_S3_SIDE_INPUT_KEY.clone(),
         );
         metadata.insert("side_input_format".to_string(), "csv".to_string());
+
+        let schema: SchemaRef = ctx.table("bid")?.collect().await?[0].schema();
+        metadata.insert(
+            "side_input_schema".to_string(),
+            String::from_utf8(schema_to_bytes(schema)).expect("schema to be utf8"),
+        );
     }
+
+    Ok(())
 }
 
 pub async fn nexmark_benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
@@ -399,7 +411,7 @@ pub async fn nexmark_benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
     // *delete* and **recreate** the source function every time we change the query.
     let mut metadata = HashMap::new();
     metadata.insert("workers".to_string(), serde_json::to_string(&worker)?);
-    add_extra_metadata(opt, &mut metadata);
+    add_extra_metadata(opt, &ctx, &mut metadata).await?;
 
     let tasks = (0..opt.generators)
         .into_iter()
