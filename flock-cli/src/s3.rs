@@ -15,7 +15,7 @@
 
 use anyhow::{bail, Result};
 use benchmarks::rainbow_println;
-use clap::{App, Arg, ArgMatches, SubCommand};
+use clap::{App, Arg, ArgMatches};
 use ini::Ini;
 use lazy_static::lazy_static;
 use rusoto_core::Region;
@@ -44,20 +44,20 @@ pub fn command(matches: &ArgMatches) -> Result<()> {
     Ok(())
 }
 
-pub fn command_args() -> App<'static, 'static> {
-    SubCommand::with_name("upload")
+pub fn command_args() -> App<'static> {
+    App::new("upload")
         .about("Uploads a function code to AWS S3")
         .arg(
-            Arg::with_name("code path")
-                .short("p")
+            Arg::new("code path")
+                .short('p')
                 .long("path")
                 .value_name("FILE")
                 .help("Sets the path to the function code")
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("s3 key")
-                .short("k")
+            Arg::new("s3 key")
+                .short('k')
                 .long("key")
                 .value_name("S3_KEY")
                 .help("Sets the S3 key to upload the function code to")

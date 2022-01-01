@@ -15,15 +15,15 @@
 
 use anyhow::{anyhow, Result};
 use benchmarks::rainbow_println;
-use clap::{App, ArgMatches, SubCommand};
+use clap::{App, ArgMatches};
 use rustyline::Editor;
 
 pub fn command(_: &ArgMatches) -> Result<()> {
     futures::executor::block_on(fsql())
 }
 
-pub fn command_args() -> App<'static, 'static> {
-    SubCommand::with_name("fsql").about("The terminal-based front-end to Flock")
+pub fn command_args() -> App<'static> {
+    App::new("fsql").about("The terminal-based front-end to Flock")
 }
 
 /// The main entry point for fsql.

@@ -13,70 +13,74 @@
 
 //! This crate runs the NexMark Benchmark on cloud function services.
 
-use anyhow::{anyhow, bail, Context as _, Result};
+use anyhow::{anyhow, Context as _, Ok, Result};
 use benchmarks::{nexmark_benchmark, rainbow_println, NexmarkBenchmarkOpt};
-use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
+use clap::{App, AppSettings, Arg, ArgMatches};
+use log::warn;
 
 pub fn command(matches: &ArgMatches) -> Result<()> {
     let (command, matches) = match matches.subcommand() {
-        (command, Some(matches)) => (command, matches),
-        (_, None) => unreachable!(),
+        Some((command, matches)) => (command, matches),
+        None => unreachable!(),
     };
 
     match command {
         "run" => run(matches),
-        _ => bail!(matches.usage().to_owned()),
+        _ => {
+            warn!("{} command is not implemented", command);
+            Ok(())
+        }
     }
     .with_context(|| anyhow!("{} command failed", command))?;
 
     Ok(())
 }
 
-pub fn command_args() -> App<'static, 'static> {
-    SubCommand::with_name("nexmark")
+pub fn command_args() -> App<'static> {
+    App::new("nexmark")
         .about("The NEXMark Benchmark Tool")
         .setting(AppSettings::SubcommandRequired)
         .subcommand(run_args())
 }
 
-fn run_args() -> App<'static, 'static> {
-    SubCommand::with_name("run")
+fn run_args() -> App<'static> {
+    App::new("run")
         .about("Runs the NEXMark Benchmark")
         .arg(
-            Arg::with_name("query number")
-                .short("q")
+            Arg::new("query number")
+                .short('q')
                 .long("query")
                 .help("Sets the NEXMark benchmark query number [0-12]")
                 .takes_value(true)
                 .default_value("3"),
         )
         .arg(
-            Arg::with_name("duration")
-                .short("s")
+            Arg::new("duration")
+                .short('s')
                 .long("seconds")
                 .help("Runs the NEXMark benchmark for a number of seconds")
                 .takes_value(true)
                 .default_value("20"),
         )
         .arg(
-            Arg::with_name("data generators")
-                .short("g")
+            Arg::new("data generators")
+                .short('g')
                 .long("generators")
                 .help("Runs the NEXMark benchmark with a number of data generators")
                 .takes_value(true)
                 .default_value("1"),
         )
         .arg(
-            Arg::with_name("events per second")
-                .short("e")
+            Arg::new("events per second")
+                .short('e')
                 .long("events-per-second")
                 .help("Runs the NEXMark benchmark with a number of events per second")
                 .takes_value(true)
                 .default_value("1000"),
         )
         .arg(
-            Arg::with_name("data sink type")
-                .short("t")
+            Arg::new("data sink type")
+                .short('t')
                 .long("data-sink-type")
                 .help("Runs the NEXMark benchmark with a data sink type")
                 .takes_value(true)
@@ -84,14 +88,14 @@ fn run_args() -> App<'static, 'static> {
                 .default_value("blackhole"),
         )
         .arg(
-            Arg::with_name("async type")
-                .short("a")
+            Arg::new("async type")
+                .short('a')
                 .long("async-type")
                 .help("Runs the NEXMark benchmark with async function invocations"),
         )
         .arg(
-            Arg::with_name("memory size")
-                .short("m")
+            Arg::new("memory size")
+                .short('m')
                 .long("memory-size")
                 .help("Sets the memory size (MB) for the worker function")
                 .takes_value(true)

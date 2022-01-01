@@ -18,8 +18,9 @@ use crate::nexmark;
 use crate::s3;
 use crate::ysb;
 use anyhow::Context as _;
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, Result};
 use clap::{crate_version, App, AppSettings};
+use log::warn;
 
 #[tokio::main]
 pub async fn main() -> Result<()> {
@@ -29,7 +30,7 @@ pub async fn main() -> Result<()> {
         .about("Command Line Interactive Contoller for Flock")
         .version(crate_version!())
         .setting(AppSettings::SubcommandRequired)
-        .setting(AppSettings::GlobalVersion)
+        .setting(AppSettings::PropagateVersion)
         .author("UMD Database Group")
         .args(&args::get_args())
         .subcommand(nexmark::command_args())
@@ -40,8 +41,8 @@ pub async fn main() -> Result<()> {
 
     let global_matches = app_cli.get_matches();
     let (command, matches) = match global_matches.subcommand() {
-        (command, Some(matches)) => (command, matches),
-        (_, None) => unreachable!(),
+        Some((command, matches)) => (command, matches),
+        None => unreachable!(),
     };
 
     args::get_logging(&global_matches, matches)?.init();
@@ -52,7 +53,10 @@ pub async fn main() -> Result<()> {
         "upload" => s3::command(matches),
         "lambda" => lambda::command(matches),
         "fsql" => fsql::command(matches),
-        _ => bail!(matches.usage().to_owned()),
+        _ => {
+            warn!("{} command is not implemented", command);
+            Ok(())
+        }
     }
     .with_context(|| anyhow!("{} command failed", command))?;
 

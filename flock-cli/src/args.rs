@@ -16,9 +16,9 @@ use benchmarks::rainbow_string;
 use clap::{Arg, ArgMatches};
 use std::io::Write;
 
-pub fn get_args() -> Vec<Arg<'static, 'static>> {
-    let config = Arg::with_name("config")
-        .short("c")
+pub fn get_args() -> Vec<Arg<'static>> {
+    let config = Arg::new("config")
+        .short('c')
         .long("config")
         .value_name("FILE")
         .help("Sets a custom config file")
@@ -26,20 +26,20 @@ pub fn get_args() -> Vec<Arg<'static, 'static>> {
     get_logging_args().into_iter().chain(vec![config]).collect()
 }
 
-fn get_logging_args() -> Vec<Arg<'static, 'static>> {
+fn get_logging_args() -> Vec<Arg<'static>> {
     [
-        Arg::with_name("log-level")
+        Arg::new("log-level")
             .long("log-level")
             .possible_values(&["error", "warn", "info", "debug", "trace", "off"])
             .help("Log level [default: info]")
             .global(true)
             .takes_value(true),
-        Arg::with_name("trace")
+        Arg::new("trace")
             .long("trace")
             .help("Log ultra-verbose (trace level) information")
             .global(true)
             .takes_value(false),
-        Arg::with_name("silent")
+        Arg::new("silent")
             .long("silent")
             .help("Suppress all output")
             .global(true)
