@@ -16,6 +16,7 @@ use crate::fsql;
 use crate::lambda;
 use crate::nexmark;
 use crate::s3;
+use crate::ysb;
 use anyhow::Context as _;
 use anyhow::{anyhow, bail, Result};
 use clap::{crate_version, App, AppSettings};
@@ -32,6 +33,7 @@ pub async fn main() -> Result<()> {
         .author("UMD Database Group")
         .args(&args::get_args())
         .subcommand(nexmark::command_args())
+        .subcommand(ysb::command_args())
         .subcommand(s3::command_args())
         .subcommand(lambda::command_args())
         .subcommand(fsql::command_args());
@@ -46,6 +48,7 @@ pub async fn main() -> Result<()> {
 
     match command {
         "nexmark" => nexmark::command(matches),
+        "ysb" => ysb::command(matches),
         "upload" => s3::command(matches),
         "lambda" => lambda::command(matches),
         "fsql" => fsql::command(matches),

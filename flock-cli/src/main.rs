@@ -19,6 +19,7 @@ mod rainbow;
 #[cfg(feature = "cli")]
 mod repl;
 mod s3;
+mod ysb;
 
 use anyhow::Result;
 

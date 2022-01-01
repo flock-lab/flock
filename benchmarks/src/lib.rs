@@ -14,3 +14,7 @@
 #[path = "./nexmark/main.rs"]
 pub mod nexmark;
 pub use nexmark::{nexmark_benchmark, NexmarkBenchmarkOpt};
+
+#[path = "./ysb/main.rs"]
+pub mod ysb;
+pub use ysb::{ysb_benchmark, YSBBenchmarkOpt};
