@@ -1,0 +1,22 @@
+// Begin DataFusion GraphViz Plan (see https://graphviz.org)
+digraph {
+  subgraph cluster_1
+  {
+    graph[label="LogicalPlan"]
+    2[shape=box label="Projection: #bid.auction, #bid.price"]
+    3[shape=box label="Filter: #bid.auction % Int64(123) = Int64(0)"]
+    2 -> 3 [arrowhead=none, arrowtail=normal, dir=back]
+    4[shape=box label="TableScan: bid projection=Some([0, 2])"]
+    3 -> 4 [arrowhead=none, arrowtail=normal, dir=back]
+  }
+  subgraph cluster_5
+  {
+    graph[label="Detailed LogicalPlan"]
+    6[shape=box label="Projection: #bid.auction, #bid.price\nSchema: [auction:Int32, price:Int32]"]
+    7[shape=box label="Filter: #bid.auction % Int64(123) = Int64(0)\nSchema: [auction:Int32, price:Int32]"]
+    6 -> 7 [arrowhead=none, arrowtail=normal, dir=back]
+    8[shape=box label="TableScan: bid projection=Some([0, 2])\nSchema: [auction:Int32, price:Int32]"]
+    7 -> 8 [arrowhead=none, arrowtail=normal, dir=back]
+  }
+}
+// End DataFusion GraphViz Plan

@@ -1,0 +1,50 @@
+// Begin DataFusion GraphViz Plan (see https://graphviz.org)
+digraph {
+  subgraph cluster_1
+  {
+    graph[label="LogicalPlan"]
+    2[shape=box label="Projection: #P.p_id, #P.name"]
+    3[shape=box label="Join: #P.p_id = #A.seller"]
+    2 -> 3 [arrowhead=none, arrowtail=normal, dir=back]
+    4[shape=box label="Projection: #P.p_id, #P.name, alias=P"]
+    3 -> 4 [arrowhead=none, arrowtail=normal, dir=back]
+    5[shape=box label="Projection: #person.p_id, #person.name, alias=P"]
+    4 -> 5 [arrowhead=none, arrowtail=normal, dir=back]
+    6[shape=box label="Aggregate: groupBy=[[#person.p_id, #person.name]], aggr=[[]]"]
+    5 -> 6 [arrowhead=none, arrowtail=normal, dir=back]
+    7[shape=box label="TableScan: person projection=Some([0, 1])"]
+    6 -> 7 [arrowhead=none, arrowtail=normal, dir=back]
+    8[shape=box label="Projection: #A.seller, alias=A"]
+    3 -> 8 [arrowhead=none, arrowtail=normal, dir=back]
+    9[shape=box label="Projection: #auction.seller, alias=A"]
+    8 -> 9 [arrowhead=none, arrowtail=normal, dir=back]
+    10[shape=box label="Aggregate: groupBy=[[#auction.seller]], aggr=[[]]"]
+    9 -> 10 [arrowhead=none, arrowtail=normal, dir=back]
+    11[shape=box label="TableScan: auction projection=Some([7])"]
+    10 -> 11 [arrowhead=none, arrowtail=normal, dir=back]
+  }
+  subgraph cluster_12
+  {
+    graph[label="Detailed LogicalPlan"]
+    13[shape=box label="Projection: #P.p_id, #P.name\nSchema: [p_id:Int32, name:Utf8]"]
+    14[shape=box label="Join: #P.p_id = #A.seller\nSchema: [p_id:Int32, name:Utf8, seller:Int32]"]
+    13 -> 14 [arrowhead=none, arrowtail=normal, dir=back]
+    15[shape=box label="Projection: #P.p_id, #P.name, alias=P\nSchema: [p_id:Int32, name:Utf8]"]
+    14 -> 15 [arrowhead=none, arrowtail=normal, dir=back]
+    16[shape=box label="Projection: #person.p_id, #person.name, alias=P\nSchema: [p_id:Int32, name:Utf8]"]
+    15 -> 16 [arrowhead=none, arrowtail=normal, dir=back]
+    17[shape=box label="Aggregate: groupBy=[[#person.p_id, #person.name]], aggr=[[]]\nSchema: [p_id:Int32, name:Utf8]"]
+    16 -> 17 [arrowhead=none, arrowtail=normal, dir=back]
+    18[shape=box label="TableScan: person projection=Some([0, 1])\nSchema: [p_id:Int32, name:Utf8]"]
+    17 -> 18 [arrowhead=none, arrowtail=normal, dir=back]
+    19[shape=box label="Projection: #A.seller, alias=A\nSchema: [seller:Int32]"]
+    14 -> 19 [arrowhead=none, arrowtail=normal, dir=back]
+    20[shape=box label="Projection: #auction.seller, alias=A\nSchema: [seller:Int32]"]
+    19 -> 20 [arrowhead=none, arrowtail=normal, dir=back]
+    21[shape=box label="Aggregate: groupBy=[[#auction.seller]], aggr=[[]]\nSchema: [seller:Int32]"]
+    20 -> 21 [arrowhead=none, arrowtail=normal, dir=back]
+    22[shape=box label="TableScan: auction projection=Some([7])\nSchema: [seller:Int32]"]
+    21 -> 22 [arrowhead=none, arrowtail=normal, dir=back]
+  }
+}
+// End DataFusion GraphViz Plan

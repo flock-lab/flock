@@ -1,0 +1,34 @@
+// Begin DataFusion GraphViz Plan (see https://graphviz.org)
+digraph {
+  subgraph cluster_1
+  {
+    graph[label="LogicalPlan"]
+    2[shape=box label="Projection: #person.name, #person.city, #person.state, #auction.a_id"]
+    3[shape=box label="Join: #auction.seller = #person.p_id"]
+    2 -> 3 [arrowhead=none, arrowtail=normal, dir=back]
+    4[shape=box label="Filter: #auction.category = Int64(10)"]
+    3 -> 4 [arrowhead=none, arrowtail=normal, dir=back]
+    5[shape=box label="TableScan: auction projection=Some([0, 7, 8])"]
+    4 -> 5 [arrowhead=none, arrowtail=normal, dir=back]
+    6[shape=box label="Filter: #person.state = Utf8(_or_) OR #person.state = Utf8(_id_) OR #person.state = Utf8(_ca_)"]
+    3 -> 6 [arrowhead=none, arrowtail=normal, dir=back]
+    7[shape=box label="TableScan: person projection=Some([0, 1, 4, 5])"]
+    6 -> 7 [arrowhead=none, arrowtail=normal, dir=back]
+  }
+  subgraph cluster_8
+  {
+    graph[label="Detailed LogicalPlan"]
+    9[shape=box label="Projection: #person.name, #person.city, #person.state, #auction.a_id\nSchema: [name:Utf8, city:Utf8, state:Utf8, a_id:Int32]"]
+    10[shape=box label="Join: #auction.seller = #person.p_id\nSchema: [a_id:Int32, seller:Int32, category:Int32, p_id:Int32, name:Utf8, city:Utf8, state:Utf8]"]
+    9 -> 10 [arrowhead=none, arrowtail=normal, dir=back]
+    11[shape=box label="Filter: #auction.category = Int64(10)\nSchema: [a_id:Int32, seller:Int32, category:Int32]"]
+    10 -> 11 [arrowhead=none, arrowtail=normal, dir=back]
+    12[shape=box label="TableScan: auction projection=Some([0, 7, 8])\nSchema: [a_id:Int32, seller:Int32, category:Int32]"]
+    11 -> 12 [arrowhead=none, arrowtail=normal, dir=back]
+    13[shape=box label="Filter: #person.state = Utf8(_or_) OR #person.state = Utf8(_id_) OR #person.state = Utf8(_ca_)\nSchema: [p_id:Int32, name:Utf8, city:Utf8, state:Utf8]"]
+    10 -> 13 [arrowhead=none, arrowtail=normal, dir=back]
+    14[shape=box label="TableScan: person projection=Some([0, 1, 4, 5])\nSchema: [p_id:Int32, name:Utf8, city:Utf8, state:Utf8]"]
+    13 -> 14 [arrowhead=none, arrowtail=normal, dir=back]
+  }
+}
+// End DataFusion GraphViz Plan

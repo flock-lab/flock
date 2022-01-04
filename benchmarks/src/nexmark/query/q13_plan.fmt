@@ -1,0 +1,4 @@
+Projection: #bid.auction, #bid.bidder, #bid.price, #bid.b_date_time, #side_input.value [auction:Int32, bidder:Int32, price:Int32, b_date_time:Timestamp(Millisecond, None), value:Int32]
+  Join: #bid.auction = #side_input.key [auction:Int32, bidder:Int32, price:Int32, b_date_time:Timestamp(Millisecond, None), key:Int32, value:Int32]
+    TableScan: bid projection=Some([0, 1, 2, 3]) [auction:Int32, bidder:Int32, price:Int32, b_date_time:Timestamp(Millisecond, None)]
+    TableScan: side_input projection=Some([0, 1]) [key:Int32, value:Int32]
