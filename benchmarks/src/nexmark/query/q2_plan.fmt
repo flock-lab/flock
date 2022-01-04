@@ -1,0 +1,3 @@
+Projection: #bid.auction, #bid.price [auction:Int32, price:Int32]
+  Filter: #bid.auction % Int64(123) = Int64(0) [auction:Int32, price:Int32]
+    TableScan: bid projection=Some([0, 2]) [auction:Int32, price:Int32]

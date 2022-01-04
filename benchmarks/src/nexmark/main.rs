@@ -490,6 +490,9 @@ mod tests {
     use super::*;
     use arrow::util::pretty::pretty_format_batches;
     use flock::transmute::event_bytes_to_batch;
+    use std::fs::File;
+    use std::io::Write;
+    use std::time::Instant;
 
     #[tokio::test]
     async fn nexmark_sql_queries() -> Result<()> {
@@ -544,6 +547,142 @@ mod tests {
 
             let output = flock_ctx.execute().await?;
             println!("{}", pretty_format_batches(&output)?);
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn nexmark_display_graphviz() -> Result<()> {
+        let sqls = vec![
+            nexmark_query(0),
+            nexmark_query(1),
+            nexmark_query(2),
+            nexmark_query(3),
+            nexmark_query(4),
+            nexmark_query(5),
+            nexmark_query(6),
+            nexmark_query(7),
+            nexmark_query(8),
+            nexmark_query(9),
+            nexmark_query(10),
+            nexmark_query(11),
+            nexmark_query(13),
+            // keep q12 as the last one since it has new field in the `bid` table.
+            nexmark_query(12),
+        ];
+        let mut ctx = register_nexmark_tables().await?;
+
+        for (i, sql) in sqls.iter().enumerate() {
+            let mut query = &sql[0];
+            let mut query_number = i;
+            if i == 12 {
+                query_number += 1;
+            } else if i == 13 {
+                query_number -= 1;
+            }
+    
+            if query_number == 12 {
+                query = &sql[1];
+                ctx.deregister_table("bid")?;
+                let bid_schema = Arc::new(Schema::new(vec![
+                    Field::new("auction", DataType::Int32, false),
+                    Field::new("bidder", DataType::Int32, false),
+                    Field::new("price", DataType::Int32, false),
+                    Field::new(
+                        "b_date_time",
+                        DataType::Timestamp(TimeUnit::Millisecond, None),
+                        false,
+                    ),
+                    Field::new(
+                        "p_time",
+                        DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".to_string())),
+                        false,
+                    ),
+                ]));
+                let bid_table = MemTable::try_new(
+                    bid_schema.clone(),
+                    vec![vec![RecordBatch::new_empty(bid_schema)]],
+                )?;
+                ctx.register_table("bid", Arc::new(bid_table))?;
+            }
+
+            let logical_plan = ctx.create_logical_plan(query)?;
+            let logical_plan = ctx.optimize(&logical_plan)?;
+    
+            let mut output = File::create(format!("/tmp/q{}_plan.dot", query_number))?;
+            write!(output, "{}", logical_plan.display_graphviz())?;
+
+            let mut output = File::create(format!("/tmp/q{}_plan.fmt", query_number))?;
+            write!(output, "{}", format!("{}", logical_plan.display_indent_schema()))?;
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn nexmark_gen_physical_plan_time() -> Result<()> {
+        let sqls = vec![
+            nexmark_query(0),
+            nexmark_query(1),
+            nexmark_query(2),
+            nexmark_query(3),
+            nexmark_query(4),
+            nexmark_query(5),
+            nexmark_query(6),
+            nexmark_query(7),
+            nexmark_query(8),
+            nexmark_query(9),
+            nexmark_query(10),
+            nexmark_query(11),
+            nexmark_query(13),
+            // keep q12 as the last one since it has new field in the `bid` table.
+            nexmark_query(12),
+        ];
+        let mut ctx = register_nexmark_tables().await?;
+
+        for (i, sql) in sqls.iter().enumerate() {
+            let mut query = &sql[0];
+            let mut query_number = i;
+            if i == 12 {
+                query_number += 1;
+            } else if i == 13 {
+                query_number -= 1;
+            }
+    
+            if query_number == 12 {
+                query = &sql[1];
+                ctx.deregister_table("bid")?;
+                let bid_schema = Arc::new(Schema::new(vec![
+                    Field::new("auction", DataType::Int32, false),
+                    Field::new("bidder", DataType::Int32, false),
+                    Field::new("price", DataType::Int32, false),
+                    Field::new(
+                        "b_date_time",
+                        DataType::Timestamp(TimeUnit::Millisecond, None),
+                        false,
+                    ),
+                    Field::new(
+                        "p_time",
+                        DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".to_string())),
+                        false,
+                    ),
+                ]));
+                let bid_table = MemTable::try_new(
+                    bid_schema.clone(),
+                    vec![vec![RecordBatch::new_empty(bid_schema)]],
+                )?;
+                ctx.register_table("bid", Arc::new(bid_table))?;
+            }
+
+            let logical_plan = ctx.create_logical_plan(query)?;
+            let logical_plan = ctx.optimize(&logical_plan)?;
+
+            let now = Instant::now();
+            ctx.create_physical_plan(&logical_plan).await?;
+            println!(
+                "q{} generates physical plan in {:?} us",
+                query_number,
+                now.elapsed().as_micros()
+            );
         }
         Ok(())
     }

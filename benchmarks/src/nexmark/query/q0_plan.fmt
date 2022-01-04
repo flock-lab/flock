@@ -1,0 +1,2 @@
+Projection: #bid.auction, #bid.bidder, #bid.price, #bid.b_date_time [auction:Int32, bidder:Int32, price:Int32, b_date_time:Timestamp(Millisecond, None)]
+  TableScan: bid projection=Some([0, 1, 2, 3]) [auction:Int32, bidder:Int32, price:Int32, b_date_time:Timestamp(Millisecond, None)]

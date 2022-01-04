@@ -1,0 +1,7 @@
+Projection: #bid.auction, #bid.price, #bid.bidder, #bid.b_date_time [auction:Int32, price:Int32, bidder:Int32, b_date_time:Timestamp(Millisecond, None)]
+  Join: #bid.price = #B1.maxprice [auction:Int32, bidder:Int32, price:Int32, b_date_time:Timestamp(Millisecond, None), maxprice:Int32;N]
+    TableScan: bid projection=Some([0, 1, 2, 3]) [auction:Int32, bidder:Int32, price:Int32, b_date_time:Timestamp(Millisecond, None)]
+    Projection: #B1.maxprice, alias=B1 [maxprice:Int32;N]
+      Projection: #MAX(bid.price) AS maxprice, alias=B1 [maxprice:Int32;N]
+        Aggregate: groupBy=[[]], aggr=[[MAX(#bid.price)]] [MAX(bid.price):Int32;N]
+          TableScan: bid projection=Some([0, 1, 2, 3]) [auction:Int32, bidder:Int32, price:Int32, b_date_time:Timestamp(Millisecond, None)]

@@ -1,0 +1,3 @@
+Projection: #bid.bidder, #COUNT(UInt8(1)) AS bid_count, #MIN(bid.b_date_time) AS start_time, #MAX(bid.b_date_time) AS end_time [bidder:Int32, bid_count:UInt64;N, start_time:Timestamp(Millisecond, None);N, end_time:Timestamp(Millisecond, None);N]
+  Aggregate: groupBy=[[#bid.bidder]], aggr=[[COUNT(UInt8(1)), MIN(#bid.b_date_time), MAX(#bid.b_date_time)]] [bidder:Int32, COUNT(UInt8(1)):UInt64;N, MIN(bid.b_date_time):Timestamp(Millisecond, None);N, MAX(bid.b_date_time):Timestamp(Millisecond, None);N]
+    TableScan: bid projection=Some([1, 3]) [bidder:Int32, b_date_time:Timestamp(Millisecond, None)]

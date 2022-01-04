@@ -1,0 +1,38 @@
+// Begin DataFusion GraphViz Plan (see https://graphviz.org)
+digraph {
+  subgraph cluster_1
+  {
+    graph[label="LogicalPlan"]
+    2[shape=box label="Projection: #bid.auction, #bid.price, #bid.bidder, #bid.b_date_time"]
+    3[shape=box label="Join: #bid.price = #B1.maxprice"]
+    2 -> 3 [arrowhead=none, arrowtail=normal, dir=back]
+    4[shape=box label="TableScan: bid projection=Some([0, 1, 2, 3])"]
+    3 -> 4 [arrowhead=none, arrowtail=normal, dir=back]
+    5[shape=box label="Projection: #B1.maxprice, alias=B1"]
+    3 -> 5 [arrowhead=none, arrowtail=normal, dir=back]
+    6[shape=box label="Projection: #MAX(bid.price) AS maxprice, alias=B1"]
+    5 -> 6 [arrowhead=none, arrowtail=normal, dir=back]
+    7[shape=box label="Aggregate: groupBy=[[]], aggr=[[MAX(#bid.price)]]"]
+    6 -> 7 [arrowhead=none, arrowtail=normal, dir=back]
+    8[shape=box label="TableScan: bid projection=Some([0, 1, 2, 3])"]
+    7 -> 8 [arrowhead=none, arrowtail=normal, dir=back]
+  }
+  subgraph cluster_9
+  {
+    graph[label="Detailed LogicalPlan"]
+    10[shape=box label="Projection: #bid.auction, #bid.price, #bid.bidder, #bid.b_date_time\nSchema: [auction:Int32, price:Int32, bidder:Int32, b_date_time:Timestamp(Millisecond, None)]"]
+    11[shape=box label="Join: #bid.price = #B1.maxprice\nSchema: [auction:Int32, bidder:Int32, price:Int32, b_date_time:Timestamp(Millisecond, None), maxprice:Int32;N]"]
+    10 -> 11 [arrowhead=none, arrowtail=normal, dir=back]
+    12[shape=box label="TableScan: bid projection=Some([0, 1, 2, 3])\nSchema: [auction:Int32, bidder:Int32, price:Int32, b_date_time:Timestamp(Millisecond, None)]"]
+    11 -> 12 [arrowhead=none, arrowtail=normal, dir=back]
+    13[shape=box label="Projection: #B1.maxprice, alias=B1\nSchema: [maxprice:Int32;N]"]
+    11 -> 13 [arrowhead=none, arrowtail=normal, dir=back]
+    14[shape=box label="Projection: #MAX(bid.price) AS maxprice, alias=B1\nSchema: [maxprice:Int32;N]"]
+    13 -> 14 [arrowhead=none, arrowtail=normal, dir=back]
+    15[shape=box label="Aggregate: groupBy=[[]], aggr=[[MAX(#bid.price)]]\nSchema: [MAX(bid.price):Int32;N]"]
+    14 -> 15 [arrowhead=none, arrowtail=normal, dir=back]
+    16[shape=box label="TableScan: bid projection=Some([0, 1, 2, 3])\nSchema: [auction:Int32, bidder:Int32, price:Int32, b_date_time:Timestamp(Millisecond, None)]"]
+    15 -> 16 [arrowhead=none, arrowtail=normal, dir=back]
+  }
+}
+// End DataFusion GraphViz Plan

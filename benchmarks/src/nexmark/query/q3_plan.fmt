@@ -1,0 +1,6 @@
+Projection: #person.name, #person.city, #person.state, #auction.a_id [name:Utf8, city:Utf8, state:Utf8, a_id:Int32]
+  Join: #auction.seller = #person.p_id [a_id:Int32, seller:Int32, category:Int32, p_id:Int32, name:Utf8, city:Utf8, state:Utf8]
+    Filter: #auction.category = Int64(10) [a_id:Int32, seller:Int32, category:Int32]
+      TableScan: auction projection=Some([0, 7, 8]) [a_id:Int32, seller:Int32, category:Int32]
+    Filter: #person.state = Utf8("or") OR #person.state = Utf8("id") OR #person.state = Utf8("ca") [p_id:Int32, name:Utf8, city:Utf8, state:Utf8]
+      TableScan: person projection=Some([0, 1, 4, 5]) [p_id:Int32, name:Utf8, city:Utf8, state:Utf8]
