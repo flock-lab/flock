@@ -580,7 +580,7 @@ mod tests {
             } else if i == 13 {
                 query_number -= 1;
             }
-    
+
             if query_number == 12 {
                 query = &sql[1];
                 ctx.deregister_table("bid")?;
@@ -608,12 +608,12 @@ mod tests {
 
             let logical_plan = ctx.create_logical_plan(query)?;
             let logical_plan = ctx.optimize(&logical_plan)?;
-    
+
             let mut output = File::create(format!("/tmp/q{}_plan.dot", query_number))?;
             write!(output, "{}", logical_plan.display_graphviz())?;
 
             let mut output = File::create(format!("/tmp/q{}_plan.fmt", query_number))?;
-            write!(output, "{}", format!("{}", logical_plan.display_indent_schema()))?;
+            write!(output, "{}", logical_plan.display_indent_schema())?;
         }
         Ok(())
     }
@@ -647,7 +647,7 @@ mod tests {
             } else if i == 13 {
                 query_number -= 1;
             }
-    
+
             if query_number == 12 {
                 query = &sql[1];
                 ctx.deregister_table("bid")?;
