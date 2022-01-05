@@ -18,13 +18,13 @@
 use crate::error::{FlockError, Result};
 use crate::runtime::payload::{Payload, Uuid};
 use bitmap::Bitmap;
-use dashmap::DashMap;
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::record_batch::RecordBatch;
+use hashbrown::HashMap;
 use std::ops::{Deref, DerefMut};
 
-/// `DashMap` is a thread-safe hash map inside the lambda function that is used
-/// to aggregate the data frames of the previous stage of dataflow to ensure the
+/// `Arena` is a global hash map inside the lambda function that is used to
+/// aggregate the data frames of the previous stage of dataflow to ensure the
 /// integrity of the window data for stream processing.
 ///
 /// # Key-value pairs
@@ -32,7 +32,7 @@ use std::ops::{Deref, DerefMut};
 ///   query time.
 /// * The value is the data frames of the previous stage of dataflow for a given
 ///   query at a given time wrapped by `WindowSession`.
-pub struct Arena(DashMap<String, WindowSession>);
+pub struct Arena(HashMap<String, WindowSession>);
 
 /// `WindowSession` is an abstraction of a temporal window that is used to store
 /// the data frames of the previous stage of dataflow to ensure the integrity of
@@ -73,12 +73,12 @@ impl WindowSession {
 impl Arena {
     /// Create a new `Arena`.
     pub fn new() -> Arena {
-        Arena(DashMap::<String, WindowSession>::new())
+        Arena(HashMap::<String, WindowSession>::new())
     }
 
     /// Get the data fragments in the temporal window via the key.
     pub fn batches(&mut self, tid: String) -> Vec<Vec<Vec<RecordBatch>>> {
-        if let Some((_, window)) = (*self).remove(&tid) {
+        if let Some(window) = (*self).remove(&tid) {
             vec![window.r1_records, window.r2_records]
         } else {
             vec![vec![], vec![]]
@@ -127,7 +127,7 @@ impl Arena {
 }
 
 impl Deref for Arena {
-    type Target = DashMap<String, WindowSession>;
+    type Target = HashMap<String, WindowSession>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
