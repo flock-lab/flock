@@ -17,6 +17,7 @@ use crate::datasource::nexmark::event::{Auction, Bid, Person};
 use crate::datasource::nexmark::NEXMarkEvent;
 use crate::error::Result;
 use crate::transmute::event_bytes_to_batch;
+use datafusion::arrow::util::pretty::pretty_format_batches;
 use lambda_runtime::{handler_fn, Context};
 use std::sync::Arc;
 
@@ -24,18 +25,15 @@ use std::sync::Arc;
 async fn handler(event: NEXMarkEvent, _: Context) -> Result<NEXMarkEvent> {
     let person_schema = Arc::new(Person::schema());
     let batches = event_bytes_to_batch(&event.persons, person_schema, 1024);
-    let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
-    println!("{}", formatted);
+    println!("{}", pretty_format_batches(&batches)?);
 
     let auction_schema = Arc::new(Auction::schema());
     let batches = event_bytes_to_batch(&event.auctions, auction_schema, 1024);
-    let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
-    println!("{}", formatted);
+    println!("{}", pretty_format_batches(&batches)?);
 
     let bid_schema = Arc::new(Bid::schema());
     let batches = event_bytes_to_batch(&event.bids, bid_schema, 1024);
-    let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
-    println!("{}", formatted);
+    println!("{}", pretty_format_batches(&batches)?);
 
     Ok(event)
 }
@@ -72,18 +70,15 @@ mod tests {
 
         let person_schema = Arc::new(Person::schema());
         let batches = event_bytes_to_batch(&ret_events.persons, person_schema, 1024);
-        let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
-        println!("{}", formatted);
+        println!("{}", pretty_format_batches(&batches)?);
 
         let auction_schema = Arc::new(Auction::schema());
         let batches = event_bytes_to_batch(&ret_events.auctions, auction_schema, 1024);
-        let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
-        println!("{}", formatted);
+        println!("{}", pretty_format_batches(&batches)?);
 
         let bid_schema = Arc::new(Bid::schema());
         let batches = event_bytes_to_batch(&ret_events.bids, bid_schema, 1024);
-        let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
-        println!("{}", formatted);
+        println!("{}", pretty_format_batches(&batches)?);
 
         Ok(())
     }
@@ -118,18 +113,15 @@ mod tests {
         let de_events: NEXMarkEvent = serde_json::from_slice(&response.payload.unwrap()).unwrap();
         let person_schema = Arc::new(Person::schema());
         let batches = event_bytes_to_batch(&de_events.persons, person_schema, 1024);
-        let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
-        println!("{}", formatted);
+        println!("{}", pretty_format_batches(&batches)?);
 
         let auction_schema = Arc::new(Auction::schema());
         let batches = event_bytes_to_batch(&de_events.auctions, auction_schema, 1024);
-        let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
-        println!("{}", formatted);
+        println!("{}", pretty_format_batches(&batches)?);
 
         let bid_schema = Arc::new(Bid::schema());
         let batches = event_bytes_to_batch(&de_events.bids, bid_schema, 1024);
-        let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
-        println!("{}", formatted);
+        println!("{}", pretty_format_batches(&batches)?);
 
         Ok(())
     }

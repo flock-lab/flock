@@ -13,9 +13,9 @@
 
 //! Flock error types
 
-use arrow::error::ArrowError;
+use datafusion::arrow::error::ArrowError;
 use datafusion::error::DataFusionError;
-use parquet::errors::ParquetError;
+use datafusion::parquet::errors::ParquetError;
 
 use std::error;
 use std::fmt::{Display, Formatter};

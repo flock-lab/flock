@@ -19,10 +19,10 @@
 use crate::datasource::DataSource;
 use crate::encoding::Encoding;
 use crate::transmute::*;
-use arrow::datatypes::Schema;
-use arrow::record_batch::RecordBatch;
-use arrow_flight::utils::flight_data_to_arrow_batch;
-use arrow_flight::FlightData;
+use datafusion::arrow::datatypes::Schema;
+use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::arrow_flight::utils::flight_data_to_arrow_batch;
+use datafusion::arrow_flight::FlightData;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -196,11 +196,11 @@ impl Payload {
 mod tests {
     use super::*;
     use crate::error::Result;
-    use arrow::array::{Array, StructArray};
-    use arrow::csv;
-    use arrow::datatypes::{DataType, Field, Schema};
-    use arrow::json;
-    use arrow_flight::utils::flight_data_from_arrow_batch;
+    use datafusion::arrow::array::{Array, StructArray};
+    use datafusion::arrow::csv;
+    use datafusion::arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::arrow::json;
+    use datafusion::arrow_flight::utils::flight_data_from_arrow_batch;
     use serde_json::Value;
     use std::sync::Arc;
     use std::time::Instant;
@@ -257,7 +257,7 @@ mod tests {
             struct_array.get_array_memory_size()
         );
 
-        let options = arrow::ipc::writer::IpcWriteOptions::default();
+        let options = datafusion::arrow::ipc::writer::IpcWriteOptions::default();
         let (_, flight_data) = flight_data_from_arrow_batch(&batch, &options);
         let flight_data_size = flight_data.data_header.len() + flight_data.data_body.len();
         assert_eq!(1856, flight_data_size);
@@ -348,7 +348,7 @@ mod tests {
         }
 
         // Option: Arrow Flight Data
-        let options = arrow::ipc::writer::IpcWriteOptions::default();
+        let options = datafusion::arrow::ipc::writer::IpcWriteOptions::default();
         let (_, flight_data) = flight_data_from_arrow_batch(batch, &options);
 
         {
@@ -393,7 +393,7 @@ mod tests {
 
     // Convert record batch to payload for network transmission.
     fn to_vec(batches: &[RecordBatch], uuid: Uuid, encoding: Encoding) -> Vec<u8> {
-        let options = arrow::ipc::writer::IpcWriteOptions::default();
+        let options = datafusion::arrow::ipc::writer::IpcWriteOptions::default();
         let data_frames = batches
             .par_iter()
             .map(|b| {

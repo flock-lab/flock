@@ -15,7 +15,7 @@
 
 use crate::datasource::epoch::Epoch;
 use crate::datasource::nexmark::config::NEXMarkConfig;
-use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
+use datafusion::arrow::datatypes::{DataType, Field, Schema, TimeUnit};
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};

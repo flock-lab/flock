@@ -13,9 +13,9 @@
 
 #[path = "../rainbow.rs"]
 mod rainbow;
-use arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
-use arrow::record_batch::RecordBatch;
-use arrow::util::pretty::pretty_format_batches;
+use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
+use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::arrow::util::pretty::pretty_format_batches;
 use datafusion::datasource::MemTable;
 use datafusion::execution::context::ExecutionContext as DataFusionExecutionContext;
 use datafusion::physical_plan::empty::EmptyExec;
@@ -488,7 +488,7 @@ pub fn nexmark_query(query_number: usize) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arrow::util::pretty::pretty_format_batches;
+    use datafusion::arrow::util::pretty::pretty_format_batches;
     use flock::transmute::event_bytes_to_batch;
     use std::fs::File;
     use std::io::Write;

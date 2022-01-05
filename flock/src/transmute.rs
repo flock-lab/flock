@@ -17,12 +17,12 @@ use crate::datasource::DataSource;
 use crate::encoding::Encoding;
 use crate::error::{FlockError, Result};
 use crate::runtime::payload::{DataFrame, Payload, Uuid};
-use arrow::datatypes::{Schema, SchemaRef};
-use arrow::json;
-use arrow::record_batch::RecordBatch;
-use arrow_flight::utils::flight_data_from_arrow_batch;
-use arrow_flight::FlightData;
-use arrow_flight::SchemaAsIpc;
+use datafusion::arrow::datatypes::{Schema, SchemaRef};
+use datafusion::arrow::json;
+use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::arrow_flight::utils::flight_data_from_arrow_batch;
+use datafusion::arrow_flight::FlightData;
+use datafusion::arrow_flight::SchemaAsIpc;
 use datafusion::physical_plan::coalesce_batches::CoalesceBatchesExec;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::repartition::RepartitionExec;
@@ -125,14 +125,15 @@ pub fn unmarshal(data: Vec<DataFrame>, encoding: Encoding) -> Vec<DataFrame> {
 
 /// Serialize the schema
 pub fn schema_to_bytes(schema: SchemaRef) -> Vec<u8> {
-    let options = arrow::ipc::writer::IpcWriteOptions::default();
+    let options = datafusion::arrow::ipc::writer::IpcWriteOptions::default();
     let flight_data: FlightData = SchemaAsIpc::new(&schema, &options).into();
     flight_data.data_header
 }
 
 /// Deserialize the schema
 pub fn schema_from_bytes(bytes: &[u8]) -> Result<Arc<Schema>> {
-    let schema = arrow::ipc::convert::schema_from_bytes(bytes).map_err(FlockError::Arrow)?;
+    let schema =
+        datafusion::arrow::ipc::convert::schema_from_bytes(bytes).map_err(FlockError::Arrow)?;
     Ok(Arc::new(schema))
 }
 
@@ -144,7 +145,7 @@ pub fn json_value_to_batch(event: Value) -> (Vec<RecordBatch>, Vec<RecordBatch>,
 
 /// Convert record batches to payload for network transmission.
 pub fn batch_to_json_value(batches: &[RecordBatch], uuid: Uuid, encoding: Encoding) -> Value {
-    let options = arrow::ipc::writer::IpcWriteOptions::default();
+    let options = datafusion::arrow::ipc::writer::IpcWriteOptions::default();
     let data_frames = batches
         .par_iter()
         .map(|b| {
@@ -180,7 +181,7 @@ pub fn to_payload(
     uuid: Uuid,
     sync: bool,
 ) -> Payload {
-    let options = arrow::ipc::writer::IpcWriteOptions::default();
+    let options = datafusion::arrow::ipc::writer::IpcWriteOptions::default();
     let encoding = Encoding::default();
     let dataframe = |batches: &[RecordBatch]| -> Vec<DataFrame> {
         batches
@@ -221,7 +222,7 @@ pub fn to_payload(
 
 /// Convert record batch to bytes for network transmission.
 pub fn to_bytes(batch: &RecordBatch, uuid: Uuid, encoding: Encoding) -> bytes::Bytes {
-    let options = arrow::ipc::writer::IpcWriteOptions::default();
+    let options = datafusion::arrow::ipc::writer::IpcWriteOptions::default();
     let schema = schema_to_bytes(batch.schema());
     let (_, flight_data) = flight_data_from_arrow_batch(batch, &options);
 
@@ -268,8 +269,8 @@ pub fn event_bytes_to_batch(
 mod tests {
     use super::*;
     use crate::error::FlockError;
-    use arrow::array::UInt32Array;
-    use arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::arrow::array::UInt32Array;
+    use datafusion::arrow::datatypes::{DataType, Field, Schema};
     use datafusion::physical_plan::expressions::col;
     use tokio::task::JoinHandle;
 

@@ -25,6 +25,7 @@ mod tests {
     use crate::runtime::executor::plan::physical_plan;
     use crate::runtime::query::{Schedule, StreamWindow};
     use crate::transmute::event_bytes_to_batch;
+    use datafusion::arrow::util::pretty::pretty_format_batches;
     use datafusion::datasource::MemTable;
     use datafusion::physical_plan::collect;
     use indoc::indoc;
@@ -90,10 +91,7 @@ mod tests {
             let output = collect(physical_plan).await?;
 
             // show output
-            println!(
-                "{}",
-                arrow::util::pretty::pretty_format_batches(&output).unwrap()
-            );
+            println!("{}", pretty_format_batches(&output)?);
         }
 
         Ok(())

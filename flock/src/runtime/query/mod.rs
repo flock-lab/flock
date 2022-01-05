@@ -26,7 +26,7 @@
 )]
 
 use crate::datasource::DataSource;
-use arrow::datatypes::SchemaRef;
+use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::physical_plan::ExecutionPlan;
 use std::any::Any;
 use std::fmt::Debug;

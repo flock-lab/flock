@@ -25,8 +25,8 @@ use crate::error::Result;
 use crate::runtime::payload::{Payload, Uuid};
 use crate::runtime::query::StreamWindow;
 use crate::transmute::*;
-use arrow::datatypes::SchemaRef;
-use arrow::record_batch::RecordBatch;
+use datafusion::arrow::datatypes::SchemaRef;
+use datafusion::arrow::record_batch::RecordBatch;
 use lazy_static::lazy_static;
 use log::info;
 use serde::{Deserialize, Serialize};
@@ -423,6 +423,7 @@ impl NEXMarkSource {
 mod test {
     use super::*;
     use crate::datasource::nexmark::event::{Auction, Bid, Person};
+    use datafusion::arrow::util::pretty::pretty_format_batches;
 
     #[test]
     fn test_gen_data() -> Result<()> {
@@ -481,18 +482,15 @@ mod test {
 
         let person_schema = Arc::new(Person::schema());
         let batches = event_bytes_to_batch(&de_events.persons, person_schema, batch_size);
-        let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
-        println!("{}", formatted);
+        println!("{}", pretty_format_batches(&batches)?);
 
         let auction_schema = Arc::new(Auction::schema());
         let batches = event_bytes_to_batch(&de_events.auctions, auction_schema, batch_size);
-        let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
-        println!("{}", formatted);
+        println!("{}", pretty_format_batches(&batches)?);
 
         let bid_schema = Arc::new(Bid::schema());
         let batches = event_bytes_to_batch(&de_events.bids, bid_schema, batch_size);
-        let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
-        println!("{}", formatted);
+        println!("{}", pretty_format_batches(&batches)?);
 
         Ok(())
     }

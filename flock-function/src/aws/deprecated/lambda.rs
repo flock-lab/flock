@@ -13,9 +13,9 @@
 
 //! The generic lambda function for sub-plan execution on AWS Lambda.
 
-use arrow::record_batch::RecordBatch;
 use aws_lambda_events::event::kafka::KafkaEvent;
 use aws_lambda_events::event::kinesis::KinesisEvent;
+use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::physical_plan::Partitioning;
 use futures::executor::block_on;
 use lambda_runtime::{handler_fn, Context};
@@ -274,6 +274,7 @@ async fn handler(event: Value, _: Context) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use datafusion::arrow::util::pretty::pretty_format_batches;
     use datafusion::physical_plan::ExecutionPlan;
     use driver::QueryFlow;
     use serde_json::json;
@@ -363,10 +364,7 @@ mod tests {
             let (batches, _, _) = to_batch(res);
 
             if i == 0 {
-                println!(
-                    "{}",
-                    arrow::util::pretty::pretty_format_batches(&batches).unwrap(),
-                );
+                println!("{}", pretty_format_batches(&batches)?,);
             }
         }
 

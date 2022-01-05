@@ -23,8 +23,9 @@ mod tests {
     use crate::runtime::executor::plan::physical_plan;
     use crate::runtime::query::StreamWindow;
     use crate::transmute::event_bytes_to_batch;
-    use arrow::array::UInt64Array;
-    use arrow::record_batch::RecordBatch;
+    use datafusion::arrow::array::UInt64Array;
+    use datafusion::arrow::record_batch::RecordBatch;
+    use datafusion::arrow::util::pretty::pretty_format_batches;
     use datafusion::datasource::MemTable;
     use datafusion::physical_plan::expressions::Column;
     use datafusion::physical_plan::limit::truncate_batch;
@@ -154,8 +155,7 @@ mod tests {
             let output_partitions = collect(plan).await?;
 
             // show output
-            let formatted = arrow::util::pretty::pretty_format_batches(&output_partitions).unwrap();
-            println!("{}", formatted);
+            println!("{}", pretty_format_batches(&output_partitions)?);
         }
 
         Ok(())

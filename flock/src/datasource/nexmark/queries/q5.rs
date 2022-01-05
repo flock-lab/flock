@@ -23,6 +23,7 @@ mod tests {
     use crate::runtime::executor::plan::physical_plan;
     use crate::runtime::query::StreamWindow;
     use crate::transmute::event_bytes_to_batch;
+    use datafusion::arrow::util::pretty::pretty_format_batches;
     use datafusion::datasource::MemTable;
     use datafusion::physical_plan::collect;
     use indoc::indoc;
@@ -106,8 +107,7 @@ mod tests {
             let batches = collect(physical_plan).await?;
 
             // show output
-            let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
-            println!("{}", formatted);
+            println!("{}", pretty_format_batches(&batches)?);
 
             unsafe {
                 bids_batches = Arc::get_mut_unchecked(

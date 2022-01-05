@@ -19,8 +19,8 @@
 //! representation to track which data fragments in the current time-window are
 //! available, versus which are not.
 
-use arrow::buffer::MutableBuffer;
-use arrow::util::bit_util;
+use datafusion::arrow::buffer::MutableBuffer;
+use datafusion::arrow::util::bit_util;
 
 /// A bitmap is a bit vector that can be used to represent a set of flags.
 #[derive(Debug)]

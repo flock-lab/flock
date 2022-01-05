@@ -19,15 +19,15 @@ use crate::error::{FlockError, Result};
 use crate::runtime::payload::DataFrame;
 use crate::services::*;
 use crate::transmute::*;
-use arrow::csv;
-use arrow::datatypes::Schema;
-use arrow::record_batch::RecordBatch;
-use arrow_flight::utils::flight_data_from_arrow_batch;
-use arrow_flight::utils::flight_data_to_arrow_batch;
-use arrow_flight::FlightData;
+use datafusion::arrow::csv;
+use datafusion::arrow::datatypes::Schema;
+use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::arrow_flight::utils::flight_data_from_arrow_batch;
+use datafusion::arrow_flight::utils::flight_data_to_arrow_batch;
+use datafusion::arrow_flight::FlightData;
 use datafusion::execution::context::ExecutionContext;
+use datafusion::parquet::arrow::ArrowWriter;
 use datafusion::prelude::CsvReadOptions;
-use parquet::arrow::ArrowWriter;
 use rayon::prelude::*;
 use rusoto_core::ByteStream;
 use rusoto_s3::{GetObjectRequest, PutObjectRequest, S3};
@@ -214,7 +214,7 @@ impl DataSink {
             .map(|b| {
                 let (_, flight_data) = flight_data_from_arrow_batch(
                     b,
-                    &arrow::ipc::writer::IpcWriteOptions::default(),
+                    &datafusion::arrow::ipc::writer::IpcWriteOptions::default(),
                 );
                 if self.encoding != Encoding::None {
                     DataFrame {

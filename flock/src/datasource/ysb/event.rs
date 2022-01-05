@@ -14,7 +14,7 @@
 //! YSB Ad Event.
 
 use crate::datasource::epoch::Epoch;
-use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
+use datafusion::arrow::datatypes::{DataType, Field, Schema, TimeUnit};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

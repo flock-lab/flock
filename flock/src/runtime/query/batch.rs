@@ -21,7 +21,7 @@
 
 use crate::datasource::DataSource;
 use crate::runtime::query::Query;
-use arrow::datatypes::SchemaRef;
+use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::physical_plan::ExecutionPlan;
 use std::any::Any;
 use std::sync::Arc;

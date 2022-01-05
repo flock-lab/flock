@@ -16,8 +16,8 @@
 
 use aws_lambda_events::event::kinesis::KinesisEvent;
 
-use arrow::json::{self, reader::infer_json_schema};
-use arrow::record_batch::RecordBatch;
+use datafusion::arrow::json::{self, reader::infer_json_schema};
+use datafusion::arrow::record_batch::RecordBatch;
 
 use crate::prelude::*;
 use rayon::prelude::*;

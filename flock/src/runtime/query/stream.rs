@@ -29,7 +29,7 @@
 
 use super::Query;
 use crate::datasource::DataSource;
-use arrow::datatypes::SchemaRef;
+use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::physical_plan::ExecutionPlan;
 use serde::{Deserialize, Serialize};
 use std::any::Any;

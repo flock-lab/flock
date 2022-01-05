@@ -17,8 +17,8 @@
 use crate::datasink::DataSinkType;
 use crate::encoding::Encoding;
 use crate::error::{FlockError, Result};
-use arrow::datatypes::{Schema, SchemaRef};
-use arrow::record_batch::RecordBatch;
+use datafusion::arrow::datatypes::{Schema, SchemaRef};
+use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::ExecutionPlan;
@@ -362,10 +362,10 @@ mod tests {
     use super::*;
     use crate::datasource::kinesis;
     use crate::error::Result;
-    use arrow::array::*;
-    use arrow::datatypes::{DataType, Field, Schema};
-    use arrow::record_batch::RecordBatch;
     use aws_lambda_events::event::kinesis::KinesisEvent;
+    use datafusion::arrow::array::*;
+    use datafusion::arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::arrow::record_batch::RecordBatch;
     use datafusion::datasource::MemTable;
     use datafusion::physical_plan::collect;
 

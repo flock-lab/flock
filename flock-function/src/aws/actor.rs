@@ -11,8 +11,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use arrow::csv::reader::ReaderBuilder;
-use arrow::record_batch::RecordBatch;
+use datafusion::arrow::csv::reader::ReaderBuilder;
+use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::physical_plan::Partitioning::RoundRobinBatch;
 use flock::prelude::*;
 use futures::executor::block_on;
