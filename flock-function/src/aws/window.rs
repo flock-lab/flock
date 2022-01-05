@@ -12,9 +12,11 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use crate::actor::*;
-use arrow::array::{Int32Array, TimestampMillisecondArray, TimestampNanosecondArray, UInt64Array};
-use arrow::record_batch::RecordBatch;
 use chrono::{DateTime, NaiveDateTime, Utc};
+use datafusion::arrow::array::{
+    Int32Array, TimestampMillisecondArray, TimestampNanosecondArray, UInt64Array,
+};
+use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::datasource::MemTable;
 use datafusion::execution::context::ExecutionContext as DataFusionExecutionContext;
 use datafusion::logical_plan::{col, count_distinct};

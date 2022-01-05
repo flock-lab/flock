@@ -19,7 +19,7 @@ use self::nexmark::NEXMarkSource;
 use self::ysb::YSBSource;
 use crate::error::Result;
 use crate::runtime::payload::{Payload, Uuid};
-use arrow::record_batch::RecordBatch;
+use datafusion::arrow::record_batch::RecordBatch;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 

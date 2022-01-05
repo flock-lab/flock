@@ -25,8 +25,8 @@ use crate::error::Result;
 use crate::runtime::payload::{Payload, Uuid};
 use crate::runtime::query::{Schedule, StreamWindow};
 use crate::transmute::*;
-use arrow::datatypes::SchemaRef;
-use arrow::record_batch::RecordBatch;
+use datafusion::arrow::datatypes::SchemaRef;
+use datafusion::arrow::record_batch::RecordBatch;
 use lazy_static::lazy_static;
 use log::info;
 use serde::{Deserialize, Serialize};
@@ -340,6 +340,7 @@ impl YSBSource {
 mod test {
     use super::*;
     use crate::datasource::ysb::event::AdEvent;
+    use datafusion::arrow::util::pretty::pretty_format_batches;
 
     #[test]
     fn test_gen_ysb_data() -> Result<()> {
@@ -396,8 +397,7 @@ mod test {
             ad_event_schema,
             *FLOCK_SYNC_GRANULE_SIZE,
         );
-        let formatted = arrow::util::pretty::pretty_format_batches(&batches).unwrap();
-        println!("{}", formatted);
+        println!("{}", pretty_format_batches(&batches)?);
 
         Ok(())
     }

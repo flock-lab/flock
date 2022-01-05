@@ -18,7 +18,7 @@ extern crate daggy;
 use daggy::{Dag, NodeIndex, Walker};
 
 use crate::error::{FlockError, Result};
-use arrow::datatypes::Schema;
+use datafusion::arrow::datatypes::Schema;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::ExecutionPlan;
 use serde_json::Value;
@@ -279,10 +279,10 @@ mod tests {
     extern crate daggy;
     use daggy::NodeIndex;
 
-    use arrow::array::*;
-    use arrow::datatypes::{DataType, Field, Schema};
-    use arrow::record_batch::RecordBatch;
     use aws_lambda_events::event::kinesis::KinesisEvent;
+    use datafusion::arrow::array::*;
+    use datafusion::arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::arrow::record_batch::RecordBatch;
 
     use datafusion::datasource::MemTable;
     use datafusion::execution::context::ExecutionContext;

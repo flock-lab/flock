@@ -22,9 +22,9 @@ use crate::datasource::DataSource;
 use crate::driver::deploy::ExecutionEnvironment;
 use crate::driver::funcgen::dag::*;
 use crate::prelude::*;
-use arrow::datatypes::SchemaRef;
 use blake2::{Blake2b, Digest};
 use chrono::{DateTime, Utc};
+use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::physical_plan::ExecutionPlan;
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
@@ -177,9 +177,9 @@ mod tests {
     use super::*;
     use std::sync::Arc;
 
-    use arrow::array::*;
-    use arrow::datatypes::{DataType, Field, Schema};
-    use arrow::record_batch::RecordBatch;
+    use datafusion::arrow::array::*;
+    use datafusion::arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::arrow::record_batch::RecordBatch;
 
     use datafusion::datasource::MemTable;
     use datafusion::execution::context::ExecutionContext;

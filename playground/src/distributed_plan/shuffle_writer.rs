@@ -106,7 +106,7 @@ impl ShuffleWriterExec {
             Some(Partitioning::Hash(exprs, n)) => {
                 let num_output_partitions = *n;
                 let hashes_buf = &mut vec![];
-                let random_state = ahash::RandomState::with_seeds(0, 0, 0, 0);
+                let random_state = datafusion::ahash::RandomState::with_seeds(0, 0, 0, 0);
 
                 while let Some(result) = stream.next().await {
                     let input_batch = result?;
@@ -234,6 +234,7 @@ mod tests {
     use super::*;
     use datafusion::arrow::array::{StringArray, UInt32Array};
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::arrow::util::pretty::pretty_format_batches;
     use datafusion::physical_plan::coalesce_partitions::CoalescePartitionsExec;
     use datafusion::physical_plan::expressions::Column;
     use datafusion::physical_plan::memory::MemoryExec;
@@ -299,10 +300,8 @@ mod tests {
         assert_eq!(2, batch.num_columns());
         assert_eq!(2, batch.num_rows());
 
-        println!(
-            "{}",
-            datafusion::arrow::util::pretty::pretty_format_batches(&batches).unwrap()
-        );
+        println!("{}", pretty_format_batches(&batches)?);
+
         Ok(())
     }
 

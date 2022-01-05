@@ -102,9 +102,9 @@ impl Encoding {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arrow::array::*;
-    use arrow::datatypes::{DataType, Field, Schema};
-    use arrow::record_batch::RecordBatch;
+    use datafusion::arrow::array::*;
+    use datafusion::arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::arrow::record_batch::RecordBatch;
 
     use datafusion::datasource::MemTable;
     use datafusion::execution::context::ExecutionContext;

@@ -19,11 +19,11 @@
 
 use aws_lambda_events::event::kafka::KafkaEvent;
 
-use arrow::json::{self, reader::infer_json_schema};
-use arrow::record_batch::RecordBatch;
+use datafusion::arrow::json::{self, reader::infer_json_schema};
+use datafusion::arrow::record_batch::RecordBatch;
 
 use crate::prelude::*;
-use arrow::datatypes::Schema;
+use datafusion::arrow::datatypes::Schema;
 use rayon::prelude::*;
 use rusoto_lambda::CreateEventSourceMappingRequest;
 use serde::{Deserialize, Serialize};
@@ -134,7 +134,7 @@ pub fn to_batch(event: KafkaEvent) -> Vec<RecordBatch> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use arrow::util::pretty;
+    use datafusion::arrow::util::pretty;
 
     #[test]
     #[ignore]

@@ -231,8 +231,8 @@ where
 mod tests {
     use super::*;
     use crate::error::Result;
-    use arrow::datatypes::{DataType, Field, Schema};
-    use arrow::json;
+    use datafusion::arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::arrow::json;
     use std::io::BufReader;
     use std::sync::Arc;
 

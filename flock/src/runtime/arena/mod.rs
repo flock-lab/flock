@@ -17,10 +17,10 @@
 
 use crate::error::{FlockError, Result};
 use crate::runtime::payload::{Payload, Uuid};
-use arrow::datatypes::SchemaRef;
-use arrow::record_batch::RecordBatch;
 use bitmap::Bitmap;
 use dashmap::DashMap;
+use datafusion::arrow::datatypes::SchemaRef;
+use datafusion::arrow::record_batch::RecordBatch;
 use std::ops::{Deref, DerefMut};
 
 /// `DashMap` is a thread-safe hash map inside the lambda function that is used
@@ -146,8 +146,8 @@ mod tests {
     use crate::error::Result;
     use crate::runtime::payload::UuidBuilder;
     use crate::transmute::to_payload;
-    use arrow::csv;
-    use arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::arrow::csv;
+    use datafusion::arrow::datatypes::{DataType, Field, Schema};
 
     fn init_batches() -> Vec<RecordBatch> {
         let schema = Schema::new(vec![

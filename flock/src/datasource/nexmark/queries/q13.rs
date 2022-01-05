@@ -23,8 +23,8 @@ mod tests {
     use crate::runtime::executor::plan::physical_plan;
     use crate::runtime::query::StreamWindow;
     use crate::transmute::event_bytes_to_batch;
-    use arrow::datatypes::{DataType, Field, Schema};
-    use arrow::util::pretty::pretty_format_batches;
+    use datafusion::arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::arrow::util::pretty::pretty_format_batches;
     use datafusion::datasource::MemTable;
     use datafusion::execution::context::ExecutionContext as DataFusionExecutionContext;
     use datafusion::physical_plan::collect;

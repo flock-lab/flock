@@ -16,7 +16,7 @@
 use std::collections::BTreeMap;
 use std::{env, error::Error, path::PathBuf, sync::Arc};
 
-use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
+use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 
 /// Compares formatted output of a record batch with an expected
 /// vector of strings, with the result of pretty formatting record
@@ -33,7 +33,7 @@ macro_rules! assert_batches_eq {
     ($EXPECTED_LINES: expr, $CHUNKS: expr) => {
         let expected_lines: Vec<String> = $EXPECTED_LINES.iter().map(|&s| s.into()).collect();
 
-        let formatted = arrow::util::pretty::pretty_format_batches($CHUNKS)
+        let formatted = datafusion::arrow::util::pretty::pretty_format_batches($CHUNKS)
             .unwrap()
             .to_string();
 
@@ -68,7 +68,7 @@ macro_rules! assert_batches_sorted_eq {
             expected_lines.as_mut_slice()[2..num_lines - 1].sort_unstable()
         }
 
-        let formatted = arrow::util::pretty::pretty_format_batches($CHUNKS)
+        let formatted = datafusion::arrow::util::pretty::pretty_format_batches($CHUNKS)
             .unwrap()
             .to_string();
         // fix for windows: \r\n -->

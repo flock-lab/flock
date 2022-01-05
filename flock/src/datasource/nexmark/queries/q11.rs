@@ -23,10 +23,10 @@ mod tests {
     use crate::runtime::executor::plan::physical_plan;
     use crate::runtime::query::{Schedule, StreamWindow};
     use crate::transmute::*;
-    use arrow::array::{Int32Array, TimestampMillisecondArray, UInt64Array};
-    use arrow::record_batch::RecordBatch;
-    use arrow::util::pretty::pretty_format_batches;
     use chrono::{DateTime, NaiveDateTime, Utc};
+    use datafusion::arrow::array::{Int32Array, TimestampMillisecondArray, UInt64Array};
+    use datafusion::arrow::record_batch::RecordBatch;
+    use datafusion::arrow::util::pretty::pretty_format_batches;
     use datafusion::datasource::MemTable;
     use datafusion::execution::context::ExecutionContext as DataFusionExecutionContext;
     use datafusion::logical_plan::{col, count_distinct};
