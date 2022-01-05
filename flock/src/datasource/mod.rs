@@ -124,4 +124,5 @@ pub mod epoch;
 pub mod kafka;
 pub mod kinesis;
 pub mod nexmark;
+pub mod tpch;
 pub mod ysb;

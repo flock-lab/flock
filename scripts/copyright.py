@@ -41,11 +41,11 @@ COPYRIGHT_HEADER = None
 
 NEW_LINE_MARK = '\n'
 COPYRIGHT_HEADER = COPYRIGHT.split(NEW_LINE_MARK)[1]
-p = re.search('(\d{4})', COPYRIGHT_HEADER).group(0)
-process = subprocess.Popen(["date", "+%Y"], stdout=subprocess.PIPE)
-date, err = process.communicate()
-date = date.decode("utf-8").rstrip("\n")
-COPYRIGHT_HEADER = COPYRIGHT_HEADER.replace(p, date)
+# p = re.search('(\d{4})', COPYRIGHT_HEADER).group(0)
+# process = subprocess.Popen(["date", "+%Y"], stdout=subprocess.PIPE)
+# date, err = process.communicate()
+# date = date.decode("utf-8").rstrip("\n")
+# COPYRIGHT_HEADER = COPYRIGHT_HEADER.replace(p, date)
 
 
 def generate_copyright(template, lang='go'):
