@@ -13,6 +13,7 @@
 
 //! This is a playground for testing the system design ideas of Flock.
 
+use flock::configs::AwsLambdaConfig;
 use flock::prelude::*;
 use lazy_static::lazy_static;
 use rusoto_core::Region;
@@ -43,7 +44,7 @@ struct PlaygroundOpt {
 }
 
 async fn create_function(func_name: &str) -> Result<String> {
-    let s3_bucket = FLOCK_CONF["flock"]["s3_bucket"].to_string();
+    let s3_bucket = FLOCK_CONF["s3"]["bucket"].to_string();
     if LAMBDA_CLIENT
         .get_function(GetFunctionRequest {
             function_name: String::from(func_name),
@@ -70,17 +71,18 @@ async fn create_function(func_name: &str) -> Result<String> {
             ))),
         }
     } else {
+        let config = AwsLambdaConfig::new();
         match LAMBDA_CLIENT
             .create_function(CreateFunctionRequest {
                 code: FunctionCode {
                     s3_bucket: Some(s3_bucket.clone()),
-                    s3_key: Some(String::from(func_name)),
+                    s3_key: Some(func_name.to_string()),
                     ..Default::default()
                 },
-                function_name: String::from(func_name),
-                handler: DeployConfig::handler(),
-                role: DeployConfig::role().await,
-                runtime: DeployConfig::runtime(),
+                function_name: func_name.to_string(),
+                handler: config.handler,
+                role: config.role,
+                runtime: config.runtime,
                 ..Default::default()
             })
             .await

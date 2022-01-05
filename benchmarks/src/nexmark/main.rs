@@ -43,8 +43,8 @@ static SIDE_INPUT_DOWNLOAD_URL: &str = concat!(
 );
 
 lazy_static! {
-    pub static ref FLOCK_S3_KEY: String = FLOCK_CONF["flock"]["s3_key"].to_string();
-    pub static ref FLOCK_S3_BUCKET: String = FLOCK_CONF["flock"]["s3_bucket"].to_string();
+    pub static ref FLOCK_S3_KEY: String = FLOCK_CONF["s3"]["key"].to_string();
+    pub static ref FLOCK_S3_BUCKET: String = FLOCK_CONF["s3"]["bucket"].to_string();
     pub static ref FLOCK_S3_CLIENT: S3Client = S3Client::new(Region::default());
 
     pub static ref FLOCK_EMPTY_PLAN: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(false, Arc::new(Schema::empty())));
@@ -237,13 +237,13 @@ pub async fn create_nexmark_functions(
         "Creating lambda function: {}",
         rainbow_string(NEXMARK_SOURCE_FUNC_NAME.clone())
     );
-    create_lambda_function(&nexmark_source_ctx, Some(2048 /* MB */)).await?;
+    create_lambda_function(&nexmark_source_ctx, 2048 /* MB */).await?;
 
     // Create the function for the nexmark worker.
     match next_func_name.clone() {
         CloudFunction::Lambda(name) => {
             info!("Creating lambda function: {}", rainbow_string(name));
-            create_lambda_function(&nexmark_worker_ctx, Some(opt.memory_size)).await?;
+            create_lambda_function(&nexmark_worker_ctx, opt.memory_size).await?;
         }
         CloudFunction::Group((name, concurrency)) => {
             info!(
@@ -263,7 +263,7 @@ pub async fn create_nexmark_functions(
                             "Creating function member: {}",
                             rainbow_string(&worker_ctx.name)
                         );
-                        create_lambda_function(&worker_ctx, Some(memory_size)).await?;
+                        create_lambda_function(&worker_ctx, memory_size).await?;
                         set_lambda_concurrency(worker_ctx.name, 1).await
                     })
                 })

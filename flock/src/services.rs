@@ -14,14 +14,14 @@
 //! This module contains various utility functions.
 
 use crate::config::FLOCK_CONF;
-use crate::driver::deploy::config as DeployConfig;
-use crate::driver::logwatch::tail::{self, fetch_logs, AWSResponse};
+use crate::configs::AwsLambdaConfig;
+use crate::driver::monitor::cloudwatch::{self, fetch_logs, AWSResponse};
 use crate::error::{FlockError, Result};
 use crate::runtime::context::ExecutionContext;
 use bytes::Bytes;
 use humantime::parse_duration;
 use lazy_static::lazy_static;
-use log::info;
+use log::{debug, info, warn};
 use rusoto_core::{ByteStream, Region, RusotoError};
 use rusoto_efs::{
     CreateAccessPointError, CreateAccessPointRequest, CreateFileSystemError,
@@ -30,14 +30,16 @@ use rusoto_efs::{
     RootDirectory,
 };
 use rusoto_lambda::{
-    CreateFunctionRequest, FunctionCode, GetFunctionRequest, InvocationRequest, InvocationResponse,
-    Lambda, LambdaClient, PutFunctionConcurrencyRequest, UpdateFunctionCodeRequest,
+    CreateFunctionRequest, FunctionConfiguration, GetFunctionRequest, InvocationRequest,
+    InvocationResponse, Lambda, LambdaClient, PutFunctionConcurrencyRequest,
+    UpdateFunctionCodeRequest,
 };
 use rusoto_logs::CloudWatchLogsClient;
 use rusoto_s3::{ListObjectsV2Request, PutObjectRequest, S3Client, S3};
 use rusoto_sqs::SqsClient;
-use std::path::Path;
+use std::sync::Arc;
 use std::time::Duration;
+use tokio::task::JoinHandle;
 
 lazy_static! {
     /// AWS Lambda function async invocation.
@@ -55,15 +57,15 @@ lazy_static! {
     pub static ref FLOCK_ASYNC_GRANULE_SIZE: usize = FLOCK_CONF["lambda"]["async_granule"].parse::<usize>().unwrap();
 
     /// Flock S3 key prefix.
-    pub static ref FLOCK_S3_KEY: String = FLOCK_CONF["flock"]["s3_key"].to_string();
+    pub static ref FLOCK_S3_KEY: String = FLOCK_CONF["s3"]["key"].to_string();
     /// Flock S3 bucket name.
-    pub static ref FLOCK_S3_BUCKET: String = FLOCK_CONF["flock"]["s3_bucket"].to_string();
+    pub static ref FLOCK_S3_BUCKET: String = FLOCK_CONF["s3"]["bucket"].to_string();
     /// Flock availablity zone.
-    pub static ref FLOCK_AVAILABILITY_ZONE: String = FLOCK_CONF["flock"]["availability_zone"].to_string();
+    pub static ref FLOCK_AVAILABILITY_ZONE: String = FLOCK_CONF["aws"]["availability_zone"].to_string();
     /// Flock subnet id.
-    pub static ref FLOCK_SUBNET_ID: String = FLOCK_CONF["flock"]["subnet_id"].to_string();
+    pub static ref FLOCK_SUBNET_ID: String = FLOCK_CONF["aws"]["subnet_id"].to_string();
     /// Flock security group id.
-    pub static ref FLOCK_SECURITY_GROUP_ID: String = FLOCK_CONF["flock"]["security_group_id"].to_string();
+    pub static ref FLOCK_SECURITY_GROUP_ID: String = FLOCK_CONF["aws"]["security_group_id"].to_string();
 
     /// Flock EFS creation token.
     pub static ref FLOCK_EFS_CREATION_TOKEN: String = FLOCK_CONF["efs"]["creation_token"].to_string();
@@ -112,7 +114,7 @@ pub async fn fetch_aws_watchlogs(group: &str, mtime: std::time::Duration) -> Res
     let timeout = parse_duration("1min").unwrap();
     let sleep_for = parse_duration("5s").ok();
     let mut token: Option<String> = None;
-    let mut req = tail::create_filter_request(group, mtime, None, token);
+    let mut req = cloudwatch::create_filter_request(group, mtime, None, token);
     loop {
         if logged {
             break;
@@ -126,13 +128,13 @@ pub async fn fetch_aws_watchlogs(group: &str, mtime: std::time::Duration) -> Res
                 info!("Got a Token response");
                 logged = true;
                 token = Some(x);
-                req = tail::create_filter_request(group, mtime, None, token);
+                req = cloudwatch::create_filter_request(group, mtime, None, token);
             }
             AWSResponse::LastLog(t) => match sleep_for {
                 Some(x) => {
                     info!("Got a lastlog response");
                     token = None;
-                    req = tail::create_filter_from_timestamp(group, t, None, token);
+                    req = cloudwatch::create_filter_from_timestamp(group, t, None, token);
                     info!("Waiting {:?} before requesting logs again...", x);
                     tokio::time::sleep(x).await;
                 }
@@ -208,11 +210,58 @@ pub async fn invoke_lambda_function(
     }
 }
 
+/// Creates AWS Lambda functions for the specified job.
+///
+/// # Arguments
+/// * `config` - The configuration for the AWS Lambda functions.
+///
+/// # Returns
+/// The created AWS Lambda functions' configurations.
+pub async fn create_lambda_functions(
+    config: Arc<AwsLambdaConfig>,
+) -> Result<Vec<FunctionConfiguration>> {
+    if config.function_names.is_none() {
+        warn!("Creating AWS Lambda functions without function names.");
+    }
+
+    let lambda_client = Arc::new(LambdaClient::new(Region::default()));
+    let function_names = config.function_names.clone().unwrap_or_default();
+
+    let tasks = function_names
+        .into_iter()
+        .map(|name| {
+            let client = lambda_client.clone();
+            let conf = Arc::try_unwrap(config.clone()).unwrap();
+            tokio::spawn(async move {
+                debug!("Creating AWS Lambda function: {}", name);
+                client
+                    .create_function(CreateFunctionRequest {
+                        function_name: name,
+                        code: conf.code,
+                        handler: conf.handler,
+                        runtime: conf.runtime,
+                        role: conf.role,
+                        vpc_config: conf.vpc_config,
+                        environment: conf.environment,
+                        timeout: conf.timeout,
+                        memory_size: conf.memory_size,
+                        ..Default::default()
+                    })
+                    .await
+                    .map_err(|e| FlockError::AWS(e.to_string()))
+            })
+        })
+        .collect::<Vec<JoinHandle<Result<FunctionConfiguration>>>>();
+
+    Ok(futures::future::join_all(tasks)
+        .await
+        .into_iter()
+        .map(|x| x.unwrap().unwrap())
+        .collect())
+}
+
 /// Creates a single lambda function using bootstrap.zip in Amazon S3.
-pub async fn create_lambda_function(
-    ctx: &ExecutionContext,
-    memory_size: Option<i64>,
-) -> Result<String> {
+pub async fn create_lambda_function(ctx: &ExecutionContext, memory_size: i64) -> Result<String> {
     let func_name = ctx.name.clone();
     if FLOCK_LAMBDA_CLIENT
         .get_function(GetFunctionRequest {
@@ -230,40 +279,18 @@ pub async fn create_lambda_function(
                 ..Default::default()
             })
             .await
-            .map_err(|e| FlockError::Internal(e.to_string()))?;
+            .map_err(|e| FlockError::AWS(e.to_string()))?;
         conf.function_name
-            .ok_or_else(|| FlockError::Internal("No function name!".to_string()))
+            .ok_or_else(|| FlockError::AWS("No function name!".to_string()))
     } else {
-        let _mount_path = Path::new(&*FLOCK_EFS_MOUNT_PATH);
-        let conf = FLOCK_LAMBDA_CLIENT
-            .create_function(CreateFunctionRequest {
-                code: FunctionCode {
-                    s3_bucket: Some(FLOCK_S3_BUCKET.clone()),
-                    s3_key: Some(FLOCK_S3_KEY.clone()),
-                    ..Default::default()
-                },
-                function_name: func_name.clone(),
-                handler: DeployConfig::handler(),
-                role: DeployConfig::role().await,
-                runtime: DeployConfig::runtime(),
-                memory_size,
-                environment: DeployConfig::environment(ctx),
-                timeout: Some(*FLOCK_LAMBDA_TIMEOUT),
-                // FIXME: Disable mount EFS
-                // file_system_configs: Some(vec![FileSystemConfig {
-                //     arn:              efs,
-                //     local_mount_path: mount_path.to_str().unwrap().to_string(),
-                // }]),
-                // vpc_config: Some(VpcConfig {
-                //     subnet_ids:         Some(vec![FLOCK_SUBNET_ID.clone()]),
-                //     security_group_ids: Some(vec![FLOCK_SECURITY_GROUP_ID.clone()]),
-                // }),
-                ..Default::default()
-            })
-            .await
-            .map_err(|e| FlockError::Internal(e.to_string()))?;
-        conf.function_name
-            .ok_or_else(|| FlockError::Internal("No function name!".to_string()))
+        let mut configs = AwsLambdaConfig::new();
+        configs.set_memory_size(memory_size);
+        configs.set_function_spec(ctx);
+        let resp: Vec<FunctionConfiguration> = create_lambda_functions(Arc::new(configs)).await?;
+        resp[0]
+            .function_name
+            .clone()
+            .ok_or_else(|| FlockError::AWS("No function name!".to_string()))
     }
 }
 

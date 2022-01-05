@@ -1,12 +1,27 @@
 [flock]
 
 discription = "Flock: A Practical Serverless Streaming SQL Query Engine"
+
 license = "Copyright (c) 2020-present, UMD Database Group. The library, examples, and all source code are released AGPL-3.0 License."
+
 production = false
 
-# Default s3 address to store the generic function code
-s3_bucket = "flock-lab"
-s3_key = "flock"
+# S3 configuration
+[s3]
+# S3 bucket name to store the generic functions
+bucket = "flock-lab"
+
+# S3 key prefix to store the generic function code
+key = "flock"
+
+# AWS configuration
+[aws]
+
+# Amazon Linux 2
+runtime = "provided.al2"
+
+# The Amazon Resource Name (ARN) of the function's execution role.
+role = "flock"
 
 # Availability zone
 availability_zone = "us-east-1a"
@@ -17,9 +32,11 @@ subnet_id = "subnet-c4cc0f9b"
 # Security group ID
 security_group_id = "sg-00e4f30f882ad9150"
 
+# Lambda configuration
 [lambda]
 
-environment = "execution_context"
+# Environment context name (key) in the function payload's hashmap
+environment = "flock_context"
 
 # Default target batch size (16 KB)
 target_batch_size = 16384
@@ -44,6 +61,12 @@ max_invoke_retries = 10
 # Timeout for the function
 timeout = "300"
 
+# Memory size for the different purposes of the function.
+regular_memory_size = "512"
+offline_aggreate_memory_size = "10240"
+realtime_aggreate_memory_size = "2480"
+
+# EFS configuration
 [efs]
 
 # A string of up to 64 ASCII characters that Amazon EFS uses to ensure idempotent creation.
@@ -62,6 +85,7 @@ user_id = 1000
 # The access point permissions for the root directory.
 permissions = "0777"
 
+# Nexmark configuration
 [nexmark]
 
 q13_s3_side_input_key = "nexmark_q13_side_input"
@@ -69,6 +93,7 @@ q4_s3_key = "nexmark_q4_plan"
 q6_s3_key = "nexmark_q6_plan"
 s3_key = "nexmark"
 
+# YSB configuration
 [ysb]
 
 s3_key = "ysb"

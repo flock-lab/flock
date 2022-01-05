@@ -25,7 +25,6 @@ pub use crate::config;
 pub use crate::config::FLOCK_CONF;
 pub use crate::datasink::{DataSink, DataSinkFormat, DataSinkType};
 pub use crate::datasource::{nexmark, tpch, ysb, DataSource, DataStream, RelationPartitions};
-pub use crate::driver::deploy::config as DeployConfig;
 pub use crate::encoding::Encoding;
 pub use crate::error::{FlockError, Result};
 pub use crate::runtime::arena::{Arena, WindowSession};

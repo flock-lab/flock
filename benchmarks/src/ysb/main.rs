@@ -31,8 +31,8 @@ use ysb::event::{AdEvent, Campaign};
 use ysb::YSBSource;
 
 lazy_static! {
-    static ref FLOCK_S3_KEY: String = FLOCK_CONF["flock"]["s3_key"].to_string();
-    static ref FLOCK_S3_BUCKET: String = FLOCK_CONF["flock"]["s3_bucket"].to_string();
+    static ref FLOCK_S3_KEY: String = FLOCK_CONF["s3"]["key"].to_string();
+    static ref FLOCK_S3_BUCKET: String = FLOCK_CONF["s3"]["bucket"].to_string();
 
     static ref FLOCK_EMPTY_PLAN: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(false, Arc::new(Schema::empty())));
     static ref FLOCK_CONCURRENCY: usize = FLOCK_CONF["lambda"]["concurrency"].parse::<usize>().unwrap();
@@ -129,7 +129,7 @@ async fn create_ysb_functions(
 
     // Create the function for the ysb source generator.
     info!("Creating lambda function: {}", YSB_SOURCE_FUNC_NAME.clone());
-    create_lambda_function(&ysb_source_ctx, Some(1024)).await?;
+    create_lambda_function(&ysb_source_ctx, 1024).await?;
 
     // Create the function for the ysb worker.
     match next_func_name.clone() {
@@ -145,7 +145,7 @@ async fn create_ysb_functions(
                     tokio::spawn(async move {
                         worker_ctx.name = format!("{}-{:02}", group_name, i);
                         info!("Creating function member: {}", worker_ctx.name);
-                        create_lambda_function(&worker_ctx, Some(memory_size)).await?;
+                        create_lambda_function(&worker_ctx, memory_size).await?;
                         set_lambda_concurrency(worker_ctx.name, 1).await
                     })
                 })
