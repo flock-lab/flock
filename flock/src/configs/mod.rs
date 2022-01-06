@@ -17,4 +17,4 @@ pub mod aws_lambda;
 pub use aws_lambda::AwsLambdaConfig;
 
 mod flock;
-pub use flock::FLOCK_CONF;
+pub use self::flock::FLOCK_CONF;
