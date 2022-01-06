@@ -9,9 +9,9 @@
 
 The generic lambda function code is built in advance and uploaded to AWS S3.
 
-|  Service  | Cloud Platform | S3 Bucket | S3 Key |        S3 URL        | [YSB Bench](https://github.com/yahoo/streaming-benchmarks) | [NEXMark Bench](https://beam.apache.org/documentation/sdks/java/testing/nexmark/) |
+|  Service  | Cloud Platform | S3 Bucket | S3 Key |        Hardware      | [YSB Bench](https://github.com/yahoo/streaming-benchmarks) | [NEXMark Bench](https://beam.apache.org/documentation/sdks/java/testing/nexmark/) |
 | :-------: | :------------: | :-------: | :----: | :------------------: | :--------------------------------------------------------: | :-------------------------------------------------------------------------------: |
-| **Flock** |   AWS Lambda   | flock-lab | flock  | s3://flock-lab/flock |                             ✅                             |                                        ✅                                         |
+| **Flock** |   AWS Lambda   | flock-lab | flock  |        Arm, x86      |                             ✅                             |                                        ✅                                          |
 
 ## Build From Source Code
 
