@@ -21,8 +21,7 @@
 //! use flock::prelude::*;
 //! ```
 
-pub use crate::config;
-pub use crate::config::FLOCK_CONF;
+pub use crate::configs::{AwsLambdaConfig, FLOCK_CONF};
 pub use crate::datasink::{DataSink, DataSinkFormat, DataSinkType};
 pub use crate::datasource::{nexmark, tpch, ysb, DataSource, DataStream, RelationPartitions};
 pub use crate::encoding::Encoding;

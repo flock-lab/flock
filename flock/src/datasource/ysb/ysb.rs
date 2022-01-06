@@ -13,7 +13,7 @@
 
 //! Yahoo Streaming Benchmark Suite.
 
-use crate::config::FLOCK_CONF;
+use crate::configs::FLOCK_CONF;
 use crate::datasource::config::Config;
 use crate::datasource::epoch::Epoch;
 use crate::datasource::ysb::event::{AdEvent, Campaign};

@@ -13,7 +13,7 @@
 
 //! Nexmark benchmark suite
 
-use crate::config::FLOCK_CONF;
+use crate::configs::FLOCK_CONF;
 use crate::datasource::config::Config;
 use crate::datasource::epoch::Epoch;
 use crate::datasource::nexmark::event::{Auction, Bid, Person};

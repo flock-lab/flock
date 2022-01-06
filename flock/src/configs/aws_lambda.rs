@@ -13,7 +13,7 @@
 
 //! Helper functions to create a Lambda function.
 
-use crate::config::FLOCK_CONF;
+use crate::configs::FLOCK_CONF;
 use crate::encoding::Encoding;
 use crate::error::{FlockError, Result};
 use crate::runtime::context::ExecutionContext;

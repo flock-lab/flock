@@ -23,7 +23,7 @@
 //! work on other cloud functions that then together execute the query in a
 //! distributed dataflow model.
 
-use crate::config::FLOCK_CONF;
+use crate::configs::FLOCK_CONF;
 use crate::encoding::Encoding;
 use crate::error::{FlockError, Result};
 use crate::runtime::context::CloudFunction;

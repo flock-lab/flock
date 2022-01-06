@@ -13,8 +13,8 @@
 
 //! This module contains various utility functions.
 
-use crate::config::FLOCK_CONF;
 use crate::configs::AwsLambdaConfig;
+use crate::configs::FLOCK_CONF;
 use crate::driver::monitor::cloudwatch::{self, fetch_logs, AWSResponse};
 use crate::error::{FlockError, Result};
 use crate::runtime::context::ExecutionContext;

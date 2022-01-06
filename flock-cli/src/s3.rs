@@ -27,7 +27,7 @@ use std::path::Path;
 
 lazy_static! {
     /// Global settings.
-    pub static ref FLOCK_CONF: Ini = Ini::load_from_str(include_str!("../../flock/src/config.toml")).unwrap();
+    pub static ref FLOCK_CONF: Ini = Ini::load_from_str(include_str!("../../flock/src/configs/flock.toml")).unwrap();
     pub static ref FLOCK_S3_BUCKET: String = FLOCK_CONF["s3"]["bucket"].to_string();
 }
 
