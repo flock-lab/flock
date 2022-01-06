@@ -63,7 +63,7 @@ Build_and_Deploy() {
   echo
   echo $(echogreen "[1] Compiling Flock Lambda Function...")
   cd flock-function
-  cargo +nightly build --target x86_64-unknown-linux-gnu --release --features "arrow/simd datafusion/simd mimalloc"
+  cargo +nightly build --target x86_64-unknown-linux-gnu --release --features "datafusion/simd mimalloc"
   echo
   echo $(echogreen "[2] Compiling Flock CLI...")
   cd ../flock-cli

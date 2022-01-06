@@ -13,7 +13,7 @@
 
 //! Common unit test utility methods
 
-use crate::config::FLOCK_CONF;
+use crate::configs::FLOCK_CONF;
 use crate::datasource::DataSource;
 use crate::driver::QueryFlow;
 use crate::encoding::Encoding;

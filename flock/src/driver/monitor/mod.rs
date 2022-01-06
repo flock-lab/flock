@@ -13,3 +13,5 @@
 
 //! This crates monitors the status of cloud resources requested by each
 //! continous query.
+
+pub mod cloudwatch;

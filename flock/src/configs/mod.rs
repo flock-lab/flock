@@ -11,7 +11,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-//! This crate collects execution logs and helps users analyze lambda functions
-//! for further adaptive query optimization.
+//! This module provides various default configurations for Flock.
 
-pub mod tail;
+pub mod aws_lambda;
+pub use aws_lambda::AwsLambdaConfig;
+
+mod flock;
+pub use self::flock::FLOCK_CONF;

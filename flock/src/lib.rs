@@ -26,7 +26,7 @@
 
 //! [Flock](https://github.com/flock-lab/flock) is a cloud-native, distributed, fault-tolerant, and highly-available streaming query engine that supports SQL on cloud function services.
 
-pub mod config;
+pub mod configs;
 pub mod datasink;
 pub mod datasource;
 pub mod driver;

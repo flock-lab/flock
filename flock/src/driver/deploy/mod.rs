@@ -16,11 +16,7 @@
 
 use crate::driver::funcgen::function::QueryFlow;
 use crate::error::{FlockError, Result};
-
-use rusoto_core::Region;
-use rusoto_lambda::{CreateFunctionRequest, Lambda, LambdaClient};
-
-pub mod config;
+use crate::services::create_lambda_function;
 
 /// Query Execution Context decides to execute your queries either remotely or
 /// locally.
@@ -66,25 +62,8 @@ impl ExecutionEnvironment {
     /// such as Amazon CloudWatch Logs for log streaming and AWS X-Ray for
     /// request tracing.
     async fn lambda_deployment(flow: &QueryFlow) -> Result<()> {
-        let client = &LambdaClient::new(Region::default());
         for (_, ctx) in flow.ctx.iter() {
-            let _: Vec<_> = config::function_name(ctx)
-                .iter()
-                .map(|name| async move {
-                    client
-                        .create_function(CreateFunctionRequest {
-                            code: config::function_code(),
-                            environment: config::environment(ctx),
-                            function_name: name.to_owned(),
-                            handler: config::handler(),
-                            memory_size: config::memory_size(ctx),
-                            role: config::role().await,
-                            runtime: config::runtime(),
-                            ..CreateFunctionRequest::default()
-                        })
-                        .await
-                })
-                .collect();
+            create_lambda_function(ctx, 512).await?;
         }
 
         Ok(())
