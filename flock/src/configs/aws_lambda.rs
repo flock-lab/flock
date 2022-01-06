@@ -16,7 +16,7 @@
 use crate::config::FLOCK_CONF;
 use crate::encoding::Encoding;
 use crate::error::{FlockError, Result};
-use crate::runtime::context::{CloudFunction, ExecutionContext};
+use crate::runtime::context::ExecutionContext;
 use rusoto_core::Region;
 use rusoto_iam::{GetRoleRequest, Iam, IamClient};
 use rusoto_lambda::{Environment, FunctionCode};
@@ -52,14 +52,14 @@ pub struct AwsLambdaConfig {
     ///
     /// For more information about Lambda runtimes, see the AWS Lambda Runtimes:
     /// https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html
-    pub runtime:        Option<String>,
+    pub runtime:       Option<String>,
     /// The AWS Lambda function handler.
     ///
     /// The Lambda function handler is the method in your function code that
     /// processes events. When your function is invoked, Lambda runs the handler
     /// method. When the handler exits or returns a response, it becomes
     /// available to handle another event.
-    pub handler:        Option<String>,
+    pub handler:       Option<String>,
     /// The AWS Lambda function memory size.
     ///
     /// The value of the memory property must be a multiple of 64 MB. This
@@ -95,7 +95,7 @@ pub struct AwsLambdaConfig {
     ///
     /// TODO: The follow-up research work here is to use machine learning to
     /// dynamically optimize the memory size setting of each lambda function.
-    pub memory_size:    Option<i64>,
+    pub memory_size:   Option<i64>,
     /// The AWS Lambda function timeout.
     ///
     /// The value of the timeout property is a maximum function execution time,
@@ -105,7 +105,7 @@ pub struct AwsLambdaConfig {
     /// of your Lambda function. As a best practice, you should set the timeout
     /// value based on your expected execution time to prevent your function
     /// from running longer than intended.
-    pub timeout:        Option<i64>,
+    pub timeout:       Option<i64>,
     /// The AWS Lambda function role.
     ///
     /// A Lambda function's execution role is an AWS Identity and Access
@@ -117,7 +117,7 @@ pub struct AwsLambdaConfig {
     /// has to access AWS resources. The role must be a role that you have
     /// created in your AWS account. For more information, see the AWS Lambda
     /// Roles: https://docs.aws.amazon.com/lambda/latest/dg/lambda-intro-execution-role.html
-    pub role:           String,
+    pub role:          String,
     /// The AWS Lambda function VPC configuration.
     ///
     /// You can configure a Lambda function to connect to private subnets in a
@@ -126,7 +126,7 @@ pub struct AwsLambdaConfig {
     /// such as databases, cache instances, or internal services. Connect your
     /// function to the VPC to access private resources while the function is
     /// running.
-    pub vpc_config:     Option<rusoto_lambda::VpcConfig>,
+    pub vpc_config:    Option<rusoto_lambda::VpcConfig>,
     /// The AWS Lambda function environment variables.
     ///
     /// Lambda invokes your function in an execution environment. The execution
@@ -134,13 +134,13 @@ pub struct AwsLambdaConfig {
     /// manages the resources required to run your function. Lambda re-uses the
     /// execution environment from a previous invocation if one is available, or
     /// it can create a new execution environment.
-    pub environment:    Option<Environment>,
+    pub environment:   Option<Environment>,
     /// The AWS Lambda function code.
     ///
     /// The Lambda service stores your function code in an internal S3 bucket
     /// that's private to your account. Each AWS account is allocated 75 GB of
     /// storage in each Region.
-    pub code:           FunctionCode,
+    pub code:          FunctionCode,
     /// The AWS Lambda function names.
     ///
     /// The function names are unique to each AWS account. If you choose not to
@@ -158,23 +158,12 @@ pub struct AwsLambdaConfig {
     /// The length constraint applies only to the full ARN. If you
     /// specify only the function name, it is limited to 64 characters in
     /// length.
-    ///
-    /// - If the next call is `CloudFunction::Sink`, then the current lambda
-    ///   function's concurrency = 1 and its type is
-    ///   `CloudFunction::Group((name, group_size))`.
-    ///
-    /// - If the next call is `CloudFunction::Group(..)`, then the current
-    ///   lambda function's concurrency > 1 (default = 32) and its type is
-    ///   `CloudFunction::Lambda(name)`.
-    ///
-    /// - If the next call is `CloudFunction::Lambda(..)`, then the current
-    ///   lambda function's concurrency = 1 and its type is
-    ///   `CloudFunction::Group((name, group_size))`.
-    pub function_names: Option<Vec<String>>,
+    pub function_name: String,
 }
 
-impl Default for AwsLambdaConfig {
-    fn default() -> Self {
+impl AwsLambdaConfig {
+    /// Creates a new AWS Lambda function.
+    pub async fn try_new() -> Result<AwsLambdaConfig> {
         let runtime = Some(FLOCK_CONF["aws"]["runtime"].to_string());
         let handler = Some("handler".to_owned());
         let memory_size = Some(
@@ -183,7 +172,7 @@ impl Default for AwsLambdaConfig {
                 .unwrap(),
         );
         let timeout = Some(FLOCK_CONF["lambda"]["timeout"].parse::<i64>().unwrap());
-        let role = AwsLambdaConfig::default_role().unwrap();
+        let role = AwsLambdaConfig::default_role().await?;
         let vpc_config = None;
         let environment = None;
 
@@ -198,9 +187,9 @@ impl Default for AwsLambdaConfig {
             image_uri:         None,
         };
 
-        let function_names = None;
+        let function_name = "".to_string();
 
-        Self {
+        Ok(AwsLambdaConfig {
             runtime,
             handler,
             memory_size,
@@ -209,15 +198,8 @@ impl Default for AwsLambdaConfig {
             vpc_config,
             environment,
             code,
-            function_names,
-        }
-    }
-}
-
-impl AwsLambdaConfig {
-    /// Creates a new AWS Lambda function.
-    pub fn new() -> Self {
-        Self::default()
+            function_name,
+        })
     }
 
     /// Creates a new AWS Lambda function with the specified function name.
@@ -281,28 +263,20 @@ impl AwsLambdaConfig {
             variables: Some(map),
         });
 
-        // Set the function names.
-        let concurrency = FLOCK_CONF["lambda"]["concurrency"].parse::<i64>().unwrap();
-        self.function_names = Some(match &ctx.next {
-            CloudFunction::Sink(_) => (0..concurrency)
-                .map(|idx| format!("{}-{}", ctx.name, idx))
-                .collect(),
-            CloudFunction::Group(..) => vec![ctx.name.to_owned()],
-            CloudFunction::Lambda(..) => (0..concurrency)
-                .map(|idx| format!("{}-{}", ctx.name, idx))
-                .collect(),
-        });
-
+        // Set the function name.
+        self.function_name = ctx.name.clone();
         self
     }
 
     /// Creates a new AWS Lambda function with a default role.
-    fn default_role() -> Result<String> {
+    async fn default_role() -> Result<String> {
         let iam = IamClient::new(Region::default());
-        let resp = futures::executor::block_on(iam.get_role(GetRoleRequest {
-            role_name: FLOCK_CONF["aws"]["role"].to_string(),
-        }))
-        .map_err(|e| FlockError::AWS(e.to_string()))?;
+        let resp = iam
+            .get_role(GetRoleRequest {
+                role_name: FLOCK_CONF["aws"]["role"].to_string(),
+            })
+            .await
+            .map_err(|e| FlockError::AWS(e.to_string()))?;
         Ok(resp.role.arn)
     }
 }

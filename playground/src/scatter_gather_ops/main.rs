@@ -71,7 +71,7 @@ async fn create_function(func_name: &str) -> Result<String> {
             ))),
         }
     } else {
-        let config = AwsLambdaConfig::new();
+        let config = AwsLambdaConfig::try_new().await?;
         match LAMBDA_CLIENT
             .create_function(CreateFunctionRequest {
                 code: FunctionCode {

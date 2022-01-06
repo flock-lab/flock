@@ -21,7 +21,7 @@ use crate::runtime::context::ExecutionContext;
 use bytes::Bytes;
 use humantime::parse_duration;
 use lazy_static::lazy_static;
-use log::{debug, info, warn};
+use log::info;
 use rusoto_core::{ByteStream, Region, RusotoError};
 use rusoto_efs::{
     CreateAccessPointError, CreateAccessPointRequest, CreateFileSystemError,
@@ -30,16 +30,13 @@ use rusoto_efs::{
     RootDirectory,
 };
 use rusoto_lambda::{
-    CreateFunctionRequest, FunctionConfiguration, GetFunctionRequest, InvocationRequest,
-    InvocationResponse, Lambda, LambdaClient, PutFunctionConcurrencyRequest,
-    UpdateFunctionCodeRequest,
+    CreateFunctionRequest, GetFunctionRequest, InvocationRequest, InvocationResponse, Lambda,
+    LambdaClient, PutFunctionConcurrencyRequest, UpdateFunctionCodeRequest,
 };
 use rusoto_logs::CloudWatchLogsClient;
 use rusoto_s3::{ListObjectsV2Request, PutObjectRequest, S3Client, S3};
 use rusoto_sqs::SqsClient;
-use std::sync::Arc;
 use std::time::Duration;
-use tokio::task::JoinHandle;
 
 lazy_static! {
     /// AWS Lambda function async invocation.
@@ -210,56 +207,6 @@ pub async fn invoke_lambda_function(
     }
 }
 
-/// Creates AWS Lambda functions for the specified job.
-///
-/// # Arguments
-/// * `config` - The configuration for the AWS Lambda functions.
-///
-/// # Returns
-/// The created AWS Lambda functions' configurations.
-pub async fn create_lambda_functions(
-    config: Arc<AwsLambdaConfig>,
-) -> Result<Vec<FunctionConfiguration>> {
-    if config.function_names.is_none() {
-        warn!("Creating AWS Lambda functions without function names.");
-    }
-
-    let lambda_client = Arc::new(LambdaClient::new(Region::default()));
-    let function_names = config.function_names.clone().unwrap_or_default();
-
-    let tasks = function_names
-        .into_iter()
-        .map(|name| {
-            let client = lambda_client.clone();
-            let conf = Arc::try_unwrap(config.clone()).unwrap();
-            tokio::spawn(async move {
-                debug!("Creating AWS Lambda function: {}", name);
-                client
-                    .create_function(CreateFunctionRequest {
-                        function_name: name,
-                        code: conf.code,
-                        handler: conf.handler,
-                        runtime: conf.runtime,
-                        role: conf.role,
-                        vpc_config: conf.vpc_config,
-                        environment: conf.environment,
-                        timeout: conf.timeout,
-                        memory_size: conf.memory_size,
-                        ..Default::default()
-                    })
-                    .await
-                    .map_err(|e| FlockError::AWS(e.to_string()))
-            })
-        })
-        .collect::<Vec<JoinHandle<Result<FunctionConfiguration>>>>();
-
-    Ok(futures::future::join_all(tasks)
-        .await
-        .into_iter()
-        .map(|x| x.unwrap().unwrap())
-        .collect())
-}
-
 /// Creates a single lambda function using bootstrap.zip in Amazon S3.
 pub async fn create_lambda_function(ctx: &ExecutionContext, memory_size: i64) -> Result<String> {
     let func_name = ctx.name.clone();
@@ -283,13 +230,26 @@ pub async fn create_lambda_function(ctx: &ExecutionContext, memory_size: i64) ->
         conf.function_name
             .ok_or_else(|| FlockError::AWS("No function name!".to_string()))
     } else {
-        let mut configs = AwsLambdaConfig::new();
-        configs.set_memory_size(memory_size);
-        configs.set_function_spec(ctx);
-        let resp: Vec<FunctionConfiguration> = create_lambda_functions(Arc::new(configs)).await?;
-        resp[0]
-            .function_name
-            .clone()
+        let mut conf = AwsLambdaConfig::try_new().await?;
+        conf.set_memory_size(memory_size);
+        conf.set_function_spec(ctx);
+        let resp = FLOCK_LAMBDA_CLIENT
+            .create_function(CreateFunctionRequest {
+                function_name: conf.function_name,
+                code: conf.code,
+                handler: conf.handler,
+                runtime: conf.runtime,
+                role: conf.role,
+                vpc_config: conf.vpc_config,
+                environment: conf.environment,
+                timeout: conf.timeout,
+                memory_size: conf.memory_size,
+                ..Default::default()
+            })
+            .await
+            .map_err(|e| FlockError::AWS(e.to_string()))?;
+
+        resp.function_name
             .ok_or_else(|| FlockError::AWS("No function name!".to_string()))
     }
 }
