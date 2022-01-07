@@ -63,7 +63,7 @@ impl ExecutionEnvironment {
     /// request tracing.
     async fn lambda_deployment(flow: &QueryFlow) -> Result<()> {
         for (_, ctx) in flow.ctx.iter() {
-            create_lambda_function(ctx, 512).await?;
+            create_lambda_function(ctx, 512, "x86_64").await?;
         }
 
         Ok(())

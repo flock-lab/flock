@@ -21,12 +21,13 @@ Help() {
   # Display Help
   echo $(echogreen "A Benchmark Script for Flock")
   echo
-  echo "Syntax: flock_bench [-g|-h|-c|-r]"
+  echo "Syntax: flock_bench [-g|-h|-c|-r|-a]"
   echo "options:"
   echo "g     Print the GPL license notification."
   echo "h     Print this Help."
   echo "c     Compile and deploy the benchmark."
   echo "r     Run the benchmark."
+  echo "a     Build the benchmark with specific architechture. x86_64 or arm64. Default is x86_64."
   echo
 }
 
@@ -61,21 +62,23 @@ Build_and_Deploy() {
   echo $(echogreen "         Compiling and Deploying Benchmarks                 ")
   echo $(echogreen "============================================================")
   echo
-  echo $(echogreen "[1] Compiling Flock Lambda Function...")
+  echo $(echogreen "Building $arch")
+  echo
+  echo $(echogreen "[1/3]") $(echoblue "Compiling Flock Lambda Function...")
   cd flock-function
-  cargo +nightly build --target x86_64-unknown-linux-gnu --release --features "datafusion/simd mimalloc"
+  cargo +nightly build --target $arch --release --features "simd mimalloc"
   echo
-  echo $(echogreen "[2] Compiling Flock CLI...")
+  echo $(echogreen "[2/3]") $(echoblue "Compiling Flock CLI...")
   cd ../flock-cli
-  cargo +nightly build --target x86_64-unknown-linux-gnu --release
+  cargo +nightly build --target $arch --release
   echo
-  echo $(echogreen "[3] Deploying Flock Lambda Function...")
+  echo $(echogreen "[3/3]") $(echoblue "Deploying Flock Lambda Function...")
   echo
-  cd ../target/x86_64-unknown-linux-gnu/release
+  cd ../target/$arch/release
   ./flock-cli upload -p flock -k flock
   cd ../../..
   echo
-  echo $(echogreen "[OK] Flock Completed Deployment.")
+  echo $(echogreen "============================================================")
   echo
 }
 
@@ -89,18 +92,21 @@ Run() {
   echo
   echo $(echored "[Error] If you want to run the benchmark, please use \"flock-cli [nexmark|ysb] run\".")
   echo
-  echo $(echoblue "$ ./target/x86_64-unknown-linux-gnu/release/flock-cli nexmark run -h")
+  echo $(echoblue "$ ./target/$arch/release/flock-cli nexmark run -h")
   echo
-  ./target/x86_64-unknown-linux-gnu/release/flock-cli nexmark run -h
+  ./target/$arch/release/flock-cli nexmark run -h
   echo
 }
 
 ############################################################
 # Process the input options. Add options as needed.        #
 ############################################################
+arch="x86_64"
+compile=false
+run=false
 
 # Get the options
-while getopts "hgcr" option; do
+while getopts "hgcra:" option; do
   case $option in
   h) # display Help
     Help
@@ -111,12 +117,13 @@ while getopts "hgcr" option; do
     exit
     ;;
   c) # compile and deploy the benchmark
-    Build_and_Deploy
-    exit
+    compile=true
     ;;
   r) # run the benchmark
-    Run
-    exit
+    run=true
+    ;;
+  a) # build the benchmark with specific architechture.
+    arch=$OPTARG
     ;;
   \?) # Invalid option
     echo $(echored "Error: Invalid option")
@@ -126,6 +133,26 @@ while getopts "hgcr" option; do
     ;;
   esac
 done
+
+if [ "$arch" != "x86_64" ] && [ "$arch" != "arm64" ]; then
+  echo $(echored "Error: Invalid architechture. Please use \"flock-bench -a x86_64\" or \"flock-bench -a arm64\".")
+  echo
+  exit
+fi
+
+if [ "$arch" == "x86_64" ]; then
+  arch="x86_64-unknown-linux-gnu"
+elif [ "$arch" == "arm64" ]; then
+  arch="aarch64-unknown-linux-gnu"
+fi
+
+if [ "$compile" = true ]; then
+  Build_and_Deploy
+fi
+
+if [ "$run" = true ]; then
+  Run
+fi
 
 echo
 echo $(echored "Error: incomplete command line arguments, please use '-h' for help.")

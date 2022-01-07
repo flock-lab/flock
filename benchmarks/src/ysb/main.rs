@@ -69,6 +69,10 @@ pub struct YSBBenchmarkOpt {
     /// The worker function's memory size
     #[structopt(short = "m", long = "memory_size", default_value = "128")]
     pub memory_size: i64,
+
+    /// The system architecture to use
+    #[structopt(short = "a", long = "arch", default_value = "x86_64")]
+    pub architecture: String,
 }
 
 #[tokio::main]
@@ -129,7 +133,7 @@ async fn create_ysb_functions(
 
     // Create the function for the ysb source generator.
     info!("Creating lambda function: {}", YSB_SOURCE_FUNC_NAME.clone());
-    create_lambda_function(&ysb_source_ctx, 1024).await?;
+    create_lambda_function(&ysb_source_ctx, 1024, &opt.architecture).await?;
 
     // Create the function for the ysb worker.
     match next_func_name.clone() {
@@ -142,10 +146,11 @@ async fn create_ysb_functions(
                     let mut worker_ctx = ysb_worker_ctx.clone();
                     let group_name = name.clone();
                     let memory_size = opt.memory_size;
+                    let architecture = opt.architecture.clone();
                     tokio::spawn(async move {
                         worker_ctx.name = format!("{}-{:02}", group_name, i);
                         info!("Creating function member: {}", worker_ctx.name);
-                        create_lambda_function(&worker_ctx, memory_size).await?;
+                        create_lambda_function(&worker_ctx, memory_size, &architecture).await?;
                         set_lambda_concurrency(worker_ctx.name, 1).await
                     })
                 })

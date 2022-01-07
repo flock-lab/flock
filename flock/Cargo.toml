@@ -9,6 +9,7 @@ edition = "2021"
 
 [features]
 snmalloc = [ "snmalloc-rs" ]
+simd = [ "datafusion/simd" ]
 
 [dependencies]
 async-trait = "0.1.42"
@@ -41,15 +42,15 @@ rand = { version = "0.8.3", features = [ "small_rng", "std_rng" ] }
 rayon = "1.5"
 regex = { version = "1.4.3", optional = true }
 remove_dir_all = { version = "0.7", optional = true }
-rusoto_core = "0.47.0"
-rusoto_efs = "0.47.0"
-rusoto_iam = "0.47.0"
-rusoto_kafka = "0.47.0"
-rusoto_kinesis = "0.47.0"
-rusoto_lambda = "0.47.0"
-rusoto_logs = "0.47.0"
-rusoto_s3 = "0.47.0"
-rusoto_sqs = "0.47.0"
+rusoto_core = { git = "https://github.com/flock-lab/rusoto", branch = "flock" }
+rusoto_efs = { git = "https://github.com/flock-lab/rusoto", branch = "flock" }
+rusoto_iam = { git = "https://github.com/flock-lab/rusoto", branch = "flock" }
+rusoto_kafka = { git = "https://github.com/flock-lab/rusoto", branch = "flock" }
+rusoto_kinesis = { git = "https://github.com/flock-lab/rusoto", branch = "flock" }
+rusoto_lambda = { git = "https://github.com/flock-lab/rusoto", branch = "flock" }
+rusoto_logs = { git = "https://github.com/flock-lab/rusoto", branch = "flock" }
+rusoto_s3 = { git = "https://github.com/flock-lab/rusoto", branch = "flock" }
+rusoto_sqs = { git = "https://github.com/flock-lab/rusoto", branch = "flock" }
 rust-ini = "0.17"
 serde = { version = "1.0", features = [ "derive" ] }
 serde_bytes = "0.11"

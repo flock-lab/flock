@@ -30,10 +30,6 @@ repos:
       - id: check-symlinks
       - id: check-case-conflict
       - id: check-merge-conflict
-  # - repo: https://github.com/jumanjihouse/pre-commit-hooks
-  #   rev: 1.11.0
-  #   hooks:
-  #     - id: shellcheck
   - repo: https://github.com/wangkuiyi/google-style-precommit-hook
     rev: v0.1.1
     hooks:

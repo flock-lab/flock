@@ -93,6 +93,15 @@ fn run_args() -> App<'static> {
                 .takes_value(true)
                 .default_value("128"),
         )
+        .arg(
+            Arg::new("architecture")
+                .short('r')
+                .long("arch")
+                .help("Sets the architecture for the worker function")
+                .takes_value(true)
+                .possible_values(&["x86_64", "arm64"])
+                .default_value("x86_64"),
+        )
 }
 
 pub fn run(matches: &ArgMatches) -> Result<()> {
@@ -144,6 +153,14 @@ pub fn run(matches: &ArgMatches) -> Result<()> {
             .unwrap()
             .parse::<i64>()
             .with_context(|| anyhow!("Invalid memory size"))?;
+    }
+
+    if matches.is_present("architecture") {
+        opt.architecture = matches
+            .value_of("architecture")
+            .unwrap()
+            .parse::<String>()
+            .with_context(|| anyhow!("Invalid architecture"))?;
     }
 
     rainbow_println(include_str!("./flock"));

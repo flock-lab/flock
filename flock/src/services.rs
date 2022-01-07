@@ -208,7 +208,11 @@ pub async fn invoke_lambda_function(
 }
 
 /// Creates a single lambda function using bootstrap.zip in Amazon S3.
-pub async fn create_lambda_function(ctx: &ExecutionContext, memory_size: i64) -> Result<String> {
+pub async fn create_lambda_function(
+    ctx: &ExecutionContext,
+    memory_size: i64,
+    architecture: &str,
+) -> Result<String> {
     let func_name = ctx.name.clone();
     if FLOCK_LAMBDA_CLIENT
         .get_function(GetFunctionRequest {
@@ -233,8 +237,10 @@ pub async fn create_lambda_function(ctx: &ExecutionContext, memory_size: i64) ->
         let mut conf = AwsLambdaConfig::try_new().await?;
         conf.set_memory_size(memory_size);
         conf.set_function_spec(ctx);
+        conf.set_architectures(vec![architecture.to_string()]);
         let resp = FLOCK_LAMBDA_CLIENT
             .create_function(CreateFunctionRequest {
+                architectures: conf.architectures,
                 function_name: conf.function_name,
                 code: conf.code,
                 handler: conf.handler,
