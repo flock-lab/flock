@@ -96,6 +96,12 @@ pub struct AwsLambdaConfig {
     /// TODO: The follow-up research work here is to use machine learning to
     /// dynamically optimize the memory size setting of each lambda function.
     pub memory_size:   Option<i64>,
+    /// The AWS Lambda function system architectures.
+    ///
+    /// The instruction set architecture that the function supports. Enter a
+    /// string array with one of the valid values (arm64 or x86_64). The
+    /// default value is x86_64.
+    pub architectures: Option<Vec<String>>,
     /// The AWS Lambda function timeout.
     ///
     /// The value of the timeout property is a maximum function execution time,
@@ -188,6 +194,7 @@ impl AwsLambdaConfig {
         };
 
         let function_name = "".to_string();
+        let architectures = Some(vec!["x86_64".to_string()]);
 
         Ok(AwsLambdaConfig {
             runtime,
@@ -199,6 +206,7 @@ impl AwsLambdaConfig {
             environment,
             code,
             function_name,
+            architectures,
         })
     }
 
@@ -265,6 +273,13 @@ impl AwsLambdaConfig {
 
         // Set the function name.
         self.function_name = ctx.name.clone();
+        self
+    }
+
+    /// Creates a new AWS Lambda function with the specified system
+    /// architecture.
+    pub fn set_architectures(&mut self, architectures: Vec<String>) -> &mut Self {
+        self.architectures = Some(architectures);
         self
     }
 

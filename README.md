@@ -9,9 +9,9 @@
 
 The generic lambda function code is built in advance and uploaded to AWS S3.
 
-|  Service  | Cloud Platform | S3 Bucket | S3 Key |        Hardware      | [YSB Bench](https://github.com/yahoo/streaming-benchmarks) | [NEXMark Bench](https://beam.apache.org/documentation/sdks/java/testing/nexmark/) |
-| :-------: | :------------: | :-------: | :----: | :------------------: | :--------------------------------------------------------: | :-------------------------------------------------------------------------------: |
-| **Flock** |   AWS Lambda   | flock-lab | flock  |        Arm, x86      |                             ✅                             |                                        ✅                                          |
+|  Service  | Cloud Platform | S3 Bucket | S3 Key | Hardware | [YSB Bench](https://github.com/yahoo/streaming-benchmarks) | [NEXMark Bench](https://beam.apache.org/documentation/sdks/java/testing/nexmark/) |
+| :-------: | :------------: | :-------: | :----: | :------: | :--------------------------------------------------------: | :-------------------------------------------------------------------------------: |
+| **Flock** |   AWS Lambda   | flock-lab | flock  | Arm, x86 |                             ✅                             |                                        ✅                                         |
 
 ## Build From Source Code
 
@@ -19,8 +19,7 @@ You can enable the features `simd` (to use SIMD instructions) and/or `mimalloc` 
 
 ```shell
 # yum install -y openssl-devel gcc
-$ cargo +nightly build --target x86_64-unknown-linux-gnu --release \
-        --features "arrow/simd datafusion/simd snmalloc"
+$ cargo +nightly build --target x86_64-unknown-linux-gnu --release --features "simd snmalloc"
 ```
 
 ## Upgrade Cloud Function Services
