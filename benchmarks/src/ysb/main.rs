@@ -31,9 +31,6 @@ use ysb::event::{AdEvent, Campaign};
 use ysb::YSBSource;
 
 lazy_static! {
-    static ref FLOCK_S3_KEY: String = FLOCK_CONF["s3"]["key"].to_string();
-    static ref FLOCK_S3_BUCKET: String = FLOCK_CONF["s3"]["bucket"].to_string();
-
     static ref FLOCK_EMPTY_PLAN: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(false, Arc::new(Schema::empty())));
     static ref FLOCK_CONCURRENCY: usize = FLOCK_CONF["lambda"]["concurrency"].parse::<usize>().unwrap();
 

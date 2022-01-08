@@ -53,8 +53,10 @@ lazy_static! {
     /// Flock async invocation granularity.
     pub static ref FLOCK_ASYNC_GRANULE_SIZE: usize = FLOCK_CONF["lambda"]["async_granule"].parse::<usize>().unwrap();
 
-    /// Flock S3 key prefix.
-    pub static ref FLOCK_S3_KEY: String = FLOCK_CONF["s3"]["key"].to_string();
+    /// Flock x86_64 binary S3 key prefix.
+    pub static ref FLOCK_S3_X86_64_KEY: String = FLOCK_CONF["s3"]["x86_64_key"].to_string();
+    /// Flock Arm_64 binary S3 key prefix.
+    pub static ref FLOCK_S3_ARM_64_KEY: String = FLOCK_CONF["s3"]["arm_64_key"].to_string();
     /// Flock S3 bucket name.
     pub static ref FLOCK_S3_BUCKET: String = FLOCK_CONF["s3"]["bucket"].to_string();
     /// Flock availablity zone.
@@ -214,6 +216,18 @@ pub async fn create_lambda_function(
     architecture: &str,
 ) -> Result<String> {
     let func_name = ctx.name.clone();
+    let flock_s3_key = if architecture == "x86_64" {
+        FLOCK_S3_X86_64_KEY.clone()
+    } else {
+        FLOCK_S3_ARM_64_KEY.clone()
+    };
+
+    let mut conf = AwsLambdaConfig::try_new().await?;
+    conf.set_memory_size(memory_size);
+    conf.set_function_spec(ctx);
+    conf.set_architectures(vec![architecture.to_string()]);
+    conf.set_code(&flock_s3_key);
+
     if FLOCK_LAMBDA_CLIENT
         .get_function(GetFunctionRequest {
             function_name: ctx.name.clone(),
@@ -224,9 +238,10 @@ pub async fn create_lambda_function(
     {
         let conf = FLOCK_LAMBDA_CLIENT
             .update_function_code(UpdateFunctionCodeRequest {
+                architectures: conf.architectures,
                 function_name: func_name.clone(),
                 s3_bucket: Some(FLOCK_S3_BUCKET.clone()),
-                s3_key: Some(FLOCK_S3_KEY.clone()),
+                s3_key: Some(flock_s3_key),
                 ..Default::default()
             })
             .await
@@ -234,10 +249,6 @@ pub async fn create_lambda_function(
         conf.function_name
             .ok_or_else(|| FlockError::AWS("No function name!".to_string()))
     } else {
-        let mut conf = AwsLambdaConfig::try_new().await?;
-        conf.set_memory_size(memory_size);
-        conf.set_function_spec(ctx);
-        conf.set_architectures(vec![architecture.to_string()]);
         let resp = FLOCK_LAMBDA_CLIENT
             .create_function(CreateFunctionRequest {
                 architectures: conf.architectures,

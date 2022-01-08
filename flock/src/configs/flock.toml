@@ -12,7 +12,8 @@ production = false
 bucket = "flock-lab"
 
 # S3 key prefix to store the generic function code
-key = "flock"
+x86_64_key = "flock_x86_64"
+arm_64_key = "flock_arm64"
 
 # AWS configuration
 [aws]

@@ -9,26 +9,18 @@
 
 The generic lambda function code is built in advance and uploaded to AWS S3.
 
-|  Service  | Cloud Platform | S3 Bucket | S3 Key | Hardware | [YSB Bench](https://github.com/yahoo/streaming-benchmarks) | [NEXMark Bench](https://beam.apache.org/documentation/sdks/java/testing/nexmark/) |
-| :-------: | :------------: | :-------: | :----: | :------: | :--------------------------------------------------------: | :-------------------------------------------------------------------------------: |
-| **Flock** |   AWS Lambda   | flock-lab | flock  | Arm, x86 |                             ✅                             |                                        ✅                                         |
+| FaaS Service | AWS Lambda | GCP Functions | Azure Functions | Architectures | SIMD | [YSB](https://github.com/yahoo/streaming-benchmarks) | [NEXMark](https://beam.apache.org/documentation/sdks/java/testing/nexmark/) |
+| :----------: | :--------: | :-----------: | :-------------: | :-----------: | :--: | :--------------------------------------------------: | :-------------------------------------------------------------------------: |
+|  **Flock**   |  🏅🏅🏅🏅  |    👉 TBD     |     👉 TBD      | **Arm**, x86  |  ✅  |                          ✅                          |                                     ✅                                      |
 
 ## Build From Source Code
 
 You can enable the features `simd` (to use SIMD instructions) and/or `mimalloc` or `snmalloc` (to use either the mimalloc or snmalloc allocator) as features by passing them in as --features:
 
-```shell
-# yum install -y openssl-devel gcc
-$ cargo +nightly build --target x86_64-unknown-linux-gnu --release --features "simd snmalloc"
-```
+To build and deploy Flock to AWS Lambda in one step, you can use the following command:
 
-## Upgrade Cloud Function Services
-
-flock-cli is an interactive command-line query tool for Flock.
-
-```shell
-$ cd target/x86_64-unknown-linux-gnu/release/
-$ ./flock-cli --help
+```ignore
+$ ./configure -c -a x86_64
 ```
 
 <details>
@@ -36,34 +28,64 @@ $ ./flock-cli --help
 <strong>Output</strong>
 </summary>
 
-```shell
-Flock 0.2.0
-UMD Database Group
-Command Line Interactive Contoller for Flock
+```ignore
+============================================================
+ Compiling and Deploying Benchmarks
+============================================================
 
-USAGE:
-    flock-cli [OPTIONS] [SUBCOMMAND]
+Building x86_64-unknown-linux-gnu
 
-FLAGS:
-    -h, --help       Prints help information
-    -V, --version    Prints version information
+[1/3] Compiling Flock Lambda Function...
+[2/3] Compiling Flock CLI...
+[3/3] Deploying Flock Lambda Function...
 
-OPTIONS:
-    -c, --config <FILE>    Sets a custom config file
+============================================================
+                Upload function code to S3
+============================================================
 
-SUBCOMMANDS:
-    fsql       The terminal-based front-end to Flock
-    help       Prints this message or the help of the given subcommand(s)
-    nexmark    The NEXMark Benchmark Tool
-    upload     Uploads a function code to AWS S3
+Packaging code and uploading to S3...
+[OK] Upload Succeed.
+
+============================================================
 ```
 
 </details>
 </br>
 
+If you prefer to use the `cargo` command to build and deploy Flock, you can use the following commands:
+
+<details>
+<summary>
+<strong>Commands</strong>
+</summary>
+
+1.  Build Flock for x86_64
+
+    ```ignore
+    $ cargo +nightly build --target x86_64-unknown-linux-gnu --release --features "simd mimalloc"
+    ```
+
+2.  Deploy Flock binary to AWS S3
+
+        ```ignore
+        $ cd ./target/x86_64-unknown-linux-gnu/release
+        $ ./flock-cli upload --path ./flock -key flock_x86_64
+        ```
+
+    </details>
+    </br>
+
 ## Nexmark Benchmark
 
-All the following Nexmark queries share the same lambda function code.
+### Schemas
+
+These are multiple queries over a three entities model representing on online auction system:
+
+- **Person** represents a person submitting an item for auction and/or making a bid on an auction.
+- **Auction** represents an item under auction.
+- **Bid** represents a bid for an item under auction.
+
+### Queries
 
 | Query                                                                                              | Name                            | Summary                                                                                                             | Flock |
 | -------------------------------------------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ----- |
@@ -82,36 +104,14 @@ All the following Nexmark queries share the same lambda function code.
 | [q12](https://github.com/flock-lab/flock/blob/master/flock/src/datasource/nexmark/queries/q12.sql) | Processing Time Windows         | How many bids does a user make within a fixed processing time limit? Illustrates working in processing time window. | ✅    |
 | [q13](https://github.com/flock-lab/flock/blob/master/flock/src/datasource/nexmark/queries/q13.sql) | Bounded Side Input Join         | Joins a stream to a bounded side input, modeling basic stream enrichment.                                           | ✅    |
 
-We provide a script (`flock_bench.sh`) to build, deploy and run the benchmark.
+> Note: q1 ~ q8 are from original NEXMark queries, q0 and q9 ~ q13 are from Apache Beam.
 
-```shell
-$ ./flock_bench.sh -help
+### Run the benchmark
 
-A Benchmark Script for Flock
+`flock-cli` is a command line interface to Flock. It can be used to run queries or benchmarks against Flock. For example, to run the query 5 on x86_64 for 10 seconds with 1,000 events per second, and 1 generator, you can run:
 
-Syntax: flock_bench [-g|-h|-c|-r [-b <bench_type>] [-q <query_id>] [-s <number_of_seconds>] [-e <events_per_second>] [-p <number_of_parallel_streams>]]
-options:
-g     Print the GPL license notification.
-h     Print this Help.
-c     Compile and deploy the benchmark.
-r     Run the benchmark. Default: false
-b     The type of the benchmark [nexmark, ysb]. Default: 'nexmark'
-q     NexMark Query Number [0-9]. Ignored if '-b' is not 'nexmark'. Default: 5
-p     Number of Data Generators. Default: 1
-s     Seconds to run the benchmark. Default: 10
-e     Number of events per second. Default: 1000
-```
-
-To build and deploy the benchmark, run:
-
-```shell
-$ ./flock_bench.sh -c
-```
-
-For example, to run the query 5 for 10 seconds with 1,000 events per second, and 1 generator, you can run:
-
-```shell
-$ ./flock_bench.sh -r -b nexmark -q 5 -s 10 -e 1000 -p 1
+```ignore
+$ ./flock-cli nexmark run -q 5 -s 10 -e 1000 -g 1 --arch x86_64
 ```
 
 <details>
@@ -119,56 +119,80 @@ $ ./flock_bench.sh -r -b nexmark -q 5 -s 10 -e 1000 -p 1
 <strong>Client Output</strong>
 </summary>
 
-```bash
-============================================================
- Running the benchmark
-============================================================
-Benchmark Type: NEXMARK
-Query Number: 5 (ignored for YSB)
-Generators: 1
-Events Per Second: 1000
-Seconds to Run: 10
-============================================================
+``````bash
+ /`
+/:y/` `
+`shdhso.
+ -yhddh+.
+  .yhhhy+-
+   .syyhs+/.
+    `+shhs++:.
+     `:syyyo++/.
+       .+ssys+++/-`          `.----.`
+        ./oyyyo+++/:.`     `-/+++/-..`
+          -/osyso++++/:.` -/++/-`
+           .-/osssoo++++/:++++`
+           `.-/++osooo++++++++-
+              `-:/+oooo++++++o/
+                `-:/+o++++++oo-                                `````             `
+                 `.-//++++++o/   `:++:::://   .:++:`        .:///////.       .://///+-   ./++:` .++/.
+                 ``..:+++++o+`     os`   -+     ss        `/+-`//. `-+/`   `+s:`   `o:    `so  `:+-
+                     :+++++/`      os`  --      ss        /o`  `+o`  `++   +s:      ``    `so .+:`
+                   `:+++++:        os:::o/      ss        o/   /+++`  :s   ss.            `ss/so`
+                 .:++++:.`         os`  --      ss     `  /o``+/``o/:`++   +s:      `     `so .oo.
+             `.:/++++/.            os`          ss    :+   /+:-`  .-:+/`   `+s:`    o/    `so  `+s:
+          .-----:/++-            `:++:-       .:++::::+/    .:++//++:.       ./++///+-   .:o+:`  :o/:
+          `.-:::-/:`                                            ``
+        `--.``-/:`
+            .:-`
 
-[OK] Benchmark Starting
 
-[1] Warming up the lambda functions
+Flock: A Practical Serverless Streaming SQL Query Engine (https://github.com/flock-lab/flock)
 
-[2021-12-16T19:09:13Z INFO  nexmark_bench] Running the NEXMark benchmark with the following options: NexmarkBenchmarkOpt { query_number: 5, debug: true, generators: 1, seconds: 10, events_per_second: 1000 }
-[2021-12-16T19:09:13Z INFO  nexmark_bench] Creating lambda function: flock_datasource
-[2021-12-16T19:09:13Z INFO  nexmark_bench] Creating lambda function group: Group(("q5-00", 8))
-[2021-12-16T19:09:13Z INFO  nexmark_bench] Creating function member: q5-00-00
-[2021-12-16T19:09:14Z INFO  nexmark_bench] Creating function member: q5-00-01
-[2021-12-16T19:09:14Z INFO  nexmark_bench] Creating function member: q5-00-02
-[2021-12-16T19:09:15Z INFO  nexmark_bench] Creating function member: q5-00-03
-[2021-12-16T19:09:15Z INFO  nexmark_bench] Creating function member: q5-00-04
-[2021-12-16T19:09:16Z INFO  nexmark_bench] Creating function member: q5-00-05
-[2021-12-16T19:09:16Z INFO  nexmark_bench] Creating function member: q5-00-06
-[2021-12-16T19:09:17Z INFO  nexmark_bench] Creating function member: q5-00-07
-[2021-12-16T19:09:17Z INFO  nexmark_bench] [OK] Invoking NEXMark source function: flock_datasource by generator 0
-[2021-12-16T19:09:17Z INFO  nexmark_bench] [OK] Received status from function. InvocationResponse { executed_version: None, function_error: None, log_result: None, payload: Some(b""), status_code: Some(202) }
-[2021-12-16T19:09:17Z INFO  nexmark_bench] Waiting for the current invocations to be logged.
-[2021-12-16T19:09:22Z INFO  driver::logwatch::tail] Sending log request FilterLogEventsRequest { end_time: None, filter_pattern: None, limit: Some(100), log_group_name: "/aws/lambda/flock_datasource", log_stream_name_prefix: None, log_stream_names: None, next_token: None, start_time: Some(1639681702541) }
-[2021-12-16T19:09:24Z INFO  driver::logwatch::tail] [OK] Got response from AWS CloudWatch Logs.
-[2021-12-16T19:09:24Z INFO  driver::deploy::common] Got a Token response
--------------------------------------------------------------
+Copyright (c) 2020-present, UMD Data System Group.
 
-[2] Running the benchmark
+▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒
 
-[2021-12-16T19:09:26Z INFO  nexmark_bench] Running the NEXMark benchmark with the following options: NexmarkBenchmarkOpt { query_number: 5, debug: true, generators: 1, seconds: 10, events_per_second: 1000 }
-[2021-12-16T19:09:26Z INFO  nexmark_bench] Creating lambda function: flock_datasource
-[2021-12-16T19:09:26Z INFO  nexmark_bench] Creating lambda function group: Group(("q5-00", 8))
-[2021-12-16T19:09:26Z INFO  nexmark_bench] Creating function member: q5-00-00
-[2021-12-16T19:09:27Z INFO  nexmark_bench] Creating function member: q5-00-01
-[2021-12-16T19:09:27Z INFO  nexmark_bench] Creating function member: q5-00-02
-[2021-12-16T19:09:28Z INFO  nexmark_bench] Creating function member: q5-00-03
-[2021-12-16T19:09:28Z INFO  nexmark_bench] Creating function member: q5-00-04
-[2021-12-16T19:09:28Z INFO  nexmark_bench] Creating function member: q5-00-05
-[2021-12-16T19:09:29Z INFO  nexmark_bench] Creating function member: q5-00-06
-[2021-12-16T19:09:29Z INFO  nexmark_bench] Creating function member: q5-00-07
-[2021-12-16T19:09:30Z INFO  nexmark_bench] [OK] Invoking NEXMark source function: flock_datasource by generator 0
-[2021-12-16T19:09:30Z INFO  nexmark_bench] [OK] Received status from function. InvocationResponse { executed_version: None, function_error: None, log_result: None, payload: Some(b""), status_code: Some(202) }
-[2021-12-16T19:09:30Z INFO  nexmark_bench] Waiting for the current invocations to be logged.
+This program is free software: you can use, redistribute, and/or modify it under the terms of the GNU Affero
+General Public License, version 3 or later ("AGPL"), as published by the Free Software Foundation.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+You should have received a copy of the GNU Affero General Public License along with this program. If not, see
+<http://www.gnu.org/licenses/>.
+
+▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒
+
+================================================================
+                    Running the benchmark
+================================================================
+[info] Running the NEXMark benchmark with the following options:
+
+NexmarkBenchmarkOpt {
+    query_number: 5,
+    generators: 1,
+    seconds: 10,
+    events_per_second: 1000,
+    data_sink_type: "blackhole",
+    async_type: false,
+    memory_size: 128,
+    architecture: "x86_64",
+}
+
+[info] Creating lambda function: flock_datasource
+[info] Creating lambda function group: Group(("q5-00", 8))
+[info] Creating function member: q5-00-00
+[info] Creating function member: q5-00-01
+[info] Creating function member: q5-00-02
+[info] Creating function member: q5-00-03
+[info] Creating function member: q5-00-04
+[info] Creating function member: q5-00-05
+[info] Creating function member: q5-00-06
+[info] Creating function member: q5-00-07
+[info] [OK] Invoking NEXMark source function: flock_datasource by generator 0
+[info] [OK] Received status from function. InvocationResponse { executed_version: None, function_error: None, log_result: None, payload: Some(b""), status_code: Some(202) }
+[info] Waiting for the current invocations to be logged.
 [2021-12-16T19:09:35Z INFO  driver::logwatch::tail] Sending log request FilterLogEventsRequest { end_time: None, filter_pattern: None, limit: Some(100), log_group_name: "/aws/lambda/flock_datasource", log_stream_name_prefix: None, log_stream_names: None, next_token: None, start_time: Some(1639681715344) }
 [2021-12-16T19:09:38Z INFO  driver::logwatch::tail] [OK] Got response from AWS CloudWatch Logs.
 2021-12-16 14:09:18 START RequestId: fd8ae2ad-b64a-4e02-88c8-c43f00974022 Version: $LATEST
@@ -213,7 +237,7 @@ Seconds to Run: 10
 -------------------------------------------------------------
 
 [OK] Nexmark Benchmark Complete
-```
+``````
 
 </details>
 </br>
@@ -282,6 +306,61 @@ START RequestId: 78c64a1a-b312-4099-b596-541c078b04b7 Version: $LATEST
 
 </details>
 </br>
+
+## Advanced Usage
+
+`flock-cli` has a number of advanced features that can be used to control and customize the behavior of Flock.
+
+For example, to delete all functions, you can use the `flock-cli lambda -D` command. Or use the `flock-cli lambda -d <function pattern>` command to delete specific functions. To list all functions, use the `flock-cli lambda -L` command.
+
+To see the help for the `nexmark run` command, issue the command: `flock-cli nexmark run -h`
+
+```ignore
+Runs the NEXMark Benchmark
+
+USAGE:
+    flock-cli nexmark run [OPTIONS]
+
+OPTIONS:
+    -a, --async-type
+            Runs the NEXMark benchmark with async function invocations
+
+    -e, --events-per-second <events per second>
+            Runs the NEXMark benchmark with a number of events per second [default: 1000]
+
+    -g, --generators <data generators>
+            Runs the NEXMark benchmark with a number of data generators [default: 1]
+
+    -h, --help
+            Print help information
+
+        --log-level <log-level>
+            Log level [default: info] [possible values: error, warn, info, debug, trace, off]
+
+    -m, --memory-size <memory size>
+            Sets the memory size (MB) for the worker function [default: 128]
+
+    -q, --query <query number>
+            Sets the NEXMark benchmark query number [default: 3] [possible values: 0, 1, 2, 3, 4, 5,
+            6, 7, 8, 9, 10, 11, 12, 13]
+
+    -r, --arch <architecture>
+            Sets the architecture for the worker function [default: x86_64] [possible values:
+            x86_64, arm64]
+
+    -s, --seconds <duration>
+            Runs the NEXMark benchmark for a number of seconds [default: 20]
+
+        --silent
+            Suppress all output
+
+    -t, --data-sink-type <data sink type>
+            Runs the NEXMark benchmark with a data sink type [default: blackhole] [possible values:
+            sqs, s3, dynamodb, efs, blackhole]
+
+        --trace
+            Log ultra-verbose (trace level) information
+```
 
 ## License
 

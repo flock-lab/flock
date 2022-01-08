@@ -26,6 +26,7 @@ sudo yum install -y openssl-devel llvm-devel
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 source $HOME/.cargo/env
 rustup target add --toolchain nightly aarch64-unknown-linux-gnu
+rustup target add --toolchain nightly x86_64-unknown-linux-gnu
 
 # rustup target add --toolchain nightly aarch64-unknown-linux-musl
 # git clone git://git.musl-libc.org/musl

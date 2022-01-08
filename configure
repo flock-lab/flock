@@ -62,21 +62,23 @@ Build_and_Deploy() {
   echo $(echogreen "         Compiling and Deploying Benchmarks                 ")
   echo $(echogreen "============================================================")
   echo
-  echo $(echogreen "Building $arch")
+  echo $(echogreen "Building $target_arch")
   echo
   echo $(echogreen "[1/3]") $(echoblue "Compiling Flock Lambda Function...")
+  echo
   cd flock-function
-  cargo +nightly build --target $arch --release --features "simd mimalloc"
+  cargo +nightly build --target $target_arch --release --features "simd mimalloc"
+  cd ..
   echo
   echo $(echogreen "[2/3]") $(echoblue "Compiling Flock CLI...")
-  cd ../flock-cli
-  cargo +nightly build --target $arch --release
+  echo
+  cd flock-cli
+  cargo +nightly build --target $host_arch --release
+  cd ..
   echo
   echo $(echogreen "[3/3]") $(echoblue "Deploying Flock Lambda Function...")
   echo
-  cd ../target/$arch/release
-  ./flock-cli upload -p flock -k flock
-  cd ../../..
+  ./target/$host_arch/release/flock-cli upload -p ./target/$target_arch/release/flock -k flock_$target
   echo
   echo $(echogreen "============================================================")
   echo
@@ -101,7 +103,7 @@ Run() {
 ############################################################
 # Process the input options. Add options as needed.        #
 ############################################################
-arch="x86_64"
+target="unknown"
 compile=false
 run=false
 
@@ -123,7 +125,7 @@ while getopts "hgcra:" option; do
     run=true
     ;;
   a) # build the benchmark with specific architechture.
-    arch=$OPTARG
+    target=$OPTARG
     ;;
   \?) # Invalid option
     echo $(echored "Error: Invalid option")
@@ -134,16 +136,28 @@ while getopts "hgcra:" option; do
   esac
 done
 
-if [ "$arch" != "x86_64" ] && [ "$arch" != "arm64" ]; then
-  echo $(echored "Error: Invalid architechture. Please use \"flock-bench -a x86_64\" or \"flock-bench -a arm64\".")
-  echo
-  exit
+host=$(uname -m)
+if [ "$host" = "x86_64" ]; then
+  host_arch="x86_64-unknown-linux-gnu"
+elif [ "$host" = "aarch64" ]; then
+  host_arch="aarch64-unknown-linux-gnu"
 fi
 
-if [ "$arch" == "x86_64" ]; then
-  arch="x86_64-unknown-linux-gnu"
-elif [ "$arch" == "arm64" ]; then
-  arch="aarch64-unknown-linux-gnu"
+if [ "$target" != "x86_64" ] && [ "$target" != "arm64" ]; then
+  target_arch="$host_arch"
+  if [ "$host" = "x86_64" ]; then
+    target="x86_64"
+  elif [ "$host" = "aarch64" ]; then
+    target="arm64"
+  fi
+elif [ "$target" == "x86_64" ]; then
+  target_arch="x86_64-unknown-linux-gnu"
+elif [ "$target" == "arm64" ]; then
+  target_arch="aarch64-unknown-linux-gnu"
+fi
+
+if [ "$target_arch" != "$host_arch" ]; then
+  export PKG_CONFIG_ALLOW_CROSS=1
 fi
 
 if [ "$compile" = true ]; then
@@ -154,6 +168,8 @@ if [ "$run" = true ]; then
   Run
 fi
 
-echo
-echo $(echored "Error: incomplete command line arguments, please use '-h' for help.")
-echo
+if [ "$compile" = false ] && [ "$run" = false ]; then
+  echo
+  echo $(echored "Error: incomplete command line arguments, please use '-h' for help.")
+  echo
+fi
