@@ -25,6 +25,7 @@ use flock::prelude::*;
 use hashring::HashRing;
 use lambda_runtime::{handler_fn, Context};
 use lazy_static::lazy_static;
+use log::info;
 use serde_json::Value;
 use std::cell::Cell;
 use std::sync::Once;
@@ -117,6 +118,8 @@ macro_rules! init_exec_context {
 
 async fn handler(event: Payload, _: Context) -> Result<Value> {
     let (ctx, arena) = init_exec_context!();
+
+    info!("Lambda function architecture: {}", std::env::consts::ARCH);
 
     match &event.datasource {
         DataSource::Payload(_) => actor::handler(ctx, arena, event).await,

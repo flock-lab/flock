@@ -27,9 +27,7 @@ use log::info;
 use nexmark::event::{side_input_schema, Auction, Bid, Person};
 use nexmark::NEXMarkSource;
 use rainbow::{rainbow_println, rainbow_string};
-use rusoto_core::Region;
 use rusoto_lambda::InvocationResponse;
-use rusoto_s3::S3Client;
 use std::collections::HashMap;
 use std::sync::Arc;
 use structopt::StructOpt;
@@ -43,10 +41,6 @@ static SIDE_INPUT_DOWNLOAD_URL: &str = concat!(
 );
 
 lazy_static! {
-    pub static ref FLOCK_S3_KEY: String = FLOCK_CONF["s3"]["key"].to_string();
-    pub static ref FLOCK_S3_BUCKET: String = FLOCK_CONF["s3"]["bucket"].to_string();
-    pub static ref FLOCK_S3_CLIENT: S3Client = S3Client::new(Region::default());
-
     pub static ref FLOCK_EMPTY_PLAN: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(false, Arc::new(Schema::empty())));
     pub static ref FLOCK_CONCURRENCY: usize = FLOCK_CONF["lambda"]["concurrency"].parse::<usize>().unwrap();
 

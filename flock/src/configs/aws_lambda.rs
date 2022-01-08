@@ -187,7 +187,7 @@ impl AwsLambdaConfig {
             // S3 bucket for the pre-compiled deployment package.
             s3_bucket:         Some(FLOCK_CONF["s3"]["bucket"].to_string()),
             // S3 key for the pre-compiled deployment package.
-            s3_key:            Some(FLOCK_CONF["s3"]["key"].to_string()),
+            s3_key:            Some(FLOCK_CONF["s3"]["x86_64_key"].to_string()),
             s3_object_version: None,
             zip_file:          None,
             image_uri:         None,
@@ -208,6 +208,21 @@ impl AwsLambdaConfig {
             function_name,
             architectures,
         })
+    }
+
+    /// Creates a new AWS Lambda function with the specified function code's s3
+    /// key.
+    pub fn set_code(&mut self, key: &str) -> &mut Self {
+        self.code = FunctionCode {
+            // S3 bucket for the pre-compiled deployment package.
+            s3_bucket:         Some(FLOCK_CONF["s3"]["bucket"].to_string()),
+            // S3 key for the pre-compiled deployment package.
+            s3_key:            Some(key.to_string()),
+            s3_object_version: None,
+            zip_file:          None,
+            image_uri:         None,
+        };
+        self
     }
 
     /// Creates a new AWS Lambda function with the specified function name.
