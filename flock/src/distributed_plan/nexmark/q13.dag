@@ -1,0 +1,19 @@
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "auction", index: 0 }], 16))
+  MemoryExec: partitions=1, partition_sizes=[1]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "key", index: 0 }], 16))
+  MemoryExec: partitions=1, partition_sizes=[1]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: None
+  ProjectionExec: expr=[auction@0 as auction, bidder@1 as bidder, price@2 as price, b_date_time@3 as b_date_time, value@5 as value]
+    CoalesceBatchesExec: target_batch_size=4096
+      HashJoinExec: mode=Partitioned, join_type=Inner, on=[(Column { name: "auction", index: 0 }, Column { name: "key", index: 0 })]
+        CoalesceBatchesExec: target_batch_size=4096
+          MemoryExec: partitions=0, partition_sizes=[]
+        CoalesceBatchesExec: target_batch_size=4096
+          MemoryExec: partitions=0, partition_sizes=[]

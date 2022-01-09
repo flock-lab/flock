@@ -1,0 +1,12 @@
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "bidder", index: 0 }], 16))
+  HashAggregateExec: mode=Partial, gby=[bidder@0 as bidder], aggr=[COUNT(UInt8(1)), MIN(bid.p_time), MAX(bid.p_time)]
+    MemoryExec: partitions=1, partition_sizes=[1]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: None
+  ProjectionExec: expr=[bidder@0 as bidder, COUNT(UInt8(1))@1 as bid_count, MIN(bid.p_time)@2 as start_time, MAX(bid.p_time)@3 as end_time]
+    HashAggregateExec: mode=FinalPartitioned, gby=[bidder@0 as bidder], aggr=[COUNT(UInt8(1)), MIN(bid.p_time), MAX(bid.p_time)]
+      CoalesceBatchesExec: target_batch_size=4096
+        MemoryExec: partitions=0, partition_sizes=[]

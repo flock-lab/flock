@@ -26,6 +26,7 @@ use humantime::parse_duration;
 use lazy_static::lazy_static;
 use log::info;
 use nexmark::event::{side_input_schema, Auction, Bid, Person};
+use nexmark::register_nexmark_tables;
 use nexmark::NEXMarkSource;
 use rainbow::{rainbow_println, rainbow_string};
 use rusoto_lambda::InvocationResponse;
@@ -97,40 +98,6 @@ async fn main() -> Result<()> {
     env_logger::init();
     nexmark_benchmark(&mut NexmarkBenchmarkOpt::from_args()).await?;
     Ok(())
-}
-
-pub async fn register_nexmark_tables() -> Result<DataFusionExecutionContext> {
-    let mut ctx = DataFusionExecutionContext::new();
-    let person_schema = Arc::new(Person::schema());
-    let person_table = MemTable::try_new(
-        person_schema.clone(),
-        vec![vec![RecordBatch::new_empty(person_schema)]],
-    )?;
-    ctx.register_table("person", Arc::new(person_table))?;
-
-    let auction_schema = Arc::new(Auction::schema());
-    let auction_table = MemTable::try_new(
-        auction_schema.clone(),
-        vec![vec![RecordBatch::new_empty(auction_schema)]],
-    )?;
-    ctx.register_table("auction", Arc::new(auction_table))?;
-
-    let bid_schema = Arc::new(Bid::schema());
-    let bid_table = MemTable::try_new(
-        bid_schema.clone(),
-        vec![vec![RecordBatch::new_empty(bid_schema)]],
-    )?;
-    ctx.register_table("bid", Arc::new(bid_table))?;
-
-    // For NEXMark Q13
-    let side_input_schema = Arc::new(side_input_schema());
-    let side_input_table = MemTable::try_new(
-        side_input_schema.clone(),
-        vec![vec![RecordBatch::new_empty(side_input_schema)]],
-    )?;
-    ctx.register_table("side_input", Arc::new(side_input_table))?;
-
-    Ok(ctx)
 }
 
 pub async fn create_nexmark_source(opt: &mut NexmarkBenchmarkOpt) -> Result<NEXMarkSource> {

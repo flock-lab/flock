@@ -1,0 +1,6 @@
+=== Physical subplan ===
+ShuffleWriterExec: None
+  ProjectionExec: expr=[auction@0 as auction, price@1 as price]
+    CoalesceBatchesExec: target_batch_size=4096
+      FilterExec: CAST(auction@0 AS Int64) % 123 = 0
+        MemoryExec: partitions=1, partition_sizes=[1]

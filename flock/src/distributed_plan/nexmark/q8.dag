@@ -1,0 +1,39 @@
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "p_id", index: 0 }, Column { name: "name", index: 1 }], 16))
+  HashAggregateExec: mode=Partial, gby=[p_id@0 as p_id, name@1 as name], aggr=[]
+    MemoryExec: partitions=1, partition_sizes=[1]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "p_id", index: 0 }], 16))
+  ProjectionExec: expr=[p_id@0 as p_id, name@1 as name]
+    ProjectionExec: expr=[p_id@0 as p_id, name@1 as name]
+      HashAggregateExec: mode=FinalPartitioned, gby=[p_id@0 as p_id, name@1 as name], aggr=[]
+        CoalesceBatchesExec: target_batch_size=4096
+          MemoryExec: partitions=0, partition_sizes=[]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "seller", index: 0 }], 16))
+  HashAggregateExec: mode=Partial, gby=[seller@0 as seller], aggr=[]
+    MemoryExec: partitions=1, partition_sizes=[1]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "seller", index: 0 }], 16))
+  ProjectionExec: expr=[seller@0 as seller]
+    ProjectionExec: expr=[seller@0 as seller]
+      HashAggregateExec: mode=FinalPartitioned, gby=[seller@0 as seller], aggr=[]
+        CoalesceBatchesExec: target_batch_size=4096
+          MemoryExec: partitions=0, partition_sizes=[]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: None
+  ProjectionExec: expr=[p_id@0 as p_id, name@1 as name]
+    CoalesceBatchesExec: target_batch_size=4096
+      HashJoinExec: mode=Partitioned, join_type=Inner, on=[(Column { name: "p_id", index: 0 }, Column { name: "seller", index: 0 })]
+        CoalesceBatchesExec: target_batch_size=4096
+          MemoryExec: partitions=0, partition_sizes=[]
+        CoalesceBatchesExec: target_batch_size=4096
+          MemoryExec: partitions=0, partition_sizes=[]

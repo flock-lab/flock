@@ -19,6 +19,7 @@ mod nexmark_bench;
 use flock::aws::lambda;
 use flock::prelude::*;
 use log::info;
+use nexmark::register_nexmark_tables;
 use nexmark_bench::*;
 use serde_json::Value;
 use std::collections::HashMap;
