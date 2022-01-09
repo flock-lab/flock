@@ -143,8 +143,10 @@ fn create_shuffle_writer(
 mod tests {
     use super::*;
     use crate::datasource::nexmark::*;
+    use crate::datasource::ysb::*;
     use datafusion::physical_plan::coalesce_batches::CoalesceBatchesExec;
     use datafusion::physical_plan::filter::FilterExec;
+    use datafusion::physical_plan::hash_aggregate::{AggregateMode, HashAggregateExec};
     use datafusion::physical_plan::hash_join::HashJoinExec;
     use datafusion::physical_plan::projection::ProjectionExec;
     use datafusion::physical_plan::{displayable, ExecutionPlan};
@@ -249,15 +251,15 @@ mod tests {
         //   CoalesceBatchesExec: target_batch_size=4096
         //     FilterExec: CAST(category@2 AS Int64) = 10
         //       MemoryExec: partitions=1, partition_sizes=[1]
-        
-        
+
+
         // === Physical subplan ===
         // ShuffleWriterExec: Some(Hash([Column { name: "p_id", index: 0 }], 16))
         //   CoalesceBatchesExec: target_batch_size=4096
         //     FilterExec: state@3 = or OR state@3 = id OR state@3 = ca
         //       MemoryExec: partitions=1, partition_sizes=[1]
-        
-        
+
+
         // === Physical subplan ===
         // ShuffleWriterExec: None
         //   ProjectionExec: expr=[name@4 as name, city@5 as city, state@6 as state, a_id@0 as a_id]
@@ -403,6 +405,107 @@ mod tests {
                 );
             }
         }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn ysb_distributed_plan() -> Result<()> {
+        let mut ctx = register_ysb_tables().await?;
+        let df = ctx
+            .sql(include_str!("../../../benchmarks/src/ysb/ysb.sql"))
+            .await?;
+
+        let plan = df.to_logical_plan();
+        let plan = ctx.optimize(&plan)?;
+        let plan = ctx.create_physical_plan(&plan).await?;
+
+        let mut planner = DistributedPlanner::new();
+        let stages = planner.plan_query_stages(plan).await?;
+        for stage in &stages {
+            println!(
+                "=== Physical subplan ===\n{}\n",
+                displayable(stage.as_ref()).indent()
+            );
+        }
+
+        #[rustfmt::skip]
+        // Expected result:
+        //
+        // === Physical subplan ===
+        // ShuffleWriterExec: Some(Hash([Column { name: "ad_id", index: 0 }], 16))
+        //   CoalesceBatchesExec: target_batch_size=4096
+        //     FilterExec: event_type@1 = view
+        //       MemoryExec: partitions=1, partition_sizes=[1]
+        //
+        // === Physical subplan ===
+        // ShuffleWriterExec: Some(Hash([Column { name: "c_ad_id", index: 0 }], 16))
+        //   MemoryExec: partitions=1, partition_sizes=[1]
+        //
+        // === Physical subplan ===
+        // ShuffleWriterExec: Some(Hash([Column { name: "campaign_id", index: 0 }], 16))
+        //   HashAggregateExec: mode=Partial, gby=[campaign_id@3 as campaign_id], aggr=[COUNT(UInt8(1))]
+        //     CoalesceBatchesExec: target_batch_size=4096
+        //       HashJoinExec: mode=Partitioned, join_type=Inner, on=[(Column { name: "ad_id", index: 0 }, Column { name: "c_ad_id", index: 0 })]
+        //         CoalesceBatchesExec: target_batch_size=4096
+        //           MemoryExec: partitions=0, partition_sizes=[]
+        //         CoalesceBatchesExec: target_batch_size=4096
+        //           MemoryExec: partitions=0, partition_sizes=[]
+        //
+        // === Physical subplan ===
+        // ShuffleWriterExec: None
+        //   ProjectionExec: expr=[campaign_id@0 as campaign_id, COUNT(UInt8(1))@1 as COUNT(UInt8(1))]
+        //     HashAggregateExec: mode=FinalPartitioned, gby=[campaign_id@0 as campaign_id], aggr=[COUNT(UInt8(1))]
+        //       CoalesceBatchesExec: target_batch_size=4096
+        //         MemoryExec: partitions=0, partition_sizes=[]
+        assert_eq!(4, stages.len());
+
+        // verify stage 0
+        let stage0 = stages[0].children()[0].clone();
+        let coalesce = downcast_exec!(stage0, CoalesceBatchesExec);
+        let filter = coalesce.children()[0].clone();
+        let filter = downcast_exec!(filter, FilterExec);
+        let input = filter.children()[0].clone();
+        let input = downcast_exec!(input, MemoryExec);
+        println!("Stage 0:\nInput {:#?}\n", input.schema());
+
+        // verify stage 1
+        let stage1 = stages[1].children()[0].clone();
+        let input = downcast_exec!(stage1, MemoryExec);
+        println!("Stage 1:\nInput {:#?}\n", input.schema());
+
+        // verify stage 2
+        let stage2 = stages[2].children()[0].clone();
+        let partial_hash = downcast_exec!(stage2, HashAggregateExec);
+        assert!(*partial_hash.mode() == AggregateMode::Partial);
+        let coalesce = partial_hash.children()[0].clone();
+        let coalesce = downcast_exec!(coalesce, CoalesceBatchesExec);
+        let join = coalesce.children()[0].clone();
+        let join = downcast_exec!(join, HashJoinExec);
+
+        let join_input_1 = join.children()[0].clone();
+        // skip CoalesceBatches
+        let input_1 = join_input_1.children()[0].clone();
+        let input_1 = downcast_exec!(input_1, MemoryExec);
+        println!("Stage 2:\nInput_1 {:#?}\n", input_1.schema());
+
+        let join_input_2 = join.children()[1].clone();
+        // skip CoalesceBatches
+        let input_2 = join_input_2.children()[0].clone();
+        let input_2 = downcast_exec!(input_2, MemoryExec);
+        println!("Stage 2:\nInput_2 {:#?}\n", input_2.schema());
+
+        // verify stage 3
+        let stage3 = stages[3].children()[0].clone();
+        let projection = downcast_exec!(stage3, ProjectionExec);
+        let final_hash = projection.children()[0].clone();
+        let final_hash = downcast_exec!(final_hash, HashAggregateExec);
+        assert!(*final_hash.mode() == AggregateMode::FinalPartitioned);
+        let coalesce = final_hash.children()[0].clone();
+        let coalesce = downcast_exec!(coalesce, CoalesceBatchesExec);
+        let input = coalesce.children()[0].clone();
+        let input = downcast_exec!(input, MemoryExec);
+        println!("Stage 3:\nInput {:#?}\n", input.schema());
 
         Ok(())
     }

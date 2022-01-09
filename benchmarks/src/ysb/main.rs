@@ -12,10 +12,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use datafusion::arrow::datatypes::{Schema, SchemaRef};
-use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::arrow::util::pretty::pretty_format_batches;
-use datafusion::datasource::MemTable;
-use datafusion::execution::context::ExecutionContext as DataFusionExecutionContext;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::ExecutionPlan;
 use flock::aws::{cloudwatch, lambda};
@@ -29,6 +26,7 @@ use std::sync::Arc;
 use structopt::StructOpt;
 use tokio::task::JoinHandle;
 use ysb::event::{AdEvent, Campaign};
+use ysb::register_ysb_tables;
 use ysb::YSBSource;
 
 lazy_static! {
@@ -79,25 +77,6 @@ async fn main() -> Result<()> {
     env_logger::init();
     ysb_benchmark(YSBBenchmarkOpt::from_args()).await?;
     Ok(())
-}
-
-async fn register_ysb_tables() -> Result<DataFusionExecutionContext> {
-    let mut ctx = DataFusionExecutionContext::new();
-    let ad_event_schema = Arc::new(AdEvent::schema());
-    let ad_event_table = MemTable::try_new(
-        ad_event_schema.clone(),
-        vec![vec![RecordBatch::new_empty(ad_event_schema)]],
-    )?;
-    ctx.register_table("ad_event", Arc::new(ad_event_table))?;
-
-    let campaign_schema = Arc::new(Campaign::schema());
-    let campaign_table = MemTable::try_new(
-        campaign_schema.clone(),
-        vec![vec![RecordBatch::new_empty(campaign_schema)]],
-    )?;
-    ctx.register_table("campaign", Arc::new(campaign_table))?;
-
-    Ok(ctx)
 }
 
 fn create_ysb_source(opt: &YSBBenchmarkOpt) -> YSBSource {
