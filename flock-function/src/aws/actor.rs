@@ -14,6 +14,7 @@
 use datafusion::arrow::csv::reader::ReaderBuilder;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::physical_plan::Partitioning::RoundRobinBatch;
+use flock::aws::s3;
 use flock::prelude::*;
 use futures::executor::block_on;
 use hashring::HashRing;
@@ -22,11 +23,10 @@ use log::{info, warn};
 use rayon::prelude::*;
 use rusoto_core::Region;
 use rusoto_lambda::{InvokeAsyncRequest, Lambda, LambdaClient};
-use rusoto_s3::{GetObjectRequest, S3};
 use serde_json::json;
 use serde_json::Value;
 use std::collections::HashMap;
-use std::io::{Cursor, Read};
+use std::io::Cursor;
 use std::sync::{Arc, Mutex};
 
 lazy_static! {
@@ -108,24 +108,8 @@ pub async fn collect(
 
 /// Read the payload from S3 via the S3 bucket and the key.
 async fn read_payload_from_s3(bucket: String, key: String) -> Result<Payload> {
-    let body = FLOCK_S3_CLIENT
-        .get_object(GetObjectRequest {
-            bucket,
-            key,
-            ..Default::default()
-        })
-        .await
-        .map_err(|e| FlockError::AWS(e.to_string()))?
-        .body
-        .take()
-        .expect("body is empty");
-    let payload: Payload = tokio::task::spawn_blocking(move || {
-        let mut buf = Vec::new();
-        body.into_blocking_read().read_to_end(&mut buf).unwrap();
-        serde_json::from_slice(&buf).unwrap()
-    })
-    .await
-    .expect("failed to load payload from S3");
+    let body = s3::get_object(&bucket, &key).await?;
+    let payload: Payload = serde_json::from_slice(&body)?;
     Ok(payload)
 }
 
@@ -285,25 +269,8 @@ pub async fn infer_side_input(
 ) -> Result<Vec<RecordBatch>> {
     if let Some(metadata) = metadata {
         if let Some(key) = metadata.get("side_input_s3_key") {
-            let body = FLOCK_S3_CLIENT
-                .get_object(GetObjectRequest {
-                    bucket: FLOCK_S3_BUCKET.clone(),
-                    key: key.parse::<String>().unwrap(),
-                    ..Default::default()
-                })
-                .await
-                .map_err(|e| FlockError::AWS(e.to_string()))?
-                .body
-                .take()
-                .expect("body is empty");
-
-            let bytes: Vec<u8> = tokio::task::spawn_blocking(move || {
-                let mut buf = Vec::new();
-                body.into_blocking_read().read_to_end(&mut buf).unwrap();
-                buf
-            })
-            .await
-            .expect("failed to load side input from S3");
+            let key = key.parse::<String>().unwrap();
+            let bytes = s3::get_object(&FLOCK_S3_BUCKET, &key).await?;
 
             let format = metadata
                 .get("side_input_format")

@@ -20,6 +20,7 @@ use datafusion::datasource::MemTable;
 use datafusion::execution::context::ExecutionContext as DataFusionExecutionContext;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::ExecutionPlan;
+use flock::aws::{cloudwatch, efs, lambda, s3};
 use flock::prelude::*;
 use humantime::parse_duration;
 use lazy_static::lazy_static;
@@ -153,9 +154,9 @@ pub async fn create_nexmark_source(opt: &mut NexmarkBenchmarkOpt) -> Result<NEXM
             .text_with_charset("utf-8")
             .await
             .map_err(|_| "Failed to read side input data")?;
-        put_object_to_s3_if_missing(
-            FLOCK_S3_BUCKET.clone(),
-            NEXMARK_Q13_S3_SIDE_INPUT_KEY.clone(),
+        s3::put_object_if_missing(
+            &FLOCK_S3_BUCKET,
+            &NEXMARK_Q13_S3_SIDE_INPUT_KEY,
             data.as_bytes().to_vec(),
         )
         .await?;
@@ -180,12 +181,8 @@ pub async fn plan_placement(
                 6 => (FLOCK_S3_BUCKET.clone(), NEXMARK_Q6_S3_KEY.clone()),
                 _ => unreachable!(),
             };
-            put_object_to_s3_if_missing(
-                s3_bucket.clone(),
-                s3_key.clone(),
-                serde_json::to_vec(&physcial_plan)?,
-            )
-            .await?;
+            s3::put_object_if_missing(&s3_bucket, &s3_key, serde_json::to_vec(&physcial_plan)?)
+                .await?;
             Ok((FLOCK_EMPTY_PLAN.clone(), Some((s3_bucket, s3_key))))
         }
         _ => Ok((physcial_plan, None)),
@@ -235,13 +232,14 @@ pub async fn create_nexmark_functions(
         "Creating lambda function: {}",
         rainbow_string(NEXMARK_SOURCE_FUNC_NAME.clone())
     );
-    create_lambda_function(&nexmark_source_ctx, 2048 /* MB */, &opt.architecture).await?;
+    lambda::create_function(&nexmark_source_ctx, 2048 /* MB */, &opt.architecture).await?;
 
     // Create the function for the nexmark worker.
     match next_func_name.clone() {
         CloudFunction::Lambda(name) => {
             info!("Creating lambda function: {}", rainbow_string(name));
-            create_lambda_function(&nexmark_worker_ctx, opt.memory_size, &opt.architecture).await?;
+            lambda::create_function(&nexmark_worker_ctx, opt.memory_size, &opt.architecture)
+                .await?;
         }
         CloudFunction::Group((name, concurrency)) => {
             info!(
@@ -262,8 +260,8 @@ pub async fn create_nexmark_functions(
                             "Creating function member: {}",
                             rainbow_string(&worker_ctx.name)
                         );
-                        create_lambda_function(&worker_ctx, memory_size, &architecture).await?;
-                        set_lambda_concurrency(worker_ctx.name, 1).await
+                        lambda::create_function(&worker_ctx, memory_size, &architecture).await?;
+                        lambda::set_concurrency(&worker_ctx.name, 1).await
                     })
                 })
                 .collect::<Vec<JoinHandle<Result<()>>>>();
@@ -278,23 +276,23 @@ pub async fn create_nexmark_functions(
 /// Create an Elastic file system access point for Flock.
 #[allow(dead_code)]
 async fn create_file_system() -> Result<String> {
-    let mut efs_id = create_aws_efs().await?;
+    let mut efs_id = efs::create().await?;
     if efs_id.is_empty() {
-        efs_id = discribe_aws_efs().await?;
+        efs_id = efs::discribe().await?;
     }
     info!("[OK] Creating AWS Elastic File System: {}", efs_id);
 
-    create_mount_target(&efs_id).await?;
+    efs::create_mount_target(&efs_id).await?;
     info!("[OK] Creating AWS EFS Mount Target");
 
-    let access_point_id = create_aws_efs_access_point(&efs_id).await?;
+    let access_point_id = efs::create_access_point(&efs_id).await?;
 
     let access_point_arn = if access_point_id.is_empty() {
-        describe_aws_efs_access_point(None, Some(efs_id))
+        efs::describe_access_point(None, Some(efs_id))
             .await
             .map_err(|e| FlockError::AWS(format!("{}", e)))?
     } else {
-        describe_aws_efs_access_point(Some(access_point_id), None)
+        efs::describe_access_point(Some(access_point_id), None)
             .await
             .map_err(|e| FlockError::AWS(format!("{}", e)))?
     };
@@ -411,13 +409,12 @@ pub async fn nexmark_benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
     let tasks = (0..opt.generators)
         .into_iter()
         .map(|i| {
-            let f = NEXMARK_SOURCE_FUNC_NAME.clone();
             let s = nexmark_conf.clone();
             let m = metadata.clone();
             tokio::spawn(async move {
                 info!(
                     "[OK] Invoking NEXMark source function: {} by generator {}\n",
-                    rainbow_string(&f),
+                    rainbow_string(&*NEXMARK_SOURCE_FUNC_NAME),
                     i
                 );
                 let p = serde_json::to_vec(&Payload {
@@ -427,7 +424,12 @@ pub async fn nexmark_benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
                     ..Default::default()
                 })?
                 .into();
-                invoke_lambda_function(f, Some(p), FLOCK_LAMBDA_ASYNC_CALL.to_string()).await
+                lambda::invoke_function(
+                    &NEXMARK_SOURCE_FUNC_NAME,
+                    &FLOCK_LAMBDA_ASYNC_CALL,
+                    Some(p),
+                )
+                .await
             })
         })
         // this collect *is needed* so that the join below can switch between tasks.
@@ -437,7 +439,7 @@ pub async fn nexmark_benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
 
     info!("Waiting for the current invocations to be logged.");
     tokio::time::sleep(parse_duration("5s").unwrap()).await;
-    fetch_aws_watchlogs(&NEXMARK_SOURCE_LOG_GROUP, parse_duration("1min").unwrap()).await?;
+    cloudwatch::fetch(&NEXMARK_SOURCE_LOG_GROUP, parse_duration("1min").unwrap()).await?;
 
     let sink_type = DataSinkType::new(&opt.data_sink_type)?;
     if sink_type != DataSinkType::Blackhole {
@@ -453,7 +455,7 @@ pub async fn nexmark_benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
         );
         info!("[OK] Last data sink function: {}", data_sink.function_name);
         let function_log_group = format!("/aws/lambda/{}", data_sink.function_name);
-        fetch_aws_watchlogs(&function_log_group, parse_duration("1min").unwrap()).await?;
+        cloudwatch::fetch(&function_log_group, parse_duration("1min").unwrap()).await?;
         println!("{}", pretty_format_batches(&data_sink.record_batches)?);
     }
 

@@ -14,9 +14,9 @@
 //! This crate responsibles for deploying the query to cloud function services
 //! on public clouds.
 
+use crate::aws::lambda;
 use crate::driver::funcgen::function::QueryFlow;
 use crate::error::{FlockError, Result};
-use crate::services::create_lambda_function;
 
 /// Query Execution Context decides to execute your queries either remotely or
 /// locally.
@@ -63,7 +63,7 @@ impl ExecutionEnvironment {
     /// request tracing.
     async fn lambda_deployment(flow: &QueryFlow) -> Result<()> {
         for (_, ctx) in flow.ctx.iter() {
-            create_lambda_function(ctx, 512, "x86_64").await?;
+            lambda::create_function(ctx, 512, "x86_64").await?;
         }
 
         Ok(())

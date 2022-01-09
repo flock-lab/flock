@@ -23,6 +23,7 @@ use datafusion::logical_plan::{col, count_distinct};
 use datafusion::physical_plan::collect_partitioned;
 use datafusion::physical_plan::expressions::col as expr_col;
 use datafusion::physical_plan::Partitioning::{HashDiff, RoundRobinBatch};
+use flock::aws::lambda;
 use flock::datasource::nexmark::config::BASE_TIME;
 use flock::prelude::*;
 use log::{info, warn};
@@ -123,12 +124,8 @@ pub async fn tumbling_window_tasks(
                     eid,
                     payload.len()
                 );
-                invoke_lambda_function(
-                    function_name.clone(),
-                    Some(payload.into()),
-                    invocation_type.clone(),
-                )
-                .await?;
+                lambda::invoke_function(&function_name, &invocation_type, Some(payload.into()))
+                    .await?;
                 eid += 1;
             }
         }
@@ -230,12 +227,8 @@ pub async fn hopping_window_tasks(
                     eid,
                     payload.len()
                 );
-                invoke_lambda_function(
-                    function_name.clone(),
-                    Some(payload.into()),
-                    invocation_type.clone(),
-                )
-                .await?;
+                lambda::invoke_function(&function_name, &invocation_type, Some(payload.into()))
+                    .await?;
                 eid += 1;
             }
         }
@@ -514,12 +507,8 @@ pub async fn session_window_tasks(
                             eid,
                             payload.len()
                         );
-                        invoke_lambda_function(
-                            function_name.clone(),
-                            Some(payload.into()),
-                            invoke_type.clone(),
-                        )
-                        .await?;
+                        lambda::invoke_function(&function_name, &invoke_type, Some(payload.into()))
+                            .await?;
                     }
                     Ok(())
                 })
@@ -820,12 +809,8 @@ pub async fn global_window_tasks(
                             eid,
                             payload.len()
                         );
-                        invoke_lambda_function(
-                            function_name.clone(),
-                            Some(payload.into()),
-                            invoke_type.clone(),
-                        )
-                        .await?;
+                        lambda::invoke_function(&function_name, &invoke_type, Some(payload.into()))
+                            .await?;
                     }
                     Ok(())
                 })
@@ -876,8 +861,7 @@ pub async fn elementwise_tasks(
             payload.metadata = metadata.clone();
             let bytes = serde_json::to_vec(&payload)?;
             info!("[OK] function payload bytes: {}", bytes.len());
-            invoke_lambda_function(function_name, Some(bytes.into()), invocation_type.clone())
-                .await?;
+            lambda::invoke_function(&function_name, &invocation_type, Some(bytes.into())).await?;
         } else {
             // Calculate the total data packets to be sent.
             // transfrom tuple (a, b) to (Arc::new(a), Arc::new(b))
@@ -917,12 +901,8 @@ pub async fn elementwise_tasks(
 
                 let bytes = serde_json::to_vec(&payload)?;
                 info!("[OK] Event {} - function payload bytes: {}", i, bytes.len());
-                invoke_lambda_function(
-                    function_name.clone(),
-                    Some(bytes.into()),
-                    invocation_type.clone(),
-                )
-                .await?;
+                lambda::invoke_function(&function_name, &invocation_type, Some(bytes.into()))
+                    .await?;
             }
         }
     }
