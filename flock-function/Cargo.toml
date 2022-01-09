@@ -1,6 +1,6 @@
 [package]
 name = "flock-function"
-version = "0.2.0"
+version = "0.3.0"
 description = "The generic cloud functions for serverless computation."
 authors = [ "Gang Liao <gangliao@cs.umd.edu>" ]
 license = "Apache-2.0"
@@ -35,6 +35,14 @@ snmalloc-rs = { version = "0.2", optional = true, features = [ "cache-friendly" 
 text_io = "0.1.8"
 tokio = { version = "1.4", features = [ "macros", "io-util", "sync", "rt-multi-thread" ] }
 uuid = { version = "0.8.2", features = [ "v4" ] }
+
+[dev-dependencies]
+cargo_toml = "0.10.1"
+
+[lib]
+name = "function"
+path = "src/lib.rs"
+crate-type = [ "lib" ]
 
 [[bin]]
 name = "flock"
