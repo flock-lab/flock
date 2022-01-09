@@ -1,0 +1,35 @@
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "a_id", index: 0 }], 16))
+    MemoryExec: partitions=1, partition_sizes=[1]
+
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "auction", index: 0 }], 16))
+    MemoryExec: partitions=1, partition_sizes=[1]
+
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "a_id", index: 0 }, Column { name: "category", index: 1 }], 16))
+    HashAggregateExec: mode=Partial, gby=[a_id@0 as a_id, category@3 as category], aggr=[MAX(bid.price)]
+    CoalesceBatchesExec: target_batch_size=4096
+        FilterExec: b_date_time@6 >= a_date_time@1 AND b_date_time@6 <= expires@2
+        CoalesceBatchesExec: target_batch_size=4096
+            HashJoinExec: mode=Partitioned, join_type=Inner, on=[(Column { name: "a_id", index: 0 }, Column { name: "auction", index: 0 })]
+            CoalesceBatchesExec: target_batch_size=4096
+                MemoryExec: partitions=0, partition_sizes=[]
+            CoalesceBatchesExec: target_batch_size=4096
+                MemoryExec: partitions=0, partition_sizes=[]
+
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "category", index: 0 }], 16))
+    HashAggregateExec: mode=Partial, gby=[category@1 as category], aggr=[AVG(Q.final)]
+    ProjectionExec: expr=[final@0 as final, category@1 as category]
+        ProjectionExec: expr=[MAX(bid.price)@2 as final, category@1 as category]
+        HashAggregateExec: mode=FinalPartitioned, gby=[a_id@0 as a_id, category@1 as category], aggr=[MAX(bid.price)]
+            CoalesceBatchesExec: target_batch_size=4096
+            MemoryExec: partitions=0, partition_sizes=[]
+
+=== Physical subplan ===
+ShuffleWriterExec: None
+    ProjectionExec: expr=[category@0 as category, AVG(Q.final)@1 as AVG(Q.final)]
+    HashAggregateExec: mode=FinalPartitioned, gby=[category@0 as category], aggr=[AVG(Q.final)]
+        CoalesceBatchesExec: target_batch_size=4096
+        MemoryExec: partitions=0, partition_sizes=[]
