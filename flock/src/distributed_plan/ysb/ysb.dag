@@ -1,0 +1,29 @@
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "ad_id", index: 0 }], 16))
+  CoalesceBatchesExec: target_batch_size=4096
+    FilterExec: event_type@1 = view
+      MemoryExec: partitions=1, partition_sizes=[1]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "c_ad_id", index: 0 }], 16))
+  MemoryExec: partitions=1, partition_sizes=[1]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "campaign_id", index: 0 }], 16))
+  HashAggregateExec: mode=Partial, gby=[campaign_id@3 as campaign_id], aggr=[COUNT(UInt8(1))]
+    CoalesceBatchesExec: target_batch_size=4096
+      HashJoinExec: mode=Partitioned, join_type=Inner, on=[(Column { name: "ad_id", index: 0 }, Column { name: "c_ad_id", index: 0 })]
+        CoalesceBatchesExec: target_batch_size=4096
+          MemoryExec: partitions=0, partition_sizes=[]
+        CoalesceBatchesExec: target_batch_size=4096
+          MemoryExec: partitions=0, partition_sizes=[]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: None
+  ProjectionExec: expr=[campaign_id@0 as campaign_id, COUNT(UInt8(1))@1 as COUNT(UInt8(1))]
+    HashAggregateExec: mode=FinalPartitioned, gby=[campaign_id@0 as campaign_id], aggr=[COUNT(UInt8(1))]
+      CoalesceBatchesExec: target_batch_size=4096
+        MemoryExec: partitions=0, partition_sizes=[]

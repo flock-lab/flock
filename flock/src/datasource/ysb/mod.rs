@@ -67,5 +67,44 @@ pub mod event;
 pub mod generator;
 pub mod query;
 pub mod ysb;
-
 pub use self::ysb::{YSBEvent, YSBSource, YSBStream};
+
+use self::event::{AdEvent, Campaign};
+use crate::error::Result;
+use datafusion::arrow::datatypes::Schema;
+use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::datasource::MemTable;
+use datafusion::execution::context::ExecutionContext;
+use std::sync::Arc;
+
+/// The YSB tables.
+pub const YSB_TABLES: &[&str] = &["ad_event", "campaign"];
+
+/// Get the schema for a given YSB table.
+pub fn get_nexmark_schema(table: &str) -> Schema {
+    match table {
+        "person" => AdEvent::schema(),
+        "auction" => Campaign::schema(),
+        _ => unimplemented!(),
+    }
+}
+
+/// Register the YSB tables with empty data.
+pub async fn register_ysb_tables() -> Result<ExecutionContext> {
+    let mut ctx = ExecutionContext::new();
+    let ad_event_schema = Arc::new(AdEvent::schema());
+    let ad_event_table = MemTable::try_new(
+        ad_event_schema.clone(),
+        vec![vec![RecordBatch::new_empty(ad_event_schema)]],
+    )?;
+    ctx.register_table("ad_event", Arc::new(ad_event_table))?;
+
+    let campaign_schema = Arc::new(Campaign::schema());
+    let campaign_table = MemTable::try_new(
+        campaign_schema.clone(),
+        vec![vec![RecordBatch::new_empty(campaign_schema)]],
+    )?;
+    ctx.register_table("campaign", Arc::new(campaign_table))?;
+
+    Ok(ctx)
+}
