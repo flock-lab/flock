@@ -18,6 +18,7 @@ use datafusion::datasource::MemTable;
 use datafusion::execution::context::ExecutionContext as DataFusionExecutionContext;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::ExecutionPlan;
+use flock::aws::{cloudwatch, lambda};
 use flock::prelude::*;
 use humantime::parse_duration;
 use lazy_static::lazy_static;
@@ -130,7 +131,7 @@ async fn create_ysb_functions(
 
     // Create the function for the ysb source generator.
     info!("Creating lambda function: {}", YSB_SOURCE_FUNC_NAME.clone());
-    create_lambda_function(&ysb_source_ctx, 1024, &opt.architecture).await?;
+    lambda::create_function(&ysb_source_ctx, 1024, &opt.architecture).await?;
 
     // Create the function for the ysb worker.
     match next_func_name.clone() {
@@ -147,8 +148,8 @@ async fn create_ysb_functions(
                     tokio::spawn(async move {
                         worker_ctx.name = format!("{}-{:02}", group_name, i);
                         info!("Creating function member: {}", worker_ctx.name);
-                        create_lambda_function(&worker_ctx, memory_size, &architecture).await?;
-                        set_lambda_concurrency(worker_ctx.name, 1).await
+                        lambda::create_function(&worker_ctx, memory_size, &architecture).await?;
+                        lambda::set_concurrency(&worker_ctx.name, 1).await
                     })
                 })
                 .collect::<Vec<JoinHandle<Result<()>>>>();
@@ -188,13 +189,12 @@ pub async fn ysb_benchmark(opt: YSBBenchmarkOpt) -> Result<()> {
     let tasks = (0..opt.generators)
         .into_iter()
         .map(|i| {
-            let f = YSB_SOURCE_FUNC_NAME.clone();
             let s = ysb_conf.clone();
             let m = metadata.clone();
             tokio::spawn(async move {
                 info!(
                     "[OK] Invoking YSB source function: {} by generator {}",
-                    f, i
+                    *YSB_SOURCE_FUNC_NAME, i
                 );
                 let p = serde_json::to_vec(&Payload {
                     datasource: DataSource::YSBEvent(s),
@@ -202,7 +202,8 @@ pub async fn ysb_benchmark(opt: YSBBenchmarkOpt) -> Result<()> {
                     ..Default::default()
                 })?
                 .into();
-                invoke_lambda_function(f, Some(p), FLOCK_LAMBDA_ASYNC_CALL.to_string()).await
+                lambda::invoke_function(&YSB_SOURCE_FUNC_NAME, &FLOCK_LAMBDA_ASYNC_CALL, Some(p))
+                    .await
             })
         })
         // this collect *is needed* so that the join below can switch between tasks.
@@ -212,7 +213,7 @@ pub async fn ysb_benchmark(opt: YSBBenchmarkOpt) -> Result<()> {
 
     info!("Waiting for the current invocations to be logged.");
     tokio::time::sleep(parse_duration("5s").unwrap()).await;
-    fetch_aws_watchlogs(&YSB_SOURCE_LOG_GROUP, parse_duration("1min").unwrap()).await?;
+    cloudwatch::fetch(&YSB_SOURCE_LOG_GROUP, parse_duration("1min").unwrap()).await?;
 
     let sink_type = DataSinkType::new(&opt.data_sink_type)?;
     if sink_type != DataSinkType::Blackhole {
@@ -224,7 +225,7 @@ pub async fn ysb_benchmark(opt: YSBBenchmarkOpt) -> Result<()> {
         );
         info!("[OK] Last data sink function: {}", data_sink.function_name);
         let function_log_group = format!("/aws/lambda/{}", data_sink.function_name);
-        fetch_aws_watchlogs(&function_log_group, parse_duration("1min").unwrap()).await?;
+        cloudwatch::fetch(&function_log_group, parse_duration("1min").unwrap()).await?;
         println!("{}", pretty_format_batches(&data_sink.record_batches)?);
     }
 

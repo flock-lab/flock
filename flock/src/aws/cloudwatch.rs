@@ -11,11 +11,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-//! This crate is a tail like tool for AWS Cloudwatch.
+//! This crate contains all wrapped functions of the AWS CloudWatch services.
 
+use crate::configs::*;
 use crate::error::{FlockError, Result};
 use chrono::Duration as Delta;
 use chrono::{DateTime, Local, NaiveDateTime, Utc};
+use humantime::parse_duration;
 use log::info;
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, DescribeLogGroupsRequest, FilterLogEventsRequest,
@@ -31,6 +33,57 @@ pub enum AWSResponse {
     LastLog(Option<i64>),
 }
 
+/// Fetches the lambda function's latest log.
+///
+/// # Arguments
+/// * `group` - The name of the log group.
+/// * `mtime` - The time of the latest log.
+pub async fn fetch(group: &str, mtime: Duration) -> Result<()> {
+    let mut logged = false;
+    let timeout = parse_duration("1min").unwrap();
+    let sleep_for = parse_duration("5s").ok();
+    let mut token: Option<String> = None;
+    let mut req = create_filter_request(group, mtime, None, token);
+    loop {
+        if logged {
+            break;
+        }
+
+        match fetch_logs(&FLOCK_WATCHLOGS_CLIENT, req, timeout)
+            .await
+            .map_err(|e| FlockError::Internal(e.to_string()))?
+        {
+            AWSResponse::Token(x) => {
+                info!("Got a Token response");
+                logged = true;
+                token = Some(x);
+                req = create_filter_request(group, mtime, None, token);
+            }
+            AWSResponse::LastLog(t) => match sleep_for {
+                Some(x) => {
+                    info!("Got a lastlog response");
+                    token = None;
+                    req = create_filter_from_timestamp(group, t, None, token);
+                    info!("Waiting {:?} before requesting logs again...", x);
+                    tokio::time::sleep(x).await;
+                }
+                None => break,
+            },
+        };
+    }
+
+    Ok(())
+}
+
+/// Calculates the start time of the log request.
+/// The start time is the time of the latest log minus the given duration.
+///
+/// # Arguments
+/// * `from` - The time of the latest log.
+/// * `delta` - The duration to subtract from the latest log.
+///
+/// # Returns
+/// The start time of the log request.
 fn calculate_start_time(from: DateTime<Local>, delta: Duration) -> Option<i64> {
     let chrono_delta = Delta::from_std(delta).unwrap();
     let start_time = from.checked_sub_signed(chrono_delta).unwrap();
@@ -38,6 +91,7 @@ fn calculate_start_time(from: DateTime<Local>, delta: Duration) -> Option<i64> {
     Some(utc_time.timestamp_millis())
 }
 
+/// Prints the timestamp in a human readable format.
 fn print_date(time: Option<i64>) -> String {
     match time {
         Some(x) => DateTime::<Local>::from(DateTime::<Utc>::from_utc(
@@ -51,6 +105,15 @@ fn print_date(time: Option<i64>) -> String {
 }
 
 /// Creates a log filter request for the given log group name.
+///
+/// # Arguments
+/// * `group` - The name of the log group.
+/// * `start` - The start time of the log request.
+/// * `filter` - The filter of the log request.
+/// * `token` - The token of the log request.
+///
+/// # Returns
+/// The log filter request.
 pub fn create_filter_request(
     group: &str,
     start: Duration,
@@ -68,6 +131,12 @@ pub fn create_filter_request(
 }
 
 /// Creates a log filter request for the given log group name.
+///
+/// # Arguments
+/// * `group` - The name of the log group.
+/// * `start` - The start time of the log request.
+/// * `filter` - The filter of the log request.
+/// * `token` - The token of the log request.
 pub fn create_filter_from_timestamp(
     group: &str,
     start: Option<i64>,
@@ -85,6 +154,14 @@ pub fn create_filter_from_timestamp(
 }
 
 /// Fetches the log events from the given log group.
+///
+/// # Arguments
+/// * `client` - The client to use to fetch the log events.
+/// * `req` - The request to fetch the log events.
+/// * `timeout` - The timeout of the request.
+///
+/// # Returns
+/// The log events.
 pub async fn fetch_logs(
     client: &CloudWatchLogsClient,
     req: FilterLogEventsRequest,
@@ -117,11 +194,14 @@ pub async fn fetch_logs(
 }
 
 /// Lists all log groups in the current region.
-pub async fn list_log_groups(c: &CloudWatchLogsClient) -> Result<()> {
+///
+/// # Arguments
+/// * `client` - The client to use to list the log groups.
+pub async fn list_log_groups(client: &CloudWatchLogsClient) -> Result<()> {
     let mut req = DescribeLogGroupsRequest::default();
     loop {
         info!("Sending list log groups request {:?}", &req);
-        let resp = c
+        let resp = client
             .describe_log_groups(req)
             .await
             .map_err(|e| FlockError::Internal(format!("Error listing log groups: {}", e)))?;

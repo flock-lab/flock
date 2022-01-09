@@ -16,6 +16,7 @@
 
 #[path = "../nexmark/main.rs"]
 mod nexmark_bench;
+use flock::aws::lambda;
 use flock::prelude::*;
 use log::info;
 use nexmark_bench::*;
@@ -83,10 +84,10 @@ async fn benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
     .into();
 
     let resp: Value = serde_json::from_slice(
-        &invoke_lambda_function(
-            NEXMARK_SOURCE_FUNC_NAME.clone(),
+        &lambda::invoke_function(
+            &NEXMARK_SOURCE_FUNC_NAME,
+            &FLOCK_LAMBDA_SYNC_CALL,
             Some(payload),
-            FLOCK_LAMBDA_SYNC_CALL.to_string(),
         )
         .await?
         .payload
@@ -120,14 +121,10 @@ async fn benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
 
     info!("[OK] Invoking NEXMark worker function: {}", function_name);
     let resp: Value = serde_json::from_slice(
-        &invoke_lambda_function(
-            function_name.clone(),
-            Some(payload),
-            FLOCK_LAMBDA_SYNC_CALL.to_string(),
-        )
-        .await?
-        .payload
-        .expect("No response"),
+        &lambda::invoke_function(&function_name, &FLOCK_LAMBDA_SYNC_CALL, Some(payload))
+            .await?
+            .payload
+            .expect("No response"),
     )?;
     info!("[OK] Received response: {:?}", resp);
     let end_time = SystemTime::now();

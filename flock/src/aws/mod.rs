@@ -11,7 +11,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-//! This crates monitors the status of cloud resources requested by each
-//! continous query.
+//! This module contains all wrapped functions of the AWS services such as
+//! Lambda, DynamoDB, S3, etc. Flock uses the AWS services to build the
+//! distributed query engine.
 
 pub mod cloudwatch;
+pub mod dynamodb;
+pub mod efs;
+pub mod lambda;
+pub mod s3;
+pub mod sqs;

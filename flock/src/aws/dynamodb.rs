@@ -11,12 +11,4 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-//! The `Driver` crate is a unified API for users to execute queries in either
-//! local environment or cloud environments.
-
-#[cfg(feature = "build")]
-pub mod build;
-pub mod deploy;
-pub mod funcgen;
-
-pub use funcgen::function::QueryFlow;
+//! This crate contains all wrapped functions of the AWS DynamoDB service.

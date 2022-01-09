@@ -21,7 +21,7 @@
 //! use flock::prelude::*;
 //! ```
 
-pub use crate::configs::{AwsLambdaConfig, FLOCK_CONF};
+pub use crate::configs::*;
 pub use crate::datasink::{DataSink, DataSinkFormat, DataSinkType};
 pub use crate::datasource::{nexmark, tpch, ysb, DataSource, DataStream, RelationPartitions};
 pub use crate::encoding::Encoding;
@@ -33,5 +33,4 @@ pub use crate::runtime::executor::{
 };
 pub use crate::runtime::payload::{DataFrame, Payload, Uuid, UuidBuilder};
 pub use crate::runtime::query::{BatchQuery, Query, Schedule, StreamQuery, StreamWindow};
-pub use crate::services::*;
 pub use crate::transmute::*;

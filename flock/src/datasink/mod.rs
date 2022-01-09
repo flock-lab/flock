@@ -14,10 +14,11 @@
 //! This module provides different data sinks for the Flock runtime to write
 //! data to.
 
+use crate::aws::s3;
+use crate::configs::*;
 use crate::encoding::Encoding;
 use crate::error::{FlockError, Result};
 use crate::runtime::payload::DataFrame;
-use crate::services::*;
 use crate::transmute::*;
 use datafusion::arrow::csv;
 use datafusion::arrow::datatypes::Schema;
@@ -29,8 +30,6 @@ use datafusion::execution::context::ExecutionContext;
 use datafusion::parquet::arrow::ArrowWriter;
 use datafusion::prelude::CsvReadOptions;
 use rayon::prelude::*;
-use rusoto_core::ByteStream;
-use rusoto_s3::{GetObjectRequest, PutObjectRequest, S3};
 use rusoto_sqs::{
     CreateQueueRequest, GetQueueUrlRequest, ReceiveMessageRequest, SendMessageRequest, Sqs,
 };
@@ -38,7 +37,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use serde_json::Value;
 use std::collections::HashMap;
-use std::io::Read;
 use std::path::Path;
 use std::sync::Arc;
 use tokio::task::{self, JoinHandle};
@@ -276,15 +274,7 @@ impl DataSink {
         self.encode_record_batches();
 
         let s3_key = self.function_name.split('-').next().unwrap();
-        FLOCK_S3_CLIENT
-            .put_object(PutObjectRequest {
-                bucket: FLOCK_S3_BUCKET.clone(),
-                key: s3_key.to_string(),
-                body: Some(ByteStream::from(serde_json::to_vec(&self)?)),
-                ..Default::default()
-            })
-            .await
-            .map_err(|e| FlockError::AWS(e.to_string()))?;
+        s3::put_object(&FLOCK_S3_BUCKET, s3_key, serde_json::to_vec(&self)?).await?;
 
         Ok(())
     }
@@ -362,26 +352,8 @@ impl DataSink {
 
     async fn read_from_s3(function_name: String) -> Result<DataSink> {
         let s3_key = function_name.split('-').next().unwrap();
-        let body = FLOCK_S3_CLIENT
-            .get_object(GetObjectRequest {
-                bucket: FLOCK_S3_BUCKET.clone(),
-                key: s3_key.to_string(),
-                ..Default::default()
-            })
-            .await
-            .map_err(|e| FlockError::AWS(e.to_string()))?
-            .body
-            .take()
-            .expect("body is empty");
-
-        let mut data: DataSink = tokio::task::spawn_blocking(move || {
-            let mut buf = Vec::new();
-            body.into_blocking_read().read_to_end(&mut buf).unwrap();
-            serde_json::from_slice(&buf).unwrap()
-        })
-        .await
-        .expect("failed to load plan from S3");
-
+        let body = s3::get_object(&FLOCK_S3_BUCKET, s3_key).await?;
+        let mut data: DataSink = serde_json::from_slice(&body)?;
         data.decode_record_batches()?;
 
         Ok(data)
