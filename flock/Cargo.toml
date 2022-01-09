@@ -1,6 +1,6 @@
 [package]
 name = "flock"
-version = "0.2.0"
+version = "0.3.0"
 description = "Flock is a cloud-native, distributed, fault-tolerant, and highly-available streaming query engine that supports SQL on cloud function services."
 authors = [ "Gang Liao <gangliao@cs.umd.edu>" ]
 license = "AGPL-3.0"
@@ -62,7 +62,6 @@ structopt = { git = "https://github.com/flock-lab/structopt", branch = "master",
 text_io = "0.1.8"
 tokio = { version = "1.4", features = [ "macros", "io-util", "sync", "rt-multi-thread" ] }
 typetag = "0.1.8"
-
 url = { version = "2.0", optional = true }
 uuid = { version = "0.8.2", features = [ "v4" ] }
 zstd = "0.9.0+zstd.1.5.0"

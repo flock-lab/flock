@@ -1,6 +1,6 @@
 [package]
 name = "benchmarks"
-version = "0.2.0"
+version = "0.3.0"
 authors = [ "Gang Liao <gangliao@cs.umd.edu>" ]
 edition = "2021"
 publish = false

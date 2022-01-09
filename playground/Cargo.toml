@@ -1,6 +1,6 @@
 [package]
 name = "flock-playground"
-version = "0.2.0"
+version = "0.3.0"
 description = "The playground for testing and experimenting with some system design ideas."
 authors = [ "Gang Liao <gangliao@cs.umd.edu>" ]
 license = "AGPL-3.0"
