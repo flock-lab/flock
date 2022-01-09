@@ -149,7 +149,7 @@ impl ExecutionContext {
                 if self.plan_s3_idx.is_some() {
                     println!("Loading plan from S3 {:?}", self.plan_s3_idx);
                     let (bucket, key) = self.plan_s3_idx.as_ref().unwrap();
-                    self.plan = serde_json::from_slice(&s3::get_object(&bucket, &key).await?)?;
+                    self.plan = serde_json::from_slice(&s3::get_object(bucket, key).await?)?;
                     Ok(&mut self.plan)
                 } else {
                     panic!("The query plan is not stored in the environment variable and S3.");

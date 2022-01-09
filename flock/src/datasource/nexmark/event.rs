@@ -129,7 +129,7 @@ impl Person {
     /// Returns `Person`'s schema.
     pub fn schema() -> Schema {
         let mut metadata = HashMap::new();
-        metadata.insert("name".to_string(), "auction".to_string());
+        metadata.insert("name".to_string(), "person".to_string());
         Schema::new_with_metadata(
             vec![
                 Field::new("p_id", DataType::Int32, false),

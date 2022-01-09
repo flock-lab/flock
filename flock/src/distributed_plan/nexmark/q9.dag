@@ -1,0 +1,46 @@
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "auction", index: 0 }, Column { name: "price", index: 2 }], 16))
+  MemoryExec: partitions=1, partition_sizes=[1]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "a_id", index: 0 }], 16))
+  MemoryExec: partitions=1, partition_sizes=[1]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "auction", index: 0 }], 16))
+  MemoryExec: partitions=1, partition_sizes=[1]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "a_id", index: 0 }], 16))
+  HashAggregateExec: mode=Partial, gby=[a_id@0 as a_id], aggr=[MAX(bid.price)]
+    CoalesceBatchesExec: target_batch_size=4096
+      FilterExec: b_date_time@6 >= a_date_time@1 AND b_date_time@6 <= expires@2
+        CoalesceBatchesExec: target_batch_size=4096
+          HashJoinExec: mode=Partitioned, join_type=Inner, on=[(Column { name: "a_id", index: 0 }, Column { name: "auction", index: 0 })]
+            CoalesceBatchesExec: target_batch_size=4096
+              MemoryExec: partitions=0, partition_sizes=[]
+            CoalesceBatchesExec: target_batch_size=4096
+              MemoryExec: partitions=0, partition_sizes=[]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "id", index: 0 }, Column { name: "final", index: 1 }], 16))
+  ProjectionExec: expr=[id@0 as id, final@1 as final]
+    ProjectionExec: expr=[a_id@0 as id, MAX(bid.price)@1 as final]
+      HashAggregateExec: mode=FinalPartitioned, gby=[a_id@0 as a_id], aggr=[MAX(bid.price)]
+        CoalesceBatchesExec: target_batch_size=4096
+          MemoryExec: partitions=0, partition_sizes=[]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: None
+  ProjectionExec: expr=[auction@0 as auction, bidder@1 as bidder, price@2 as price, b_date_time@3 as b_date_time]
+    CoalesceBatchesExec: target_batch_size=4096
+      HashJoinExec: mode=Partitioned, join_type=Inner, on=[(Column { name: "auction", index: 0 }, Column { name: "id", index: 0 }), (Column { name: "price", index: 2 }, Column { name: "final", index: 1 })]
+        CoalesceBatchesExec: target_batch_size=4096
+          MemoryExec: partitions=0, partition_sizes=[]
+        CoalesceBatchesExec: target_batch_size=4096
+          MemoryExec: partitions=0, partition_sizes=[]

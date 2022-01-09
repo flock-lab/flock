@@ -1,0 +1,72 @@
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "a_id", index: 0 }], 16))
+  MemoryExec: partitions=1, partition_sizes=[1]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "auction", index: 0 }], 16))
+  MemoryExec: partitions=1, partition_sizes=[1]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "a_id", index: 0 }], 16))
+  CoalesceBatchesExec: target_batch_size=4096
+    FilterExec: b_date_time@6 >= a_date_time@1 AND b_date_time@6 <= expires@2
+      CoalesceBatchesExec: target_batch_size=4096
+        HashJoinExec: mode=Partitioned, join_type=Inner, on=[(Column { name: "a_id", index: 0 }, Column { name: "auction", index: 0 })]
+          CoalesceBatchesExec: target_batch_size=4096
+            MemoryExec: partitions=0, partition_sizes=[]
+          CoalesceBatchesExec: target_batch_size=4096
+            MemoryExec: partitions=0, partition_sizes=[]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: None
+  CoalesceBatchesExec: target_batch_size=4096
+    MemoryExec: partitions=0, partition_sizes=[]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: None
+  ProjectionExec: expr=[seller@4 as seller, a_id@1 as a_id, price@6 as price, b_date_time@7 as b_date_time]
+    CoalesceBatchesExec: target_batch_size=4096
+      FilterExec: CAST(ROW_NUMBER() PARTITION BY [#auction.a_id] ORDER BY [#bid.price DESC NULLS FIRST]@0 AS Int64) = 1
+        WindowAggExec: wdw=[ROW_NUMBER(): Ok(Field { name: "ROW_NUMBER()", data_type: UInt64, nullable: false, dict_id: 0, dict_is_ordered: false, metadata: None })]
+          SortExec: [a_id@0 ASC,price@5 DESC]
+            CoalescePartitionsExec
+              MemoryExec: partitions=0, partition_sizes=[]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "seller", index: 0 }], 16))
+  ProjectionExec: expr=[seller@0 as seller, price@2 as price, b_date_time@3 as b_date_time]
+    SortExec: [a_id@1 ASC NULLS LAST,price@2 DESC]
+      CoalescePartitionsExec
+        MemoryExec: partitions=0, partition_sizes=[]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: None
+  CoalesceBatchesExec: target_batch_size=4096
+    MemoryExec: partitions=0, partition_sizes=[]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "seller", index: 0 }], 16))
+  HashAggregateExec: mode=Partial, gby=[seller@0 as seller], aggr=[AVG(R.price)]
+    ProjectionExec: expr=[seller@0 as seller, price@1 as price]
+      ProjectionExec: expr=[seller@1 as seller, price@2 as price]
+        CoalesceBatchesExec: target_batch_size=4096
+          FilterExec: CAST(ROW_NUMBER() PARTITION BY [#Q.seller] ORDER BY [#Q.b_date_time DESC NULLS FIRST]@0 AS Int64) <= 10
+            WindowAggExec: wdw=[ROW_NUMBER(): Ok(Field { name: "ROW_NUMBER()", data_type: UInt64, nullable: false, dict_id: 0, dict_is_ordered: false, metadata: None })]
+              SortExec: [seller@0 ASC,b_date_time@2 DESC]
+                CoalescePartitionsExec
+                  MemoryExec: partitions=0, partition_sizes=[]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: None
+  ProjectionExec: expr=[seller@0 as seller, AVG(R.price)@1 as AVG(R.price)]
+    HashAggregateExec: mode=FinalPartitioned, gby=[seller@0 as seller], aggr=[AVG(R.price)]
+      CoalesceBatchesExec: target_batch_size=4096
+        MemoryExec: partitions=0, partition_sizes=[]

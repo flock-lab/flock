@@ -1,0 +1,29 @@
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "price", index: 2 }], 16))
+  MemoryExec: partitions=1, partition_sizes=[1]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: None
+  HashAggregateExec: mode=Partial, gby=[], aggr=[MAX(bid.price)]
+    MemoryExec: partitions=1, partition_sizes=[1]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "maxprice", index: 0 }], 16))
+  ProjectionExec: expr=[maxprice@0 as maxprice]
+    ProjectionExec: expr=[MAX(bid.price)@0 as maxprice]
+      HashAggregateExec: mode=Final, gby=[], aggr=[MAX(bid.price)]
+        CoalescePartitionsExec
+          MemoryExec: partitions=0, partition_sizes=[]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: None
+  ProjectionExec: expr=[auction@0 as auction, price@2 as price, bidder@1 as bidder, b_date_time@3 as b_date_time]
+    CoalesceBatchesExec: target_batch_size=4096
+      HashJoinExec: mode=Partitioned, join_type=Inner, on=[(Column { name: "price", index: 2 }, Column { name: "maxprice", index: 0 })]
+        CoalesceBatchesExec: target_batch_size=4096
+          MemoryExec: partitions=0, partition_sizes=[]
+        CoalesceBatchesExec: target_batch_size=4096
+          MemoryExec: partitions=0, partition_sizes=[]

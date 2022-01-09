@@ -30,6 +30,7 @@ pub mod aws;
 pub mod configs;
 pub mod datasink;
 pub mod datasource;
+pub mod distributed_plan;
 pub mod driver;
 pub mod encoding;
 pub mod error;

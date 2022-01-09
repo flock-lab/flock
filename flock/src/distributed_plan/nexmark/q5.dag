@@ -1,0 +1,49 @@
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "auction", index: 0 }], 16))
+  HashAggregateExec: mode=Partial, gby=[auction@0 as auction], aggr=[COUNT(UInt8(1))]
+    MemoryExec: partitions=1, partition_sizes=[1]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "num", index: 1 }], 16))
+  ProjectionExec: expr=[auction@0 as auction, num@1 as num]
+    ProjectionExec: expr=[auction@0 as auction, COUNT(UInt8(1))@1 as num]
+      HashAggregateExec: mode=FinalPartitioned, gby=[auction@0 as auction], aggr=[COUNT(UInt8(1))]
+        CoalesceBatchesExec: target_batch_size=4096
+          MemoryExec: partitions=0, partition_sizes=[]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "auction", index: 0 }], 16))
+  HashAggregateExec: mode=Partial, gby=[auction@0 as auction], aggr=[COUNT(UInt8(1))]
+    MemoryExec: partitions=1, partition_sizes=[1]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: None
+  HashAggregateExec: mode=Partial, gby=[], aggr=[MAX(CountBids.num)]
+    ProjectionExec: expr=[num@0 as num]
+      ProjectionExec: expr=[COUNT(UInt8(1))@1 as num]
+        HashAggregateExec: mode=FinalPartitioned, gby=[auction@0 as auction], aggr=[COUNT(UInt8(1))]
+          CoalesceBatchesExec: target_batch_size=4096
+            MemoryExec: partitions=0, partition_sizes=[]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "maxn", index: 0 }], 16))
+  ProjectionExec: expr=[maxn@0 as maxn]
+    ProjectionExec: expr=[MAX(CountBids.num)@0 as maxn]
+      HashAggregateExec: mode=Final, gby=[], aggr=[MAX(CountBids.num)]
+        CoalescePartitionsExec
+          MemoryExec: partitions=0, partition_sizes=[]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: None
+  ProjectionExec: expr=[auction@0 as auction, num@1 as num]
+    CoalesceBatchesExec: target_batch_size=4096
+      HashJoinExec: mode=Partitioned, join_type=Inner, on=[(Column { name: "num", index: 1 }, Column { name: "maxn", index: 0 })]
+        CoalesceBatchesExec: target_batch_size=4096
+          MemoryExec: partitions=0, partition_sizes=[]
+        CoalesceBatchesExec: target_batch_size=4096
+          MemoryExec: partitions=0, partition_sizes=[]

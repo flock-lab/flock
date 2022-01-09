@@ -74,4 +74,60 @@ pub mod nexmark;
 mod queries;
 
 pub use self::config::NEXMarkConfig;
+pub use self::event::{side_input_schema, Auction, Bid, Person};
 pub use self::nexmark::{NEXMarkEvent, NEXMarkSource, NEXMarkStream};
+use crate::error::Result;
+use datafusion::arrow::datatypes::Schema;
+use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::datasource::MemTable;
+use datafusion::execution::context::ExecutionContext;
+use std::sync::Arc;
+
+/// The NEXMark tables.
+pub const NEXMARK_TABLES: &[&str] = &["person", "auction", "bid", "side_input"];
+
+/// Get the schema for a given NEXMark table.
+pub fn get_nexmark_schema(table: &str) -> Schema {
+    match table {
+        "person" => Person::schema(),
+        "auction" => Auction::schema(),
+        "bid" => Bid::schema(),
+        "side_input" => side_input_schema(),
+        _ => unimplemented!(),
+    }
+}
+
+/// Register the NEXMark tables with empty data.
+pub async fn register_nexmark_tables() -> Result<ExecutionContext> {
+    let mut ctx = ExecutionContext::new();
+    let person_schema = Arc::new(Person::schema());
+    let person_table = MemTable::try_new(
+        person_schema.clone(),
+        vec![vec![RecordBatch::new_empty(person_schema)]],
+    )?;
+    ctx.register_table("person", Arc::new(person_table))?;
+
+    let auction_schema = Arc::new(Auction::schema());
+    let auction_table = MemTable::try_new(
+        auction_schema.clone(),
+        vec![vec![RecordBatch::new_empty(auction_schema)]],
+    )?;
+    ctx.register_table("auction", Arc::new(auction_table))?;
+
+    let bid_schema = Arc::new(Bid::schema());
+    let bid_table = MemTable::try_new(
+        bid_schema.clone(),
+        vec![vec![RecordBatch::new_empty(bid_schema)]],
+    )?;
+    ctx.register_table("bid", Arc::new(bid_table))?;
+
+    // For NEXMark Q13
+    let side_input_schema = Arc::new(side_input_schema());
+    let side_input_table = MemTable::try_new(
+        side_input_schema.clone(),
+        vec![vec![RecordBatch::new_empty(side_input_schema)]],
+    )?;
+    ctx.register_table("side_input", Arc::new(side_input_table))?;
+
+    Ok(ctx)
+}

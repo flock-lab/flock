@@ -1,0 +1,23 @@
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "seller", index: 1 }], 16))
+  CoalesceBatchesExec: target_batch_size=4096
+    FilterExec: CAST(category@2 AS Int64) = 10
+      MemoryExec: partitions=1, partition_sizes=[1]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: Some(Hash([Column { name: "p_id", index: 0 }], 16))
+  CoalesceBatchesExec: target_batch_size=4096
+    FilterExec: state@3 = or OR state@3 = id OR state@3 = ca
+      MemoryExec: partitions=1, partition_sizes=[1]
+
+
+=== Physical subplan ===
+ShuffleWriterExec: None
+  ProjectionExec: expr=[name@4 as name, city@5 as city, state@6 as state, a_id@0 as a_id]
+    CoalesceBatchesExec: target_batch_size=4096
+      HashJoinExec: mode=Partitioned, join_type=Inner, on=[(Column { name: "seller", index: 1 }, Column { name: "p_id", index: 0 })]
+        CoalesceBatchesExec: target_batch_size=4096
+          MemoryExec: partitions=0, partition_sizes=[]
+        CoalesceBatchesExec: target_batch_size=4096
+          MemoryExec: partitions=0, partition_sizes=[]

@@ -1,0 +1,4 @@
+=== Physical subplan ===
+ShuffleWriterExec: None
+    ProjectionExec: expr=[auction@0 as auction, bidder@1 as bidder, 0.908 * CAST(price@2 AS Float64) as price, b_date_time@3 as b_date_time]
+    MemoryExec: partitions=1, partition_sizes=[1]
