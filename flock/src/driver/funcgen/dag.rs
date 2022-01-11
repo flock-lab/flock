@@ -225,7 +225,7 @@ impl QueryDag {
                     Some("FinalPartitioned") | Some("Final") => {
                         // Split the plan into two subplans
                         let object = (*json["input"].take().as_object().ok_or_else(|| {
-                            FlockError::DagPartition(
+                            FlockError::QueryStage(
                                 "Failed to parse input for hash_aggregate_exec".to_string(),
                             )
                         })?)
@@ -247,7 +247,7 @@ impl QueryDag {
                 },
                 Some("hash_join_exec") => {
                     let object = (*json.take().as_object().ok_or_else(|| {
-                        FlockError::DagPartition(
+                        FlockError::QueryStage(
                             "Failed to parse input for hash_join_exec".to_string(),
                         )
                     })?)

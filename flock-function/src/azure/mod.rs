@@ -19,7 +19,7 @@ use flock::driver::funcgen::function::QueryFlow;
 use flock::error::Result;
 
 /// AzureLauncher defines the interface for deploying and executing
-/// queries on Azure Functions.  
+/// queries on Azure Functions.
 pub struct AzureLauncher {}
 
 impl Launcher for AzureLauncher {

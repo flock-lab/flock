@@ -62,7 +62,7 @@ pub enum FlockError {
     Plan(String),
     /// Error returned when the DAG partition failed in Flock.
     /// This error should not happen in normal usage of Flock.
-    DagPartition(String),
+    QueryStage(String),
     /// Error returned during execution of the query.
     /// Examples include files not found, errors in parsing certain types.
     Execution(String),
@@ -150,7 +150,7 @@ impl Display for FlockError {
                 desc
             ),
             FlockError::Plan(ref desc) => write!(f, "Error during planning: {}", desc),
-            FlockError::DagPartition(ref desc) => {
+            FlockError::QueryStage(ref desc) => {
                 write!(f, "Error during DAG partitioning: {}", desc)
             }
             FlockError::Execution(ref desc) => write!(f, "Execution error: {}", desc),
