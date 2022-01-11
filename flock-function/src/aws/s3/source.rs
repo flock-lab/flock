@@ -70,7 +70,7 @@ pub async fn handler(_ctx: &ExecutionContext, payload: Payload) -> Result<Value>
     };
 
     let bytes = match source.window {
-        StreamWindow::HoppingWindow(..) | StreamWindow::TumblingWindow(..) => {
+        Window::Hopping(..) | Window::Tumbling(..) => {
             assert!(sec == 10);
             let mut r1 = vec![];
             let mut r2 = vec![];
@@ -104,7 +104,7 @@ pub async fn handler(_ctx: &ExecutionContext, payload: Payload) -> Result<Value>
                 sync,
             ))?
         }
-        StreamWindow::ElementWise => {
+        Window::ElementWise => {
             assert!(sec == 1);
             serde_json::to_vec(&events.select_event_to_payload(
                 0,

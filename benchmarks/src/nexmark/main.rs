@@ -102,11 +102,11 @@ async fn main() -> Result<()> {
 
 pub async fn create_nexmark_source(opt: &mut NexmarkBenchmarkOpt) -> Result<NEXMarkSource> {
     let window = match opt.query_number {
-        0..=4 | 6 | 9 | 10 | 13 => StreamWindow::ElementWise,
-        5 => StreamWindow::HoppingWindow((10, 5)),
-        7..=8 => StreamWindow::TumblingWindow(Schedule::Seconds(10)),
-        11 => StreamWindow::SessionWindow(Schedule::Seconds(10)),
-        12 => StreamWindow::GlobalWindow(Schedule::Seconds(10)),
+        0..=4 | 6 | 9 | 10 | 13 => Window::ElementWise,
+        5 => Window::Hopping((10, 5)),
+        7..=8 => Window::Tumbling(Schedule::Seconds(10)),
+        11 => Window::Session(Schedule::Seconds(10)),
+        12 => Window::Global(Schedule::Seconds(10)),
         _ => unreachable!(),
     };
 
@@ -161,7 +161,7 @@ pub async fn plan_placement(
 /// by the NexmarkBenchmark data generator function.
 pub async fn create_nexmark_functions(
     opt: &NexmarkBenchmarkOpt,
-    window: StreamWindow,
+    window: Window,
     physcial_plan: Arc<dyn ExecutionPlan>,
 ) -> Result<CloudFunction> {
     let worker_func_name = format!("q{}-00", opt.query_number);
@@ -172,12 +172,11 @@ pub async fn create_nexmark_functions(
         *FLOCK_SYNC_GRANULE_SIZE * 2
     };
 
-    let next_func_name =
-        if window != StreamWindow::ElementWise || opt.events_per_second > granule_size {
-            CloudFunction::Group((worker_func_name.clone(), *FLOCK_CONCURRENCY))
-        } else {
-            CloudFunction::Lambda(worker_func_name.clone())
-        };
+    let next_func_name = if window != Window::ElementWise || opt.events_per_second > granule_size {
+        CloudFunction::Group((worker_func_name.clone(), *FLOCK_CONCURRENCY))
+    } else {
+        CloudFunction::Lambda(worker_func_name.clone())
+    };
 
     let (plan, s3) = plan_placement(opt.query_number, physcial_plan).await?;
     let nexmark_source_ctx = ExecutionContext {

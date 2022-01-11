@@ -34,7 +34,7 @@ pub struct KinesisSource {
     /// The name of the Amazon Kinesis data stream.
     pub stream_name: String,
     /// The windows group stream elements by time or rows.
-    pub window:      StreamWindow,
+    pub window:      Window,
 }
 
 impl KinesisSource {

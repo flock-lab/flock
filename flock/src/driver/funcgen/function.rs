@@ -34,7 +34,7 @@ use std::sync::Arc;
 #[derive(Debug)]
 pub struct QueryFlow {
     /// A query information received from the client-side.
-    pub query: Box<dyn Query>,
+    pub query: Query,
     /// A DAG structure of the partitioned query plan.
     pub dag:   QueryDag,
     /// The execution context is used to initialize the execution environment.
@@ -56,7 +56,6 @@ impl QueryFlow {
             ansi_sql: sql.to_owned(),
             schema,
             datasource,
-            plan,
         });
         QueryFlow::from(query)
     }

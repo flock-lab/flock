@@ -11,27 +11,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-//! The `azure` crate contains the Azure-specific parts of the `flock-function`
-//! library.
+//! The stream module is used to define the interface for streaming data
+//! sources.
 
-use crate::launcher::Launcher;
-use flock::error::Result;
-use flock::query::Query;
-
-/// AzureLauncher defines the interface for deploying and executing
-/// queries on Azure Functions.
-pub struct AzureLauncher {}
-
-impl Launcher for AzureLauncher {
-    fn new(_query: &Query) -> Self {
-        AzureLauncher {}
-    }
-
-    fn deploy(&self) -> Result<()> {
-        unimplemented!();
-    }
-
-    fn execute(&self) -> Result<()> {
-        unimplemented!();
-    }
-}
+pub mod window;
+pub use window::{Schedule, Window};

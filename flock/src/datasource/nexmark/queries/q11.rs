@@ -21,7 +21,7 @@ mod tests {
     use crate::datasource::nexmark::NEXMarkSource;
     use crate::error::{FlockError, Result};
     use crate::runtime::executor::plan::physical_plan;
-    use crate::runtime::query::{Schedule, StreamWindow};
+    use crate::stream::{Schedule, Window};
     use crate::transmute::*;
     use chrono::{DateTime, NaiveDateTime, Utc};
     use datafusion::arrow::array::{Int32Array, TimestampMillisecondArray, UInt64Array};
@@ -108,7 +108,7 @@ mod tests {
             seconds,
             threads,
             event_per_second,
-            StreamWindow::SessionWindow(Schedule::Seconds(4)),
+            Window::Session(Schedule::Seconds(4)),
         );
 
         // data source generation
@@ -129,7 +129,7 @@ mod tests {
 
         let schema = Arc::new(Bid::schema());
         let interval = match nex.window {
-            StreamWindow::SessionWindow(Schedule::Seconds(interval)) => interval,
+            Window::Session(Schedule::Seconds(interval)) => interval,
             _ => unreachable!(),
         };
 

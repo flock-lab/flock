@@ -21,8 +21,8 @@ mod tests {
     use crate::datasource::nexmark::NEXMarkSource;
     use crate::error::Result;
     use crate::runtime::executor::plan::physical_plan;
-    use crate::runtime::query::Schedule;
-    use crate::runtime::query::StreamWindow;
+    use crate::stream::Schedule;
+    use crate::stream::Window;
     use crate::transmute::event_bytes_to_batch;
     use datafusion::arrow::util::pretty::pretty_format_batches;
     use datafusion::datasource::MemTable;
@@ -40,7 +40,7 @@ mod tests {
             seconds,
             threads,
             event_per_second,
-            StreamWindow::TumblingWindow(Schedule::Seconds(2)),
+            Window::Tumbling(Schedule::Seconds(2)),
         );
 
         // data source generation
@@ -63,7 +63,7 @@ mod tests {
         let auction_schema = Arc::new(Auction::schema());
         let person_schema = Arc::new(Person::schema());
         let window_size = match nex.window {
-            StreamWindow::TumblingWindow(Schedule::Seconds(sec)) => sec,
+            Window::Tumbling(Schedule::Seconds(sec)) => sec,
             _ => unreachable!(),
         };
 

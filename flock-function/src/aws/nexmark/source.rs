@@ -56,19 +56,19 @@ pub async fn handler(ctx: &ExecutionContext, payload: Payload) -> Result<Value> 
     info!("[OK] Generate nexmark events.");
 
     match source.window {
-        StreamWindow::TumblingWindow(Schedule::Seconds(window_size)) => {
+        Window::Tumbling(Schedule::Seconds(window_size)) => {
             tumbling_window_tasks(payload, events, sec, window_size).await?;
         }
-        StreamWindow::HoppingWindow((window_size, hop_size)) => {
+        Window::Hopping((window_size, hop_size)) => {
             hopping_window_tasks(payload, events, sec, window_size, hop_size).await?;
         }
-        StreamWindow::ElementWise => {
+        Window::ElementWise => {
             elementwise_tasks(payload, events, sec).await?;
         }
-        StreamWindow::SessionWindow(Schedule::Seconds(timeout)) => {
+        Window::Session(Schedule::Seconds(timeout)) => {
             session_window_tasks(payload, events, sec, timeout).await?;
         }
-        StreamWindow::GlobalWindow(Schedule::Seconds(window_size)) => {
+        Window::Global(Schedule::Seconds(window_size)) => {
             global_window_tasks(payload, events, sec, window_size).await?;
         }
         _ => unimplemented!(),

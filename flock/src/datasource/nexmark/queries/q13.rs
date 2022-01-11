@@ -21,7 +21,7 @@ mod tests {
     use crate::datasource::nexmark::NEXMarkSource;
     use crate::error::Result;
     use crate::runtime::executor::plan::physical_plan;
-    use crate::runtime::query::StreamWindow;
+    use crate::stream::Window;
     use crate::transmute::event_bytes_to_batch;
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
     use datafusion::arrow::util::pretty::pretty_format_batches;
@@ -52,12 +52,7 @@ mod tests {
         let seconds = 2;
         let threads = 1;
         let event_per_second = 1000;
-        let nex = NEXMarkSource::new(
-            seconds,
-            threads,
-            event_per_second,
-            StreamWindow::ElementWise,
-        );
+        let nex = NEXMarkSource::new(seconds, threads, event_per_second, Window::ElementWise);
 
         // data source generation
         let events = nex.generate_data()?;

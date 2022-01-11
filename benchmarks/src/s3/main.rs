@@ -38,8 +38,8 @@ pub fn set_nexmark_config(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
     opt.generators = 1;
     match opt.query_number {
         0 | 1 | 2 | 3 | 4 | 6 | 9 | 13 => opt.seconds = 1, // ElementWise
-        5 => opt.seconds = 10,                             // HoppingWindow
-        7..=8 => opt.seconds = 10,                         // TumblingWindow
+        5 => opt.seconds = 10,                             // Hopping
+        7..=8 => opt.seconds = 10,                         // Tumbling
         _ => unreachable!(),
     };
     Ok(())

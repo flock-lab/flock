@@ -27,16 +27,10 @@
 //! Reference:
 //! <https://docs.microsoft.com/en-us/stream-analytics-query/windowing-azure-stream-analytics>
 
-use super::Query;
-use crate::datasource::DataSource;
-use datafusion::arrow::datatypes::SchemaRef;
-use datafusion::physical_plan::ExecutionPlan;
 use serde::{Deserialize, Serialize};
-use std::any::Any;
-use std::sync::Arc;
 
 type Slide = usize; // seconds
-type Window = usize; // seconds
+type WindowSize = usize; // seconds
 type Hop = usize; // seconds
 
 /// You can set up a rule to run an AWS Lambda function on a schedule.
@@ -81,102 +75,75 @@ pub enum Schedule {
     Rows(usize),
 }
 
-/// A enum `StreamWindow` to define different window types.
+/// A enum `Window` to define different window types.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
-pub enum StreamWindow {
+pub enum Window {
     /// A query that aggregates data using distinct time-based windows that open
     /// and close at regular intervals. In this case, each record on an
     /// in-application stream belongs to a specific window. It is processed only
     /// once (when the query processes the window to which the record belongs).
-    TumblingWindow(Schedule),
+    Tumbling(Schedule),
     /// Unlike tumbling windows, hopping windows model scheduled overlapping
     /// windows. A hopping window specification consist of: the window size (how
     /// long each window lasts) and the hop size (by how much each window moves
     /// forward relative to the previous one). Note that a tumbling window is
     /// simply a hopping window whose 'hop' is equal to its window.
-    HoppingWindow((Window, Hop)),
+    Hopping((WindowSize, Hop)),
     /// A query that aggregates data continuously, using a fixed time or
     /// rowcount interval.
-    SlidingWindow((Window, Slide)),
+    Sliding((WindowSize, Slide)),
     /// Session windows group events that arrive at similar times, filtering out
     /// periods of time where there is no data.
-    SessionWindow(Schedule),
+    Session(Schedule),
     /// A global windows assigner assigns all elements with the same key to the
     /// same single global window. This windowing scheme is only useful if you
     /// also specify a custom trigger. Otherwise, no computation will be
     /// performed, as the global window does not have a natural end at which we
     /// could process the aggregated elements.
-    GlobalWindow(Schedule),
+    Global(Schedule),
     /// Stagger window is a windowing method that is suited for analyzing
     /// groups of data that arrive at inconsistent times. It is well suited for
     /// any time-series analytics use case, such as a set of related sales or
     /// log records. Stagger windows address the issue of related records not
     /// falling into the same time-restricted window, such as when tumbling
     /// windows were used.
-    StaggerWinodw,
+    Stagger,
     /// Element-wise stream processing at epoch level.
     ElementWise,
 }
 
-impl Default for StreamWindow {
-    fn default() -> StreamWindow {
-        StreamWindow::ElementWise
+impl Default for Window {
+    fn default() -> Window {
+        Window::ElementWise
     }
 }
 
-impl StreamWindow {
-    /// Returns a new tumbling window.
-    pub fn tumbling_window(sec: usize) -> StreamWindow {
-        StreamWindow::TumblingWindow(Schedule::Seconds(sec))
-    }
-
-    /// Returns a new sliding window.
-    pub fn sliding_window(sec: usize, slide: usize) -> StreamWindow {
-        StreamWindow::SlidingWindow((sec, slide))
-    }
+/// Returns a new tumbling window.
+pub fn tumbling_window(sec: usize) -> Window {
+    Window::Tumbling(Schedule::Seconds(sec))
 }
 
-/// SQL queries in your application code execute continuously over
-/// in-application streams.
-#[derive(Debug)]
-pub struct StreamQuery {
-    /// ANSI 2008 SQL standard with extensions.
-    /// SQL is a domain-specific language used in programming and designed for
-    /// managing data held in a relational database management system, or for
-    /// stream processing in a relational data stream management system.
-    pub ansi_sql:   String,
-    /// A schema that is the skeleton structure that represents the logical view
-    /// of streaming data.
-    pub schema:     SchemaRef,
-    /// A streaming data source.
-    pub datasource: DataSource,
-    /// The execution plan.
-    pub plan:       Arc<dyn ExecutionPlan>,
+/// Returns a new sliding window.
+pub fn sliding_window(sec: usize, slide: usize) -> Window {
+    Window::Sliding((sec, slide))
 }
 
-impl Query for StreamQuery {
-    /// Returns a reference to Any that can be used for downcasting
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
+/// Returns a new hopping window.
+pub fn hopping_window(sec: usize, hop: usize) -> Window {
+    Window::Hopping((sec, hop))
+}
 
-    /// Returns a SQL query.
-    fn sql(&self) -> &String {
-        &self.ansi_sql
-    }
+/// Returns a new session window.
+pub fn session_window(sec: usize) -> Window {
+    Window::Session(Schedule::Seconds(sec))
+}
 
-    /// Returns the data schema for a given query.
-    fn schema(&self) -> &SchemaRef {
-        &self.schema
-    }
+/// Returns a new global window.
+pub fn global_window(sec: usize) -> Window {
+    Window::Global(Schedule::Seconds(sec))
+}
 
-    /// Returns the entire physical plan for a given query.
-    fn plan(&self) -> &Arc<dyn ExecutionPlan> {
-        &self.plan
-    }
-
-    /// Returns the data source for a given query.
-    fn datasource(&self) -> &DataSource {
-        &self.datasource
-    }
+/// Returns a new element-wise window.
+pub fn element_wise_window() -> Window {
+    Window::ElementWise
 }

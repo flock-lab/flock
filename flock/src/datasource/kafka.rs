@@ -34,7 +34,7 @@ use std::sync::Arc;
 #[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct KafkaSource {
     /// The window type.
-    pub window:       StreamWindow,
+    pub window:       Window,
     /// The name of the cluster.
     pub cluster_name: String,
     /// The Amazon Resource Name (ARN) of the cluster.
