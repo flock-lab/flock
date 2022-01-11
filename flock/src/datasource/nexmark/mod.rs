@@ -80,7 +80,7 @@ use crate::error::Result;
 use datafusion::arrow::datatypes::Schema;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::datasource::MemTable;
-use datafusion::execution::context::ExecutionContext;
+use datafusion::execution::context::{ExecutionConfig, ExecutionContext};
 use std::sync::Arc;
 
 /// The NEXMark tables.
@@ -98,8 +98,11 @@ pub fn get_nexmark_schema(table: &str) -> Schema {
 }
 
 /// Register the NEXMark tables with empty data.
-pub async fn register_nexmark_tables() -> Result<ExecutionContext> {
-    let mut ctx = ExecutionContext::new();
+pub async fn register_nexmark_tables_with_shuffle_partitions(
+    shuffle_partitions: usize,
+) -> Result<ExecutionContext> {
+    let config = ExecutionConfig::new().with_target_partitions(shuffle_partitions);
+    let mut ctx = ExecutionContext::with_config(config);
     let person_schema = Arc::new(Person::schema());
     let person_table = MemTable::try_new(
         person_schema.clone(),
@@ -130,4 +133,9 @@ pub async fn register_nexmark_tables() -> Result<ExecutionContext> {
     ctx.register_table("side_input", Arc::new(side_input_table))?;
 
     Ok(ctx)
+}
+
+/// Register the NEXMark tables with empty data.
+pub async fn register_nexmark_tables() -> Result<ExecutionContext> {
+    register_nexmark_tables_with_shuffle_partitions(16).await
 }

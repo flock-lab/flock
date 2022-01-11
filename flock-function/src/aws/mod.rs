@@ -19,7 +19,7 @@ use flock::driver::funcgen::function::QueryFlow;
 use flock::error::Result;
 
 /// AwsLambdaLauncher defines the interface for deploying and executing
-/// queries on AWS Lambda.  
+/// queries on AWS Lambda.
 pub struct AwsLambdaLauncher {}
 
 impl Launcher for AwsLambdaLauncher {

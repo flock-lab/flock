@@ -19,7 +19,7 @@ use flock::driver::funcgen::function::QueryFlow;
 use flock::error::Result;
 
 /// GCPLauncher defines the interface for deploying and executing
-/// queries on GCP Functions.  
+/// queries on GCP Functions.
 pub struct GCPLauncher {}
 
 impl Launcher for GCPLauncher {

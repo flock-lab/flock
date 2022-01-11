@@ -16,7 +16,6 @@
 
 #[cfg(feature = "build")]
 pub mod build;
-pub mod deploy;
 pub mod funcgen;
 
 pub use funcgen::function::QueryFlow;

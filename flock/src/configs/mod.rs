@@ -35,6 +35,8 @@ lazy_static! {
     pub static ref FLOCK_LAMBDA_MAX_RETRIES: usize = FLOCK_CONF["lambda"]["max_invoke_retries"].parse::<usize>().unwrap();
     /// AWS Lambda function timeout.
     pub static ref FLOCK_LAMBDA_TIMEOUT: i64 = FLOCK_CONF["lambda"]["timeout"].parse::<i64>().unwrap();
+    /// AWS Lambda function concurrency.
+    pub static ref FLOCK_FUNCTION_CONCURRENCY: usize = FLOCK_CONF["lambda"]["concurrency"].parse::<usize>().unwrap();
 
     /// Flock sync invocation granularity.
     pub static ref FLOCK_SYNC_GRANULE_SIZE: usize = FLOCK_CONF["lambda"]["sync_granule"].parse::<usize>().unwrap();

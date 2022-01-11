@@ -16,6 +16,5 @@
 //! to split their query into multiple functions, and execute them in
 //! distributed fashion on cloud environments.
 
-mod memory_stream;
 pub mod planner;
-pub mod shuffle_writer;
+pub mod stage;

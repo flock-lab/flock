@@ -19,7 +19,6 @@ extern crate daggy;
 use daggy::{NodeIndex, Walker};
 
 use crate::datasource::DataSource;
-use crate::driver::deploy::ExecutionEnvironment;
 use crate::driver::funcgen::dag::*;
 use crate::prelude::*;
 use blake2::{Blake2b, Digest};
@@ -70,16 +69,6 @@ impl QueryFlow {
         QueryFlow::add_source(plan, &mut dag);
         let ctx = QueryFlow::build_context(&*query, &mut dag);
         QueryFlow { query, dag, ctx }
-    }
-
-    /// Deploy the lambda functions and execution context for the query.
-    ///
-    /// # Arguments
-    /// * `env` - The execution environment to deploy the lambda functions. The
-    ///   environment could be a local environment or a cloud platform such as
-    ///   AWS Lambda, Google Compute Engine, Azure, etc.
-    pub async fn deploy(&self, env: ExecutionEnvironment) -> Result<()> {
-        env.deploy(self).await
     }
 
     /// Add a data source node into `QueryDag`.
@@ -227,7 +216,7 @@ mod tests {
             .ctx
             .get(&NodeIndex::new(idx))
             .ok_or_else(|| {
-                FlockError::DagPartition(
+                FlockError::QueryStage(
                     "Failed to get function name field from the hash map".to_string(),
                 )
             })?
@@ -240,7 +229,7 @@ mod tests {
             .ctx
             .get(&NodeIndex::new(idx))
             .ok_or_else(|| {
-                FlockError::DagPartition(
+                FlockError::QueryStage(
                     "Failed to get next function field from the hash map".to_string(),
                 )
             })?
