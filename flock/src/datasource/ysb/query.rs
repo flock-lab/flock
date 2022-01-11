@@ -23,7 +23,7 @@ mod tests {
     use crate::datasource::ysb::YSBSource;
     use crate::error::Result;
     use crate::runtime::executor::plan::physical_plan;
-    use crate::runtime::query::{Schedule, StreamWindow};
+    use crate::stream::{Schedule, Window};
     use crate::transmute::event_bytes_to_batch;
     use datafusion::arrow::util::pretty::pretty_format_batches;
     use datafusion::datasource::MemTable;
@@ -42,7 +42,7 @@ mod tests {
             seconds,
             threads,
             event_per_second,
-            StreamWindow::TumblingWindow(Schedule::Seconds(window_size)),
+            Window::Tumbling(Schedule::Seconds(window_size)),
         );
 
         // data source generation

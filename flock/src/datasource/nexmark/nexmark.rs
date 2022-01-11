@@ -23,7 +23,7 @@ use crate::datasource::RelationPartitions;
 use crate::error::FlockError;
 use crate::error::Result;
 use crate::runtime::payload::{Payload, Uuid};
-use crate::runtime::query::StreamWindow;
+use crate::stream::Window;
 use crate::transmute::*;
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::record_batch::RecordBatch;
@@ -282,7 +282,7 @@ pub struct NEXMarkSource {
     /// The NexMark configuration.
     pub config: Config,
     /// The windows group stream elements by time or rows.
-    pub window: StreamWindow,
+    pub window: Window,
 }
 
 impl Default for NEXMarkSource {
@@ -291,19 +291,14 @@ impl Default for NEXMarkSource {
         config.insert("threads", 100.to_string());
         config.insert("seconds", 10.to_string());
         config.insert("events-per-second", 100_1000.to_string());
-        let window = StreamWindow::ElementWise;
+        let window = Window::ElementWise;
         NEXMarkSource { config, window }
     }
 }
 
 impl NEXMarkSource {
     /// Creates a new Nexmark benchmark data source.
-    pub fn new(
-        seconds: usize,
-        threads: usize,
-        events_per_second: usize,
-        window: StreamWindow,
-    ) -> Self {
+    pub fn new(seconds: usize, threads: usize, events_per_second: usize, window: Window) -> Self {
         let mut config = Config::new();
         config.insert("threads", threads.to_string());
         config.insert("seconds", seconds.to_string());
@@ -444,12 +439,7 @@ mod test {
         let seconds = 10;
         let threads = 100;
         let event_per_second = 10_000;
-        let nex = NEXMarkSource::new(
-            seconds,
-            threads,
-            event_per_second,
-            StreamWindow::ElementWise,
-        );
+        let nex = NEXMarkSource::new(seconds, threads, event_per_second, Window::ElementWise);
         let events = nex.generate_data()?;
         assert_eq!(events.persons.len(), 10);
         assert_eq!(events.auctions.len(), 10);

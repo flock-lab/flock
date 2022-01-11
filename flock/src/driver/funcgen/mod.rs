@@ -14,4 +14,4 @@
 //! Convert the physical plan into lambda functions for cloud execution.
 
 pub mod dag;
-pub mod function;
+// pub mod function;

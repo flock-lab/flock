@@ -14,8 +14,8 @@
 //! This crate responsibles for deploying the query to cloud function services
 //! on public clouds.
 
-use flock::driver::funcgen::function::QueryFlow;
 use flock::error::{FlockError, Result};
+use flock::query::Query;
 
 /// Launcher is a trait that defines the interface for deploying and executing
 /// queries on cloud function services.
@@ -24,7 +24,7 @@ pub trait Launcher {
     ///
     /// # Arguments
     /// `flow` - The query flow to be deployed.
-    fn new(query: &QueryFlow) -> Self;
+    fn new(query: &Query) -> Self;
 
     /// Deploy a query to a specific cloud function service.
     /// It is called before the query is executed.
@@ -39,7 +39,7 @@ pub trait Launcher {
 pub struct LocalLauncher {}
 
 impl Launcher for LocalLauncher {
-    fn new(_query: &QueryFlow) -> Self {
+    fn new(_query: &Query) -> Self {
         LocalLauncher {}
     }
 

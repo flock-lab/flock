@@ -26,11 +26,12 @@ pub use crate::datasink::{DataSink, DataSinkFormat, DataSinkType};
 pub use crate::datasource::{nexmark, tpch, ysb, DataSource, DataStream, RelationPartitions};
 pub use crate::encoding::Encoding;
 pub use crate::error::{FlockError, Result};
+pub use crate::query::Query;
 pub use crate::runtime::arena::{Arena, WindowSession};
 pub use crate::runtime::context::{CloudFunction, ExecutionContext};
 pub use crate::runtime::executor::{
     plan::physical_plan, ExecutionStrategy, Executor, LambdaExecutor,
 };
 pub use crate::runtime::payload::{DataFrame, Payload, Uuid, UuidBuilder};
-pub use crate::runtime::query::{BatchQuery, Query, Schedule, StreamQuery, StreamWindow};
+pub use crate::stream::{Schedule, Window};
 pub use crate::transmute::*;

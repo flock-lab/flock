@@ -21,7 +21,7 @@ mod tests {
     use crate::datasource::nexmark::NEXMarkSource;
     use crate::error::Result;
     use crate::runtime::executor::plan::physical_plan;
-    use crate::runtime::query::StreamWindow;
+    use crate::stream::Window;
     use crate::transmute::event_bytes_to_batch;
     use datafusion::arrow::util::pretty::pretty_format_batches;
     use datafusion::datasource::MemTable;
@@ -32,7 +32,7 @@ mod tests {
     #[tokio::test]
     async fn local_query_10() -> Result<()> {
         // benchmark configuration
-        let nex = NEXMarkSource::new(2, 1, 100, StreamWindow::ElementWise);
+        let nex = NEXMarkSource::new(2, 1, 100, Window::ElementWise);
 
         // data source generation
         let events = nex.generate_data()?;

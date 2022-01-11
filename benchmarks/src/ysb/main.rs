@@ -80,7 +80,7 @@ async fn main() -> Result<()> {
 }
 
 fn create_ysb_source(opt: &YSBBenchmarkOpt) -> YSBSource {
-    let window = StreamWindow::TumblingWindow(Schedule::Seconds(10));
+    let window = Window::Tumbling(Schedule::Seconds(10));
     YSBSource::new(opt.seconds, opt.generators, opt.events_per_second, window)
 }
 

@@ -198,7 +198,7 @@ NexmarkBenchmarkOpt {
 2021-12-16 14:09:18 START RequestId: fd8ae2ad-b64a-4e02-88c8-c43f00974022 Version: $LATEST
 2021-12-16 14:09:18 [2021-12-16T19:09:18Z INFO  runtime::datasource::nexmark::nexmark] Generating events for 10s over 1 partitions.
 2021-12-16 14:09:18 [2021-12-16T19:09:18Z INFO  flock::nexmark::source] Nexmark Benchmark: Query 5
-2021-12-16 14:09:18 [2021-12-16T19:09:18Z INFO  flock::nexmark::source] NEXMarkSource { config: Config { args: {"threads": "1", "events-per-second": "1000", "seconds": "10"} }, window: HoppingWindow((10, 5)) }
+2021-12-16 14:09:18 [2021-12-16T19:09:18Z INFO  flock::nexmark::source] NEXMarkSource { config: Config { args: {"threads": "1", "events-per-second": "1000", "seconds": "10"} }, window: Hopping((10, 5)) }
 2021-12-16 14:09:18 [2021-12-16T19:09:18Z INFO  flock::nexmark::source] [OK] Generate nexmark events.
 2021-12-16 14:09:18 [2021-12-16T19:09:18Z INFO  runtime::datasource::nexmark::nexmark] Epoch 0: 20 persons, 60 auctions, 920 bids.
 2021-12-16 14:09:18 [2021-12-16T19:09:18Z INFO  runtime::datasource::nexmark::nexmark] Epoch 1: 20 persons, 60 auctions, 920 bids.

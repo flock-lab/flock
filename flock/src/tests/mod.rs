@@ -13,10 +13,7 @@
 
 //! Common unit test utility methods
 
-use crate::configs::FLOCK_CONF;
 use crate::datasource::DataSource;
-use crate::driver::QueryFlow;
-use crate::encoding::Encoding;
 use crate::runtime::executor;
 use datafusion::arrow::array::{Int64Array, StringArray};
 use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef};
@@ -30,7 +27,6 @@ use serde_json::Value;
 use std::sync::Arc;
 
 extern crate daggy;
-use daggy::NodeIndex;
 
 /// The data record schema for unit tests.
 #[derive(Dummy, Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -211,20 +207,6 @@ pub async fn physical_plan(
 ) -> Arc<dyn ExecutionPlan> {
     let ctx = register_table(schema, table_name);
     executor::plan::physical_plan(&ctx, sql).await.unwrap()
-}
-
-/// Set the cloud environment context to a specific cloud function in the query.
-///
-/// # Parameters
-///
-/// * `qflow`: A struct `QueryFlow` contains all revelent query information.
-/// * `idx`: the node index of DAG in the `qflow`.
-pub fn set_env_context(qflow: &QueryFlow, idx: usize) {
-    let ctx = &qflow.ctx[&NodeIndex::new(idx)];
-    std::env::set_var(
-        &FLOCK_CONF["lambda"]["enviroment"],
-        ctx.marshal(Encoding::default()).unwrap(),
-    );
 }
 
 #[cfg(test)]

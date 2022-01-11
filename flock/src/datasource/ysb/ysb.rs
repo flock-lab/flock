@@ -23,7 +23,7 @@ use crate::datasource::RelationPartitions;
 use crate::error::FlockError;
 use crate::error::Result;
 use crate::runtime::payload::{Payload, Uuid};
-use crate::runtime::query::{Schedule, StreamWindow};
+use crate::stream::{Schedule, Window};
 use crate::transmute::*;
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::record_batch::RecordBatch;
@@ -218,7 +218,7 @@ pub struct YSBSource {
     /// The YSB configuration.
     pub config: Config,
     /// The windows group stream elements by time or rows.
-    pub window: StreamWindow,
+    pub window: Window,
 }
 
 impl Default for YSBSource {
@@ -227,19 +227,14 @@ impl Default for YSBSource {
         config.insert("threads", 16.to_string());
         config.insert("seconds", 10.to_string());
         config.insert("events-per-second", 1000.to_string());
-        let window = StreamWindow::TumblingWindow(Schedule::Seconds(10));
+        let window = Window::Tumbling(Schedule::Seconds(10));
         YSBSource { config, window }
     }
 }
 
 impl YSBSource {
     /// Creates a new YSB benchmark data source.
-    pub fn new(
-        seconds: usize,
-        threads: usize,
-        events_per_second: usize,
-        window: StreamWindow,
-    ) -> Self {
+    pub fn new(seconds: usize, threads: usize, events_per_second: usize, window: Window) -> Self {
         let mut config = Config::new();
         config.insert("threads", threads.to_string());
         config.insert("seconds", seconds.to_string());
@@ -359,12 +354,7 @@ mod test {
         let seconds = 10;
         let threads = 100;
         let event_per_second = 10_000;
-        let ysb = YSBSource::new(
-            seconds,
-            threads,
-            event_per_second,
-            StreamWindow::ElementWise,
-        );
+        let ysb = YSBSource::new(seconds, threads, event_per_second, Window::ElementWise);
         let stream = ysb.generate_data()?;
         assert_eq!(stream.events.len(), 10);
         assert!((100_000 - ysb.count_events(&stream)) < 100);

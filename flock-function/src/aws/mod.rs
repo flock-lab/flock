@@ -15,15 +15,15 @@
 //! library.
 
 use crate::launcher::Launcher;
-use flock::driver::funcgen::function::QueryFlow;
 use flock::error::Result;
+use flock::query::Query;
 
 /// AwsLambdaLauncher defines the interface for deploying and executing
 /// queries on AWS Lambda.
 pub struct AwsLambdaLauncher {}
 
 impl Launcher for AwsLambdaLauncher {
-    fn new(_query: &QueryFlow) -> Self {
+    fn new(_query: &Query) -> Self {
         AwsLambdaLauncher {}
     }
 

@@ -15,15 +15,15 @@
 //! library.
 
 use crate::launcher::Launcher;
-use flock::driver::funcgen::function::QueryFlow;
 use flock::error::Result;
+use flock::query::Query;
 
 /// GCPLauncher defines the interface for deploying and executing
 /// queries on GCP Functions.
 pub struct GCPLauncher {}
 
 impl Launcher for GCPLauncher {
-    fn new(_query: &QueryFlow) -> Self {
+    fn new(_query: &Query) -> Self {
         GCPLauncher {}
     }
 

@@ -21,7 +21,7 @@ mod tests {
     use crate::datasource::nexmark::NEXMarkSource;
     use crate::error::{FlockError, Result};
     use crate::runtime::executor::plan::physical_plan;
-    use crate::runtime::query::StreamWindow;
+    use crate::stream::Window;
     use crate::transmute::event_bytes_to_batch;
     use datafusion::arrow::util::pretty::pretty_format_batches;
     use datafusion::datasource::MemTable;
@@ -43,7 +43,7 @@ mod tests {
             seconds,
             threads,
             event_per_second,
-            StreamWindow::HoppingWindow((window, hop)),
+            Window::Hopping((window, hop)),
         );
 
         // data source generation
@@ -71,7 +71,7 @@ mod tests {
 
         let bid_schema = Arc::new(Bid::schema());
         let (window, hop) = match nex.window {
-            StreamWindow::HoppingWindow((window, hop)) => (window, hop),
+            Window::Hopping((window, hop)) => (window, hop),
             _ => unreachable!(),
         };
 

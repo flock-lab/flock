@@ -713,7 +713,7 @@ mod tests {
         // ProjectionExec: expr=[MAX(test_table.c1)@1 as MAX(test_table.c1), MIN(test_table.c2)@2 as MIN(test_table.c2), c3@0 as c3]
         //   HashAggregateExec: mode=FinalPartitioned, gby=[c3@0 as c3], aggr=[MAX(test_table.c1), MIN(test_table.c2)]
         //     CoalesceBatchesExec: target_batch_size=4096
-        //       RepartitionExec: partitioning=Hash([Column { name: "c3", index: 0 }], 16)         
+        //       RepartitionExec: partitioning=Hash([Column { name: "c3", index: 0 }], 16)
         //         HashAggregateExec: mode=Partial, gby=[c3@2 as c3], aggr=[MAX(test_table.c1), MIN(test_table.c2)]
         //           CoalesceBatchesExec: target_batch_size=4096
         //             FilterExec: c2@1 < CAST(101 AS Float64) AND c1@0 > 91

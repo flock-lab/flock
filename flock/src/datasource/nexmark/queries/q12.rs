@@ -21,7 +21,7 @@ mod tests {
     use crate::datasource::nexmark::NEXMarkSource;
     use crate::error::Result;
     use crate::runtime::executor::plan::physical_plan;
-    use crate::runtime::query::{Schedule, StreamWindow};
+    use crate::stream::{Schedule, Window};
     use crate::transmute::*;
     use chrono::{DateTime, NaiveDateTime, Utc};
     use datafusion::arrow::array::{Int32Array, TimestampNanosecondArray, UInt64Array};
@@ -74,7 +74,7 @@ mod tests {
             seconds,
             threads,
             event_per_second,
-            StreamWindow::TumblingWindow(Schedule::Seconds(4)),
+            Window::Tumbling(Schedule::Seconds(4)),
         );
 
         // data source generation
@@ -93,7 +93,7 @@ mod tests {
 
         let schema = Arc::new(Bid::schema());
         let interval = match nex.window {
-            StreamWindow::TumblingWindow(Schedule::Seconds(interval)) => interval,
+            Window::Tumbling(Schedule::Seconds(interval)) => interval,
             _ => unreachable!(),
         };
 
