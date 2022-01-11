@@ -263,14 +263,13 @@ mod tests {
         let mut ctx = register_nexmark_tables().await?;
         let sqls = vec![
             include_str!("../../../benchmarks/src/nexmark/query/q3.sql"),
-            /* include_str!("../../../benchmarks/src/nexmark/query/q6.sql"),
-             * include_str!("../../../benchmarks/src/nexmark/query/q7.sql"),
-             * include_str!("../../../benchmarks/src/nexmark/query/q8.sql"),
-             * include_str!("../../../benchmarks/src/nexmark/query/q9.sql"),
-             * include_str!("../../../benchmarks/src/nexmark/query/q10.sql"),
-             * include_str!("../../../benchmarks/src/nexmark/query/q11.sql"),
-             * include_str!("../../../benchmarks/src/nexmark/query/q13.sql"),
-             */
+            include_str!("../../../benchmarks/src/nexmark/query/q6.sql"),
+            include_str!("../../../benchmarks/src/nexmark/query/q7.sql"),
+            include_str!("../../../benchmarks/src/nexmark/query/q8.sql"),
+            include_str!("../../../benchmarks/src/nexmark/query/q9.sql"),
+            include_str!("../../../benchmarks/src/nexmark/query/q10.sql"),
+            include_str!("../../../benchmarks/src/nexmark/query/q11.sql"),
+            include_str!("../../../benchmarks/src/nexmark/query/q13.sql"),
         ];
 
         for sql in sqls {
@@ -341,7 +340,7 @@ mod tests {
         // ProjectionExec: expr=[campaign_id@0 as campaign_id, COUNT(UInt8(1))@1 as COUNT(UInt8(1))]
         //   HashAggregateExec: mode=FinalPartitioned, gby=[campaign_id@0 as campaign_id], aggr=[COUNT(UInt8(1))]
         //     MemoryExec: partitions=0, partition_sizes=[]
-        assert_eq!(4, stages.len());
+        assert_eq!(3, stages.len());
 
         Ok(())
     }
