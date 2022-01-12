@@ -28,7 +28,7 @@ pub use crate::encoding::Encoding;
 pub use crate::error::{FlockError, Result};
 pub use crate::query::{Query, Table};
 pub use crate::runtime::arena::{Arena, WindowSession};
-pub use crate::runtime::context::{CloudFunction, ExecutionContext};
+pub use crate::runtime::context::{self, CloudFunction, ExecutionContext};
 pub use crate::runtime::executor::{
     plan::physical_plan, ExecutionStrategy, Executor, LambdaExecutor,
 };

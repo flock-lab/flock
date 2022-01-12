@@ -24,6 +24,7 @@ use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::physical_plan::{collect, collect_partitioned};
+use log::info;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::collections::VecDeque;
@@ -138,28 +139,29 @@ impl PartialEq for ExecutionContext {
 }
 
 impl ExecutionContext {
-    /// Returns `plan` as a mutable reference.
+    /// Returns the execution plan of the current execution context.
     ///
-    /// if `self` is `EmptyExec`, the plan is not stored in the environment
+    /// if it's `EmptyExec`, the plan is not stored in the environment
     /// variable. In this case, we need to load the plan from S3. If the
     /// plan is already loaded, then we don't need to load it again.
-    pub async fn plan(&mut self) -> Result<&mut Arc<dyn ExecutionPlan>> {
+    pub async fn plan(&mut self) -> Result<Arc<dyn ExecutionPlan>> {
         match self.plan.as_any().downcast_ref::<EmptyExec>() {
             Some(_) => {
                 if self.plan_s3_idx.is_some() {
-                    println!("Loading plan from S3 {:?}", self.plan_s3_idx);
+                    info!("Loading plan from S3 {:?}", self.plan_s3_idx);
                     let (bucket, key) = self.plan_s3_idx.as_ref().unwrap();
                     self.plan = serde_json::from_slice(&s3::get_object(bucket, key).await?)?;
-                    Ok(&mut self.plan)
+                    Ok(self.plan.clone())
                 } else {
                     panic!("The query plan is not stored in the environment variable and S3.");
                 }
             }
-            None => Ok(&mut self.plan),
+            None => Ok(self.plan.clone()),
         }
     }
 
     /// Executes the physical plan.
+    ///
     /// `execute` must be called after the execution of `feed_one_source` or
     /// `feed_two_source` or `feed_data_sources`.
     pub async fn execute(&mut self) -> Result<Vec<RecordBatch>> {
@@ -173,6 +175,7 @@ impl ExecutionContext {
     }
 
     /// Executes the physical plan.
+    ///
     /// `execute_partitioned` must be called after the execution of
     /// `feed_one_source` or `feed_two_source` or `feed_data_sources`.
     pub async fn execute_partitioned(&mut self) -> Result<Vec<Vec<RecordBatch>>> {
@@ -183,104 +186,6 @@ impl ExecutionContext {
                 e, self.plan
             ))),
         }
-    }
-
-    /// Serializes `ExecutionContext` from client-side.
-    pub fn marshal(&self, encoding: Encoding) -> Result<String> {
-        Ok(match encoding {
-            Encoding::Snappy | Encoding::Lz4 | Encoding::Zstd => {
-                let encoded: Vec<u8> = serde_json::to_vec(&self)?;
-                serde_json::to_string(&CloudEnvironment {
-                    context: encoding.compress(&encoded)?,
-                    encoding,
-                })?
-            }
-            Encoding::None => serde_json::to_string(&CloudEnvironment {
-                context: serde_json::to_vec(&self)?,
-                encoding,
-            })?,
-            _ => unimplemented!(),
-        })
-    }
-
-    /// Deserializes `ExecutionContext` from cloud-side.
-    pub fn unmarshal(s: &str) -> Result<ExecutionContext> {
-        let env: CloudEnvironment = serde_json::from_str(s)?;
-
-        Ok(match env.encoding {
-            Encoding::Snappy | Encoding::Lz4 | Encoding::Zstd => {
-                let encoded = env.encoding.decompress(&env.context)?;
-                serde_json::from_slice(&encoded).map_err(FlockError::SerdeJson)?
-            }
-            Encoding::None => {
-                serde_json::from_slice(&env.context).map_err(FlockError::SerdeJson)?
-            }
-            _ => unimplemented!(),
-        })
-    }
-
-    /// Feed one data source to the execution plan.
-    pub async fn feed_one_source(&mut self, partitions: &[Vec<RecordBatch>]) -> Result<()> {
-        // Breadth-first search
-        let mut queue = VecDeque::new();
-        queue.push_front(self.plan().await?.clone());
-
-        while !queue.is_empty() {
-            let mut p = queue.pop_front().unwrap();
-            if p.children().is_empty() {
-                unsafe {
-                    Arc::get_mut_unchecked(&mut p)
-                        .as_mut_any()
-                        .downcast_mut::<MemoryExec>()
-                        .unwrap()
-                        .set_partitions(&partitions.to_vec());
-                }
-                break;
-            }
-
-            p.children()
-                .iter()
-                .enumerate()
-                .for_each(|(i, _)| queue.push_back(p.children()[i].clone()));
-        }
-
-        Ok(())
-    }
-
-    /// Feed two data sources to the execution plan like join two tables.
-    pub async fn feed_two_source(
-        &mut self,
-        left: &[Vec<RecordBatch>],
-        right: &[Vec<RecordBatch>],
-    ) -> Result<()> {
-        // Breadth-first search
-        let mut queue = VecDeque::new();
-        queue.push_front(self.plan().await?.clone());
-
-        while !queue.is_empty() {
-            let mut p = queue.pop_front().unwrap();
-            if p.children().is_empty() {
-                for partition in &[&left, &right] {
-                    if compare_schema(p.schema(), partition[0][0].schema()) {
-                        unsafe {
-                            Arc::get_mut_unchecked(&mut p)
-                                .as_mut_any()
-                                .downcast_mut::<MemoryExec>()
-                                .unwrap()
-                                .set_partitions(&partition.to_vec());
-                        }
-                        break;
-                    }
-                }
-            }
-
-            p.children()
-                .iter()
-                .enumerate()
-                .for_each(|(i, _)| queue.push_back(p.children()[i].clone()));
-        }
-
-        Ok(())
     }
 
     /// Feeds all data sources to the execution plan.
@@ -316,6 +221,41 @@ impl ExecutionContext {
     }
 }
 
+/// Serializes `ExecutionContext` from client-side.
+pub fn marshal(ctx: &ExecutionContext, encoding: Encoding) -> Result<String> {
+    Ok(match encoding {
+        Encoding::Snappy | Encoding::Lz4 | Encoding::Zstd => {
+            let encoded: Vec<u8> = serde_json::to_vec(ctx)?;
+            serde_json::to_string(&CloudEnvironment {
+                context: encoding.compress(&encoded)?,
+                encoding,
+            })?
+        }
+        Encoding::None => serde_json::to_string(&CloudEnvironment {
+            context: serde_json::to_vec(ctx)?,
+            encoding,
+        })?,
+        _ => unimplemented!(),
+    })
+}
+
+/// Deserializes `ExecutionContext` from cloud-side.
+pub fn unmarshal<T>(encoded_ctx: T) -> Result<ExecutionContext>
+where
+    T: AsRef<str>,
+{
+    let env: CloudEnvironment = serde_json::from_str(encoded_ctx.as_ref())?;
+
+    Ok(match env.encoding {
+        Encoding::Snappy | Encoding::Lz4 | Encoding::Zstd => {
+            let encoded = env.encoding.decompress(&env.context)?;
+            serde_json::from_slice(&encoded)?
+        }
+        Encoding::None => serde_json::from_slice(&env.context)?,
+        _ => unimplemented!(),
+    })
+}
+
 /// Compare two execution plans' schemas.
 /// Returns true if they are belong to the same plan node.
 fn compare_schema(schema1: SchemaRef, schema2: SchemaRef) -> bool {
@@ -337,51 +277,57 @@ fn compare_schema(schema1: SchemaRef, schema2: SchemaRef) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::datasource::kinesis;
+    use crate::assert_batches_eq;
     use crate::error::Result;
-    use aws_lambda_events::event::kinesis::KinesisEvent;
     use datafusion::arrow::array::*;
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
     use datafusion::arrow::record_batch::RecordBatch;
     use datafusion::datasource::MemTable;
-    use datafusion::physical_plan::collect;
 
     #[tokio::test]
-    #[ignore]
-    async fn lambda_context_marshal() -> Result<()> {
-        let plan = r#"{"execution_plan":"coalesce_batches_exec","input":{"execution_plan":"memory_exec","schema":{"fields":[{"name":"c1","data_type":"Int64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c2","data_type":"Float64","nullable":true,"dict_id":0,"dict_is_ordered":false},{"name":"c3","data_type":"Utf8","nullable":true,"dict_id":0,"dict_is_ordered":false}],"metadata":{}},"projection":null},"target_batch_size":16384}"#;
-        let name = "hello".to_owned();
-        let next =
-            CloudFunction::Lambda("SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836Z".to_owned());
+    async fn feed_one_data_source() -> Result<()> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("c1", DataType::Int64, false),
+            Field::new("c2", DataType::Float64, false),
+            Field::new("c3", DataType::Utf8, false),
+            Field::new("c4", DataType::UInt64, false),
+            Field::new("c5", DataType::Utf8, false),
+            Field::new("neg", DataType::Int64, false),
+        ]));
 
-        let plan: Arc<dyn ExecutionPlan> = serde_json::from_str(plan)?;
-        let lambda_context = ExecutionContext {
-            plan,
-            name,
-            next,
-            ..Default::default()
-        };
-
-        let json = lambda_context.marshal(Encoding::default())?;
-        let de_json = ExecutionContext::unmarshal(&json)?;
-        assert_eq!(lambda_context, de_json);
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    #[ignore]
-    async fn feed_one_source() -> Result<()> {
-        let input = include_str!("../tests/data/example-kinesis-event-1.json");
-        let input: KinesisEvent = serde_json::from_str(input).unwrap();
-        let partitions = vec![kinesis::to_batch(input)];
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![90, 90, 91, 101, 92, 102, 93, 103])),
+                Arc::new(Float64Array::from(vec![
+                    92.1, 93.2, 95.3, 96.4, 98.5, 99.6, 100.7, 101.8,
+                ])),
+                Arc::new(StringArray::from(vec![
+                    "a", "a", "d", "b", "b", "d", "c", "c",
+                ])),
+                Arc::new(UInt64Array::from(vec![33, 1, 54, 33, 12, 75, 2, 87])),
+                Arc::new(StringArray::from(vec![
+                    "rapport",
+                    "pedantic",
+                    "mimesis",
+                    "haptic",
+                    "baksheesh",
+                    "amok",
+                    "devious",
+                    "c",
+                ])),
+                Arc::new(Int64Array::from(vec![
+                    -90, -90, -91, -101, -92, -102, -93, -103,
+                ])),
+            ],
+        )?;
 
         let mut ctx = datafusion::execution::context::ExecutionContext::new();
-        let provider = MemTable::try_new(partitions[0][0].schema(), partitions.clone())?;
+        let table = MemTable::try_new(schema.clone(), vec![vec![RecordBatch::new_empty(schema)]])?;
 
-        ctx.register_table("test", Arc::new(provider))?;
+        ctx.register_table("test", Arc::new(table))?;
 
-        let sql = "SELECT MAX(c1), MIN(c2), c3 FROM test WHERE c2 < 99 GROUP BY c3";
+        let sql = "SELECT MAX(c1), MIN(c2), c3 FROM test WHERE c2 < 99 GROUP BY c3 ORDER BY c3";
         let logical_plan = ctx.create_logical_plan(sql)?;
         let logical_plan = ctx.optimize(&logical_plan)?;
         let physical_plan = ctx.create_physical_plan(&logical_plan).await?;
@@ -399,25 +345,27 @@ mod tests {
             next: CloudFunction::Sink(DataSinkType::Blackhole),
             ..Default::default()
         };
-        ctx.feed_one_source(&partitions).await?;
+        ctx.feed_data_sources(&[vec![vec![batch]]]).await?;
 
-        let batches = collect(ctx.plan.clone()).await?;
+        let batches = ctx.execute().await?;
 
         let expected = vec![
             "+--------------+--------------+----+",
             "| MAX(test.c1) | MIN(test.c2) | c3 |",
             "+--------------+--------------+----+",
-            "| 100          | 92.1         | a  |",
+            "| 90           | 92.1         | a  |",
+            "| 101          | 96.4         | b  |",
+            "| 91           | 95.3         | d  |",
             "+--------------+--------------+----+",
         ];
 
-        crate::assert_batches_eq!(&expected, &batches);
+        assert_batches_eq!(&expected, &batches);
 
         Ok(())
     }
 
     #[tokio::test]
-    async fn feed_two_source() -> Result<()> {
+    async fn feed_two_data_sources() -> Result<()> {
         let schema1 = Arc::new(Schema::new(vec![
             Field::new("a", DataType::Utf8, false),
             Field::new("b", DataType::Int32, false),
@@ -444,13 +392,12 @@ mod tests {
             ],
         )?;
 
-        let partitions1 = vec![vec![batch1]];
-        let partitions2 = vec![vec![batch2]];
-
         let mut ctx = datafusion::execution::context::ExecutionContext::new();
 
-        let table1 = MemTable::try_new(schema1, partitions1.clone())?;
-        let table2 = MemTable::try_new(schema2, partitions2.clone())?;
+        let table1 =
+            MemTable::try_new(schema1.clone(), vec![vec![RecordBatch::new_empty(schema1)]])?;
+        let table2 =
+            MemTable::try_new(schema2.clone(), vec![vec![RecordBatch::new_empty(schema2)]])?;
 
         ctx.register_table("t1", Arc::new(table1))?;
         ctx.register_table("t2", Arc::new(table2))?;
@@ -479,9 +426,14 @@ mod tests {
             next: CloudFunction::Sink(DataSinkType::Blackhole),
             ..Default::default()
         };
-        ctx.feed_two_source(&partitions1, &partitions2).await?;
+        let se_json = marshal(&ctx, Encoding::default())?;
+        let de_json = unmarshal(&se_json)?;
+        assert_eq!(ctx, de_json);
 
-        let batches = collect(ctx.plan.clone()).await?;
+        ctx.feed_data_sources(&[vec![vec![batch1]], vec![vec![batch2]]])
+            .await?;
+
+        let batches = ctx.execute().await?;
 
         let expected = vec![
             "+---+----+----+",
@@ -493,7 +445,7 @@ mod tests {
             "+---+----+----+",
         ];
 
-        crate::assert_batches_eq!(&expected, &batches);
+        assert_batches_eq!(&expected, &batches);
 
         Ok(())
     }
