@@ -17,20 +17,29 @@
 use crate::launcher::Launcher;
 use async_trait::async_trait;
 use datafusion::arrow::record_batch::RecordBatch;
+use flock::distributed_plan::DistributedPlanner;
+use flock::distributed_plan::QueryDag;
 use flock::error::Result;
 use flock::query::Query;
 
 /// AwsLambdaLauncher defines the interface for deploying and executing
 /// queries on AWS Lambda.
-pub struct AwsLambdaLauncher {}
+pub struct AwsLambdaLauncher {
+    /// The DAG of a given query.
+    pub dag: QueryDag,
+}
 
 #[async_trait]
 impl Launcher for AwsLambdaLauncher {
-    fn new<T>(_query: &Query<T>) -> Self
+    async fn new<T>(query: &Query<T>) -> Result<Self>
     where
+        Self: Sized,
         T: AsRef<str> + Send + Sync + 'static,
     {
-        AwsLambdaLauncher {}
+        let plan = query.plan()?;
+        let planner = DistributedPlanner::new();
+        let dag = planner.plan_query_stages(plan).await?;
+        Ok(AwsLambdaLauncher { dag })
     }
 
     fn deploy(&self) -> Result<()> {

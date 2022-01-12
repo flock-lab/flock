@@ -34,13 +34,14 @@ pub struct LocalLauncher {
 
 #[async_trait]
 impl Launcher for LocalLauncher {
-    fn new<T>(query: &Query<T>) -> Self
+    async fn new<T>(query: &Query<T>) -> Result<Self>
     where
+        Self: Sized,
         T: AsRef<str> + Send + Sync + 'static,
     {
-        LocalLauncher {
+        Ok(LocalLauncher {
             execution_plan: query.plan().unwrap(),
-        }
+        })
     }
 
     fn deploy(&self) -> Result<()> {
@@ -59,11 +60,11 @@ impl Launcher for LocalLauncher {
 impl LocalLauncher {
     /// Compare two execution plans' schemas.
     /// Returns true if they are belong to the same plan node.
-    /// 
+    ///
     /// # Arguments
     /// * `schema1` - The first schema.
     /// * `schema2` - The second schema.
-    /// 
+    ///
     /// # Returns
     /// * `true` - If the schemas belong to the same plan node.
     fn compare_schema(schema1: SchemaRef, schema2: SchemaRef) -> bool {
@@ -83,7 +84,7 @@ impl LocalLauncher {
     }
 
     /// Feeds the query with data.
-    /// 
+    ///
     /// # Arguments
     /// * `sources` - A list of data sources.
     pub fn feed_data_sources(&mut self, sources: &[Vec<Vec<RecordBatch>>]) {
@@ -151,7 +152,7 @@ mod tests {
             DataSource::Memory,
         );
 
-        let mut launcher = LocalLauncher::new(&query);
+        let mut launcher = LocalLauncher::new(&query).await?;
 
         let batch = RecordBatch::try_new(
             schema.clone(),
