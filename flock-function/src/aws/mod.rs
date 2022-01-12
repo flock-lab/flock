@@ -15,6 +15,8 @@
 //! library.
 
 use crate::launcher::Launcher;
+use async_trait::async_trait;
+use datafusion::arrow::record_batch::RecordBatch;
 use flock::error::Result;
 use flock::query::Query;
 
@@ -22,8 +24,12 @@ use flock::query::Query;
 /// queries on AWS Lambda.
 pub struct AwsLambdaLauncher {}
 
+#[async_trait]
 impl Launcher for AwsLambdaLauncher {
-    fn new(_query: &Query) -> Self {
+    fn new<T>(_query: &Query<T>) -> Self
+    where
+        T: AsRef<str> + Send + Sync + 'static,
+    {
         AwsLambdaLauncher {}
     }
 
@@ -31,7 +37,7 @@ impl Launcher for AwsLambdaLauncher {
         unimplemented!();
     }
 
-    fn execute(&self) -> Result<()> {
+    async fn execute(&self) -> Result<Vec<RecordBatch>> {
         unimplemented!();
     }
 }

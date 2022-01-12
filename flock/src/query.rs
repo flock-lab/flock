@@ -21,28 +21,44 @@ use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::datasource::MemTable;
 use datafusion::execution::context::ExecutionContext;
 use datafusion::physical_plan::ExecutionPlan;
+use std::fmt::Debug;
 use std::sync::Arc;
 
-type TableName = String;
+/// The relational table represents the logical view of incoming data.
+#[derive(Clone)]
+pub struct Table<T: AsRef<str>>(pub T, pub SchemaRef);
+
+impl<T: AsRef<str>> Table<T> {
+    /// Creates a new table.
+    pub fn new(name: T, schema: SchemaRef) -> Self {
+        Table(name, schema)
+    }
+}
+
+impl<T: AsRef<str>> Debug for Table<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Table({:?}, {:?})", self.0.as_ref(), self.1)
+    }
+}
 
 /// SQL queries in your application code execute over in-application batches.
-#[derive(Debug, Default)]
-pub struct Query {
+#[derive(Debug, Default, Clone)]
+pub struct Query<T: AsRef<str>> {
     /// ANSI 2008 SQL standard with extensions.
     /// SQL is a domain-specific language used in programming and designed for
     /// managing data held in a relational database management system, or for
     /// stream processing in a relational data stream management system.
-    pub sql:        String,
-    /// Table defines the incoming data stream. each schema that is the skeleton
+    pub sql:        T,
+    /// Table defines the incoming data stream. Each table that is the skeleton
     /// structure that represents the logical view of streaming data.
-    pub tables:     Vec<(TableName, SchemaRef)>,
+    pub tables:     Vec<Table<T>>,
     /// A streaming data source.
     pub datasource: DataSource,
 }
 
-impl Query {
+impl<T: AsRef<str>> Query<T> {
     /// Creates a new query.
-    pub fn new(sql: String, tables: Vec<(TableName, SchemaRef)>, datasource: DataSource) -> Self {
+    pub fn new(sql: T, tables: Vec<Table<T>>, datasource: DataSource) -> Self {
         Self {
             sql,
             tables,
@@ -52,11 +68,11 @@ impl Query {
 
     /// Returns a SQL query.
     pub fn sql(&self) -> String {
-        self.sql.to_owned()
+        self.sql.as_ref().to_owned()
     }
 
     /// Returns the data schema for a given query.
-    pub fn tables(&self) -> &Vec<(TableName, SchemaRef)> {
+    pub fn tables(&self) -> &Vec<Table<T>> {
         &self.tables
     }
 
@@ -68,14 +84,14 @@ impl Query {
     /// Returns the physical plan for a given query.
     pub fn plan(&self) -> Result<Arc<dyn ExecutionPlan>> {
         let mut ctx = ExecutionContext::new();
-        for (name, schema) in &self.tables {
-            let table = MemTable::try_new(
-                schema.clone(),
-                vec![vec![RecordBatch::new_empty(schema.clone())]],
+        for table in &self.tables {
+            let mem_table = MemTable::try_new(
+                table.1.clone(),
+                vec![vec![RecordBatch::new_empty(table.1.clone())]],
             )?;
-            ctx.register_table(name.as_str(), Arc::new(table))?;
+            ctx.register_table(table.0.as_ref(), Arc::new(mem_table))?;
         }
-        let plan = ctx.create_logical_plan(&self.sql)?;
+        let plan = ctx.create_logical_plan(self.sql.as_ref())?;
         let plan = ctx.optimize(&plan)?;
         futures::executor::block_on(ctx.create_physical_plan(&plan))
             .map_err(|e| FlockError::Internal(e.to_string()))

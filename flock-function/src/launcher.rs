@@ -14,17 +14,20 @@
 //! This crate responsibles for deploying the query to cloud function services
 //! on public clouds.
 
-use flock::error::{FlockError, Result};
+use async_trait::async_trait;
+use datafusion::arrow::record_batch::RecordBatch;
+use flock::error::Result;
 use flock::query::Query;
 
 /// Launcher is a trait that defines the interface for deploying and executing
 /// queries on cloud function services.
+#[async_trait]
 pub trait Launcher {
     /// Create a new launcher.
     ///
     /// # Arguments
-    /// `flow` - The query flow to be deployed.
-    fn new(query: &Query) -> Self;
+    /// `query` - The query to be deployed.
+    fn new<T: AsRef<str> + Send + Sync + 'static>(query: &Query<T>) -> Self;
 
     /// Deploy a query to a specific cloud function service.
     /// It is called before the query is executed.
@@ -32,36 +35,8 @@ pub trait Launcher {
 
     /// Execute a query on a specific cloud function service.
     /// It is called after the query is deployed.
-    fn execute(&self) -> Result<()>;
-}
-
-/// LocalLauncher executes the query locally.
-pub struct LocalLauncher {}
-
-impl Launcher for LocalLauncher {
-    fn new(_query: &Query) -> Self {
-        LocalLauncher {}
-    }
-
-    fn deploy(&self) -> Result<()> {
-        Err(FlockError::Internal(
-            "Local execution doesn't require a deployment.".to_owned(),
-        ))
-    }
-
-    fn execute(&self) -> Result<()> {
-        unimplemented!();
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn version_check() -> Result<()> {
-        let manifest = cargo_toml::Manifest::from_str(include_str!("../Cargo.toml")).unwrap();
-        assert_eq!(env!("CARGO_PKG_VERSION"), manifest.package.unwrap().version);
-        Ok(())
-    }
+    /// 
+    /// # Returns
+    /// A vector of record batches.
+    async fn execute(&self) -> Result<Vec<RecordBatch>>;
 }

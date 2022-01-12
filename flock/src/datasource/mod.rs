@@ -102,6 +102,8 @@ pub enum DataSource {
     Json,
     /// AWS S3 for baseline benchmark.
     S3(NEXMarkSource),
+    /// Data source from the local memory.
+    Memory,
     /// Unknown data source.
     UnknownEvent,
 }

@@ -31,3 +31,4 @@ pub mod aws;
 pub mod azure;
 pub mod gcp;
 mod launcher;
+pub mod local;
