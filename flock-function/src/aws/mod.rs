@@ -199,9 +199,9 @@ mod tests {
 
         let stages = launcher.dag.get_all_stages();
         for (i, stage) in stages.iter().enumerate() {
+            println!("=== Query Stage {:02} ===", i);
             println!(
-                "Query Stage {:02}:\n{:#?}\nFunction Concurrency: {}\n",
-                i,
+                "{:#?}\nFunction Concurrency: {}\n",
                 stage.context.as_ref().unwrap(),
                 stage.concurrency
             );
