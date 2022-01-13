@@ -54,15 +54,25 @@ pub struct Query<T: AsRef<str>> {
     pub tables:     Vec<Table<T>>,
     /// A streaming data source.
     pub datasource: DataSource,
+    /// This is used to specify the function name for benchmarking. Otherwise,
+    /// the function name is generated from `sql`. To make the debugging easier,
+    /// we define human-readable function name for benchmarking.
+    pub query_code: Option<T>,
 }
 
 impl<T: AsRef<str>> Query<T> {
     /// Creates a new query.
-    pub fn new(sql: T, tables: Vec<Table<T>>, datasource: DataSource) -> Self {
+    pub fn new(
+        sql: T,
+        tables: Vec<Table<T>>,
+        datasource: DataSource,
+        query_code: Option<T>,
+    ) -> Self {
         Self {
             sql,
             tables,
             datasource,
+            query_code,
         }
     }
 
@@ -97,6 +107,11 @@ impl<T: AsRef<str>> Query<T> {
 
         futures::executor::block_on(ctx.create_physical_plan(&plan))
             .map_err(|e| FlockError::Internal(e.to_string()))
+    }
+
+    /// Returns the query code for a given query.
+    pub fn query_code(&self) -> Option<String> {
+        self.query_code.as_ref().map(|s| s.as_ref().to_owned())
     }
 
     /// Returns the physical plan for a given query.

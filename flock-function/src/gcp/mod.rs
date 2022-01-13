@@ -34,7 +34,7 @@ impl Launcher for GCPLauncher {
         Ok(GCPLauncher {})
     }
 
-    fn deploy(&self) -> Result<()> {
+    fn deploy(&mut self) -> Result<()> {
         unimplemented!();
     }
 

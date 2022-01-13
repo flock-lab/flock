@@ -14,26 +14,23 @@
 //! When the lambda function is called for the first time, it deserializes the
 //! corresponding execution context from the cloud environment variable.
 
-use crate::aws::s3;
 use crate::datasink::DataSinkType;
 use crate::encoding::Encoding;
 use crate::error::{FlockError, Result};
-use datafusion::arrow::datatypes::{Schema, SchemaRef};
+use crate::runtime::plan::CloudExecutionPlan;
+use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::record_batch::RecordBatch;
-use datafusion::physical_plan::empty::EmptyExec;
+use datafusion::physical_plan::collect;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::ExecutionPlan;
-use datafusion::physical_plan::{collect, collect_partitioned};
-use log::info;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::collections::VecDeque;
 use std::sync::Arc;
+use tokio::task::JoinHandle;
 
 type CloudFunctionName = String;
 type GroupSize = usize;
-type S3BUCKET = String;
-type S3KEY = String;
 
 /// Cloud environment context is a wrapper to support compression and
 /// serialization.
@@ -82,15 +79,11 @@ impl Default for CloudFunction {
     }
 }
 
-/// Lambda execution context.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+/// Cloud execution context.
+#[derive(Default, Debug, Clone, Deserialize, Serialize)]
 pub struct ExecutionContext {
-    /// The execution plans of the lambda function.
-    pub plan:        Arc<dyn ExecutionPlan>,
-    /// The S3 URL of the physical plan. If the plan is too large to be
-    /// serialized and stored in the environment variable, the system will
-    /// store the plan in S3.
-    pub plan_s3_idx: Option<(S3BUCKET, S3KEY)>,
+    /// The execution plan on cloud.
+    pub plan: CloudExecutionPlan,
     /// Cloud Function name in the current execution context.
     ///
     /// |      Cloud Function Naming Convention       |
@@ -112,26 +105,14 @@ pub struct ExecutionContext {
     /// at a certain moment.
     ///
     /// SX72HzqFz1Qij4bP-00-00
-    pub name:        CloudFunctionName,
+    pub name: CloudFunctionName,
     /// Lambda function name(s) for next invocation(s).
-    pub next:        CloudFunction,
-}
-
-impl Default for ExecutionContext {
-    fn default() -> ExecutionContext {
-        ExecutionContext {
-            plan:        Arc::new(EmptyExec::new(false, Arc::new(Schema::empty()))),
-            plan_s3_idx: None,
-            name:        "".to_string(),
-            next:        CloudFunction::Sink(DataSinkType::Blackhole),
-        }
-    }
+    pub next: CloudFunction,
 }
 
 impl PartialEq for ExecutionContext {
     fn eq(&self, other: &ExecutionContext) -> bool {
-        self.plan_s3_idx == other.plan_s3_idx
-            && self.name == other.name
+        self.name == other.name
             && self.next == other.next
             && serde_json::to_string(&self.plan).unwrap()
                 == serde_json::to_string(&other.plan).unwrap()
@@ -144,56 +125,42 @@ impl ExecutionContext {
     /// if it's `EmptyExec`, the plan is not stored in the environment
     /// variable. In this case, we need to load the plan from S3. If the
     /// plan is already loaded, then we don't need to load it again.
-    pub async fn plan(&mut self) -> Result<Arc<dyn ExecutionPlan>> {
-        match self.plan.as_any().downcast_ref::<EmptyExec>() {
-            Some(_) => {
-                if self.plan_s3_idx.is_some() {
-                    info!("Loading plan from S3 {:?}", self.plan_s3_idx);
-                    let (bucket, key) = self.plan_s3_idx.as_ref().unwrap();
-                    self.plan = serde_json::from_slice(&s3::get_object(bucket, key).await?)?;
-                    Ok(self.plan.clone())
-                } else {
-                    panic!("The query plan is not stored in the environment variable and S3.");
-                }
-            }
-            None => Ok(self.plan.clone()),
-        }
+    pub async fn plan(&mut self) -> Result<Vec<Arc<dyn ExecutionPlan>>> {
+        self.plan.get_execution_plans().await
     }
 
     /// Executes the physical plan.
     ///
     /// `execute` must be called after the execution of `feed_one_source` or
     /// `feed_two_source` or `feed_data_sources`.
-    pub async fn execute(&mut self) -> Result<Vec<RecordBatch>> {
-        match collect(self.plan().await?.clone()).await {
-            Ok(b) => Ok(b),
-            Err(e) => Err(FlockError::Plan(format!(
-                "{}. Failed to execute the plan '{:?}'",
-                e, self.plan
-            ))),
-        }
-    }
+    pub async fn execute(&mut self) -> Result<Vec<Vec<RecordBatch>>> {
+        let tasks = self
+            .plan()
+            .await?
+            .into_iter()
+            .map(|plan| {
+                tokio::spawn(async move {
+                    collect(plan)
+                        .await
+                        .map_err(|e| FlockError::Execution(e.to_string()))
+                })
+            })
+            .collect::<Vec<JoinHandle<Result<Vec<RecordBatch>>>>>();
 
-    /// Executes the physical plan.
-    ///
-    /// `execute_partitioned` must be called after the execution of
-    /// `feed_one_source` or `feed_two_source` or `feed_data_sources`.
-    pub async fn execute_partitioned(&mut self) -> Result<Vec<Vec<RecordBatch>>> {
-        match collect_partitioned(self.plan().await?.clone()).await {
-            Ok(b) => Ok(b),
-            Err(e) => Err(FlockError::Plan(format!(
-                "{}. Failed to execute the plan '{:?}'",
-                e, self.plan
-            ))),
-        }
+        Ok(futures::future::join_all(tasks)
+            .await
+            .into_iter()
+            .map(|r| r.unwrap().unwrap())
+            .collect())
     }
 
     /// Feeds all data sources to the execution plan.
     pub async fn feed_data_sources(&mut self, sources: &[Vec<Vec<RecordBatch>>]) -> Result<()> {
         // Breadth-first search
         let mut queue = VecDeque::new();
-        queue.push_front(self.plan().await?.clone());
-
+        self.plan().await?.into_iter().for_each(|plan| {
+            queue.push_back(plan);
+        });
         while !queue.is_empty() {
             let mut p = queue.pop_front().unwrap();
             if p.children().is_empty() {
@@ -340,10 +307,9 @@ mod tests {
 
         // Feed record batches back to the plan
         let mut ctx = ExecutionContext {
-            plan,
+            plan: CloudExecutionPlan::new(vec![plan], None),
             name: "test".to_string(),
             next: CloudFunction::Sink(DataSinkType::Blackhole),
-            ..Default::default()
         };
         ctx.feed_data_sources(&[vec![vec![batch]]]).await?;
 
@@ -359,7 +325,7 @@ mod tests {
             "+--------------+--------------+----+",
         ];
 
-        assert_batches_eq!(&expected, &batches);
+        assert_batches_eq!(&expected, &batches[0]);
 
         Ok(())
     }
@@ -421,10 +387,9 @@ mod tests {
 
         // Feed record batches back to the plan
         let mut ctx = ExecutionContext {
-            plan,
+            plan: CloudExecutionPlan::new(vec![plan], None),
             name: "test".to_string(),
             next: CloudFunction::Sink(DataSinkType::Blackhole),
-            ..Default::default()
         };
         let se_json = marshal(&ctx, Encoding::default())?;
         let de_json = unmarshal(&se_json)?;
@@ -445,7 +410,7 @@ mod tests {
             "+---+----+----+",
         ];
 
-        assert_batches_eq!(&expected, &batches);
+        assert_batches_eq!(&expected, &batches[0]);
 
         Ok(())
     }

@@ -11,9 +11,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use datafusion::arrow::datatypes::{Schema, SchemaRef};
+use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::util::pretty::pretty_format_batches;
-use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::ExecutionPlan;
 use flock::aws::{cloudwatch, lambda};
 use flock::prelude::*;
@@ -30,13 +29,9 @@ use ysb::register_ysb_tables;
 use ysb::YSBSource;
 
 lazy_static! {
-    static ref FLOCK_EMPTY_PLAN: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(false, Arc::new(Schema::empty())));
-    static ref FLOCK_CONCURRENCY: usize = FLOCK_CONF["lambda"]["concurrency"].parse::<usize>().unwrap();
-
     // YSB Benchmark
     static ref YSB_AD_EVENT: SchemaRef = Arc::new(AdEvent::schema());
     static ref YSB_CAMPAIGN: SchemaRef = Arc::new(Campaign::schema());
-    static ref YSB_SOURCE_FUNC_NAME: String = "flock_datasource".to_string();
     static ref YSB_SOURCE_LOG_GROUP: String = "/aws/lambda/flock_datasource".to_string();
 }
 
@@ -92,24 +87,26 @@ async fn create_ysb_functions(
     physcial_plan: Arc<dyn ExecutionPlan>,
 ) -> Result<CloudFunction> {
     let worker_func_name = "ysb-00".to_string();
-    let next_func_name = CloudFunction::Group((worker_func_name.clone(), *FLOCK_CONCURRENCY));
+    let next_func_name =
+        CloudFunction::Group((worker_func_name.clone(), *FLOCK_FUNCTION_CONCURRENCY));
 
     let ysb_source_ctx = ExecutionContext {
-        plan:        FLOCK_EMPTY_PLAN.clone(),
-        plan_s3_idx: None,
-        name:        YSB_SOURCE_FUNC_NAME.clone(),
-        next:        next_func_name.clone(),
+        plan: CloudExecutionPlan::new(vec![FLOCK_EMPTY_PLAN.clone()], None),
+        name: FLOCK_DATA_SOURCE_FUNC_NAME.clone(),
+        next: next_func_name.clone(),
     };
 
     let ysb_worker_ctx = ExecutionContext {
-        plan:        physcial_plan,
-        plan_s3_idx: None,
-        name:        worker_func_name.clone(),
-        next:        CloudFunction::Sink(DataSinkType::new(&opt.data_sink_type)?),
+        plan: CloudExecutionPlan::new(vec![physcial_plan], None),
+        name: worker_func_name.clone(),
+        next: CloudFunction::Sink(DataSinkType::new(&opt.data_sink_type)?),
     };
 
     // Create the function for the ysb source generator.
-    info!("Creating lambda function: {}", YSB_SOURCE_FUNC_NAME.clone());
+    info!(
+        "Creating lambda function: {}",
+        FLOCK_DATA_SOURCE_FUNC_NAME.clone()
+    );
     lambda::create_function(&ysb_source_ctx, 1024, &opt.architecture).await?;
 
     // Create the function for the ysb worker.
@@ -173,7 +170,7 @@ pub async fn ysb_benchmark(opt: YSBBenchmarkOpt) -> Result<()> {
             tokio::spawn(async move {
                 info!(
                     "[OK] Invoking YSB source function: {} by generator {}",
-                    *YSB_SOURCE_FUNC_NAME, i
+                    *FLOCK_DATA_SOURCE_FUNC_NAME, i
                 );
                 let p = serde_json::to_vec(&Payload {
                     datasource: DataSource::YSBEvent(s),
@@ -181,8 +178,12 @@ pub async fn ysb_benchmark(opt: YSBBenchmarkOpt) -> Result<()> {
                     ..Default::default()
                 })?
                 .into();
-                lambda::invoke_function(&YSB_SOURCE_FUNC_NAME, &FLOCK_LAMBDA_ASYNC_CALL, Some(p))
-                    .await
+                lambda::invoke_function(
+                    &FLOCK_DATA_SOURCE_FUNC_NAME,
+                    &FLOCK_LAMBDA_ASYNC_CALL,
+                    Some(p),
+                )
+                .await
             })
         })
         // this collect *is needed* so that the join below can switch between tasks.
@@ -239,7 +240,7 @@ mod tests {
         let ctx = register_ysb_tables().await?;
         let plan = physical_plan(&ctx, &sql).await?;
         let mut flock_ctx = ExecutionContext {
-            plan,
+            plan: CloudExecutionPlan::new(vec![plan], None),
             ..Default::default()
         };
 
@@ -255,7 +256,7 @@ mod tests {
             .await?;
 
         let output = flock_ctx.execute().await?;
-        println!("{}", pretty_format_batches(&output)?);
+        println!("{}", pretty_format_batches(&output[0])?);
         Ok(())
     }
 }

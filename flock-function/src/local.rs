@@ -44,7 +44,7 @@ impl Launcher for LocalLauncher {
         })
     }
 
-    fn deploy(&self) -> Result<()> {
+    fn deploy(&mut self) -> Result<()> {
         Err(FlockError::Internal(
             "Local execution doesn't require a deployment.".to_owned(),
         ))
@@ -150,6 +150,7 @@ mod tests {
             sql,
             vec![Table(table_name, schema.clone())],
             DataSource::Memory,
+            None,
         );
 
         let mut launcher = LocalLauncher::new(&query).await?;

@@ -34,7 +34,7 @@ pub trait Launcher {
 
     /// Deploy a query to a specific cloud function service.
     /// It is called before the query is executed.
-    fn deploy(&self) -> Result<()>;
+    fn deploy(&mut self) -> Result<()>;
 
     /// Execute a query on a specific cloud function service.
     /// It is called after the query is deployed.

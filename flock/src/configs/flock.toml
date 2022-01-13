@@ -6,6 +6,9 @@ license = "Copyright (c) 2020-present, UMD Database Group. The library, examples
 
 production = false
 
+# Flock data source function name
+data_source = "flock_datasource"
+
 # S3 configuration
 [s3]
 # S3 bucket name to store the generic functions

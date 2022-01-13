@@ -14,7 +14,7 @@
 //! Common unit test utility methods
 
 use crate::datasource::DataSource;
-use crate::runtime::executor;
+use crate::runtime::plan;
 use datafusion::arrow::array::{Int64Array, StringArray};
 use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use datafusion::arrow::record_batch::RecordBatch;
@@ -206,7 +206,7 @@ pub async fn physical_plan(
     table_name: &str,
 ) -> Arc<dyn ExecutionPlan> {
     let ctx = register_table(schema, table_name);
-    executor::plan::physical_plan(&ctx, sql).await.unwrap()
+    plan::physical_plan(&ctx, sql).await.unwrap()
 }
 
 #[cfg(test)]

@@ -22,7 +22,7 @@ mod tests {
     use crate::datasource::ysb::event::{AdEvent, Campaign};
     use crate::datasource::ysb::YSBSource;
     use crate::error::Result;
-    use crate::runtime::executor::plan::physical_plan;
+    use crate::runtime::plan::physical_plan;
     use crate::stream::{Schedule, Window};
     use crate::transmute::event_bytes_to_batch;
     use datafusion::arrow::util::pretty::pretty_format_batches;

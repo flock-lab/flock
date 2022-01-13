@@ -17,6 +17,7 @@
 extern crate daggy;
 use crate::configs::FLOCK_FUNCTION_CONCURRENCY;
 use crate::error::{FlockError, Result};
+use crate::runtime::context::ExecutionContext;
 use daggy::{Dag, NodeIndex, Walker};
 use datafusion::physical_plan::displayable;
 use datafusion::physical_plan::memory::MemoryExec;
@@ -35,6 +36,8 @@ pub struct QueryStage {
     pub stage:       Vec<Arc<dyn ExecutionPlan>>,
     /// Function concurrency in cloud environment.
     pub concurrency: usize,
+    /// The cloud execution context for this query stage.
+    pub context:     Option<ExecutionContext>,
 }
 
 impl QueryStage {
@@ -57,7 +60,11 @@ impl QueryStage {
         stage: Vec<Arc<dyn ExecutionPlan>>,
         concurrency: usize,
     ) -> QueryStage {
-        QueryStage { stage, concurrency }
+        QueryStage {
+            stage,
+            concurrency,
+            context: None,
+        }
     }
 }
 
@@ -66,6 +73,7 @@ impl From<Vec<Arc<dyn ExecutionPlan>>> for QueryStage {
         QueryStage {
             stage,
             concurrency: *FLOCK_FUNCTION_CONCURRENCY,
+            context: None,
         }
     }
 }
@@ -148,9 +156,14 @@ impl QueryDag {
         n
     }
 
-    /// Return a node for a given id.
+    /// Return a node's immutable reference for a given id.
     pub fn get_node(&self, id: NodeIndex) -> Option<&QueryStage> {
         self.dag.node_weight(id)
+    }
+
+    /// Return a node's mutable reference for a given id.
+    pub fn get_node_mut(&mut self, id: NodeIndex) -> Option<&mut QueryStage> {
+        self.dag.node_weight_mut(id)
     }
 
     /// Return a dsplayable string of the specified node in the dag.
@@ -224,10 +237,21 @@ impl QueryDag {
             .map(|node| serde_json::from_value(node).unwrap())
             .collect();
         if parent == NodeIndex::end() {
-            Ok(self.add_node(QueryStage { stage, concurrency }))
+            Ok(self.add_node(QueryStage {
+                stage,
+                concurrency,
+                context: None,
+            }))
         } else {
             // TODO: call add_parent instead of add_child
-            Ok(self.add_child(parent, QueryStage { stage, concurrency }))
+            Ok(self.add_child(
+                parent,
+                QueryStage {
+                    stage,
+                    concurrency,
+                    context: None,
+                },
+            ))
         }
     }
 }

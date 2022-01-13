@@ -34,7 +34,7 @@ impl Launcher for AzureLauncher {
         Ok(AzureLauncher {})
     }
 
-    fn deploy(&self) -> Result<()> {
+    fn deploy(&mut self) -> Result<()> {
         unimplemented!();
     }
 

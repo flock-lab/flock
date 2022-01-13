@@ -29,9 +29,7 @@ pub use crate::error::{FlockError, Result};
 pub use crate::query::{Query, Table};
 pub use crate::runtime::arena::{Arena, WindowSession};
 pub use crate::runtime::context::{self, CloudFunction, ExecutionContext};
-pub use crate::runtime::executor::{
-    plan::physical_plan, ExecutionStrategy, Executor, LambdaExecutor,
-};
 pub use crate::runtime::payload::{DataFrame, Payload, Uuid, UuidBuilder};
+pub use crate::runtime::plan::{physical_plan, CloudExecutionPlan};
 pub use crate::stream::{Schedule, Window};
 pub use crate::transmute::*;
