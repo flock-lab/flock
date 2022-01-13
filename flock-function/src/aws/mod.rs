@@ -159,13 +159,14 @@ impl AwsLambdaLauncher {
 mod tests {
     use super::*;
 
+    use datafusion::arrow::array::*;
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
+    use flock::assert_batches_eq;
     use flock::datasource::DataSource;
     use flock::query::Table;
     use std::sync::Arc;
 
-    #[tokio::test]
-    async fn aws_launcher_create_context() -> Result<()> {
+    fn init_query() -> Result<Query<&'static str>> {
         let table1 = "t1";
         let schema1 = Arc::new(Schema::new(vec![
             Field::new("a", DataType::Utf8, false),
@@ -185,17 +186,18 @@ mod tests {
             "LIMIT 3"
         );
 
-        let query = Query::new(
+        Ok(Query::new(
             sql,
-            vec![
-                Table(table1, schema1.clone()),
-                Table(table2, schema2.clone()),
-            ],
+            vec![Table(table1, schema1), Table(table2, schema2)],
             DataSource::Memory,
             DataSinkType::Blackhole,
             None,
-        );
+        ))
+    }
 
+    #[tokio::test]
+    async fn aws_launcher_create_context() -> Result<()> {
+        let query = init_query()?;
         let mut launcher = AwsLambdaLauncher::new(&query).await?;
         println!("SQL: {}", query.sql());
         println!("Query Code: {}\n", launcher.query_code.as_ref().unwrap());
@@ -210,6 +212,60 @@ mod tests {
                 stage.concurrency
             );
         }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn aws_launcher_execute_stages() -> Result<()> {
+        let query = init_query()?;
+        let mut launcher = AwsLambdaLauncher::new(&query).await?;
+        println!("SQL: {}", query.sql());
+        println!("Query Code: {}\n", launcher.query_code.as_ref().unwrap());
+        launcher.create_cloud_contexts()?;
+
+        // define data.
+        let batch1 = RecordBatch::try_new(
+            query.tables()[0].1.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["a", "b", "c", "d"])),
+                Arc::new(Int32Array::from(vec![1, 10, 10, 100])),
+            ],
+        )?;
+        // define data.
+        let batch2 = RecordBatch::try_new(
+            query.tables()[1].1.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["a", "b", "c", "d"])),
+                Arc::new(Int32Array::from(vec![1, 10, 10, 100])),
+            ],
+        )?;
+
+        let stages = launcher.dag.get_all_stages();
+        let mut input = vec![vec![vec![batch1]], vec![vec![batch2]]];
+        for (i, stage) in stages.into_iter().enumerate() {
+            println!("=== Query Stage {:02} ===", i);
+            let mut ctx = stage.context.clone().unwrap();
+            ctx.feed_data_sources(&input).await?;
+            input = ctx
+                .execute()
+                .await?
+                .into_iter()
+                .map(|batches| vec![batches])
+                .collect();
+        }
+
+        let expected = vec![
+            "+---+----+----+",
+            "| a | b  | d  |",
+            "+---+----+----+",
+            "| a | 1  | 1  |",
+            "| b | 10 | 10 |",
+            "| c | 10 | 10 |",
+            "+---+----+----+",
+        ];
+
+        assert_batches_eq!(&expected, &input[0][0]);
 
         Ok(())
     }
