@@ -18,7 +18,6 @@ use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::arrow::util::pretty::pretty_format_batches;
 use datafusion::datasource::MemTable;
 use datafusion::execution::context::ExecutionContext as DataFusionExecutionContext;
-use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::ExecutionPlan;
 use flock::aws::{cloudwatch, efs, lambda, s3};
 use flock::prelude::*;
@@ -43,14 +42,10 @@ static SIDE_INPUT_DOWNLOAD_URL: &str = concat!(
 );
 
 lazy_static! {
-    pub static ref FLOCK_EMPTY_PLAN: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(false, Arc::new(Schema::empty())));
-    pub static ref FLOCK_CONCURRENCY: usize = FLOCK_CONF["lambda"]["concurrency"].parse::<usize>().unwrap();
-
     // NEXMark Benchmark
     pub static ref NEXMARK_BID: SchemaRef = Arc::new(Bid::schema());
     pub static ref NEXMARK_PERSON: SchemaRef = Arc::new(Person::schema());
     pub static ref NEXMARK_AUCTION: SchemaRef = Arc::new(Auction::schema());
-    pub static ref NEXMARK_SOURCE_FUNC_NAME: String = "flock_datasource".to_string();
     pub static ref NEXMARK_SOURCE_LOG_GROUP: String = "/aws/lambda/flock_datasource".to_string();
     pub static ref NEXMARK_Q4_S3_KEY: String = FLOCK_CONF["nexmark"]["q4_s3_key"].to_string();
     pub static ref NEXMARK_Q6_S3_KEY: String = FLOCK_CONF["nexmark"]["q6_s3_key"].to_string();
@@ -173,22 +168,20 @@ pub async fn create_nexmark_functions(
     };
 
     let next_func_name = if window != Window::ElementWise || opt.events_per_second > granule_size {
-        CloudFunction::Group((worker_func_name.clone(), *FLOCK_CONCURRENCY))
+        CloudFunction::Group((worker_func_name.clone(), *FLOCK_FUNCTION_CONCURRENCY))
     } else {
         CloudFunction::Lambda(worker_func_name.clone())
     };
 
     let (plan, s3) = plan_placement(opt.query_number, physcial_plan).await?;
     let nexmark_source_ctx = ExecutionContext {
-        plan:        FLOCK_EMPTY_PLAN.clone(),
-        plan_s3_idx: s3.clone(),
-        name:        NEXMARK_SOURCE_FUNC_NAME.clone(),
-        next:        next_func_name.clone(),
+        plan: CloudExecutionPlan::new(vec![FLOCK_EMPTY_PLAN.clone()], s3.clone()),
+        name: FLOCK_DATA_SOURCE_FUNC_NAME.clone(),
+        next: next_func_name.clone(),
     };
 
     let nexmark_worker_ctx = ExecutionContext {
-        plan,
-        plan_s3_idx: s3.clone(),
+        plan: CloudExecutionPlan::new(vec![plan.clone()], s3.clone()),
         name: worker_func_name.clone(),
         next: CloudFunction::Sink(DataSinkType::new(&opt.data_sink_type)?),
     };
@@ -196,7 +189,7 @@ pub async fn create_nexmark_functions(
     // Create the function for the nexmark source generator.
     info!(
         "Creating lambda function: {}",
-        rainbow_string(NEXMARK_SOURCE_FUNC_NAME.clone())
+        rainbow_string(FLOCK_DATA_SOURCE_FUNC_NAME.clone())
     );
     lambda::create_function(&nexmark_source_ctx, 2048 /* MB */, &opt.architecture).await?;
 
@@ -380,7 +373,7 @@ pub async fn nexmark_benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
             tokio::spawn(async move {
                 info!(
                     "[OK] Invoking NEXMark source function: {} by generator {}\n",
-                    rainbow_string(&*NEXMARK_SOURCE_FUNC_NAME),
+                    rainbow_string(&*FLOCK_DATA_SOURCE_FUNC_NAME),
                     i
                 );
                 let p = serde_json::to_vec(&Payload {
@@ -391,7 +384,7 @@ pub async fn nexmark_benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
                 })?
                 .into();
                 lambda::invoke_function(
-                    &NEXMARK_SOURCE_FUNC_NAME,
+                    &FLOCK_DATA_SOURCE_FUNC_NAME,
                     &FLOCK_LAMBDA_ASYNC_CALL,
                     Some(p),
                 )
@@ -492,7 +485,7 @@ mod tests {
         for sql in sqls {
             let plan = physical_plan(&ctx, &sql[0]).await?;
             let mut flock_ctx = ExecutionContext {
-                plan,
+                plan: CloudExecutionPlan::new(vec![plan], None),
                 ..Default::default()
             };
 
@@ -513,7 +506,7 @@ mod tests {
                 .await?;
 
             let output = flock_ctx.execute().await?;
-            println!("{}", pretty_format_batches(&output)?);
+            println!("{}", pretty_format_batches(&output[0])?);
         }
         Ok(())
     }

@@ -20,7 +20,7 @@ mod tests {
     use crate::datasource::nexmark::event::Bid;
     use crate::datasource::nexmark::NEXMarkSource;
     use crate::error::Result;
-    use crate::runtime::executor::plan::physical_plan;
+    use crate::runtime::plan::physical_plan;
     use crate::stream::{Schedule, Window};
     use crate::transmute::*;
     use chrono::{DateTime, NaiveDateTime, Utc};

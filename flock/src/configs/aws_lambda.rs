@@ -16,7 +16,7 @@
 use crate::configs::FLOCK_CONF;
 use crate::encoding::Encoding;
 use crate::error::{FlockError, Result};
-use crate::runtime::context::ExecutionContext;
+use crate::runtime::context::{self, ExecutionContext};
 use rusoto_core::Region;
 use rusoto_iam::{GetRoleRequest, Iam, IamClient};
 use rusoto_lambda::{Environment, FunctionCode};
@@ -277,7 +277,7 @@ impl AwsLambdaConfig {
         let mut map = HashMap::new();
         map.insert(
             (&FLOCK_CONF["lambda"]["environment"]).to_owned(),
-            ctx.marshal(Encoding::default()).unwrap(),
+            context::marshal(ctx, Encoding::default()).unwrap(),
         );
         map.insert("RUST_LOG".to_owned(), "info".to_owned());
         map.insert("RUST_BACKTRACE".to_owned(), "full".to_owned());

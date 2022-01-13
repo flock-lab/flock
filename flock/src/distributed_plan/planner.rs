@@ -42,7 +42,7 @@ impl DistributedPlanner {
     /// Returns a new distributed plan (DAG) with the given query plan.
     #[allow(dead_code)]
     pub async fn plan_query_stages(
-        &mut self,
+        &self,
         execution_plan: Arc<dyn ExecutionPlan>,
     ) -> Result<QueryDag> {
         debug!("planning query stages\n");
@@ -51,7 +51,7 @@ impl DistributedPlanner {
 
     /// Returns a potentially DAG of the execution plan.
     fn plan_query_stages_internal(
-        &mut self,
+        &self,
         execution_plan: Arc<dyn ExecutionPlan>,
     ) -> Result<QueryDag> {
         stage::build_query_dag(execution_plan)
@@ -76,7 +76,7 @@ mod tests {
         let plan = ctx.optimize(&plan)?;
         let plan = ctx.create_physical_plan(&plan).await?;
 
-        let mut planner = DistributedPlanner::new();
+        let planner = DistributedPlanner::new();
         let dag = planner.plan_query_stages(plan).await?;
         let stages = &dag.get_all_stages();
         for (i, stage) in stages.iter().enumerate() {
@@ -106,7 +106,7 @@ mod tests {
         let plan = ctx.optimize(&plan)?;
         let plan = ctx.create_physical_plan(&plan).await?;
 
-        let mut planner = DistributedPlanner::new();
+        let planner = DistributedPlanner::new();
         let dag = planner.plan_query_stages(plan).await?;
         let stages = &dag.get_all_stages();
         for (i, stage) in stages.iter().enumerate() {
@@ -138,7 +138,7 @@ mod tests {
         let plan = ctx.optimize(&plan)?;
         let plan = ctx.create_physical_plan(&plan).await?;
 
-        let mut planner = DistributedPlanner::new();
+        let planner = DistributedPlanner::new();
         let dag = planner.plan_query_stages(plan).await?;
         let stages = &dag.get_all_stages();
         for (i, stage) in stages.iter().enumerate() {
@@ -208,7 +208,7 @@ mod tests {
         let plan = ctx.optimize(&plan)?;
         let plan = ctx.create_physical_plan(&plan).await?;
 
-        let mut planner = DistributedPlanner::new();
+        let planner = DistributedPlanner::new();
         let dag = planner.plan_query_stages(plan).await?;
         let stages = &dag.get_all_stages();
         for (i, stage) in stages.iter().enumerate() {
@@ -283,7 +283,7 @@ mod tests {
                 displayable(plan.as_ref()).indent()
             );
 
-            let mut planner = DistributedPlanner::new();
+            let planner = DistributedPlanner::new();
             let dag = planner.plan_query_stages(plan).await?;
             let stages = &dag.get_all_stages();
             for (i, stage) in stages.iter().enumerate() {
@@ -305,7 +305,7 @@ mod tests {
         let plan = ctx.optimize(&plan)?;
         let plan = ctx.create_physical_plan(&plan).await?;
 
-        let mut planner = DistributedPlanner::new();
+        let planner = DistributedPlanner::new();
         let dag = planner.plan_query_stages(plan).await?;
         let stages = &dag.get_all_stages();
         for (i, stage) in stages.iter().enumerate() {

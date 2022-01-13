@@ -74,7 +74,7 @@ async fn benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
     let start_time = SystemTime::now();
     info!(
         "[OK] Invoking NEXMark source function: {}",
-        NEXMARK_SOURCE_FUNC_NAME.clone()
+        FLOCK_DATA_SOURCE_FUNC_NAME.clone()
     );
     let payload = serde_json::to_vec(&Payload {
         datasource: DataSource::S3(nexmark_conf.clone()),
@@ -86,7 +86,7 @@ async fn benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
 
     let resp: Value = serde_json::from_slice(
         &lambda::invoke_function(
-            &NEXMARK_SOURCE_FUNC_NAME,
+            &FLOCK_DATA_SOURCE_FUNC_NAME,
             &FLOCK_LAMBDA_SYNC_CALL,
             Some(payload),
         )

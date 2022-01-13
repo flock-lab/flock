@@ -16,13 +16,10 @@ use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::physical_plan::Partitioning::RoundRobinBatch;
 use flock::aws::s3;
 use flock::prelude::*;
-use futures::executor::block_on;
 use hashring::HashRing;
 use lazy_static::lazy_static;
-use log::{info, warn};
+use log::info;
 use rayon::prelude::*;
-use rusoto_core::Region;
-use rusoto_lambda::{InvokeAsyncRequest, Lambda, LambdaClient};
 use serde_json::json;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -53,7 +50,7 @@ lazy_static! {
 pub async fn collect(
     ctx: &mut ExecutionContext,
     partitions: Vec<Vec<Vec<RecordBatch>>>,
-) -> Result<Vec<RecordBatch>> {
+) -> Result<Vec<Vec<RecordBatch>>> {
     let inputs = Arc::new(Mutex::new(vec![]));
 
     info!("Repartitioning the input data before execution.");
@@ -98,9 +95,9 @@ pub async fn collect(
         ctx.feed_data_sources(&input_partitions).await?;
         let output = ctx.execute().await?;
         info!("[OK] The execution is finished.");
-        if !output.is_empty() {
-            info!("[Ok] Output schema: {:?}", output[0].schema());
-            info!("[Ok] Output row count: {}", output[0].num_rows());
+        if !output.is_empty() && !output[0].is_empty() {
+            info!("[Ok] Output schema: {:?}", output[0][0].schema());
+            info!("[Ok] Output row count: {}", output[0][0].num_rows());
         }
         Ok(output)
     }
@@ -177,6 +174,7 @@ pub async fn handler(
     match &ctx.next {
         CloudFunction::Sink(sink_type) => {
             info!("[Ok] Sinking data to {:?}", sink_type);
+            let output = output.into_iter().flatten().collect::<Vec<_>>();
             if !output.is_empty() && DataSinkType::Blackhole != *sink_type {
                 DataSink::new(ctx.name.clone(), output, Encoding::default())
                     .write(sink_type.clone(), DataSinkFormat::SerdeBinary)
@@ -187,7 +185,7 @@ pub async fn handler(
         }
         _ => {
             let mut batches = coalesce_batches(
-                vec![output],
+                output,
                 FLOCK_CONF["lambda"]["payload_batch_size"]
                     .parse::<usize>()
                     .unwrap(),
@@ -202,39 +200,8 @@ pub async fn handler(
 }
 
 /// Invoke functions in the next stage of the data flow.
-fn invoke_next_functions(ctx: &ExecutionContext, batches: &mut Vec<RecordBatch>) -> Result<()> {
-    // retrieve the next lambda function names
-    let next_func = LambdaExecutor::next_function(ctx)?;
-
-    // create uuid builder to assign id to each payload
-    let uuid_builder =
-        UuidBuilder::new_with_ts(&ctx.name, chrono::Utc::now().timestamp(), batches.len());
-
-    let client = &LambdaClient::new(Region::default());
-    batches.into_par_iter().enumerate().for_each(|(i, batch)| {
-        // call the lambda function asynchronously until it succeeds.
-        loop {
-            let uuid = uuid_builder.get(i);
-            let request = InvokeAsyncRequest {
-                function_name: next_func.clone(),
-                invoke_args:   to_bytes(batch, uuid, Encoding::default()),
-            };
-
-            if let Ok(reponse) = block_on(client.invoke_async(request)) {
-                if let Some(code) = reponse.status {
-                    // A success response (202 Accepted) indicates that the request
-                    // is queued for invocation.
-                    if code == 202 {
-                        break;
-                    } else {
-                        warn!("Unknown invoke error: {}, retry ... ", code);
-                    }
-                }
-            }
-        }
-    });
-
-    Ok(())
+fn invoke_next_functions(_: &ExecutionContext, _: &mut Vec<RecordBatch>) -> Result<()> {
+    unimplemented!();
 }
 
 /// Infer the invocation mode of the function.

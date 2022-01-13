@@ -26,14 +26,15 @@ pub struct GCPLauncher {}
 
 #[async_trait]
 impl Launcher for GCPLauncher {
-    fn new<T>(_query: &Query<T>) -> Self
+    async fn new<T>(_: &Query<T>) -> Result<Self>
     where
+        Self: Sized,
         T: AsRef<str> + Send + Sync + 'static,
     {
-        GCPLauncher {}
+        Ok(GCPLauncher {})
     }
 
-    fn deploy(&self) -> Result<()> {
+    fn deploy(&mut self) -> Result<()> {
         unimplemented!();
     }
 

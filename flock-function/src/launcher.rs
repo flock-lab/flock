@@ -27,15 +27,18 @@ pub trait Launcher {
     ///
     /// # Arguments
     /// `query` - The query to be deployed.
-    fn new<T: AsRef<str> + Send + Sync + 'static>(query: &Query<T>) -> Self;
+    async fn new<T>(query: &Query<T>) -> Result<Self>
+    where
+        Self: Sized,
+        T: AsRef<str> + Send + Sync + 'static;
 
     /// Deploy a query to a specific cloud function service.
     /// It is called before the query is executed.
-    fn deploy(&self) -> Result<()>;
+    fn deploy(&mut self) -> Result<()>;
 
     /// Execute a query on a specific cloud function service.
     /// It is called after the query is deployed.
-    /// 
+    ///
     /// # Returns
     /// A vector of record batches.
     async fn execute(&self) -> Result<Vec<RecordBatch>>;

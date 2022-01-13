@@ -20,7 +20,7 @@ mod tests {
     use crate::datasource::nexmark::event::Bid;
     use crate::datasource::nexmark::NEXMarkSource;
     use crate::error::Result;
-    use crate::runtime::executor::plan::physical_plan;
+    use crate::runtime::plan::physical_plan;
     use crate::stream::Schedule;
     use crate::stream::Window;
     use crate::transmute::event_bytes_to_batch;

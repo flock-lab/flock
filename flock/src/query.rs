@@ -14,12 +14,13 @@
 //! The query interface is responsible for bringing the underlying query
 //! implementation (streaming and OLAP) into the system backend.
 
+use crate::datasink::DataSinkType;
 use crate::datasource::DataSource;
 use crate::error::{FlockError, Result};
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::datasource::MemTable;
-use datafusion::execution::context::ExecutionContext;
+use datafusion::execution::context::{ExecutionConfig, ExecutionContext};
 use datafusion::physical_plan::ExecutionPlan;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -54,15 +55,29 @@ pub struct Query<T: AsRef<str>> {
     pub tables:     Vec<Table<T>>,
     /// A streaming data source.
     pub datasource: DataSource,
+    /// A sink for the output of the query.
+    pub datasink:   DataSinkType,
+    /// This is used to specify the function name for benchmarking. Otherwise,
+    /// the function name is generated from `sql`. To make the debugging easier,
+    /// we define human-readable function name for benchmarking.
+    pub query_code: Option<T>,
 }
 
 impl<T: AsRef<str>> Query<T> {
     /// Creates a new query.
-    pub fn new(sql: T, tables: Vec<Table<T>>, datasource: DataSource) -> Self {
+    pub fn new(
+        sql: T,
+        tables: Vec<Table<T>>,
+        datasource: DataSource,
+        datasink: DataSinkType,
+        query_code: Option<T>,
+    ) -> Self {
         Self {
             sql,
             tables,
             datasource,
+            datasink,
+            query_code,
         }
     }
 
@@ -81,6 +96,11 @@ impl<T: AsRef<str>> Query<T> {
         self.datasource.clone()
     }
 
+    /// Returns the data sink for a given query.
+    pub fn datasink(&self) -> DataSinkType {
+        self.datasink.clone()
+    }
+
     /// Returns the physical plan for a given query.
     pub fn plan(&self) -> Result<Arc<dyn ExecutionPlan>> {
         let mut ctx = ExecutionContext::new();
@@ -91,8 +111,41 @@ impl<T: AsRef<str>> Query<T> {
             )?;
             ctx.register_table(table.0.as_ref(), Arc::new(mem_table))?;
         }
+
         let plan = ctx.create_logical_plan(self.sql.as_ref())?;
         let plan = ctx.optimize(&plan)?;
+
+        futures::executor::block_on(ctx.create_physical_plan(&plan))
+            .map_err(|e| FlockError::Internal(e.to_string()))
+    }
+
+    /// Returns the query code for a given query.
+    pub fn query_code(&self) -> Option<String> {
+        self.query_code.as_ref().map(|s| s.as_ref().to_owned())
+    }
+
+    /// Returns the physical plan for a given query.
+    ///
+    /// # Arguments
+    /// * `shuffle_partitions` - The number of output partitions to shuffle the
+    ///   data into.
+    pub fn plan_with_partitions(
+        &self,
+        shuffle_partitions: usize,
+    ) -> Result<Arc<dyn ExecutionPlan>> {
+        let config = ExecutionConfig::new().with_target_partitions(shuffle_partitions);
+        let mut ctx = ExecutionContext::with_config(config);
+        for table in &self.tables {
+            let mem_table = MemTable::try_new(
+                table.1.clone(),
+                vec![vec![RecordBatch::new_empty(table.1.clone())]],
+            )?;
+            ctx.register_table(table.0.as_ref(), Arc::new(mem_table))?;
+        }
+
+        let plan = ctx.create_logical_plan(self.sql.as_ref())?;
+        let plan = ctx.optimize(&plan)?;
+
         futures::executor::block_on(ctx.create_physical_plan(&plan))
             .map_err(|e| FlockError::Internal(e.to_string()))
     }

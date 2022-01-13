@@ -34,16 +34,17 @@ pub struct LocalLauncher {
 
 #[async_trait]
 impl Launcher for LocalLauncher {
-    fn new<T>(query: &Query<T>) -> Self
+    async fn new<T>(query: &Query<T>) -> Result<Self>
     where
+        Self: Sized,
         T: AsRef<str> + Send + Sync + 'static,
     {
-        LocalLauncher {
+        Ok(LocalLauncher {
             execution_plan: query.plan().unwrap(),
-        }
+        })
     }
 
-    fn deploy(&self) -> Result<()> {
+    fn deploy(&mut self) -> Result<()> {
         Err(FlockError::Internal(
             "Local execution doesn't require a deployment.".to_owned(),
         ))
@@ -59,11 +60,11 @@ impl Launcher for LocalLauncher {
 impl LocalLauncher {
     /// Compare two execution plans' schemas.
     /// Returns true if they are belong to the same plan node.
-    /// 
+    ///
     /// # Arguments
     /// * `schema1` - The first schema.
     /// * `schema2` - The second schema.
-    /// 
+    ///
     /// # Returns
     /// * `true` - If the schemas belong to the same plan node.
     fn compare_schema(schema1: SchemaRef, schema2: SchemaRef) -> bool {
@@ -83,7 +84,7 @@ impl LocalLauncher {
     }
 
     /// Feeds the query with data.
-    /// 
+    ///
     /// # Arguments
     /// * `sources` - A list of data sources.
     pub fn feed_data_sources(&mut self, sources: &[Vec<Vec<RecordBatch>>]) {
@@ -123,6 +124,7 @@ mod tests {
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
     use datafusion::arrow::record_batch::RecordBatch;
     use flock::assert_batches_eq;
+    use flock::datasink::DataSinkType;
     use flock::datasource::DataSource;
     use flock::query::Table;
 
@@ -149,9 +151,11 @@ mod tests {
             sql,
             vec![Table(table_name, schema.clone())],
             DataSource::Memory,
+            DataSinkType::Blackhole,
+            None,
         );
 
-        let mut launcher = LocalLauncher::new(&query);
+        let mut launcher = LocalLauncher::new(&query).await?;
 
         let batch = RecordBatch::try_new(
             schema.clone(),

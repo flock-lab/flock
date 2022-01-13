@@ -18,3 +18,6 @@
 
 pub mod planner;
 pub mod stage;
+
+pub use planner::DistributedPlanner;
+pub use stage::{QueryDag, QueryStage};

@@ -18,6 +18,9 @@ pub use aws_lambda::AwsLambdaConfig;
 
 mod flock;
 pub use self::flock::FLOCK_CONF;
+use datafusion::arrow::datatypes::Schema;
+use datafusion::physical_plan::empty::EmptyExec;
+use datafusion::physical_plan::ExecutionPlan;
 use lazy_static::lazy_static;
 use rusoto_core::Region;
 use rusoto_efs::EfsClient;
@@ -25,6 +28,7 @@ use rusoto_lambda::LambdaClient;
 use rusoto_logs::CloudWatchLogsClient;
 use rusoto_s3::S3Client;
 use rusoto_sqs::SqsClient;
+use std::sync::Arc;
 
 lazy_static! {
     /// AWS Lambda function async invocation.
@@ -80,4 +84,9 @@ lazy_static! {
     pub static ref FLOCK_SQS_CLIENT: SqsClient = SqsClient::new(Region::default());
     /// Flock CloudWatch Logs Client.
     pub static ref FLOCK_WATCHLOGS_CLIENT: CloudWatchLogsClient = CloudWatchLogsClient::new(Region::default());
+
+    /// Flock Empty query plan
+    pub static ref FLOCK_EMPTY_PLAN: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(false, Arc::new(Schema::empty())));
+    /// Flock data source function name
+    pub static ref FLOCK_DATA_SOURCE_FUNC_NAME: String = FLOCK_CONF["flock"]["data_source"].to_string();
 }
