@@ -11,27 +11,26 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-//! The `gcp` crate contains the GCP-specific parts of the `flock-function`
-//! library.
+//! This crate responsibles for executing queries on Azure Functions.
 
+use crate::error::Result;
 use crate::launcher::{ExecutionMode, Launcher};
+use crate::query::Query;
 use async_trait::async_trait;
 use datafusion::arrow::record_batch::RecordBatch;
-use flock::error::Result;
-use flock::query::Query;
 
-/// GCPLauncher defines the interface for deploying and executing
-/// queries on GCP Functions.
-pub struct GCPLauncher {}
+/// AzureLauncher defines the interface for deploying and executing
+/// queries on Azure Functions.
+pub struct AzureLauncher {}
 
 #[async_trait]
-impl Launcher for GCPLauncher {
+impl Launcher for AzureLauncher {
     async fn new<T>(_: &Query<T>) -> Result<Self>
     where
         Self: Sized,
         T: AsRef<str> + Send + Sync + 'static,
     {
-        Ok(GCPLauncher {})
+        Ok(AzureLauncher {})
     }
 
     fn deploy(&mut self) -> Result<()> {

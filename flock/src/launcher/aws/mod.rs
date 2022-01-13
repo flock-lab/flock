@@ -11,23 +11,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-//! The `aws` crate contains the AWS-specific parts of the `flock-function`
-//! library.
+//! This crate responsibles for executing queries on AWS Lambda Functions.
 
 extern crate daggy;
+use crate::configs::*;
+use crate::datasink::DataSinkType;
+use crate::distributed_plan::DistributedPlanner;
+use crate::distributed_plan::QueryDag;
+use crate::error::Result;
 use crate::launcher::{ExecutionMode, Launcher};
+use crate::query::Query;
+use crate::runtime::context::*;
+use crate::runtime::plan::CloudExecutionPlan;
 use async_trait::async_trait;
 use daggy::NodeIndex;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::physical_plan::ExecutionPlan;
-use flock::configs::*;
-use flock::datasink::DataSinkType;
-use flock::distributed_plan::DistributedPlanner;
-use flock::distributed_plan::QueryDag;
-use flock::error::Result;
-use flock::query::Query;
-use flock::runtime::context::*;
-use flock::runtime::plan::CloudExecutionPlan;
 use log::debug;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
@@ -98,6 +97,25 @@ impl Launcher for AwsLambdaLauncher {
 }
 
 impl AwsLambdaLauncher {
+    /// Create a new `AwsLambdaLauncher` instance.
+    pub async fn try_new<T>(
+        query_code: T,
+        plan: Arc<dyn ExecutionPlan>,
+        sink_type: DataSinkType,
+    ) -> Result<Self>
+    where
+        T: Into<String>,
+    {
+        let planner = DistributedPlanner::new();
+        let dag = planner.plan_query_stages(plan.clone()).await?;
+        Ok(AwsLambdaLauncher {
+            query_code: Some(query_code.into()),
+            plan,
+            dag,
+            sink_type,
+        })
+    }
+
     /// Initialize the query code for the query.
     pub fn set_query_code<T>(&mut self, query: &Query<T>)
     where
@@ -114,7 +132,7 @@ impl AwsLambdaLauncher {
     /// Create the cloud contexts for the query.
     ///
     /// This function creates a new context for each query stage in the DAG.
-    fn create_cloud_contexts(&mut self) -> Result<()> {
+    pub fn create_cloud_contexts(&mut self) -> Result<()> {
         debug!("Creating cloud contexts for both central and distributed query processing.");
 
         // Creates the cloud contexts for the distributed mode
@@ -184,12 +202,12 @@ impl AwsLambdaLauncher {
 mod tests {
     use super::*;
 
+    use crate::assert_batches_eq;
+    use crate::datasource::DataSource;
+    use crate::query::QueryType;
+    use crate::query::Table;
     use datafusion::arrow::array::*;
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
-    use flock::assert_batches_eq;
-    use flock::datasource::DataSource;
-    use flock::query::QueryType;
-    use flock::query::Table;
     use std::sync::Arc;
 
     fn init_query() -> Result<Query<&'static str>> {

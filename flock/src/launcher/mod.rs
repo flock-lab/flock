@@ -14,10 +14,15 @@
 //! This crate responsibles for deploying the query to cloud function services
 //! on public clouds.
 
+pub mod aws;
+pub mod azure;
+pub mod gcp;
+pub mod local;
+
+use crate::error::Result;
+use crate::query::Query;
 use async_trait::async_trait;
 use datafusion::arrow::record_batch::RecordBatch;
-use flock::error::Result;
-use flock::query::Query;
 
 /// The execution model for the query.
 #[allow(dead_code)]

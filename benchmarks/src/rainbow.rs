@@ -16,6 +16,7 @@
 use std::f64::consts::PI;
 
 /// Prints the text in the rainbow fansion.
+#[allow(dead_code)]
 pub fn rainbow_println<S: Into<String>>(line: S) {
     let frequency: f64 = 0.1;
     let spread: f64 = 3.0;
@@ -31,6 +32,7 @@ pub fn rainbow_println<S: Into<String>>(line: S) {
 }
 
 /// Converts a line to a rainbow-colored string.
+#[allow(dead_code)]
 pub fn rainbow_string<S: Into<String>>(line: S) -> String {
     let frequency: f64 = 0.1;
     let spread: f64 = 3.0;
