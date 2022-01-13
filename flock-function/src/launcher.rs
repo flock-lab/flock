@@ -19,6 +19,18 @@ use datafusion::arrow::record_batch::RecordBatch;
 use flock::error::Result;
 use flock::query::Query;
 
+/// The execution model for the query.
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExecutionMode {
+    /// In centralized mode, the query is executed on a single cloud
+    /// function.
+    Centralized,
+    /// In distributed mode, the query is represented as a DAG and
+    /// executed on multiple cloud functions.
+    Distributed,
+}
+
 /// Launcher is a trait that defines the interface for deploying and executing
 /// queries on cloud function services.
 #[async_trait]
@@ -39,7 +51,10 @@ pub trait Launcher {
     /// Execute a query on a specific cloud function service.
     /// It is called after the query is deployed.
     ///
+    /// # Arguments
+    /// `mode` - The execution mode of the query.
+    ///
     /// # Returns
     /// A vector of record batches.
-    async fn execute(&self) -> Result<Vec<RecordBatch>>;
+    async fn execute(&self, mode: ExecutionMode) -> Result<Vec<RecordBatch>>;
 }

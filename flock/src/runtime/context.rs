@@ -90,8 +90,7 @@ pub struct ExecutionContext {
     /// |---------------------------------------------|
     /// |  query code  -  plan index  -  group index  |
     ///
-    /// - query code: the cryptographic hash digest of a query produced by
-    ///   BLAKE2b ([RFC 7693](https://tools.ietf.org/html/rfc7693)).
+    /// - query code: the hash digest of a sql query.
     ///
     /// - plan index: the 2-digit number [00-99] indicates the index of the
     ///   subplan of the current query in the dag.

@@ -21,11 +21,12 @@ use daggy::{NodeIndex, Walker};
 use crate::datasource::DataSource;
 use crate::driver::funcgen::dag::*;
 use crate::prelude::*;
-use blake2::{Blake2b, Digest};
 use chrono::{DateTime, Utc};
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::physical_plan::ExecutionPlan;
+use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, VecDeque};
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
 /// `QueryFlow` contains all the context information of the current query
@@ -112,7 +113,9 @@ impl QueryFlow {
         query: &dyn Query,
         dag: &mut QueryDag,
     ) -> HashMap<NodeIndex, ExecutionContext> {
-        let mut query_code = base64::encode(&Blake2b::digest(query.sql().as_bytes()));
+        let mut hasher = DefaultHasher::new();
+        query.sql().hash(&mut hasher);
+        let mut query_code = hasher.finish().to_string();
         query_code.truncate(16);
         let timestamp = chrono::offset::Utc::now();
 
@@ -171,8 +174,6 @@ mod tests {
 
     use datafusion::datasource::MemTable;
     use datafusion::execution::context::ExecutionContext;
-
-    use blake2::{Blake2b, Digest};
 
     async fn init_query_flow(sql: &str) -> Result<QueryFlow> {
         let schema = Arc::new(Schema::new(vec![
@@ -325,8 +326,9 @@ mod tests {
     async fn lambda_function_name() -> Result<()> {
         // The hash of the SQL statement is used as the first 16 characters of the
         // function name.
-        let hash = Blake2b::digest(b"SELECT b FROM t ORDER BY b ASC LIMIT 3");
-        let mut s1 = base64::encode(&hash);
+        let mut hasher = DefaultHasher::new();
+        b"SELECT b FROM t ORDER BY b ASC LIMIT 3".hash(&mut hasher);
+        let mut s1 = hasher.finish().to_string();
         s1.truncate(16);
 
         // The sub-plan index in the dag is used as the second 2 characters of the

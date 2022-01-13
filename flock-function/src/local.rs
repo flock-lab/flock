@@ -13,7 +13,7 @@
 
 //! This crate responsibles for executing queries on the local machine.
 
-use crate::launcher::Launcher;
+use crate::launcher::{ExecutionMode, Launcher};
 use async_trait::async_trait;
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::record_batch::RecordBatch;
@@ -50,7 +50,8 @@ impl Launcher for LocalLauncher {
         ))
     }
 
-    async fn execute(&self) -> Result<Vec<RecordBatch>> {
+    async fn execute(&self, mode: ExecutionMode) -> Result<Vec<RecordBatch>> {
+        assert!(mode == ExecutionMode::Centralized);
         collect(self.execution_plan.clone())
             .await
             .map_err(|e| FlockError::Execution(e.to_string()))
@@ -115,6 +116,13 @@ impl LocalLauncher {
                 .for_each(|(i, _)| queue.push_back(p.children()[i].clone()));
         }
     }
+
+    /// Collects the results of the query.
+    pub async fn collect(&self) -> Result<Vec<RecordBatch>> {
+        collect(self.execution_plan.clone())
+            .await
+            .map_err(|e| FlockError::Execution(e.to_string()))
+    }
 }
 
 #[cfg(test)]
@@ -126,6 +134,7 @@ mod tests {
     use flock::assert_batches_eq;
     use flock::datasink::DataSinkType;
     use flock::datasource::DataSource;
+    use flock::query::QueryType;
     use flock::query::Table;
 
     #[tokio::test]
@@ -153,6 +162,7 @@ mod tests {
             DataSource::Memory,
             DataSinkType::Blackhole,
             None,
+            QueryType::OLAP,
         );
 
         let mut launcher = LocalLauncher::new(&query).await?;
@@ -185,7 +195,7 @@ mod tests {
         )?;
 
         launcher.feed_data_sources(&[vec![vec![batch]]]);
-        let batches = launcher.execute().await?;
+        let batches = launcher.collect().await?;
 
         let expected = vec![
             "+--------------------+--------------------+----------------------+",

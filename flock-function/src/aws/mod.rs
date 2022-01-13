@@ -15,7 +15,7 @@
 //! library.
 
 extern crate daggy;
-use crate::launcher::Launcher;
+use crate::launcher::{ExecutionMode, Launcher};
 use async_trait::async_trait;
 use daggy::NodeIndex;
 use datafusion::arrow::record_batch::RecordBatch;
@@ -91,7 +91,7 @@ impl Launcher for AwsLambdaLauncher {
     /// the results to the next lambda function. This greatly simplifies the
     /// code size and complexity of the distributed query engine. Meanwhile, the
     /// latency is significantly reduced.
-    async fn execute(&self) -> Result<Vec<RecordBatch>> {
+    async fn execute(&self, _: ExecutionMode) -> Result<Vec<RecordBatch>> {
         unimplemented!();
     }
 }
@@ -163,6 +163,7 @@ mod tests {
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
     use flock::assert_batches_eq;
     use flock::datasource::DataSource;
+    use flock::query::QueryType;
     use flock::query::Table;
     use std::sync::Arc;
 
@@ -192,6 +193,7 @@ mod tests {
             DataSource::Memory,
             DataSinkType::Blackhole,
             None,
+            QueryType::OLAP,
         ))
     }
 
