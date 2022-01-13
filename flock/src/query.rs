@@ -14,6 +14,7 @@
 //! The query interface is responsible for bringing the underlying query
 //! implementation (streaming and OLAP) into the system backend.
 
+use crate::datasink::DataSinkType;
 use crate::datasource::DataSource;
 use crate::error::{FlockError, Result};
 use datafusion::arrow::datatypes::SchemaRef;
@@ -54,6 +55,8 @@ pub struct Query<T: AsRef<str>> {
     pub tables:     Vec<Table<T>>,
     /// A streaming data source.
     pub datasource: DataSource,
+    /// A sink for the output of the query.
+    pub datasink:   DataSinkType,
     /// This is used to specify the function name for benchmarking. Otherwise,
     /// the function name is generated from `sql`. To make the debugging easier,
     /// we define human-readable function name for benchmarking.
@@ -66,12 +69,14 @@ impl<T: AsRef<str>> Query<T> {
         sql: T,
         tables: Vec<Table<T>>,
         datasource: DataSource,
+        datasink: DataSinkType,
         query_code: Option<T>,
     ) -> Self {
         Self {
             sql,
             tables,
             datasource,
+            datasink,
             query_code,
         }
     }
@@ -89,6 +94,11 @@ impl<T: AsRef<str>> Query<T> {
     /// Returns the data source for a given query.
     pub fn datasource(&self) -> DataSource {
         self.datasource.clone()
+    }
+
+    /// Returns the data sink for a given query.
+    pub fn datasink(&self) -> DataSinkType {
+        self.datasink.clone()
     }
 
     /// Returns the physical plan for a given query.

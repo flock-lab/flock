@@ -40,6 +40,8 @@ pub struct AwsLambdaLauncher {
     pub query_code: Option<String>,
     /// The DAG of a given query.
     pub dag:        QueryDag,
+    /// The data sink type of a given query.
+    pub sink_type:  DataSinkType,
     /// The entire execution plan. This can be used to execute the query
     /// in a single Lambda function.
     pub plan:       Arc<dyn ExecutionPlan>,
@@ -53,6 +55,7 @@ impl Launcher for AwsLambdaLauncher {
         T: AsRef<str> + Send + Sync + 'static,
     {
         let plan = query.plan()?;
+        let sink_type = query.datasink();
 
         let planner = DistributedPlanner::new();
         let dag = planner.plan_query_stages(plan.clone()).await?;
@@ -67,6 +70,7 @@ impl Launcher for AwsLambdaLauncher {
         Ok(AwsLambdaLauncher {
             plan,
             dag,
+            sink_type,
             query_code,
         })
     }
@@ -123,8 +127,7 @@ impl AwsLambdaLauncher {
             let query_code = self.query_code.as_ref().expect("query code not set");
 
             let next = if i == 0 {
-                // TODO: More generic interface to support other data sinks.
-                CloudFunction::Sink(DataSinkType::Blackhole)
+                CloudFunction::Sink(self.sink_type.clone())
             } else if concurrency[i - 1 /* parent */] == 1 {
                 CloudFunction::Group((
                     format!("{}-{:02}", query_code, count - 1 - (i - 1)),
@@ -189,6 +192,7 @@ mod tests {
                 Table(table2, schema2.clone()),
             ],
             DataSource::Memory,
+            DataSinkType::Blackhole,
             None,
         );
 

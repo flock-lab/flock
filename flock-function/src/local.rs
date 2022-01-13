@@ -124,6 +124,7 @@ mod tests {
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
     use datafusion::arrow::record_batch::RecordBatch;
     use flock::assert_batches_eq;
+    use flock::datasink::DataSinkType;
     use flock::datasource::DataSource;
     use flock::query::Table;
 
@@ -150,6 +151,7 @@ mod tests {
             sql,
             vec![Table(table_name, schema.clone())],
             DataSource::Memory,
+            DataSinkType::Blackhole,
             None,
         );
 
