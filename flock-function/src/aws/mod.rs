@@ -28,6 +28,7 @@ use flock::error::Result;
 use flock::query::Query;
 use flock::runtime::context::*;
 use flock::runtime::plan::CloudExecutionPlan;
+use log::debug;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
@@ -114,37 +115,61 @@ impl AwsLambdaLauncher {
     ///
     /// This function creates a new context for each query stage in the DAG.
     fn create_cloud_contexts(&mut self) -> Result<()> {
-        let dag = &mut self.dag;
-        let count = dag.node_count();
-        assert!(count < 100);
+        debug!("Creating cloud contexts for both central and distributed query processing.");
 
-        let concurrency = (0..count)
-            .map(|i| dag.get_node(NodeIndex::new(i)).unwrap().concurrency)
-            .collect::<Vec<usize>>();
+        // Creates the cloud contexts for the distributed mode
+        {
+            let dag = &mut self.dag;
+            let count = dag.node_count();
+            assert!(count < 100);
 
-        (0..count).rev().for_each(|i| {
-            let node = dag.get_node_mut(NodeIndex::new(i)).unwrap();
+            let concurrency = (0..count)
+                .map(|i| dag.get_node(NodeIndex::new(i)).unwrap().concurrency)
+                .collect::<Vec<usize>>();
+
+            (0..count).rev().for_each(|i| {
+                let node = dag.get_node_mut(NodeIndex::new(i)).unwrap();
+                let query_code = self.query_code.as_ref().expect("query code not set");
+
+                let next = if i == 0 {
+                    CloudFunction::Sink(self.sink_type.clone())
+                } else if concurrency[i - 1 /* parent */] == 1 {
+                    CloudFunction::Group((
+                        format!("{}-{:02}", query_code, count - 1 - (i - 1)),
+                        *FLOCK_FUNCTION_CONCURRENCY,
+                    ))
+                } else {
+                    CloudFunction::Lambda(format!("{}-{:02}", query_code, count - 1 - (i - 1)))
+                };
+
+                let ctx = ExecutionContext {
+                    plan: CloudExecutionPlan::new(node.stage.clone(), None),
+                    name: format!("{}-{:02}", query_code, count - 1 - i),
+                    next,
+                };
+
+                node.context = Some(ctx);
+            });
+        }
+
+        // Creates the cloud contexts for centralized mode
+        {
             let query_code = self.query_code.as_ref().expect("query code not set");
-
-            let next = if i == 0 {
-                CloudFunction::Sink(self.sink_type.clone())
-            } else if concurrency[i - 1 /* parent */] == 1 {
-                CloudFunction::Group((
-                    format!("{}-{:02}", query_code, count - 1 - (i - 1)),
+            let _data_source_ctx = ExecutionContext {
+                plan: CloudExecutionPlan::new(vec![FLOCK_EMPTY_PLAN.clone()], None),
+                name: FLOCK_DATA_SOURCE_FUNC_NAME.clone(),
+                next: CloudFunction::Group((
+                    format!("{}-{:02}", query_code, 0),
                     *FLOCK_FUNCTION_CONCURRENCY,
-                ))
-            } else {
-                CloudFunction::Lambda(format!("{}-{:02}", query_code, count - 1 - (i - 1)))
+                )),
             };
-
-            let ctx = ExecutionContext {
-                plan: CloudExecutionPlan::new(node.stage.clone(), None),
-                name: format!("{}-{:02}", query_code, count - 1 - i),
-                next,
+            let _worker_ctx = ExecutionContext {
+                // TODO: add option to store the execution plan in S3.
+                plan: CloudExecutionPlan::new(vec![self.plan.clone()], None),
+                name: format!("{}-{:02}", query_code, 0),
+                next: CloudFunction::Sink(self.sink_type.clone()),
             };
-
-            node.context = Some(ctx);
-        });
+        }
 
         Ok(())
     }
