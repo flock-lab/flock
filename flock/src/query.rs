@@ -42,6 +42,34 @@ impl<T: AsRef<str>> Debug for Table<T> {
     }
 }
 
+/// The stream type for the query.
+#[allow(dead_code)]
+#[derive(Clone, Debug)]
+pub enum StreamType {
+    /// Regular stream.
+    Regular,
+    /// NEXMark Benchmark.
+    NEXMarkBench,
+    /// Yahoo! Streaming Benchmark.
+    YSBBench,
+}
+
+/// The query type for the query.
+#[allow(dead_code)]
+#[derive(Clone, Debug)]
+pub enum QueryType {
+    /// OLAP workload.
+    OLAP,
+    /// Streaming workload.
+    Streaming(StreamType),
+}
+
+impl Default for QueryType {
+    fn default() -> Self {
+        QueryType::Streaming(StreamType::NEXMarkBench)
+    }
+}
+
 /// SQL queries in your application code execute over in-application batches.
 #[derive(Debug, Default, Clone)]
 pub struct Query<T: AsRef<str>> {
@@ -61,6 +89,8 @@ pub struct Query<T: AsRef<str>> {
     /// the function name is generated from `sql`. To make the debugging easier,
     /// we define human-readable function name for benchmarking.
     pub query_code: Option<T>,
+    /// The query type.
+    pub query_type: QueryType,
 }
 
 impl<T: AsRef<str>> Query<T> {
@@ -71,6 +101,7 @@ impl<T: AsRef<str>> Query<T> {
         datasource: DataSource,
         datasink: DataSinkType,
         query_code: Option<T>,
+        query_type: QueryType,
     ) -> Self {
         Self {
             sql,
@@ -78,6 +109,7 @@ impl<T: AsRef<str>> Query<T> {
             datasource,
             datasink,
             query_code,
+            query_type,
         }
     }
 

@@ -352,7 +352,7 @@ fn build_query_dag_from_serde_json(plan: Arc<dyn ExecutionPlan>) -> Result<Query
                 dag.insert(
                     leaf,
                     vec![Value::Object(left_obj), Value::Object(right_obj)],
-                    1,
+                    *FLOCK_FUNCTION_CONCURRENCY,
                 )?;
                 return Ok(dag);
             }

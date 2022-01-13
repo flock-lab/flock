@@ -48,7 +48,8 @@ target_batch_size = 16384
 # Default raw record batch size in the payload (512 KB)
 payload_batch_size = 524288
 
-# Lambda function concurrency
+# Lambda function group's concurrency or size, and the concurrency
+# of each function in the group is 1
 concurrency = 32
 
 aggregate_threshold = 10485760

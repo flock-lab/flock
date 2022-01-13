@@ -14,7 +14,7 @@
 //! The `gcp` crate contains the GCP-specific parts of the `flock-function`
 //! library.
 
-use crate::launcher::Launcher;
+use crate::launcher::{ExecutionMode, Launcher};
 use async_trait::async_trait;
 use datafusion::arrow::record_batch::RecordBatch;
 use flock::error::Result;
@@ -38,7 +38,7 @@ impl Launcher for GCPLauncher {
         unimplemented!();
     }
 
-    async fn execute(&self) -> Result<Vec<RecordBatch>> {
+    async fn execute(&self, _: ExecutionMode) -> Result<Vec<RecordBatch>> {
         unimplemented!();
     }
 }
