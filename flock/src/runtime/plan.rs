@@ -18,6 +18,7 @@
 use crate::aws::s3;
 use crate::error::Result;
 use datafusion::execution::context::ExecutionContext;
+use datafusion::physical_plan::displayable;
 use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
 use datafusion::physical_plan::hash_join::HashJoinExec;
 use datafusion::physical_plan::sort::SortExec;
@@ -30,7 +31,7 @@ type S3BUCKET = String;
 type S3KEY = String;
 
 /// The execution plan on cloud.
-#[derive(Default, Debug, Clone, Deserialize, Serialize)]
+#[derive(Default, Clone, Deserialize, Serialize)]
 pub struct CloudExecutionPlan {
     /// The execution plans of the lambda function.
     pub execution_plans: Vec<Arc<dyn ExecutionPlan>>,
@@ -38,6 +39,22 @@ pub struct CloudExecutionPlan {
     /// serialized and stored in the environment variable, the system will
     /// store the plan in S3.
     pub object_storage:  Option<(S3BUCKET, S3KEY)>,
+}
+
+impl std::fmt::Debug for CloudExecutionPlan {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let plan_str = self
+            .execution_plans
+            .iter()
+            .map(|plan| format!("{}", displayable(plan.as_ref()).indent()))
+            .collect::<Vec<String>>()
+            .join("\n");
+        write!(
+            f,
+            "CloudExecutionPlan {{ execution_plans: {}, object_storage: {:?} }}",
+            plan_str, self.object_storage
+        )
+    }
 }
 
 impl CloudExecutionPlan {

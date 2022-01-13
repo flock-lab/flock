@@ -34,6 +34,7 @@ use std::sync::Arc;
 
 /// AwsLambdaLauncher defines the interface for deploying and executing
 /// queries on AWS Lambda.
+#[derive(Debug)]
 pub struct AwsLambdaLauncher {
     /// The first component of the function name.
     pub query_code: Option<String>,
@@ -148,5 +149,64 @@ impl AwsLambdaLauncher {
     /// Create the cloud functions for the query.
     fn create_cloud_functions(&self) -> Result<()> {
         unimplemented!();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use datafusion::arrow::datatypes::{DataType, Field, Schema};
+    use flock::datasource::DataSource;
+    use flock::query::Table;
+    use std::sync::Arc;
+
+    #[tokio::test]
+    async fn aws_launcher_create_context() -> Result<()> {
+        let table1 = "t1";
+        let schema1 = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Utf8, false),
+            Field::new("b", DataType::Int32, false),
+        ]));
+
+        let table2 = "t2";
+        let schema2 = Arc::new(Schema::new(vec![
+            Field::new("c", DataType::Utf8, false),
+            Field::new("d", DataType::Int32, false),
+        ]));
+
+        let sql = concat!(
+            "SELECT a, b, d ",
+            "FROM t1 JOIN t2 ON a = c ",
+            "ORDER BY a ASC ",
+            "LIMIT 3"
+        );
+
+        let query = Query::new(
+            sql,
+            vec![
+                Table(table1, schema1.clone()),
+                Table(table2, schema2.clone()),
+            ],
+            DataSource::Memory,
+            None,
+        );
+
+        let mut launcher = AwsLambdaLauncher::new(&query).await?;
+        println!("SQL: {}", query.sql());
+        println!("Query Code: {}\n", launcher.query_code.as_ref().unwrap());
+        launcher.create_cloud_contexts()?;
+
+        let stages = launcher.dag.get_all_stages();
+        for (i, stage) in stages.iter().enumerate() {
+            println!(
+                "Query Stage {:02}:\n{:#?}\nFunction Concurrency: {}\n",
+                i,
+                stage.context.as_ref().unwrap(),
+                stage.concurrency
+            );
+        }
+
+        Ok(())
     }
 }
