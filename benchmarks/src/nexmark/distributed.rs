@@ -55,7 +55,7 @@ pub async fn nexmark_benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
     let mut launcher = AwsLambdaLauncher::try_new(query_code, plan, sink_type).await?;
     launcher.create_cloud_contexts()?;
     let dag = &mut launcher.dag;
-    create_nexmark_functions(dag, &opt).await?;
+    create_nexmark_functions(dag, opt).await?;
 
     let mut metadata = HashMap::new();
     add_extra_metadata(opt, &mut metadata).await?;

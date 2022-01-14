@@ -12,6 +12,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use crate::actor::*;
+use crate::{consistent_hash_context, ConsistentHashContext, CONSISTENT_HASH_CONTEXT};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use datafusion::arrow::array::{
     Int32Array, TimestampMillisecondArray, TimestampNanosecondArray, UInt64Array,
@@ -58,15 +59,7 @@ pub async fn tumbling_window_tasks(
         FLOCK_LAMBDA_ASYNC_CALL.to_string()
     };
 
-    // To make data source generator function work generally, we *cannot*
-    // use `CONSISTENT_HASH_CONTEXT` from cloud environment. The cloud
-    // environment is used to specialize the plan for each function (stage
-    // of the query). We WANT to use the same data source function to handle
-    // all benchamrk queries.
-    // `ring`: the consistent hashing ring to forward the windowed events to the
-    // same function execution environment.
-    // `group_name`: the name of the group of the function.
-    let (mut ring, group_name) = infer_actor_info(&payload.metadata)?;
+    let (ring, group_name) = consistent_hash_context!();
 
     let mut window: Box<Vec<(RelationPartitions, RelationPartitions)>> = Box::new(vec![]);
 
@@ -91,7 +84,7 @@ pub async fn tumbling_window_tasks(
             .map(|(a, b)| if a.len() > b.len() { a.len() } else { b.len() })
             .sum::<usize>();
 
-        let mut uuid_builder = UuidBuilder::new_with_ts(&group_name, Utc::now().timestamp(), size);
+        let mut uuid_builder = UuidBuilder::new_with_ts(group_name, Utc::now().timestamp(), size);
 
         // Distribute the window data to a single function execution environment.
         let function_name = ring
@@ -163,7 +156,7 @@ pub async fn hopping_window_tasks(
         FLOCK_LAMBDA_ASYNC_CALL.to_string()
     };
 
-    let (mut ring, group_name) = infer_actor_info(&payload.metadata)?;
+    let (ring, group_name) = consistent_hash_context!();
     let mut window: Box<Vec<(RelationPartitions, RelationPartitions)>> = Box::new(vec![]);
 
     for time in (0..seconds).step_by(hop_size) {
@@ -194,7 +187,7 @@ pub async fn hopping_window_tasks(
             .map(|(a, b)| if a.len() > b.len() { a.len() } else { b.len() })
             .sum::<usize>();
 
-        let mut uuid_builder = UuidBuilder::new_with_ts(&group_name, Utc::now().timestamp(), size);
+        let mut uuid_builder = UuidBuilder::new_with_ts(group_name, Utc::now().timestamp(), size);
 
         // Distribute the window data to a single function execution environment.
         let function_name = ring
@@ -402,7 +395,7 @@ pub async fn session_window_tasks(
     }
     let sync = infer_invocation_type(&payload.metadata)?;
     let (group_key, table_name) = infer_session_keys(&payload.metadata)?;
-    let (mut ring, group_name) = infer_actor_info(&payload.metadata)?;
+    let (ring, group_name) = consistent_hash_context!();
 
     let (invocation_type, granule_size) = if sync {
         (FLOCK_LAMBDA_SYNC_CALL.to_string(), *FLOCK_SYNC_GRANULE_SIZE)
@@ -694,8 +687,8 @@ pub async fn global_window_tasks(
     }
     let sync = infer_invocation_type(&payload.metadata)?;
     let (group_key, table_name) = infer_session_keys(&payload.metadata)?;
-    let (mut ring, group_name) = infer_actor_info(&payload.metadata)?;
     let add_process_time_sql = infer_add_process_time_query(&payload.metadata)?;
+    let (ring, group_name) = consistent_hash_context!();
 
     let (invocation_type, granule_size) = if sync {
         (FLOCK_LAMBDA_SYNC_CALL.to_string(), *FLOCK_SYNC_GRANULE_SIZE)
@@ -841,7 +834,7 @@ pub async fn elementwise_tasks(
 ) -> Result<()> {
     let query_number = payload.query_number;
     let metadata = payload.metadata;
-    let (mut ring, group_name) = infer_actor_info(&metadata)?;
+    let (ring, group_name) = consistent_hash_context!();
     let sync = infer_invocation_type(&metadata)?;
     let invocation_type = if sync {
         FLOCK_LAMBDA_SYNC_CALL.to_string()
@@ -874,7 +867,7 @@ pub async fn elementwise_tasks(
             let size = if a.len() > b.len() { a.len() } else { b.len() };
 
             let mut uuid_builder =
-                UuidBuilder::new_with_ts(&group_name, Utc::now().timestamp(), size);
+                UuidBuilder::new_with_ts(group_name, Utc::now().timestamp(), size);
 
             // Distribute the epoch data to a single function execution environment.
             let function_name = ring
