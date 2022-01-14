@@ -37,6 +37,7 @@ snmalloc-rs = { version = "0.2", optional = true, features = [ "cache-friendly" 
 text_io = "0.1.8"
 tokio = { version = "1.4", features = [ "macros", "io-util", "sync", "rt-multi-thread" ] }
 uuid = { version = "0.8.2", features = [ "v4" ] }
+openssl = { version = "0.10.32", features = ["vendored"] }
 
 [dev-dependencies]
 cargo_toml = "0.10.1"

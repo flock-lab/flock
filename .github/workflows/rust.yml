@@ -53,7 +53,7 @@ jobs:
 
   build:
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         # a list of all the targets
         include:
