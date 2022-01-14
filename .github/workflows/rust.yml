@@ -115,7 +115,7 @@ jobs:
         if: steps.changes.outputs.src == 'true'
         run: cargo build --release --verbose --target $TARGET --features "simd mimalloc"
       - name: List target
-        run: find ./target
+        run: find ./target || true
       - name: Compress
         if: steps.changes.outputs.src == 'true'
         run: |
@@ -150,7 +150,7 @@ jobs:
           name: result
           path: ./artifacts
       - name: List
-        run: find ./artifacts
+        run: find ./artifacts || true
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
