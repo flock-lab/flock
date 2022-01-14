@@ -47,7 +47,7 @@ jobs:
       - name: cargo test
         if: steps.changes.outputs.src == 'true'
         run: |
-          cargo test
+          cargo +nightly test
 
   build:
     strategy:
@@ -113,7 +113,7 @@ jobs:
         run: rustup target add $TARGET
       - name: Run build
         if: steps.changes.outputs.src == 'true'
-        run: cargo build --release --verbose --target $TARGET --features "simd mimalloc"
+        run: cargo +nightly build --release --verbose --target $TARGET --features "simd mimalloc"
       - name: List target
         run: find ./target || true
       - name: Compress
