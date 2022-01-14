@@ -1,4 +1,4 @@
-name: CI
+name: flock
 
 on:
   push:
@@ -9,8 +9,10 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
-  # LAMBDA_NAME: hello step_1 step_2 gen_data
-  # AWS_LAMBDA_ROLE: ${{ secrets.AWS_LAMBDA_ROLE }}
+defaults:
+  run:
+    # necessary for windows
+    shell: bash
 
 jobs:
   test:
@@ -29,11 +31,9 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
-          override: true
-          components: rustfmt, clippy
-      - name: update all third-party dependencies
-        run: |
-          cargo update
+      # - name: update all third-party dependencies
+      #   run: |
+      #     cargo update
       - uses: dorny/paths-filter@v2
         id: changes
         with:
@@ -44,11 +44,117 @@ jobs:
               - 'flock-cli/**'
               - 'flock-function/**'
               - 'playground/**'
-      - name: build and tests
+      - name: cargo test
         if: steps.changes.outputs.src == 'true'
         run: |
-          cargo build -j8
           cargo test
+
+  build:
+    strategy:
+      fail-fast: true
+      matrix:
+        # a list of all the targets
+        include:
+          - TARGET: x86_64-unknown-linux-gnu
+            OS: ubuntu-latest
+          - TARGET: x86_64-unknown-linux-musl
+            OS: ubuntu-latest
+          - TARGET: aarch64-unknown-linux-gnu
+            OS: ubuntu-latest
+          - TARGET: aarch64-unknown-linux-musl
+            OS: ubuntu-latest
+    needs: test
+    runs-on: ${{ matrix.OS }}
+    env:
+      TARGET: ${{ matrix.TARGET }}
+      OS: ${{ matrix.OS }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Cargo cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ./target
+          key: ${{ runner.os }}-cargo-${{matrix.TARGET}}-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+      # - name: update all third-party dependencies
+      #   run: |
+      #     cargo update
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            src:
+              - 'benchmarks/**'
+              - 'flock/**'
+              - 'flock-cli/**'
+              - 'flock-function/**'
+              - 'playground/**'
+      - name: Install and configure dependencies
+        run: |
+          # dependencies are only needed on ubuntu as that's the only place where
+          # we make cross-compilation
+          if [[ $OS =~ ^ubuntu.*$ ]]; then
+            sudo apt-get install -qq crossbuild-essential-arm64 crossbuild-essential-armhf
+          fi
+          # some additional configuration for cross-compilation on linux
+          cat >>~/.cargo/config <<EOF
+          [target.aarch64-unknown-linux-gnu]
+          linker = "aarch64-linux-gnu-gcc"
+          [target.aarch64-unknown-linux-musl]
+          linker = "aarch64-linux-gnu-gcc"
+          EOF
+      - name: Install rust target
+        if: steps.changes.outputs.src == 'true'
+        run: rustup target add $TARGET
+      - name: Run build
+        if: steps.changes.outputs.src == 'true'
+        run: cargo build --release --verbose --target $TARGET --features "simd mimalloc"
+      - name: List target
+        run: find ./target
+      - name: Compress
+        if: steps.changes.outputs.src == 'true'
+        run: |
+          mkdir -p ./artifacts
+          if [[ $GITHUB_REF_TYPE =~ ^tag$ ]]; then
+            TAG=$GITHUB_REF_NAME
+          else
+            TAG=$GITHUB_SHA
+          fi
+          mv ./target/$TARGET/release/flock ./flock
+          mv ./target/$TARGET/release/flock-function ./flock-function
+          mv ./target/$TARGET/release/flock-cli ./flock-cli
+          strip --strip-all ./flock-function
+          tar -czf ./artifacts/flock-$TARGET-$TAG.tar.gz flock flock-function flock-cli
+      - name: Archive artifact
+        if: steps.changes.outputs.src == 'true'
+        uses: actions/upload-artifact@v2
+        with:
+          name: result
+          path: |
+            ./artifacts
+
+ # deploys to github releases on tag
+  deploy:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: result
+          path: ./artifacts
+      - name: List
+        run: find ./artifacts
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ./artifacts/*.tar.gz
 
 #   coverage:
 #     name: Coverage
