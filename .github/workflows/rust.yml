@@ -31,9 +31,11 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
-      # - name: update all third-party dependencies
-      #   run: |
-      #     cargo update
+          override: true
+          components: rustfmt, clippy
+      - name: update all third-party dependencies
+        run: |
+          cargo update
       - uses: dorny/paths-filter@v2
         id: changes
         with:
@@ -81,9 +83,11 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
-      # - name: update all third-party dependencies
-      #   run: |
-      #     cargo update
+          override: true
+          components: rustfmt, clippy
+      - name: update all third-party dependencies
+        run: |
+          cargo update
       - uses: dorny/paths-filter@v2
         id: changes
         with:
