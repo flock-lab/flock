@@ -13,22 +13,25 @@
 
 #[path = "../rainbow.rs"]
 mod rainbow;
+
+#[path = "./centralized.rs"]
+mod centralized;
+
+#[path = "./distributed.rs"]
+mod distributed;
+
 use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
 use datafusion::arrow::record_batch::RecordBatch;
-use datafusion::arrow::util::pretty::pretty_format_batches;
 use datafusion::datasource::MemTable;
 use datafusion::execution::context::ExecutionContext as DataFusionExecutionContext;
 use datafusion::physical_plan::ExecutionPlan;
-use flock::aws::{cloudwatch, efs, lambda, s3};
+use flock::aws::{efs, lambda, s3};
 use flock::prelude::*;
-use humantime::parse_duration;
 use lazy_static::lazy_static;
 use log::info;
 use nexmark::event::{side_input_schema, Auction, Bid, Person};
-use nexmark::register_nexmark_tables;
 use nexmark::NEXMarkSource;
-use rainbow::{rainbow_println, rainbow_string};
-use rusoto_lambda::InvocationResponse;
+use rainbow::rainbow_string;
 use std::collections::HashMap;
 use std::sync::Arc;
 use structopt::StructOpt;
@@ -85,6 +88,10 @@ pub struct NexmarkBenchmarkOpt {
     /// The system architecture to use
     #[structopt(short = "a", long = "arch", default_value = "x86_64")]
     pub architecture: String,
+
+    /// Distributed mode or not
+    #[structopt(short = "d", long = "distributed")]
+    pub distributed: bool,
 }
 
 #[allow(dead_code)]
@@ -339,86 +346,11 @@ pub async fn add_extra_metadata(
 }
 
 pub async fn nexmark_benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
-    rainbow_println("================================================================");
-    rainbow_println("                    Running the benchmark                       ");
-    rainbow_println("================================================================");
-    info!("Running the NEXMark benchmark with the following options:\n");
-    rainbow_println(format!("{:#?}\n", opt));
-
-    let query_number = opt.query_number;
-    let nexmark_conf = create_nexmark_source(opt).await?;
-
-    let mut ctx = register_nexmark_tables().await?;
-    let plans = create_physical_plans(&mut ctx, query_number).await?;
-    let worker = create_nexmark_functions(
-        opt,
-        nexmark_conf.window.clone(),
-        plans.last().unwrap().clone(),
-    )
-    .await?;
-
-    // The source generator function needs the metadata to determine the type of the
-    // workers such as single function or a group. We don't want to keep this info
-    // in the environment as part of the source function. Otherwise, we have to
-    // *delete* and **recreate** the source function every time we change the query.
-    let mut metadata = HashMap::new();
-    metadata.insert("workers".to_string(), serde_json::to_string(&worker)?);
-    add_extra_metadata(opt, &mut metadata).await?;
-
-    let tasks = (0..opt.generators)
-        .into_iter()
-        .map(|i| {
-            let s = nexmark_conf.clone();
-            let m = metadata.clone();
-            tokio::spawn(async move {
-                info!(
-                    "[OK] Invoking NEXMark source function: {} by generator {}\n",
-                    rainbow_string(&*FLOCK_DATA_SOURCE_FUNC_NAME),
-                    i
-                );
-                let p = serde_json::to_vec(&Payload {
-                    datasource: DataSource::NEXMarkEvent(s),
-                    query_number: Some(query_number),
-                    metadata: Some(m),
-                    ..Default::default()
-                })?
-                .into();
-                lambda::invoke_function(
-                    &FLOCK_DATA_SOURCE_FUNC_NAME,
-                    &FLOCK_LAMBDA_ASYNC_CALL,
-                    Some(p),
-                )
-                .await
-            })
-        })
-        // this collect *is needed* so that the join below can switch between tasks.
-        .collect::<Vec<JoinHandle<Result<InvocationResponse>>>>();
-
-    futures::future::join_all(tasks).await;
-
-    info!("Waiting for the current invocations to be logged.");
-    tokio::time::sleep(parse_duration("5s").unwrap()).await;
-    cloudwatch::fetch(&NEXMARK_SOURCE_LOG_GROUP, parse_duration("1min").unwrap()).await?;
-
-    let sink_type = DataSinkType::new(&opt.data_sink_type)?;
-    if sink_type != DataSinkType::Blackhole {
-        let data_sink = DataSink::read(
-            format!("q{}", opt.query_number),
-            sink_type,
-            DataSinkFormat::default(),
-        )
-        .await?;
-        info!(
-            "[OK] Received {} batches from the data sink.",
-            data_sink.record_batches.len()
-        );
-        info!("[OK] Last data sink function: {}", data_sink.function_name);
-        let function_log_group = format!("/aws/lambda/{}", data_sink.function_name);
-        cloudwatch::fetch(&function_log_group, parse_duration("1min").unwrap()).await?;
-        println!("{}", pretty_format_batches(&data_sink.record_batches)?);
+    if opt.distributed {
+        distributed::nexmark_benchmark(opt).await
+    } else {
+        centralized::nexmark_benchmark(opt).await
     }
-
-    Ok(())
 }
 
 /// Returns Nextmark query strings based on the query number.
@@ -450,6 +382,7 @@ mod tests {
     use super::*;
     use datafusion::arrow::util::pretty::pretty_format_batches;
     use flock::transmute::event_bytes_to_batch;
+    use nexmark::register_nexmark_tables;
     use std::fs::File;
     use std::io::Write;
     use std::time::Instant;

@@ -13,7 +13,7 @@
 
 //! The entry point for the NEXMark benchmark on cloud functions.
 
-use crate::actor::*;
+use crate::{consistent_hash_context, ConsistentHashContext, CONSISTENT_HASH_CONTEXT};
 use chrono::Utc;
 use datafusion::physical_plan::Partitioning;
 use flock::prelude::*;
@@ -59,8 +59,8 @@ pub async fn handler(_ctx: &ExecutionContext, payload: Payload) -> Result<Value>
     info!("{:?}", source);
     info!("[OK] Generate nexmark events.");
 
-    let (mut ring, group_name) = infer_actor_info(&payload.metadata)?;
-    let uuid = UuidBuilder::new_with_ts(&group_name, Utc::now().timestamp(), 1).next_uuid();
+    let (ring, group_name) = consistent_hash_context!();
+    let uuid = UuidBuilder::new_with_ts(group_name, Utc::now().timestamp(), 1).next_uuid();
     let sync = true;
 
     let function_name = if ring.len() == 1 {

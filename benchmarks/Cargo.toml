@@ -13,6 +13,7 @@ simd = [ "datafusion/simd" ]
 [dependencies]
 base64 = "0.13.0"
 chrono = "0.4.19"
+daggy = { git = "https://github.com/flock-lab/daggy", branch = "master" }
 datafusion = { git = "https://github.com/flock-lab/arrow-datafusion", branch = "flock" }
 env_logger = "^0.9"
 flock = { path = "../flock" }

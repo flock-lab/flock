@@ -26,6 +26,7 @@ pub use crate::datasink::{DataSink, DataSinkFormat, DataSinkType};
 pub use crate::datasource::{nexmark, tpch, ysb, DataSource, DataStream, RelationPartitions};
 pub use crate::encoding::Encoding;
 pub use crate::error::{FlockError, Result};
+pub use crate::launcher::aws::AwsLambdaLauncher;
 pub use crate::query::{Query, QueryType, StreamType, Table};
 pub use crate::runtime::arena::{Arena, WindowSession};
 pub use crate::runtime::context::{self, CloudFunction, ExecutionContext};

@@ -34,6 +34,7 @@ pub mod distributed_plan;
 pub mod driver;
 pub mod encoding;
 pub mod error;
+pub mod launcher;
 pub mod prelude;
 pub mod query;
 pub mod runtime;

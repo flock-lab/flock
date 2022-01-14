@@ -13,15 +13,15 @@
 
 //! This crate responsibles for executing queries on the local machine.
 
+use crate::error::{FlockError, Result};
 use crate::launcher::{ExecutionMode, Launcher};
+use crate::query::Query;
 use async_trait::async_trait;
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::physical_plan::collect;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::ExecutionPlan;
-use flock::error::{FlockError, Result};
-use flock::query::Query;
 use std::collections::HashSet;
 use std::collections::VecDeque;
 use std::sync::Arc;
@@ -128,18 +128,18 @@ impl LocalLauncher {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::assert_batches_eq;
+    use crate::datasink::DataSinkType;
+    use crate::datasource::DataSource;
+    use crate::query::QueryType;
+    use crate::query::Table;
     use datafusion::arrow::array::*;
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
     use datafusion::arrow::record_batch::RecordBatch;
-    use flock::assert_batches_eq;
-    use flock::datasink::DataSinkType;
-    use flock::datasource::DataSource;
-    use flock::query::QueryType;
-    use flock::query::Table;
 
     #[tokio::test]
     async fn version_check() -> Result<()> {
-        let manifest = cargo_toml::Manifest::from_str(include_str!("../Cargo.toml")).unwrap();
+        let manifest = cargo_toml::Manifest::from_str(include_str!("../../Cargo.toml")).unwrap();
         assert_eq!(env!("CARGO_PKG_VERSION"), manifest.package.unwrap().version);
         Ok(())
     }

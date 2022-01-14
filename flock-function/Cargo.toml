@@ -41,11 +41,6 @@ uuid = { version = "0.8.2", features = [ "v4" ] }
 [dev-dependencies]
 cargo_toml = "0.10.1"
 
-[lib]
-name = "function"
-path = "src/lib.rs"
-crate-type = [ "lib" ]
-
 [[bin]]
 name = "flock"
 path = "src/aws/main.rs"

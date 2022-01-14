@@ -16,7 +16,6 @@ use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::physical_plan::Partitioning::RoundRobinBatch;
 use flock::aws::s3;
 use flock::prelude::*;
-use hashring::HashRing;
 use lazy_static::lazy_static;
 use log::info;
 use rayon::prelude::*;
@@ -302,54 +301,6 @@ pub fn infer_session_keys(metadata: &Option<HashMap<String, String>>) -> Result<
     Err(FlockError::Internal(
         "Failed to infer session group key.".to_string(),
     ))
-}
-
-/// Infer the actor information for the function invocation.
-pub fn infer_actor_info(
-    metadata: &Option<HashMap<String, String>>,
-) -> Result<(HashRing<String>, String)> {
-    #[allow(unused_assignments)]
-    let mut next_function = CloudFunction::default();
-    if let Some(metadata) = metadata {
-        next_function = serde_json::from_str(
-            metadata
-                .get(&"workers".to_string())
-                .expect("workers is missing."),
-        )?;
-    } else {
-        return Err(FlockError::Execution("metadata is missing.".to_owned()));
-    }
-
-    let (group_name, group_size) = match &next_function {
-        CloudFunction::Lambda(name) => (name.clone(), 1),
-        CloudFunction::Group((name, size)) => (name.clone(), *size),
-        CloudFunction::Sink(..) => (String::new(), 0),
-    };
-
-    // The *consistent hash* technique distributes the data packets in a time window
-    // to the same function name in the function group. Because each function in the
-    // function group has a concurrency of *1*, all data packets from the same query
-    // can be routed to the same function execution environment.
-    let mut ring: HashRing<String> = HashRing::new();
-    match group_size {
-        0 => {
-            unreachable!("group_size should not be 0.");
-        }
-        1 => {
-            // only one function in the function group, the data packets are routed to the
-            // next function.
-            ring.add(group_name.clone());
-        }
-        _ => {
-            // multiple functions in the function group, the data packets are routed to the
-            // function with the same hash value.
-            (0..group_size).for_each(|i| {
-                ring.add(format!("{}-{:02}", group_name, i));
-            });
-        }
-    }
-
-    Ok((ring, group_name))
 }
 
 /// This function is only used for NEXMark Q12 to add the process time field to

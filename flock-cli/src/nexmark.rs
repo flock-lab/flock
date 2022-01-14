@@ -113,6 +113,12 @@ fn run_args() -> App<'static> {
                 .possible_values(&["x86_64", "arm64"])
                 .default_value("x86_64"),
         )
+        .arg(
+            Arg::new("distributed")
+                .short('d')
+                .long("distributed")
+                .help("Runs the NEXMark benchmark with distributed workers"),
+        )
 }
 
 pub fn run(matches: &ArgMatches) -> Result<()> {
@@ -180,6 +186,10 @@ pub fn run(matches: &ArgMatches) -> Result<()> {
             .unwrap()
             .parse::<String>()
             .with_context(|| anyhow!("Invalid architecture"))?;
+    }
+
+    if matches.is_present("distributed") {
+        opt.distributed = true;
     }
 
     rainbow_println(include_str!("./flock"));
