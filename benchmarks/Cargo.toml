@@ -22,6 +22,7 @@ humantime = "2.1.0"
 itertools = "0.10.0"
 lazy_static = "1.4"
 log = "0.4.14"
+openssl = { version = "0.10.32", features = [ "vendored" ] }
 reqwest = "0.11.7"
 rusoto_core = { git = "https://github.com/flock-lab/rusoto", branch = "flock" }
 rusoto_lambda = { git = "https://github.com/flock-lab/rusoto", branch = "flock" }

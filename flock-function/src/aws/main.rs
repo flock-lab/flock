@@ -41,7 +41,7 @@ async fn handler(event: Payload, _: Context) -> Result<Value> {
     let (ctx, arena) = init_exec_context!();
     update_consistent_hash_context(&event.metadata)?;
 
-    info!("Lambda function architecture: {}", std::env::consts::ARCH);
+    info!("AWS Lambda architecture: {}", std::env::consts::ARCH);
 
     match &event.datasource {
         DataSource::Payload(_) => actor::handler(ctx, arena, event).await,

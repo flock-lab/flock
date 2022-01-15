@@ -37,6 +37,7 @@ log = "0.4.14"
 lz4 = "1.23.1"
 mimalloc = { version = "0.1", optional = true, default-features = false }
 num_cpus = { version = "1.13.0", optional = true }
+openssl = { version = "0.10.32", features = [ "vendored" ] }
 rand = { version = "0.8.3", features = [ "small_rng", "std_rng" ] }
 rayon = "1.5"
 regex = { version = "1.4.3", optional = true }
