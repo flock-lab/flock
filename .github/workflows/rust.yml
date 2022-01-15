@@ -32,6 +32,7 @@ jobs:
             RUST: nightly
           - TARGET: aarch64-unknown-linux-musl
             OS: macos-latest
+            RUST: nightly
           # - TARGET: aarch64-unknown-linux-musl
           #   OS: ubuntu-latest
           #   RUST: nightly
