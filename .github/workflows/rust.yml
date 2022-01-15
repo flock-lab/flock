@@ -101,14 +101,11 @@ jobs:
       - name: Run build
         if: steps.changes.outputs.src == 'true'
         run: |
-          if [ "${TARGET}" == "aarch64-unknown-linux-musl" ]; then 
-            CC_aarch64-unknown-linux-musl="aarch64-linux-musl-gcc" cargo +nightly build --release --verbose --target $TARGET --features "simd mimalloc"
-          else
-            cargo +nightly build --release --verbose --target $TARGET --features "simd mimalloc"
-          fi
+          cargo +nightly build --release --verbose --target $TARGET --features "simd mimalloc"
         env:
           CARGO_HOME: "~/.cargo"
           CARGO_TARGET_DIR: "target"
+          CC_aarch64-unknown-linux-musl: "aarch64-linux-musl-gcc"
       - name: List target
         run: find ./target || true
       - name: Compress
