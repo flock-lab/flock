@@ -60,11 +60,11 @@ jobs:
           # and thus are specific for a particular OS, arch and rust version.
           path: target
           key: ${{ runner.os }}-${{ matrix.TARGET }}-target-cache-${{ matrix.RUST }}-
-      - name: Setup Rust toolchain
-        run: |
-          rustup toolchain install ${{ matrix.RUST }}
-          rustup default ${{ matrix.RUST }}
-          rustup component add rustfmt
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+          components: rustfmt
       # - name: update all third-party dependencies
       #   run: |
       #     cargo update
