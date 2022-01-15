@@ -15,6 +15,90 @@ defaults:
     shell: bash
 
 jobs:
+  build_aarch64_musl:
+    strategy:
+      fail-fast: false
+      matrix:
+        # a list of all the targets
+        include:
+          - TARGET: aarch64-unknown-linux-musl
+            OS: macos-latest
+            RUST: nightly
+    runs-on: ${{ matrix.OS }}
+    env:
+      TARGET: ${{ matrix.TARGET }}
+      OS: ${{ matrix.OS }}
+      # Disable full debug symbol generation to speed up CI build and keep memory down
+      # "1" means line tables only, which is useful for panic tracebacks.
+      RUSTFLAGS: "-C debuginfo=1"
+    steps:
+      - uses: actions/checkout@v2
+      - name: Cache Cargo
+        uses: actions/cache@v2
+        with:
+          # these represent dependencies downloaded by cargo
+          # and thus do not depend on the OS, arch nor rust version.
+          path: ~/$TARGET/.cargo
+          key: cargo-cache-$TARGET-
+      - name: Cache Rust dependencies
+        uses: actions/cache@v2
+        with:
+          # these represent compiled steps of both dependencies and arrow
+          # and thus are specific for a particular OS, arch and rust version.
+          path: target
+          key: ${{ runner.os }}-${{ matrix.TARGET }}-target-cache-${{ matrix.RUST }}-
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+          components: rustfmt
+      # - name: update all third-party dependencies
+      #   run: |
+      #     cargo update
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            src:
+              - 'benchmarks/**'
+              - 'flock/**'
+              - 'flock-cli/**'
+              - 'flock-function/**'
+              - 'playground/**'
+      - name: Install and configure dependencies
+        run: |
+          # some additional configuration for cross-compilation on macos
+          cat >~/$TARGET/.cargo/config <<EOF
+          [target.aarch64-unknown-linux-gnu]
+          linker = "aarch64-linux-gnu-gcc"
+          [target.x86_64-apple-darwin]
+          rustflags = [
+            "-C", "link-arg=-undefined",
+            "-C", "link-arg=dynamic_lookup",
+          ]
+          [target.aarch64-apple-darwin]
+          rustflags = [
+            "-C", "link-arg=-undefined",
+            "-C", "link-arg=dynamic_lookup",
+          ]
+          EOF
+      - name: Install rust target
+        if: steps.changes.outputs.src == 'true'
+        run: rustup target add $TARGET
+      - name: Run build
+        if: steps.changes.outputs.src == 'true'
+        run: |
+          brew tap messense/macos-cross-toolchains
+          brew install aarch64-unknown-linux-musl
+          brew install zstd
+          export CC_aarch64_unknown_linux_musl=aarch64-unknown-linux-musl-gcc
+          export CXX_aarch64_unknown_linux_musl=aarch64-unknown-linux-musl-g++
+          export AR_aarch64_unknown_linux_musl=aarch64-unknown-linux-musl-ar
+          export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-unknown-linux-musl-gcc
+          cargo +nightly build --verbose --target $TARGET
+        env:
+          CARGO_HOME: "~/$TARGET/.cargo"
+          CARGO_TARGET_DIR: "target" 
   build:
     strategy:
       fail-fast: false
@@ -22,29 +106,18 @@ jobs:
         # a list of all the targets
         include:
           - TARGET: x86_64-unknown-linux-gnu
-            HOST: x86_64-unknown-linux-gnu
             OS: ubuntu-latest
             RUST: nightly
           - TARGET: x86_64-unknown-linux-musl
-            HOST: x86_64-unknown-linux-gnu
             OS: ubuntu-latest
             RUST: nightly
           - TARGET: aarch64-unknown-linux-gnu
-            HOST: x86_64-unknown-linux-gnu
             OS: ubuntu-latest
             RUST: nightly
-          - TARGET: aarch64-unknown-linux-musl
-            HOST: x86_64-apple-darwin
-            OS: macos-latest
-            RUST: nightly
-          # - TARGET: aarch64-unknown-linux-musl
-          #   OS: ubuntu-latest
-          #   RUST: nightly
     # if: github.ref != 'refs/heads/master'
     runs-on: ${{ matrix.OS }}
     env:
       TARGET: ${{ matrix.TARGET }}
-      HOST: ${{ matrix.HOST }}
       OS: ${{ matrix.OS }}
       # Disable full debug symbol generation to speed up CI build and keep memory down
       # "1" means line tables only, which is useful for panic tracebacks.
@@ -68,8 +141,6 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
-          target: $HOST
-          default: true
           override: true
           components: rustfmt
       # - name: update all third-party dependencies
@@ -114,15 +185,6 @@ jobs:
       - name: Run build
         if: steps.changes.outputs.src == 'true'
         run: |
-          if [ "${TARGET}" == "aarch64-unknown-linux-musl" ]; then
-            brew tap messense/macos-cross-toolchains
-            brew install aarch64-unknown-linux-musl
-            brew install zstd
-            export CC_aarch64_unknown_linux_musl=aarch64-unknown-linux-musl-gcc
-            export CXX_aarch64_unknown_linux_musl=aarch64-unknown-linux-musl-g++
-            export AR_aarch64_unknown_linux_musl=aarch64-unknown-linux-musl-ar
-            export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-unknown-linux-musl-gcc
-          fi
           cargo +nightly build --verbose --target $TARGET
         env:
           CARGO_HOME: "~/.cargo"
