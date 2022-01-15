@@ -95,8 +95,8 @@ jobs:
         if: steps.changes.outputs.src == 'true'
         run: |
           brew tap messense/macos-cross-toolchains
-          brew install aarch64-unknown-linux-musl
           brew install zstd
+          brew install aarch64-unknown-linux-musl
           export CC_aarch64_unknown_linux_musl=aarch64-unknown-linux-musl-gcc
           export CXX_aarch64_unknown_linux_musl=aarch64-unknown-linux-musl-g++
           export AR_aarch64_unknown_linux_musl=aarch64-unknown-linux-musl-ar
