@@ -108,7 +108,8 @@ jobs:
           mv ./target/$TARGET/release/flock flock
           mv ./target/$TARGET/release/flock-cli flock-cli
           strip --strip-all flock
-          tar -czf ./artifacts/flock-$TARGET-$TAG.tar.gz flock flock-cli
+          mv header license
+          tar -czf ./artifacts/flock-$TARGET-$TAG.tar.gz flock flock-cli license
       - name: Archive artifact
         uses: actions/upload-artifact@v2
         with:
