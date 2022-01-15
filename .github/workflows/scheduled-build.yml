@@ -1,10 +1,9 @@
 name: Rust
 
 on:
-  push:
-    branches: [master]
-  pull_request:
-    branches: [master]
+  schedule:
+    # Runs "at 12:00." (see https://crontab.guru)
+    - cron: '0 12 * * *'
 
 env:
   CARGO_TERM_COLOR: always
@@ -30,9 +29,9 @@ jobs:
           - TARGET: aarch64-unknown-linux-gnu
             OS: ubuntu-latest
             RUST: nightly
-          - TARGET: aarch64-unknown-linux-musl
-            OS: ubuntu-latest
-            RUST: nightly
+          # - TARGET: aarch64-unknown-linux-musl
+          #   OS: ubuntu-latest
+          #   RUST: nightly
     # if: github.ref != 'refs/heads/master'
     runs-on: ${{ matrix.OS }}
     env:
@@ -103,11 +102,33 @@ jobs:
       - name: Run build
         if: steps.changes.outputs.src == 'true'
         run: |
-          cargo +nightly build --verbose --target $TARGET
+          cargo +nightly build --release --verbose --target $TARGET --features "simd mimalloc"
         env:
           CARGO_HOME: "~/.cargo"
           CARGO_TARGET_DIR: "target"
           CC_aarch64-unknown-linux-musl: "/opt/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc"
+      - name: List target
+        run: find ./target || true
+      - name: Compress
+        if: steps.changes.outputs.src == 'true'
+        run: |
+          mkdir -p ./artifacts
+          if [[ $GITHUB_REF_TYPE =~ ^tag$ ]]; then
+            TAG=$GITHUB_REF_NAME
+          else
+            TAG=$GITHUB_SHA
+          fi
+          mv ./target/$TARGET/release/flock flock
+          mv ./target/$TARGET/release/flock-cli flock-cli
+          strip --strip-all flock
+          tar -czf ./artifacts/flock-$TARGET-$TAG.tar.gz flock flock-cli
+      - name: Archive artifact
+        if: steps.changes.outputs.src == 'true'
+        uses: actions/upload-artifact@v2
+        with:
+          name: result
+          path: |
+            ./artifacts
   test:
     strategy:
       fail-fast: false
@@ -168,111 +189,20 @@ jobs:
           CARGO_HOME: "~/.cargo"
           CARGO_TARGET_DIR: "target"
 
-#   coverage:
-#     name: Coverage
-#     runs-on: ubuntu-latest
-#     steps:
-#       - uses: actions/checkout@v2
-#       - name: Cache Cargo
-#         uses: actions/cache@v2
-#         with:
-#           path: |
-#             ~/.cargo/registry
-#             ~/.cargo/git
-#             target
-#           # this key is not equal because coverage uses different compilation flags.
-#           key: ${{ runner.os }}-cargo-target-coverage-cache
-#       - uses: actions-rs/toolchain@v1
-#         with:
-#           toolchain: nightly
-#           override: true
-#           components: rustfmt, clippy
-#       - name: update umd-arrow
-#         run: |
-#           cargo update --package arrow
-#           cargo update --package datafusion
-#       - name: Run cargo-tarpaulin
-#         uses: actions-rs/tarpaulin@v0.1
-#         with:
-#           version: '0.15.0'
-#           args: '-- --test-threads 8'
-#       - name: Upload to codecov.io
-#         uses: codecov/codecov-action@v1.0.2
-#         with:
-#           token: ${{secrets.CODECOV_TOKEN}}
-#       - name: Archive code coverage results
-#         uses: actions/upload-artifact@v1
-#         with:
-#           name: code-coverage-report
-#           path: cobertura.xml
-
-# deploy on pushes to master branch
-# assumes aws credentials (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
-# are configured in travis settings
-# see https://serverless.com/framework/docs/providers/aws/guide/credentials/
-# for more information
-# deploy:
-#   if: github.ref == 'refs/heads/master'
-#   runs-on: ubuntu-latest
-#   strategy:
-#     matrix:
-#       target:
-#         - x86_64-unknown-linux-gnu
-#   steps:
-#     - name: Checkout
-#       uses: actions/checkout@v2
-#     - name: Cache cargo and xargo
-#       uses: actions/cache@v2
-#       with:
-#         path: |
-#           ~/.cargo/registry
-#           ~/.cargo/git
-#           ~/.xargo
-#           target
-#         key: ${{ runner.os }}-cargo-flock-${{ hashFiles('**/Cargo.lock') }}
-#     - name: Install nightly
-#       uses: actions-rs/toolchain@v1
-#       with:
-#         toolchain: nightly
-#         override: true
-#       if: steps.cache.outputs.cache-hit != 'true'
-#     - name: Install xargo
-#       run: |
-#         rustup override set nightly
-#         rustup component add rust-src
-#         cargo install xargo
-#       if: steps.cache.outputs.cache-hit != 'true'
-#     - name: Build
-#       run: |
-#         rustup override set nightly
-#         xargo update --package arrow
-#         xargo build --target ${{ matrix.target }} --release
-#     - name: Configure AWS credentials
-#       uses: aws-actions/configure-aws-credentials@v1
-#       with:
-#         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#         aws-region: us-east-1
-#     - name: AWS lambda package
-#       run: |
-#         for f in $LAMBDA_NAME; do
-#           mv ./target/x86_64-unknown-linux-gnu/release/$f ./bootstrap;
-#           strip --strip-all ./bootstrap;
-#           zip -j $f.zip ./bootstrap;
-#           GET_FUNCTION_NAME=$(aws lambda list-functions --query \
-#             "Functions[?FunctionName=='${f}'].FunctionName[]" --output text);
-#           echo "${GET_FUNCTION_NAME}";
-#           if [ "${GET_FUNCTION_NAME}" == "${f}" ]; then
-#             aws lambda update-function-code --function-name $f --zip-file fileb://./$f.zip;
-#             echo "Congratulations! You've successfully upgraded Flock.";
-#           else
-#             aws lambda create-function --function-name $f \
-#               --runtime provided.al2 \
-#               --role $AWS_LAMBDA_ROLE \
-#               --handler doesnt.matter \
-#               --zip-file fileb://./$f.zip \
-#               --environment Variables={RUST_BACKTRACE=1} \
-#               --tracing-config Mode=Active;
-#             echo "Congratulations! You've successfully deployed Flock.";
-#           fi
-#         done
+  # deploys to github releases on tag
+  deploy:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v2
+        with:
+          name: result
+          path: ./artifacts
+      - name: List
+        run: find ./artifacts || true
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ./artifacts/*.tar.gz
