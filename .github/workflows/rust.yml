@@ -62,9 +62,9 @@ jobs:
           rustup toolchain install ${{ matrix.RUST }}
           rustup default ${{ matrix.RUST }}
           rustup component add rustfmt
-      # - name: update all third-party dependencies
-      #   run: |
-      #     cargo update
+      - name: update all third-party dependencies
+        run: |
+          cargo update
       - uses: dorny/paths-filter@v2
         id: changes
         with:
@@ -158,9 +158,9 @@ jobs:
           rustup toolchain install ${{ matrix.RUST }}
           rustup default ${{ matrix.RUST }}
           rustup component add rustfmt
-      # - name: update all third-party dependencies
-      #   run: |
-      #     cargo update
+      - name: update all third-party dependencies
+        run: |
+          cargo update
       - uses: dorny/paths-filter@v2
         id: changes
         with:
