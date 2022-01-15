@@ -1,4 +1,4 @@
-name: flock
+name: Rust
 
 on:
   push:
@@ -15,42 +15,6 @@ defaults:
     shell: bash
 
 jobs:
-  test:
-    # if: github.ref != 'refs/heads/master'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Cache Cargo
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          override: true
-          components: rustfmt, clippy
-      - name: update all third-party dependencies
-        run: |
-          cargo update
-      - uses: dorny/paths-filter@v2
-        id: changes
-        with:
-          filters: |
-            src:
-              - 'benchmarks/**'
-              - 'flock/**'
-              - 'flock-cli/**'
-              - 'flock-function/**'
-              - 'playground/**'
-      - name: cargo test
-        if: steps.changes.outputs.src == 'true'
-        run: |
-          cargo +nightly test
-
   build:
     strategy:
       fail-fast: false
@@ -59,35 +23,48 @@ jobs:
         include:
           - TARGET: x86_64-unknown-linux-gnu
             OS: ubuntu-latest
+            RUST: nightly
           - TARGET: x86_64-unknown-linux-musl
             OS: ubuntu-latest
+            RUST: nightly
           - TARGET: aarch64-unknown-linux-gnu
             OS: ubuntu-latest
+            RUST: nightly
           - TARGET: aarch64-unknown-linux-musl
             OS: ubuntu-latest
-    needs: test
+            RUST: nightly
+    # if: github.ref != 'refs/heads/master'
     runs-on: ${{ matrix.OS }}
     env:
       TARGET: ${{ matrix.TARGET }}
       OS: ${{ matrix.OS }}
+      # Disable full debug symbol generation to speed up CI build and keep memory down
+      # "1" means line tables only, which is useful for panic tracebacks.
+      RUSTFLAGS: "-C debuginfo=1"
     steps:
       - uses: actions/checkout@v2
-      - name: Cargo cache
+      - name: Cache Cargo
         uses: actions/cache@v2
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            ./target
-          key: ${{ runner.os }}-cargo-${{matrix.TARGET}}-${{ hashFiles('**/Cargo.lock') }}
-      - uses: actions-rs/toolchain@v1
+          # these represent dependencies downloaded by cargo
+          # and thus do not depend on the OS, arch nor rust version.
+          path: /github/home/.cargo
+          key: cargo-cache-
+      - name: Cache Rust dependencies
+        uses: actions/cache@v2
         with:
-          toolchain: nightly
-          override: true
-          components: rustfmt, clippy
-      - name: update all third-party dependencies
+          # these represent compiled steps of both dependencies and arrow
+          # and thus are specific for a particular OS, arch and rust version.
+          path: /github/home/target
+          key: ${{ runner.os }}-${{ matrix.TARGET }}-target-cache-${{ matrix.RUST }}-
+      - name: Setup Rust toolchain
         run: |
-          cargo update
+          rustup toolchain install ${{ matrix.RUST }}
+          rustup default ${{ matrix.RUST }}
+          rustup component add rustfmt
+      # - name: update all third-party dependencies
+      #   run: |
+      #     cargo update
       - uses: dorny/paths-filter@v2
         id: changes
         with:
@@ -104,6 +81,7 @@ jobs:
           # we make cross-compilation
           if [[ $OS =~ ^ubuntu.*$ ]]; then
             sudo apt-get install -qq crossbuild-essential-arm64 crossbuild-essential-armhf
+            sudo apt install musl-tools
           fi
           # some additional configuration for cross-compilation on linux
           cat >>~/.cargo/config <<EOF
@@ -117,7 +95,11 @@ jobs:
         run: rustup target add $TARGET
       - name: Run build
         if: steps.changes.outputs.src == 'true'
-        run: cargo +nightly build --release --verbose --target $TARGET --features "simd mimalloc"
+        run: |
+          cargo +nightly build --release --verbose --target $TARGET --features "simd mimalloc"
+        env:
+          CARGO_HOME: "/github/home/.cargo"
+          CARGO_TARGET_DIR: "/github/home/target"
       - name: List target
         run: find ./target || true
       - name: Compress
@@ -130,10 +112,9 @@ jobs:
             TAG=$GITHUB_SHA
           fi
           mv ./target/$TARGET/release/flock ./flock
-          mv ./target/$TARGET/release/flock-function ./flock-function
           mv ./target/$TARGET/release/flock-cli ./flock-cli
           strip --strip-all ./flock-function
-          tar -czf ./artifacts/flock-$TARGET-$TAG.tar.gz flock flock-function flock-cli
+          tar -czf ./artifacts/flock-$TARGET-$TAG.tar.gz flock flock-cli
       - name: Archive artifact
         if: steps.changes.outputs.src == 'true'
         uses: actions/upload-artifact@v2
@@ -141,11 +122,77 @@ jobs:
           name: result
           path: |
             ./artifacts
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        # a list of all the targets
+        include:
+          - TARGET: x86_64-unknown-linux-gnu
+            OS: ubuntu-latest
+            RUST: nightly
+    runs-on: ${{ matrix.OS }}
+    needs: build
+    env:
+      TARGET: ${{ matrix.TARGET }}
+      OS: ${{ matrix.OS }}
+      # Disable full debug symbol generation to speed up CI build and keep memory down
+      # "1" means line tables only, which is useful for panic tracebacks.
+      RUSTFLAGS: "-C debuginfo=1"
+    steps:
+      - uses: actions/checkout@v2
+      - name: Cache Cargo
+        uses: actions/cache@v2
+        with:
+          path: /github/home/.cargo
+          # this key equals the ones on `build` for re-use
+          key: cargo-cache-
+      - name: Cache Rust dependencies
+        uses: actions/cache@v2
+        with:
+          path: /github/home/target
+          # this key equals the ones on `build` for re-use
+          key: ${{ runner.os }}-${{ matrix.TARGET }}-target-cache-${{ matrix.RUST }}-
+      - name: Setup Rust toolchain
+        run: |
+          rustup toolchain install ${{ matrix.RUST }}
+          rustup default ${{ matrix.RUST }}
+          rustup component add rustfmt
+      # - name: update all third-party dependencies
+      #   run: |
+      #     cargo update
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            src:
+              - 'benchmarks/**'
+              - 'flock/**'
+              - 'flock-cli/**'
+              - 'flock-function/**'
+              - 'playground/**'
+      - name: Install and configure dependencies
+        run: |
+          # dependencies are only needed on ubuntu as that's the only place where
+          # we make cross-compilation
+          if [[ $OS =~ ^ubuntu.*$ ]]; then
+            sudo apt install musl-tools
+          fi
+      - name: Install rust target
+        if: steps.changes.outputs.src == 'true'
+        run: rustup target add $TARGET
+      - name: Run build
+        if: steps.changes.outputs.src == 'true'
+        run: |
+          cargo test
+        env:
+          CARGO_HOME: "/github/home/.cargo"
+          CARGO_TARGET_DIR: "/github/home/target"
 
- # deploys to github releases on tag
+  # deploys to github releases on tag
   deploy:
     if: startsWith(github.ref, 'refs/tags/')
-    needs: build
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Download artifacts
@@ -159,7 +206,6 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: ./artifacts/*.tar.gz
-
 #   coverage:
 #     name: Coverage
 #     runs-on: ubuntu-latest
