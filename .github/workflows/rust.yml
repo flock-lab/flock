@@ -89,7 +89,7 @@ jobs:
             source ~/.bashrc
           fi
           # some additional configuration for cross-compilation on linux
-          cat >>~/.cargo/config <<EOF
+          cat >~/.cargo/config <<EOF
           [target.aarch64-unknown-linux-gnu]
           linker = "aarch64-linux-gnu-gcc"
           [target.aarch64-unknown-linux-musl]
