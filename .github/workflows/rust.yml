@@ -88,6 +88,8 @@ jobs:
           rustflags = [
             "-C", "link-arg=-undefined",
             "-C", "link-arg=dynamic_lookup",
+            "-C", "target-feature=+crt-static",
+            "-C", "link-arg=-lgcc",
           ]
           EOF
       - name: Install rust target
