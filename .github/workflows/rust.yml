@@ -167,7 +167,6 @@ jobs:
         env:
           CARGO_HOME: "~/.cargo"
           CARGO_TARGET_DIR: "target"
-
 #   coverage:
 #     name: Coverage
 #     runs-on: ubuntu-latest

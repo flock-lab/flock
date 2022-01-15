@@ -3,7 +3,7 @@ name: release
 on:
   schedule:
     # Runs "at 12:00." (see https://crontab.guru)
-    - cron: '0 12 * * *'
+    - cron: "0 12 * * *"
 
 env:
   CARGO_TERM_COLOR: always
