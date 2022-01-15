@@ -36,7 +36,9 @@ jobs:
       - name: Cache Homebrew
         uses: actions/cache@v2
         with:
-          path: ~/Library/Caches/Homebrew/aarch64-unknown-linux-musl--*
+          path: |
+            ~/Library/Caches/Homebrew/aarch64-unknown-linux-musl--*
+            ~/Library/Caches/Homebrew/zstd--*
           key: brew-cache-$TARGET-
       - name: Cache Cargo
         uses: actions/cache@v2
