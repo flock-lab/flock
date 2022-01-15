@@ -48,14 +48,14 @@ jobs:
         with:
           # these represent dependencies downloaded by cargo
           # and thus do not depend on the OS, arch nor rust version.
-          path: /github/home/.cargo
+          path: ~/.cargo
           key: cargo-cache-
       - name: Cache Rust dependencies
         uses: actions/cache@v2
         with:
           # these represent compiled steps of both dependencies and arrow
           # and thus are specific for a particular OS, arch and rust version.
-          path: /github/home/target
+          path: target
           key: ${{ runner.os }}-${{ matrix.TARGET }}-target-cache-${{ matrix.RUST }}-
       - name: Setup Rust toolchain
         run: |
@@ -98,8 +98,8 @@ jobs:
         run: |
           cargo +nightly build --release --verbose --target $TARGET --features "simd mimalloc"
         env:
-          CARGO_HOME: "/github/home/.cargo"
-          CARGO_TARGET_DIR: "/github/home/target"
+          CARGO_HOME: "~/.cargo"
+          CARGO_TARGET_DIR: "target"
       - name: List target
         run: find ./target || true
       - name: Compress
@@ -144,13 +144,13 @@ jobs:
       - name: Cache Cargo
         uses: actions/cache@v2
         with:
-          path: /github/home/.cargo
+          path: ~/.cargo
           # this key equals the ones on `build` for re-use
           key: cargo-cache-
       - name: Cache Rust dependencies
         uses: actions/cache@v2
         with:
-          path: /github/home/target
+          path: target
           # this key equals the ones on `build` for re-use
           key: ${{ runner.os }}-${{ matrix.TARGET }}-target-cache-${{ matrix.RUST }}-
       - name: Setup Rust toolchain
@@ -186,8 +186,8 @@ jobs:
         run: |
           cargo test
         env:
-          CARGO_HOME: "/github/home/.cargo"
-          CARGO_TARGET_DIR: "/github/home/target"
+          CARGO_HOME: "~/.cargo"
+          CARGO_TARGET_DIR: "target"
 
   # deploys to github releases on tag
   deploy:
