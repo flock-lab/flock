@@ -101,6 +101,7 @@ jobs:
           export CXX_aarch64_unknown_linux_musl=aarch64-unknown-linux-musl-g++
           export AR_aarch64_unknown_linux_musl=aarch64-unknown-linux-musl-ar
           export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-unknown-linux-musl-gcc
+          export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS="-Zgcc-ld=lld"
           cargo +nightly build --verbose --target $TARGET
         env:
           CARGO_HOME: "~/$TARGET/.cargo"
