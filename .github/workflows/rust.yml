@@ -94,7 +94,8 @@ jobs:
           linker = "aarch64-linux-gnu-gcc"
           [target.aarch64-unknown-linux-musl]
           linker = "/opt/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc"
-          ar="/opt/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc-ar"
+          ar = "/opt/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc-ar"
+          rustflags = [ "-L /opt/aarch64-linux-musl-cross/aarch64-linux-musl/lib" ]
           EOF
       - name: Install rust target
         if: steps.changes.outputs.src == 'true'
