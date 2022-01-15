@@ -105,11 +105,9 @@ jobs:
           else
             TAG=$GITHUB_SHA
           fi
-          mv ./target/$TARGET/release/flock flock
-          mv ./target/$TARGET/release/flock-cli flock-cli
-          strip --strip-all flock
+          strip --strip-all ./target/$TARGET/release/flock
           mv header license
-          tar -czf ./artifacts/flock-$TARGET-$TAG.tar.gz flock flock-cli license
+          tar -czf ./artifacts/flock-$TARGET-$TAG.tar.gz ./target/$TARGET/release/flock ./target/$TARGET/release/flock-cli license
       - name: Archive artifact
         uses: actions/upload-artifact@v2
         with:
