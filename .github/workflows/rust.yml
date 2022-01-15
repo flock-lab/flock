@@ -33,6 +33,11 @@ jobs:
       RUSTFLAGS: "-C debuginfo=1"
     steps:
       - uses: actions/checkout@v2
+      - name: Cache Homebrew
+        uses: actions/cache@v2
+        with:
+          path: ~/Library/Caches/Homebrew/aarch64-unknown-linux-musl--*
+          key: brew-cache-$TARGET-
       - name: Cache Cargo
         uses: actions/cache@v2
         with:
