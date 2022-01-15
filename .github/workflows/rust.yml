@@ -81,7 +81,11 @@ jobs:
           # we make cross-compilation
           if [[ $OS =~ ^ubuntu.*$ ]]; then
             sudo apt-get install -qq crossbuild-essential-arm64 crossbuild-essential-armhf
-            sudo apt install musl-tools
+            wget http://more.musl.cc/$(uname -m)-linux-musl/aarch64-linux-musl-cross.tgz
+            tar -xvf aarch64-linux-musl-cross.tgz
+            sudo mv aarch64-linux-musl-cross /opt/
+            echo 'export PATH=/opt/aarch64-linux-musl-cross/bin:$PATH' >> ~/.bashrc
+            source ~/.bashrc
           fi
           # some additional configuration for cross-compilation on linux
           cat >>~/.cargo/config <<EOF
