@@ -30,6 +30,8 @@ jobs:
           - TARGET: aarch64-unknown-linux-gnu
             OS: ubuntu-latest
             RUST: nightly
+          - TARGET: aarch64-unknown-linux-musl
+            OS: macos-latest
           # - TARGET: aarch64-unknown-linux-musl
           #   OS: ubuntu-latest
           #   RUST: nightly
@@ -82,20 +84,21 @@ jobs:
           if [[ $OS =~ ^ubuntu.*$ ]]; then
             sudo apt install musl-tools
             sudo apt-get install -qq crossbuild-essential-arm64 crossbuild-essential-armhf
-            wget http://more.musl.cc/$(uname -m)-linux-musl/aarch64-linux-musl-cross.tgz
-            tar -xvf aarch64-linux-musl-cross.tgz
-            sudo mv aarch64-linux-musl-cross /opt/
-            echo 'export PATH=/opt/aarch64-linux-musl-cross/bin:$PATH' >> ~/.bashrc
-            source ~/.bashrc
           fi
           # some additional configuration for cross-compilation on linux
           cat >~/.cargo/config <<EOF
           [target.aarch64-unknown-linux-gnu]
           linker = "aarch64-linux-gnu-gcc"
-          [target.aarch64-unknown-linux-musl]
-          linker = "/opt/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc"
-          ar = "/opt/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc-ar"
-          rustflags = [ "-L /opt/aarch64-linux-musl-cross/aarch64-linux-musl/lib", "-C", "link-arg=-lgcc", "-C", "link-arg=/opt/aarch64-linux-musl-cross/aarch64-linux-musl/lib/libc.a" ]
+          [target.x86_64-apple-darwin]
+          rustflags = [
+            "-C", "link-arg=-undefined",
+            "-C", "link-arg=dynamic_lookup",
+          ]
+          [target.aarch64-apple-darwin]
+          rustflags = [
+            "-C", "link-arg=-undefined",
+            "-C", "link-arg=dynamic_lookup",
+          ]
           EOF
       - name: Install rust target
         if: steps.changes.outputs.src == 'true'
@@ -103,11 +106,19 @@ jobs:
       - name: Run build
         if: steps.changes.outputs.src == 'true'
         run: |
+          if [ "${TARGET}" == "aarch64-unknown-linux-musl" ]; then
+            brew tap messense/macos-cross-toolchains
+            brew install aarch64-unknown-linux-musl
+            brew install zstd
+            export CC_aarch64_unknown_linux_musl=aarch64-unknown-linux-musl-gcc
+            export CXX_aarch64_unknown_linux_musl=aarch64-unknown-linux-musl-g++
+            export AR_aarch64_unknown_linux_musl=aarch64-unknown-linux-musl-ar
+            export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-unknown-linux-musl-gcc
+          fi
           cargo +nightly build --verbose --target $TARGET
         env:
           CARGO_HOME: "~/.cargo"
           CARGO_TARGET_DIR: "target"
-          CC_aarch64-unknown-linux-musl: "/opt/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc"
   test:
     strategy:
       fail-fast: false
