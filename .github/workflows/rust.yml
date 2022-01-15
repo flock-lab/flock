@@ -119,7 +119,7 @@ jobs:
           fi
           mv ./target/$TARGET/release/flock ./flock
           mv ./target/$TARGET/release/flock-cli ./flock-cli
-          strip --strip-all ./flock-function
+          strip --strip-all ./flock
           tar -czf ./artifacts/flock-$TARGET-$TAG.tar.gz flock flock-cli
       - name: Archive artifact
         if: steps.changes.outputs.src == 'true'
