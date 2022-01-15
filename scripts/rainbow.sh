@@ -10,7 +10,7 @@
 __RAINBOWPALETTE="1"
 
 function __colortext() {
-    echo -e " \e[$__RAINBOWPALETTE;$2m$1\e[0m"
+    echo -e " \033[$__RAINBOWPALETTE;$2m$1\033[0m"
 }
 
 function echogreen() {
