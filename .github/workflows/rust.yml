@@ -80,6 +80,7 @@ jobs:
           # dependencies are only needed on ubuntu as that's the only place where
           # we make cross-compilation
           if [[ $OS =~ ^ubuntu.*$ ]]; then
+            sudo apt install musl-tools
             sudo apt-get install -qq crossbuild-essential-arm64 crossbuild-essential-armhf
             wget http://more.musl.cc/$(uname -m)-linux-musl/aarch64-linux-musl-cross.tgz
             tar -xvf aarch64-linux-musl-cross.tgz
@@ -181,6 +182,12 @@ jobs:
           # we make cross-compilation
           if [[ $OS =~ ^ubuntu.*$ ]]; then
             sudo apt install musl-tools
+            sudo apt-get install -qq crossbuild-essential-arm64 crossbuild-essential-armhf
+            wget http://more.musl.cc/$(uname -m)-linux-musl/aarch64-linux-musl-cross.tgz
+            tar -xvf aarch64-linux-musl-cross.tgz
+            sudo mv aarch64-linux-musl-cross /opt/
+            echo 'export PATH=/opt/aarch64-linux-musl-cross/bin:$PATH' >> ~/.bashrc
+            source ~/.bashrc
           fi
       - name: Install rust target
         if: steps.changes.outputs.src == 'true'
