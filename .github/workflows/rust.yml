@@ -16,6 +16,7 @@ defaults:
 
 jobs:
   build_aarch64_musl:
+    if: ${{ false }}  # disable for now
     strategy:
       fail-fast: false
       matrix:
