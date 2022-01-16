@@ -203,11 +203,19 @@ mod tests {
     use super::*;
 
     use crate::assert_batches_eq;
+    use crate::assert_batches_sorted_eq;
+    use crate::datasource::nexmark::event::{Auction, Person};
+    use crate::datasource::nexmark::NEXMarkSource;
     use crate::datasource::DataSource;
-    use crate::query::QueryType;
+    use crate::launcher::LocalLauncher;
     use crate::query::Table;
+    use crate::query::{QueryType, StreamType};
+    use crate::stream::Window;
+    use crate::transmute::event_bytes_to_batch;
     use datafusion::arrow::array::*;
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
+    use datafusion::arrow::util::pretty::pretty_format_batches;
+    use indoc::indoc;
     use std::sync::Arc;
 
     fn init_query() -> Result<Query<&'static str>> {
@@ -311,6 +319,123 @@ mod tests {
         ];
 
         assert_batches_eq!(&expected, &input[0][0]);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn aws_launcher_nexmark_q3_dist_hash_join() -> Result<()> {
+        let auction_schema = Arc::new(Auction::schema());
+        let person_schema = Arc::new(Person::schema());
+
+        let query = Query::new(
+            indoc! {"
+            SELECT  name,
+                    city,
+                    state,
+                    a_id
+            FROM    auction
+                    INNER JOIN person
+                            ON seller = p_id
+            WHERE  category = 10
+                    AND ( state = 'or'
+                            OR state = 'id'
+                            OR state = 'ca' );
+            "},
+            vec![
+                Table("auction", auction_schema.clone()),
+                Table("person", person_schema.clone()),
+            ],
+            DataSource::Memory,
+            DataSinkType::Blackhole,
+            None,
+            QueryType::Streaming(StreamType::NEXMarkBench),
+        );
+
+        let mut launcher = AwsLambdaLauncher::new(&query).await?;
+        println!("SQL: {}", query.sql());
+        println!("Query Code: {}\n", launcher.query_code.as_ref().unwrap());
+        launcher.create_cloud_contexts()?;
+
+        // Generate events.
+        let seconds = 1;
+        let threads = 1;
+        let event_per_second = 10_000;
+        let nexmark_source =
+            NEXMarkSource::new(seconds, threads, event_per_second, Window::ElementWise);
+        let stream = nexmark_source.generate_data()?;
+
+        let (events, (persons_num, auctions_num, bids_num)) =
+            stream.select(0, 0).expect("Failed to select event.");
+
+        println!(
+            "Selecting events for epoch {}: {} persons, {} auctions, {} bids.",
+            0, persons_num, auctions_num, bids_num
+        );
+
+        let auctions_batches = event_bytes_to_batch(&events.auctions, auction_schema, 1024);
+        let person_batches = event_bytes_to_batch(&events.persons, person_schema, 1024);
+
+        #[rustfmt::skip]
+        // --------------------------------------------------------------------------------
+        //                               NEXMark Query 3
+        // --------------------------------------------------------------------------------
+        // === Stage 0 ===
+        // CoalesceBatchesExec: target_batch_size=4096
+        //   RepartitionExec: partitioning=Hash([Column { name: "seller", index: 1 }], 16)
+        //     CoalesceBatchesExec: target_batch_size=4096
+        //       FilterExec: CAST(category@2 AS Int64) = 10
+        //         RepartitionExec: partitioning=RoundRobinBatch(16)
+        //           MemoryExec: partitions=0, partition_sizes=[]
+
+        // CoalesceBatchesExec: target_batch_size=4096
+        //   RepartitionExec: partitioning=Hash([Column { name: "p_id", index: 0 }], 16)
+        //     CoalesceBatchesExec: target_batch_size=4096
+        //       FilterExec: state@3 = or OR state@3 = id OR state@3 = ca
+        //         RepartitionExec: partitioning=RoundRobinBatch(16)
+        //           MemoryExec: partitions=0, partition_sizes=[]
+        //
+        // === Stage 1 ===
+        // ProjectionExec: expr=[name@4 as name, city@5 as city, state@6 as state, a_id@0 as a_id]
+        //   CoalesceBatchesExec: target_batch_size=4096
+        //     HashJoinExec: mode=Partitioned, join_type=Inner, on=[(Column { name: "seller", index: 1 }, Column { name: "p_id", index: 0 })]
+        //       MemoryExec: partitions=0, partition_sizes=[]
+        //       MemoryExec: partitions=0, partition_sizes=[]
+        assert!(launcher.dag.node_count() == 2);
+
+        let stages = launcher.dag.get_all_stages();
+        let input = vec![vec![auctions_batches], vec![person_batches]];
+
+        // === Query Stage 0 ===
+        let mut ctx = stages[0].context.clone().unwrap();
+        ctx.feed_data_sources(&input).await?;
+        // We **MUST USE** execute_partitioned() instead of execute() here.
+        let output = ctx.execute_partitioned().await?;
+        assert!(output.len() == 2);
+        assert_eq!(output[0].len(), output[1].len());
+
+        // === Query Stage 1 ===
+        let num_partitions = output[0].len();
+        let mut ctx = stages[1].context.clone().unwrap();
+        let mut result = vec![];
+        for i in 0..num_partitions {
+            ctx.feed_data_sources(&[vec![output[0][i].clone()], vec![output[1][i].clone()]])
+                .await?;
+            let sliced_output = ctx.execute().await?;
+            assert!(sliced_output.len() == 1);
+            result.push(sliced_output.into_iter().next().unwrap());
+        }
+
+        let result = result.into_iter().flatten().collect::<Vec<_>>();
+        let formatted = pretty_format_batches(&result).unwrap().to_string();
+        let expected: Vec<&str> = formatted.trim().lines().collect();
+
+        // Local execution mode
+        let mut launcher = LocalLauncher::new(&query).await?;
+        launcher.feed_data_sources(&input);
+        let batches = launcher.collect().await?;
+
+        assert_batches_sorted_eq!(expected, &batches);
 
         Ok(())
     }
