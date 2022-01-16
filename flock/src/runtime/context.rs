@@ -20,7 +20,7 @@ use crate::error::{FlockError, Result};
 use crate::runtime::plan::CloudExecutionPlan;
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::record_batch::RecordBatch;
-use datafusion::physical_plan::collect;
+use datafusion::physical_plan::{collect, collect_partitioned};
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::ExecutionPlan;
 use serde::{Deserialize, Serialize};
@@ -145,6 +145,31 @@ impl ExecutionContext {
                 })
             })
             .collect::<Vec<JoinHandle<Result<Vec<RecordBatch>>>>>();
+
+        Ok(futures::future::join_all(tasks)
+            .await
+            .into_iter()
+            .map(|r| r.unwrap().unwrap())
+            .collect())
+    }
+
+    /// Executes the physical plan.
+    ///
+    /// `execute_partitioned` must be called after the execution of `feed_one_source` or
+    /// `feed_two_source` or `feed_data_sources`.
+    pub async fn execute_partitioned(&mut self) -> Result<Vec<Vec<Vec<RecordBatch>>>> {
+        let tasks = self
+            .plan()
+            .await?
+            .into_iter()
+            .map(|plan| {
+                tokio::spawn(async move {
+                    collect_partitioned(plan)
+                        .await
+                        .map_err(|e| FlockError::Execution(e.to_string()))
+                })
+            })
+            .collect::<Vec<JoinHandle<Result<Vec<Vec<RecordBatch>>>>>>();
 
         Ok(futures::future::join_all(tasks)
             .await

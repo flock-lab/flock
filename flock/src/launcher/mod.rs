@@ -18,6 +18,8 @@ pub mod aws;
 pub mod azure;
 pub mod gcp;
 pub mod local;
+pub use local::LocalLauncher;
+pub use aws::AwsLambdaLauncher;
 
 use crate::error::Result;
 use crate::query::Query;
