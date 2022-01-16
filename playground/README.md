@@ -46,12 +46,12 @@ Playground with the following options: PlaygroundOpt { ops_type: "scatter_gather
 
 <center>
 Figure 1 - flock_pg_scatter's CloudWatch metrics.
-<img src="../../docs/img/playground/flock_pg_scatter.png" width=75%>
+<img src="../docs/img/playground/flock_pg_scatter.png" width=75%>
 </center>
 
 <center>
 Figure 2 - flock_pg_gather's CloudWatch metrics.
-<img src="../../docs/img/playground/flock_pg_gather.png" width=75%>
+<img src="../docs/img/playground/flock_pg_gather.png" width=75%>
 <figcaption></figcaption>
 </center>
 
