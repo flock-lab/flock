@@ -16,7 +16,7 @@ defaults:
 
 jobs:
   build_aarch64_musl:
-    if: ${{ false }}  # disable for now
+    if: ${{ false }} # disable for now
     strategy:
       fail-fast: false
       matrix:
@@ -110,7 +110,7 @@ jobs:
           cargo +nightly build --verbose --target $TARGET
         env:
           CARGO_HOME: "~/$TARGET/.cargo"
-          CARGO_TARGET_DIR: "target" 
+          CARGO_TARGET_DIR: "target"
   build:
     strategy:
       fail-fast: false

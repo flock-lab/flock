@@ -419,14 +419,11 @@ mod tests {
         let mut ctx = stages[1].context.clone().unwrap();
         let mut result = vec![];
         for i in 0..num_partitions {
-            ctx.feed_data_sources(&vec![
-                vec![output[0][i].clone()],
-                vec![output[1][i].clone()],
-            ])
-            .await?;
+            ctx.feed_data_sources(&[vec![output[0][i].clone()], vec![output[1][i].clone()]])
+                .await?;
             let sliced_output = ctx.execute().await?;
             assert!(sliced_output.len() == 1);
-            result.push(sliced_output.into_iter().nth(0).unwrap());
+            result.push(sliced_output.into_iter().next().unwrap());
         }
 
         let result = result.into_iter().flatten().collect::<Vec<_>>();

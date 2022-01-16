@@ -20,9 +20,9 @@ use crate::error::{FlockError, Result};
 use crate::runtime::plan::CloudExecutionPlan;
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::record_batch::RecordBatch;
-use datafusion::physical_plan::{collect, collect_partitioned};
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::{collect, collect_partitioned};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::collections::VecDeque;
@@ -155,8 +155,8 @@ impl ExecutionContext {
 
     /// Executes the physical plan.
     ///
-    /// `execute_partitioned` must be called after the execution of `feed_one_source` or
-    /// `feed_two_source` or `feed_data_sources`.
+    /// `execute_partitioned` must be called after the execution of
+    /// `feed_one_source` or `feed_two_source` or `feed_data_sources`.
     pub async fn execute_partitioned(&mut self) -> Result<Vec<Vec<Vec<RecordBatch>>>> {
         let tasks = self
             .plan()
