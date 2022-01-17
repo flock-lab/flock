@@ -30,7 +30,7 @@ use std::sync::Arc;
 ///
 /// # Returns
 /// A JSON object that contains the return value of the function invocation.
-pub async fn handler(ctx: &ExecutionContext, payload: Payload) -> Result<Value> {
+pub async fn handler(ctx: &mut ExecutionContext, payload: Payload) -> Result<Value> {
     // Copy data source from the payload.
     let mut source = match payload.datasource.clone() {
         DataSource::NEXMarkEvent(source) => source,
@@ -63,7 +63,7 @@ pub async fn handler(ctx: &ExecutionContext, payload: Payload) -> Result<Value> 
             hopping_window_tasks(payload, events, sec, window_size, hop_size).await?;
         }
         Window::ElementWise => {
-            elementwise_tasks(payload, events, sec).await?;
+            elementwise_tasks(ctx, payload, events, sec).await?;
         }
         Window::Session(Schedule::Seconds(timeout)) => {
             session_window_tasks(payload, events, sec, timeout).await?;

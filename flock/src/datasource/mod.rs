@@ -21,10 +21,9 @@ use crate::error::Result;
 use crate::runtime::payload::{Payload, Uuid};
 use datafusion::arrow::record_batch::RecordBatch;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 
 /// A relation's data in Arrow record batches.
-pub type RelationPartitions = Arc<Vec<Vec<RecordBatch>>>;
+pub type RelationPartitions = Vec<Vec<RecordBatch>>;
 /// To determine the function type to be called: sync or async.
 pub type FastAggregate = bool;
 
