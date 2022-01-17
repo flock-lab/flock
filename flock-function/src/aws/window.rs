@@ -22,6 +22,7 @@ use datafusion::datasource::MemTable;
 use datafusion::execution::context::ExecutionContext as DataFusionExecutionContext;
 use datafusion::logical_plan::{col, count_distinct};
 use datafusion::physical_plan::collect_partitioned;
+use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::expressions::col as expr_col;
 use datafusion::physical_plan::Partitioning::{HashDiff, RoundRobinBatch};
 use flock::aws::lambda;
@@ -828,6 +829,7 @@ pub async fn global_window_tasks(
 /// * `stream` - the source stream of events.
 /// * `seconds` - the total number of seconds to generate workloads.
 pub async fn elementwise_tasks(
+    ctx: &mut ExecutionContext,
     payload: Payload,
     stream: Arc<dyn DataStream + Send + Sync>,
     seconds: usize,
@@ -847,14 +849,68 @@ pub async fn elementwise_tasks(
         let events = stream.clone();
         if ring.len() == 1 {
             // lambda default concurrency is 1000.
-            let function_name = group_name.clone();
-            let uuid =
-                UuidBuilder::new_with_ts(&function_name, Utc::now().timestamp(), 1).next_uuid();
-            let mut payload = events.select_event_to_payload(epoch, 0, query_number, uuid, sync)?;
-            payload.metadata = metadata.clone();
-            let bytes = serde_json::to_vec(&payload)?;
-            info!("[OK] function payload bytes: {}", bytes.len());
-            lambda::invoke_function(&function_name, &invocation_type, Some(bytes.into())).await?;
+            assert!(!ctx.plan.execution_plans.is_empty());
+            let exec_plans = &ctx.plan.execution_plans;
+            if exec_plans[0].as_any().downcast_ref::<EmptyExec>().is_some() {
+                // centralized mode
+                let function_name = group_name.clone();
+                let uuid =
+                    UuidBuilder::new_with_ts(&function_name, Utc::now().timestamp(), 1).next_uuid();
+                let mut payload =
+                    events.select_event_to_payload(epoch, 0, query_number, uuid, sync)?;
+                payload.metadata = metadata.clone();
+                let bytes = serde_json::to_vec(&payload)?;
+                info!("[OK] function payload bytes: {}", bytes.len());
+                lambda::invoke_function(&function_name, &invocation_type, Some(bytes.into()))
+                    .await?;
+            } else {
+                // distributed mode
+                let partitions = events.select_event_to_batches(
+                    epoch,
+                    0, // generator id
+                    payload.query_number,
+                    sync,
+                )?;
+                let mut input = vec![];
+                for b in vec![partitions.0, partitions.1] {
+                    if !b.is_empty() {
+                        input.push(b);
+                    }
+                }
+
+                ctx.feed_data_sources(&input).await?;
+                let output = Box::new(ctx.execute_partitioned().await?);
+                let tasks = (0..output[0].len())
+                    .map(|i| {
+                        let data = output.clone();
+                        let function_name = group_name.clone();
+                        let meta = metadata.clone();
+                        let invoke_type = invocation_type.clone();
+                        tokio::spawn(async move {
+                            let mut payload = to_payload(
+                                &data[0][i],
+                                if data.len() == 1 { &[] } else { &data[1][i] },
+                                UuidBuilder::new_with_ts(&function_name, Utc::now().timestamp(), 1)
+                                    .next_uuid(),
+                                sync,
+                            );
+                            payload.query_number = query_number;
+                            payload.metadata = meta;
+
+                            let bytes = serde_json::to_vec(&payload)?;
+                            info!("[OK] function payload bytes: {}", bytes.len());
+                            lambda::invoke_function(
+                                &function_name,
+                                &invoke_type,
+                                Some(bytes.into()),
+                            )
+                            .await?;
+                            Ok(())
+                        })
+                    })
+                    .collect::<Vec<tokio::task::JoinHandle<Result<()>>>>();
+                futures::future::join_all(tasks).await;
+            }
         } else {
             // Calculate the total data packets to be sent.
             // transfrom tuple (a, b) to (Arc::new(a), Arc::new(b))

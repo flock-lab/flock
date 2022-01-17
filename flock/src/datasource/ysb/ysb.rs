@@ -27,6 +27,7 @@ use crate::stream::{Schedule, Window};
 use crate::transmute::*;
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::record_batch::RecordBatch;
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use log::info;
 use serde::{Deserialize, Serialize};
@@ -148,24 +149,19 @@ impl DataStream for YSBStream {
 
         let step = if r2.is_empty() { 2 } else { 1 };
 
-        let batch_partition = |batch: Vec<RecordBatch>| {
-            (0..batch.len())
-                .step_by(step)
-                .map(|start| {
-                    let end = if start + step > batch.len() {
-                        batch.len()
-                    } else {
-                        start + step
-                    };
-                    batch[start..end].to_vec()
-                })
-                .collect::<Vec<_>>()
+        let batch_chunks = |batches: Vec<RecordBatch>| {
+            batches
+                .into_iter()
+                .chunks(step)
+                .into_iter()
+                .map(|c| c.collect())
+                .collect()
         };
 
         if r2.is_empty() {
-            Ok((Arc::new(batch_partition(r1)), Arc::new(vec![])))
+            Ok((batch_chunks(r1), vec![]))
         } else {
-            Ok((Arc::new(batch_partition(r1)), Arc::new(batch_partition(r2))))
+            Ok((batch_chunks(r1), batch_chunks(r2)))
         }
     }
 

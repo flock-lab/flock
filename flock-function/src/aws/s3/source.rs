@@ -81,11 +81,11 @@ pub async fn handler(_ctx: &ExecutionContext, payload: Payload) -> Result<Value>
                     payload.query_number,
                     sync,
                 )?;
-                if a.len() > 0 {
-                    r1.append(Arc::get_mut(&mut a).unwrap());
+                if !a.is_empty() {
+                    r1.append(&mut a);
                 }
-                if b.len() > 0 {
-                    r2.append(Arc::get_mut(&mut b).unwrap());
+                if !b.is_empty() {
+                    r2.append(&mut b);
                 }
             }
             if r1.len() > 1 {
