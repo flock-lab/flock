@@ -23,6 +23,7 @@ use crate::launcher::{ExecutionMode, Launcher};
 use crate::query::Query;
 use crate::runtime::context::*;
 use crate::runtime::plan::CloudExecutionPlan;
+use crate::state::*;
 use async_trait::async_trait;
 use daggy::NodeIndex;
 use datafusion::arrow::record_batch::RecordBatch;
@@ -37,22 +38,23 @@ use std::sync::Arc;
 #[derive(Debug)]
 pub struct AwsLambdaLauncher {
     /// The first component of the function name.
-    pub query_code: Option<String>,
+    pub query_code:    Option<String>,
     /// The DAG of a given query.
-    pub dag:        QueryDag,
+    pub dag:           QueryDag,
     /// The data sink type of a given query.
-    pub sink_type:  DataSinkType,
+    pub sink_type:     DataSinkType,
     /// The entire execution plan. This can be used to execute the query
     /// in a single Lambda function.
-    pub plan:       Arc<dyn ExecutionPlan>,
+    pub plan:          Arc<dyn ExecutionPlan>,
+    /// The state backend to use.
+    pub state_backend: Arc<dyn StateBackend>,
 }
 
 #[async_trait]
 impl Launcher for AwsLambdaLauncher {
-    async fn new<T>(query: &Query<T>) -> Result<Self>
+    async fn new(query: &Query) -> Result<Self>
     where
         Self: Sized,
-        T: AsRef<str> + Send + Sync + 'static,
     {
         let plan = query.plan()?;
         let sink_type = query.datasink();
@@ -67,11 +69,14 @@ impl Launcher for AwsLambdaLauncher {
             query_code = Some(hasher.finish().to_string());
         }
 
+        let state_backend = query.state_backend();
+
         Ok(AwsLambdaLauncher {
             plan,
             dag,
             sink_type,
             query_code,
+            state_backend,
         })
     }
 
@@ -102,6 +107,7 @@ impl AwsLambdaLauncher {
         query_code: T,
         plan: Arc<dyn ExecutionPlan>,
         sink_type: DataSinkType,
+        state_backend: Arc<dyn StateBackend>,
     ) -> Result<Self>
     where
         T: Into<String>,
@@ -113,14 +119,12 @@ impl AwsLambdaLauncher {
             plan,
             dag,
             sink_type,
+            state_backend,
         })
     }
 
     /// Initialize the query code for the query.
-    pub fn set_query_code<T>(&mut self, query: &Query<T>)
-    where
-        T: AsRef<str> + Send + Sync + 'static,
-    {
+    pub fn set_query_code(&mut self, query: &Query) {
         self.query_code = query.query_code();
         if self.query_code.is_none() {
             let mut hasher = DefaultHasher::new();
@@ -164,7 +168,7 @@ impl AwsLambdaLauncher {
                     plan: CloudExecutionPlan::new(node.stage.clone(), None),
                     name: format!("{}-{:02}", query_code, count - 1 - i),
                     next,
-                    ..Default::default()
+                    state_backend: self.state_backend.clone(),
                 };
 
                 node.context = Some(ctx);
@@ -175,20 +179,20 @@ impl AwsLambdaLauncher {
         {
             let query_code = self.query_code.as_ref().expect("query code not set");
             let _data_source_ctx = ExecutionContext {
-                plan: CloudExecutionPlan::new(vec![FLOCK_EMPTY_PLAN.clone()], None),
-                name: FLOCK_DATA_SOURCE_FUNC_NAME.clone(),
-                next: CloudFunction::Group((
+                plan:          CloudExecutionPlan::new(vec![FLOCK_EMPTY_PLAN.clone()], None),
+                name:          FLOCK_DATA_SOURCE_FUNC_NAME.clone(),
+                next:          CloudFunction::Group((
                     format!("{}-{:02}", query_code, 0),
                     *FLOCK_FUNCTION_CONCURRENCY,
                 )),
-                ..Default::default()
+                state_backend: self.state_backend.clone(),
             };
             let _worker_ctx = ExecutionContext {
                 // TODO: add option to store the execution plan in S3.
-                plan: CloudExecutionPlan::new(vec![self.plan.clone()], None),
-                name: format!("{}-{:02}", query_code, 0),
-                next: CloudFunction::Sink(self.sink_type.clone()),
-                ..Default::default()
+                plan:          CloudExecutionPlan::new(vec![self.plan.clone()], None),
+                name:          format!("{}-{:02}", query_code, 0),
+                next:          CloudFunction::Sink(self.sink_type.clone()),
+                state_backend: self.state_backend.clone(),
             };
         }
 
@@ -219,16 +223,15 @@ mod tests {
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
     use datafusion::arrow::util::pretty::pretty_format_batches;
     use indoc::indoc;
-    use std::sync::Arc;
 
-    fn init_query() -> Result<Query<&'static str>> {
-        let table1 = "t1";
+    fn init_query() -> Result<Query> {
+        let table1 = "t1".to_owned();
         let schema1 = Arc::new(Schema::new(vec![
             Field::new("a", DataType::Utf8, false),
             Field::new("b", DataType::Int32, false),
         ]));
 
-        let table2 = "t2";
+        let table2 = "t2".to_owned();
         let schema2 = Arc::new(Schema::new(vec![
             Field::new("c", DataType::Utf8, false),
             Field::new("d", DataType::Int32, false),
@@ -248,6 +251,7 @@ mod tests {
             DataSinkType::Blackhole,
             None,
             QueryType::OLAP,
+            Arc::new(HashMapStateBackend::new()),
         ))
     }
 
@@ -346,13 +350,14 @@ mod tests {
                             OR state = 'ca' );
             "},
             vec![
-                Table("auction", auction_schema.clone()),
-                Table("person", person_schema.clone()),
+                Table("auction".to_string(), auction_schema.clone()),
+                Table("person".to_string(), person_schema.clone()),
             ],
             DataSource::Memory,
             DataSinkType::Blackhole,
             None,
             QueryType::Streaming(StreamType::NEXMarkBench),
+            Arc::new(HashMapStateBackend::new()),
         );
 
         let mut launcher = AwsLambdaLauncher::new(&query).await?;

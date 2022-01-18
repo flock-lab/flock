@@ -34,10 +34,9 @@ pub struct LocalLauncher {
 
 #[async_trait]
 impl Launcher for LocalLauncher {
-    async fn new<T>(query: &Query<T>) -> Result<Self>
+    async fn new(query: &Query) -> Result<Self>
     where
         Self: Sized,
-        T: AsRef<str> + Send + Sync + 'static,
     {
         Ok(LocalLauncher {
             execution_plan: query.plan().unwrap(),
@@ -133,6 +132,7 @@ mod tests {
     use crate::datasource::DataSource;
     use crate::query::QueryType;
     use crate::query::Table;
+    use crate::state::*;
     use datafusion::arrow::array::*;
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
     use datafusion::arrow::record_batch::RecordBatch;
@@ -146,7 +146,7 @@ mod tests {
 
     #[tokio::test]
     async fn local_launcher() -> Result<()> {
-        let table_name = "test_table";
+        let table_name = "test_table".to_owned();
         let schema = Arc::new(Schema::new(vec![
             Field::new("c1", DataType::Int64, false),
             Field::new("c2", DataType::Float64, false),
@@ -163,6 +163,7 @@ mod tests {
             DataSinkType::Blackhole,
             None,
             QueryType::OLAP,
+            Arc::new(HashMapStateBackend::new()),
         );
 
         let mut launcher = LocalLauncher::new(&query).await?;

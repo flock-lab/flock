@@ -46,10 +46,9 @@ pub trait Launcher {
     ///
     /// # Arguments
     /// `query` - The query to be deployed.
-    async fn new<T>(query: &Query<T>) -> Result<Self>
+    async fn new(query: &Query) -> Result<Self>
     where
-        Self: Sized,
-        T: AsRef<str> + Send + Sync + 'static;
+        Self: Sized;
 
     /// Deploy a query to a specific cloud function service.
     /// It is called before the query is executed.

@@ -37,3 +37,10 @@ impl StateBackend for S3StateBackend {
         self
     }
 }
+
+impl S3StateBackend {
+    /// Creates a new S3StateBackend.
+    pub fn new() -> Self {
+        Self {}
+    }
+}

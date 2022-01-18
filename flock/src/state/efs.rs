@@ -18,16 +18,16 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::any::Any;
 
-/// EFSStateBackend is a state backend that stores query states in Amazon
+/// EfsStateBackend is a state backend that stores query states in Amazon
 /// Elastic File System (EFS).
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
-pub struct EFSStateBackend {}
+pub struct EfsStateBackend {}
 
 #[async_trait]
 #[typetag::serde(name = "efs_state_backend")]
-impl StateBackend for EFSStateBackend {
+impl StateBackend for EfsStateBackend {
     fn name(&self) -> String {
-        "EFSStateBackend".to_string()
+        "EfsStateBackend".to_string()
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -36,5 +36,12 @@ impl StateBackend for EFSStateBackend {
 
     fn as_mut_any(&mut self) -> &mut dyn Any {
         self
+    }
+}
+
+impl EfsStateBackend {
+    /// Creates a new EFSStateBackend.
+    pub fn new() -> Self {
+        Self {}
     }
 }

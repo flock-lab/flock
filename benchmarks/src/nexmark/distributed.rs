@@ -30,6 +30,7 @@ use nexmark::register_nexmark_tables;
 use rainbow::{rainbow_println, rainbow_string};
 use rusoto_lambda::InvocationResponse;
 use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::task::JoinHandle;
 
 lazy_static! {
@@ -52,7 +53,15 @@ pub async fn nexmark_benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
     let plan = plans.last().unwrap().clone();
     let sink_type = DataSinkType::new(&opt.data_sink_type)?;
 
-    let mut launcher = AwsLambdaLauncher::try_new(query_code, plan, sink_type).await?;
+    let state_backend: Arc<dyn StateBackend> = match opt.state_backend.as_str() {
+        "hashmap" => Arc::new(HashMapStateBackend::new()),
+        "s3" => Arc::new(S3StateBackend::new()),
+        "efs" => Arc::new(EfsStateBackend::new()),
+        _ => unreachable!(),
+    };
+
+    let mut launcher =
+        AwsLambdaLauncher::try_new(query_code, plan, sink_type, state_backend).await?;
     launcher.create_cloud_contexts()?;
     let dag = &mut launcher.dag;
     create_nexmark_functions(dag, opt).await?;

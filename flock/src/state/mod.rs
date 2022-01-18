@@ -36,13 +36,13 @@
 //!   backend, data is stored as serialized byte arrays, or CSV files or Parquet
 //!   files. This backend provides fault tolerance.
 //!
-//! - `EFSStateBackend`: holds in-flight data in Amazon Elastic File System
+//! - `EfsStateBackend`: holds in-flight data in Amazon Elastic File System
 //!   (EFS). Unlike the Arena backend, data is stored as serialized byte arrays,
 //!   or CSV files or Parquet files. This backend provides fault tolerance.
 //!
 //! If nothing else is configured, the system will use the HashMapStateBackend.
 //!
-//! Note that S3StateBackend and EFSStateBackend allow keeping very large state,
+//! Note that S3StateBackend and EfsStateBackend allow keeping very large state,
 //! compared to the HashMapStateBackend that keeps state in memory. This also
 //! means, however, that the maximum throughput that can be achieved will be
 //! lower with this state backend. All reads/writes from/to this backend have to
@@ -63,7 +63,7 @@ mod s3;
 pub use s3::S3StateBackend;
 
 mod efs;
-pub use efs::EFSStateBackend;
+pub use efs::EfsStateBackend;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -101,5 +101,12 @@ impl StateBackend for HashMapStateBackend {
 
     fn as_mut_any(&mut self) -> &mut dyn Any {
         self
+    }
+}
+
+impl HashMapStateBackend {
+    /// Creates a new HashMapStateBackend.
+    pub fn new() -> Self {
+        Self {}
     }
 }
