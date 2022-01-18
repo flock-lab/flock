@@ -152,12 +152,40 @@ pub async fn handler(
     let metadata = event.metadata.clone();
     let uuid = event.uuid.clone();
 
+    let input = prepare_data_sources(ctx, arena, event).await?;
+    if input.is_empty() {
+        let info = format!(
+            "[Ok] Function {}: aggregation has not yet been completed.",
+            ctx.name
+        );
+        info!("{}", info);
+        return Ok(json!({ "response": info }));
+    }
+
+    let output = collect(ctx, input).await?;
+    invoke_next_functions(ctx, query_number, uuid, metadata, output).await
+}
+
+/// Prepare the data sources to the executor in the current function.
+///
+/// # Arguments
+/// * `ctx` - The runtime context of the current function.
+/// * `arena` - The global memory arena for the function across invocations.
+/// * `event` - The payload of the current function invocation.
+///
+/// # Returns
+/// The input data for the executor in the current function.
+async fn prepare_data_sources(
+    ctx: &mut ExecutionContext,
+    arena: &mut Arena,
+    event: Payload,
+) -> Result<Vec<Vec<Vec<RecordBatch>>>> {
     let mut input = vec![];
-    if let Ok(batch) = infer_side_input(&metadata).await {
+    if let Ok(batch) = infer_side_input(&event.metadata).await {
         input.push(vec![batch]);
     }
 
-    if let Some((bucket, key)) = infer_s3_mode(&metadata) {
+    if let Some((bucket, key)) = infer_s3_mode(&event.metadata) {
         info!("Reading payload from S3...");
         let payload = read_payload_from_s3(bucket, key).await?;
         info!("[OK] Received payload from S3.");
@@ -168,10 +196,7 @@ pub async fn handler(
 
         input.push(vec![r1]);
         input.push(vec![r2]);
-    } else if match &ctx.next {
-        CloudFunction::Sink(..) | CloudFunction::Lambda(..) => true,
-        CloudFunction::Group(..) => false,
-    } {
+    } else if is_aggregate_function(ctx) {
         // ressemble data packets to a single window.
         let (ready, uuid) = arena.reassemble(event);
         if ready {
@@ -181,9 +206,7 @@ pub async fn handler(
                 .into_iter()
                 .for_each(|b| input.push(b));
         } else {
-            let response = "Window data collection has not been completed.".to_string();
-            info!("{}", response);
-            return Ok(json!({ "response": response }));
+            return Ok(vec![]);
         }
     } else {
         // data packet is an individual event for the current function.
@@ -192,8 +215,7 @@ pub async fn handler(
         input.push(vec![r2]);
     }
 
-    let output = collect(ctx, input).await?;
-    invoke_next_functions(ctx, query_number, uuid, metadata, output).await
+    Ok(input)
 }
 
 /// Invoke the next functions in the dataflow pipeline.
@@ -241,20 +263,18 @@ async fn invoke_next_functions(
                 // can be executed by a single lambda function for the next stage of the
                 // dataflow pipeline.
                 let output = Box::new(output);
-                let tasks = (0..output.len())
+                let size = output.len();
+                let mut uuid_builder =
+                    UuidBuilder::new_with_ts(group_name, Utc::now().timestamp(), size);
+                let tasks = (0..size)
                     .map(|i| {
                         let data = output.clone();
                         let function_name = group_name.clone();
                         let meta = metadata.clone();
                         let invoke_type = invocation_type.clone();
+                        let uuid = uuid_builder.next_uuid();
                         tokio::spawn(async move {
-                            let mut payload = to_payload(
-                                &data[i],
-                                &[],
-                                UuidBuilder::new_with_ts(&function_name, Utc::now().timestamp(), 1)
-                                    .next_uuid(),
-                                sync,
-                            );
+                            let mut payload = to_payload(&data[i], &[], uuid, sync);
                             payload.query_number = query_number;
                             payload.metadata = meta;
                             let bytes = serde_json::to_vec(&payload)?;

@@ -888,18 +888,21 @@ pub async fn elementwise_tasks(
 
                 ctx.feed_data_sources(&input).await?;
                 let output = Box::new(ctx.execute_partitioned().await?);
-                let tasks = (0..output[0].len())
+                let size = output[0].len();
+                let mut uuid_builder =
+                    UuidBuilder::new_with_ts(group_name, Utc::now().timestamp(), size);
+                let tasks = (0..size)
                     .map(|i| {
                         let data = output.clone();
                         let function_name = group_name.clone();
                         let meta = metadata.clone();
                         let invoke_type = invocation_type.clone();
+                        let uuid = uuid_builder.next_uuid();
                         tokio::spawn(async move {
                             let mut payload = to_payload(
                                 &data[0][i],
                                 if data.len() == 1 { &[] } else { &data[1][i] },
-                                UuidBuilder::new_with_ts(&function_name, Utc::now().timestamp(), 1)
-                                    .next_uuid(),
+                                uuid,
                                 sync,
                             );
                             payload.query_number = query_number;
