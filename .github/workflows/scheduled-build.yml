@@ -58,7 +58,7 @@ jobs:
           key: ${{ runner.os }}-${{ matrix.TARGET }}-target-cache-${{ matrix.RUST }}-
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-01-16
+          toolchain: nightly
           override: true
           components: rustfmt
       # - name: update all third-party dependencies
