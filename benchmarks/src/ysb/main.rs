@@ -247,7 +247,7 @@ mod tests {
         };
 
         flock_ctx
-            .feed_data_sources(&[
+            .feed_data_sources(vec![
                 vec![event_bytes_to_batch(
                     &event.ad_events,
                     YSB_AD_EVENT.clone(),

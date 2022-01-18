@@ -436,7 +436,7 @@ mod tests {
             };
 
             flock_ctx
-                .feed_data_sources(&[
+                .feed_data_sources(vec![
                     vec![event_bytes_to_batch(&event.bids, NEXMARK_BID.clone(), 1024)],
                     vec![event_bytes_to_batch(
                         &event.persons,

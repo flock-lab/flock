@@ -306,7 +306,7 @@ mod tests {
         for (i, stage) in stages.into_iter().enumerate() {
             println!("=== Query Stage {:02} ===", i);
             let mut ctx = stage.context.clone().unwrap();
-            ctx.feed_data_sources(&input).await?;
+            ctx.feed_data_sources(input).await?;
             input = ctx
                 .execute()
                 .await?
@@ -416,7 +416,7 @@ mod tests {
 
         // === Query Stage 0 ===
         let mut ctx = stages[0].context.clone().unwrap();
-        ctx.feed_data_sources(&input).await?;
+        ctx.feed_data_sources(input.clone()).await?;
         // We **MUST USE** execute_partitioned() instead of execute() here.
         let output = ctx.execute_partitioned().await?;
         assert!(output.len() == 2);
@@ -427,7 +427,7 @@ mod tests {
         let mut ctx = stages[1].context.clone().unwrap();
         let mut result = vec![];
         for i in 0..num_partitions {
-            ctx.feed_data_sources(&[vec![output[0][i].clone()], vec![output[1][i].clone()]])
+            ctx.feed_data_sources(vec![vec![output[0][i].clone()], vec![output[1][i].clone()]])
                 .await?;
             let sliced_output = ctx.execute().await?;
             ctx.clean_data_sources().await?;
@@ -441,7 +441,7 @@ mod tests {
 
         // Local execution mode
         let mut launcher = LocalLauncher::new(&query).await?;
-        launcher.feed_data_sources(&input);
+        launcher.feed_data_sources(input);
         let batches = launcher.collect().await?;
 
         assert_batches_sorted_eq!(expected, &batches);

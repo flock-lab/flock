@@ -94,8 +94,9 @@ pub async fn collect(
     if input_partitions.is_empty() {
         Ok(vec![])
     } else {
-        ctx.feed_data_sources(&input_partitions).await?;
+        ctx.feed_data_sources(input_partitions).await?;
         let output = ctx.execute().await?;
+        ctx.clean_data_sources().await?;
         info!("[OK] The execution is finished.");
         if !output.is_empty() && !output[0].is_empty() {
             info!("[Ok] Output schema: {:?}", output[0][0].schema());

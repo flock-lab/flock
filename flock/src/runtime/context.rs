@@ -209,7 +209,7 @@ impl ExecutionContext {
                         .as_mut_any()
                         .downcast_mut::<MemoryExec>()
                         .unwrap()
-                        .set_partitions(&vec![vec![RecordBatch::new_empty(schema)]]);
+                        .set_partitions(vec![vec![RecordBatch::new_empty(schema)]]);
                 }
             }
 
@@ -223,16 +223,22 @@ impl ExecutionContext {
     }
 
     /// Feeds all data sources to the execution plan.
-    pub async fn feed_data_sources(&mut self, sources: &[Vec<Vec<RecordBatch>>]) -> Result<()> {
+    pub async fn feed_data_sources(
+        &mut self,
+        mut sources: Vec<Vec<Vec<RecordBatch>>>,
+    ) -> Result<()> {
         // Breadth-first search
         let mut queue = VecDeque::new();
         self.plan().await?.into_iter().for_each(|plan| {
             queue.push_back(plan);
         });
+
+        let mut found = false;
+        let mut index = 0xFFFFFFFF;
         while !queue.is_empty() {
             let mut plan = queue.pop_front().unwrap();
             if plan.children().is_empty() {
-                for partition in sources {
+                for (i, partition) in sources.iter().enumerate() {
                     let mut schema = Arc::new(Schema::new(vec![]));
                     let mut flag = false;
                     for p in partition.iter().filter(|p| !p.is_empty()) {
@@ -247,14 +253,21 @@ impl ExecutionContext {
                     }
 
                     if compare_schema(plan.schema(), schema) {
-                        unsafe {
-                            Arc::get_mut_unchecked(&mut plan)
-                                .as_mut_any()
-                                .downcast_mut::<MemoryExec>()
-                                .unwrap()
-                                .set_partitions(partition);
-                        }
+                        index = i;
+                        found = true;
                         break;
+                    }
+                }
+
+                if found {
+                    unsafe {
+                        Arc::get_mut_unchecked(&mut plan)
+                            .as_mut_any()
+                            .downcast_mut::<MemoryExec>()
+                            .unwrap()
+                            .set_partitions(sources.remove(index));
+                        index = 0xFFFFFFFF;
+                        found = false;
                     }
                 }
             }
@@ -393,7 +406,7 @@ mod tests {
             next: CloudFunction::Sink(DataSinkType::Blackhole),
             ..Default::default()
         };
-        ctx.feed_data_sources(&[vec![vec![batch]]]).await?;
+        ctx.feed_data_sources(vec![vec![vec![batch]]]).await?;
 
         let batches = ctx.execute().await?;
 
@@ -478,7 +491,7 @@ mod tests {
         let de_json = unmarshal(&se_json)?;
         assert_eq!(ctx, de_json);
 
-        ctx.feed_data_sources(&[vec![vec![batch1]], vec![vec![batch2]]])
+        ctx.feed_data_sources(vec![vec![vec![batch1]], vec![vec![batch2]]])
             .await?;
 
         let batches = ctx.execute().await?;

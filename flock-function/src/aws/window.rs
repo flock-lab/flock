@@ -886,7 +886,7 @@ pub async fn elementwise_tasks(
                     }
                 }
 
-                ctx.feed_data_sources(&input).await?;
+                ctx.feed_data_sources(input).await?;
                 let output = Box::new(ctx.execute_partitioned().await?);
                 let size = output[0].len();
                 let mut uuid_builder =
@@ -925,6 +925,8 @@ pub async fn elementwise_tasks(
                     })
                     .collect::<Vec<tokio::task::JoinHandle<Result<()>>>>();
                 futures::future::join_all(tasks).await;
+                // clear the data sources.
+                ctx.clean_data_sources().await?;
             }
         } else {
             // Calculate the total data packets to be sent.
