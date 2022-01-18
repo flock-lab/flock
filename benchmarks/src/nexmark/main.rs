@@ -185,12 +185,14 @@ pub async fn create_nexmark_functions(
         plan: CloudExecutionPlan::new(vec![FLOCK_EMPTY_PLAN.clone()], s3.clone()),
         name: FLOCK_DATA_SOURCE_FUNC_NAME.clone(),
         next: next_func_name.clone(),
+        ..Default::default()
     };
 
     let nexmark_worker_ctx = ExecutionContext {
         plan: CloudExecutionPlan::new(vec![plan.clone()], s3.clone()),
         name: worker_func_name.clone(),
         next: CloudFunction::Sink(DataSinkType::new(&opt.data_sink_type)?),
+        ..Default::default()
     };
 
     // Create the function for the nexmark source generator.

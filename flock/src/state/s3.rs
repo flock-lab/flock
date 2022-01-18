@@ -14,13 +14,26 @@
 //! Use S3 state backend to manage the state of the execution engine.
 
 use super::StateBackend;
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+use std::any::Any;
 
 /// S3StateBackend is a state backend that stores query states in Amazon S3.
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct S3StateBackend {}
 
+#[async_trait]
+#[typetag::serde(name = "s3_state_backend")]
 impl StateBackend for S3StateBackend {
-    /// The type of the state backend.
-    fn name() -> &'static str {
-        "S3StateBackend"
+    fn name(&self) -> String {
+        "S3StateBackend".to_string()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_mut_any(&mut self) -> &mut dyn Any {
+        self
     }
 }

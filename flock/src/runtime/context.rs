@@ -18,6 +18,7 @@ use crate::datasink::DataSinkType;
 use crate::encoding::Encoding;
 use crate::error::{FlockError, Result};
 use crate::runtime::plan::CloudExecutionPlan;
+use crate::state::*;
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::physical_plan::memory::MemoryExec;
@@ -80,10 +81,10 @@ impl Default for CloudFunction {
 }
 
 /// Cloud execution context.
-#[derive(Default, Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ExecutionContext {
     /// The execution plan on cloud.
-    pub plan: CloudExecutionPlan,
+    pub plan:          CloudExecutionPlan,
     /// Cloud Function name in the current execution context.
     ///
     /// |      Cloud Function Naming Convention       |
@@ -104,9 +105,22 @@ pub struct ExecutionContext {
     /// at a certain moment.
     ///
     /// SX72HzqFz1Qij4bP-00-00
-    pub name: CloudFunctionName,
+    pub name:          CloudFunctionName,
     /// Lambda function name(s) for next invocation(s).
-    pub next: CloudFunction,
+    pub next:          CloudFunction,
+    /// The current state of the execution context.
+    pub state_backend: Arc<dyn StateBackend>,
+}
+
+impl Default for ExecutionContext {
+    fn default() -> Self {
+        ExecutionContext {
+            plan:          CloudExecutionPlan::default(),
+            name:          CloudFunctionName::default(),
+            next:          CloudFunction::default(),
+            state_backend: Arc::new(HashMapStateBackend::default()),
+        }
+    }
 }
 
 impl PartialEq for ExecutionContext {
@@ -334,6 +348,7 @@ mod tests {
             plan: CloudExecutionPlan::new(vec![plan], None),
             name: "test".to_string(),
             next: CloudFunction::Sink(DataSinkType::Blackhole),
+            ..Default::default()
         };
         ctx.feed_data_sources(&[vec![vec![batch]]]).await?;
 
@@ -414,6 +429,7 @@ mod tests {
             plan: CloudExecutionPlan::new(vec![plan], None),
             name: "test".to_string(),
             next: CloudFunction::Sink(DataSinkType::Blackhole),
+            ..Default::default()
         };
         let se_json = marshal(&ctx, Encoding::default())?;
         let de_json = unmarshal(&se_json)?;

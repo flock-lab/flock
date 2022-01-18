@@ -164,6 +164,7 @@ impl AwsLambdaLauncher {
                     plan: CloudExecutionPlan::new(node.stage.clone(), None),
                     name: format!("{}-{:02}", query_code, count - 1 - i),
                     next,
+                    ..Default::default()
                 };
 
                 node.context = Some(ctx);
@@ -180,12 +181,14 @@ impl AwsLambdaLauncher {
                     format!("{}-{:02}", query_code, 0),
                     *FLOCK_FUNCTION_CONCURRENCY,
                 )),
+                ..Default::default()
             };
             let _worker_ctx = ExecutionContext {
                 // TODO: add option to store the execution plan in S3.
                 plan: CloudExecutionPlan::new(vec![self.plan.clone()], None),
                 name: format!("{}-{:02}", query_code, 0),
                 next: CloudFunction::Sink(self.sink_type.clone()),
+                ..Default::default()
             };
         }
 

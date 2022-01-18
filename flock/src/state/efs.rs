@@ -14,14 +14,27 @@
 //! Use EFS state backend to manage the state of the execution engine.
 
 use super::StateBackend;
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+use std::any::Any;
 
 /// EFSStateBackend is a state backend that stores query states in Amazon
 /// Elastic File System (EFS).
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct EFSStateBackend {}
 
+#[async_trait]
+#[typetag::serde(name = "efs_state_backend")]
 impl StateBackend for EFSStateBackend {
-    /// The type of the state backend.
-    fn name() -> &'static str {
-        "EFSStateBackend"
+    fn name(&self) -> String {
+        "EFSStateBackend".to_string()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_mut_any(&mut self) -> &mut dyn Any {
+        self
     }
 }

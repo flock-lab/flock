@@ -31,7 +31,7 @@
 //!   store the values, triggers, etc. This backend does not provide any
 //!   guarantees on fault tolerance. This backend is always available, which
 //!   doesn't need to be specified.
-//!  
+//!
 //! - `S3StateBackend`: holds in-flight data in AWS S3 buckets. Unlike the Arena
 //!   backend, data is stored as serialized byte arrays, or CSV files or Parquet
 //!   files. This backend provides fault tolerance.
@@ -65,18 +65,41 @@ pub use s3::S3StateBackend;
 mod efs;
 pub use efs::EFSStateBackend;
 
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+use std::any::Any;
+use std::fmt::Debug;
+
 /// The state backend trait defines the interface for state backends.
-pub trait StateBackend {
+#[async_trait]
+#[typetag::serde(tag = "state_backend")]
+pub trait StateBackend: Debug + Send + Sync {
     /// The type of the state backend.
-    fn name() -> &'static str;
+    fn name(&self) -> String;
+    /// Returns the state backend as [`Any`](std::any::Any) so that it can be
+    /// downcast to a specific implementation.
+    fn as_any(&self) -> &dyn Any;
+    /// Return the value as an mutable Any to allow for downcasts to specific
+    /// implementations.
+    fn as_mut_any(&mut self) -> &mut dyn Any;
 }
 
 /// The default state backend.
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct HashMapStateBackend {}
 
+#[async_trait]
+#[typetag::serde(name = "hashmap_state_backend")]
 impl StateBackend for HashMapStateBackend {
-    /// The type of the state backend.
-    fn name() -> &'static str {
-        "HashMapStateBackend"
+    fn name(&self) -> String {
+        "HashMapStateBackend".to_string()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_mut_any(&mut self) -> &mut dyn Any {
+        self
     }
 }
