@@ -11,7 +11,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-//! EFS state backend to manage the state of the execution engine.
+//! Use EFS state backend to manage the state of the execution engine.
 
 use super::StateBackend;
 
@@ -21,7 +21,7 @@ pub struct EFSStateBackend {}
 
 impl StateBackend for EFSStateBackend {
     /// The type of the state backend.
-    fn state_backend_name() -> &'static str {
+    fn name() -> &'static str {
         "EFSStateBackend"
     }
 }

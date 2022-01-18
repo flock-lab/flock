@@ -11,7 +11,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-//! S3 state backend to manage the state of the execution engine.
+//! Use S3 state backend to manage the state of the execution engine.
 
 use super::StateBackend;
 
@@ -20,7 +20,7 @@ pub struct S3StateBackend {}
 
 impl StateBackend for S3StateBackend {
     /// The type of the state backend.
-    fn state_backend_name() -> &'static str {
+    fn name() -> &'static str {
         "S3StateBackend"
     }
 }

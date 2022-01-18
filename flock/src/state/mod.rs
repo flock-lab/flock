@@ -68,7 +68,7 @@ pub use efs::EFSStateBackend;
 /// The state backend trait defines the interface for state backends.
 pub trait StateBackend {
     /// The type of the state backend.
-    fn state_backend_name() -> &'static str;
+    fn name() -> &'static str;
 }
 
 /// The default state backend.
@@ -76,7 +76,7 @@ pub struct HashMapStateBackend {}
 
 impl StateBackend for HashMapStateBackend {
     /// The type of the state backend.
-    fn state_backend_name() -> &'static str {
+    fn name() -> &'static str {
         "HashMapStateBackend"
     }
 }
