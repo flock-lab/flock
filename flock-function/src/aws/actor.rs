@@ -11,9 +11,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use crate::{consistent_hash_context, ConsistentHashContext, CONSISTENT_HASH_CONTEXT};
+use chrono::Utc;
 use datafusion::arrow::csv::reader::ReaderBuilder;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::physical_plan::Partitioning::RoundRobinBatch;
+use flock::aws::lambda;
 use flock::aws::s3;
 use flock::prelude::*;
 use lazy_static::lazy_static;
@@ -109,6 +112,24 @@ async fn read_payload_from_s3(bucket: String, key: String) -> Result<Payload> {
     Ok(payload)
 }
 
+/// Check the current function type.
+///
+/// If the function type is `lambda`, the function uses the default lambda
+/// concurrency. If the function type is `group`, the function is an aggregator
+/// and the concurrency is 1.
+fn is_aggregate_function(ctx: &ExecutionContext) -> bool {
+    // if the function name format is "<query code>-<plan index>-<group index>",
+    // then it is an aggregate function.
+    let dash_count = ctx.name.matches('-').count();
+    if dash_count == 2 {
+        true
+    } else if dash_count == 1 {
+        false
+    } else {
+        panic!("Invalid function name: {}", ctx.name);
+    }
+}
+
 /// The endpoint for worker function invocations. The worker function
 /// invocations are invoked by the data source generator or the former stage of
 /// the dataflow pipeline.
@@ -126,14 +147,17 @@ pub async fn handler(
     event: Payload,
 ) -> Result<Value> {
     info!("Receiving a data packet: {:?}", event.uuid);
-    let tid = event.uuid.tid.clone();
+
+    let query_number = event.query_number;
+    let metadata = event.metadata.clone();
+    let uuid = event.uuid.clone();
 
     let mut input = vec![];
-    if let Ok(batch) = infer_side_input(&event.metadata).await {
+    if let Ok(batch) = infer_side_input(&metadata).await {
         input.push(vec![batch]);
     }
 
-    if let Some((bucket, key)) = infer_s3_mode(&event.metadata) {
+    if let Some((bucket, key)) = infer_s3_mode(&metadata) {
         info!("Reading payload from S3...");
         let payload = read_payload_from_s3(bucket, key).await?;
         info!("[OK] Received payload from S3.");
@@ -169,6 +193,34 @@ pub async fn handler(
     }
 
     let output = collect(ctx, input).await?;
+    invoke_next_functions(ctx, query_number, uuid, metadata, output).await
+}
+
+/// Invoke the next functions in the dataflow pipeline.
+///
+/// # Arguments
+/// * `ctx` - The runtime context of the current function.
+/// * `query_num` - The query number of the current request (for testing).
+/// * `uuid` - The UUID of the current payload.
+/// * `metadata` - The metadata of the current request.
+/// * `output` - The output of the current function.
+///
+/// # Returns
+/// A JSON object that contains the return value of the current function.
+async fn invoke_next_functions(
+    ctx: &ExecutionContext,
+    query_number: Option<usize>,
+    uuid: Uuid,
+    metadata: Option<HashMap<String, String>>,
+    output: Vec<Vec<RecordBatch>>,
+) -> Result<Value> {
+    let (ring, _) = consistent_hash_context!();
+    let sync = infer_invocation_type(&metadata)?;
+    let invocation_type = if sync {
+        FLOCK_LAMBDA_SYNC_CALL.to_string()
+    } else {
+        FLOCK_LAMBDA_ASYNC_CALL.to_string()
+    };
 
     match &ctx.next {
         CloudFunction::Sink(sink_type) => {
@@ -182,25 +234,98 @@ pub async fn handler(
                 Ok(json!({ "response": "No data to sink." }))
             }
         }
-        _ => {
-            let mut batches = coalesce_batches(
-                output,
-                FLOCK_CONF["lambda"]["payload_batch_size"]
-                    .parse::<usize>()
-                    .unwrap(),
-            )
-            .await?;
-            assert_eq!(1, batches.len());
-            // call the next stage of the dataflow graph.
-            invoke_next_functions(ctx, &mut batches[0])?;
-            Ok(json!({"name": &ctx.name, "tid": tid}))
+        CloudFunction::Lambda(group_name) => {
+            if is_aggregate_function(ctx) {
+                // If the current function is an aggregator, which means its output
+                // can be repartitioned to multiple partitions, and each partition
+                // can be executed by a single lambda function for the next stage of the
+                // dataflow pipeline.
+                let output = Box::new(output);
+                let tasks = (0..output.len())
+                    .map(|i| {
+                        let data = output.clone();
+                        let function_name = group_name.clone();
+                        let meta = metadata.clone();
+                        let invoke_type = invocation_type.clone();
+                        tokio::spawn(async move {
+                            let mut payload = to_payload(
+                                &data[i],
+                                &[],
+                                UuidBuilder::new_with_ts(&function_name, Utc::now().timestamp(), 1)
+                                    .next_uuid(),
+                                sync,
+                            );
+                            payload.query_number = query_number;
+                            payload.metadata = meta;
+                            let bytes = serde_json::to_vec(&payload)?;
+
+                            info!(
+                                "[OK] {} function's payload bytes: {}",
+                                function_name,
+                                bytes.len()
+                            );
+                            lambda::invoke_function(
+                                &function_name,
+                                &invoke_type,
+                                Some(bytes.into()),
+                            )
+                            .await?;
+                            Ok(())
+                        })
+                    })
+                    .collect::<Vec<tokio::task::JoinHandle<Result<()>>>>();
+                futures::future::join_all(tasks).await;
+            } else {
+                // If the current function is not an aggregator, which means its
+                // output CANNOT be repartitioned to multiple partitions,
+                // otherwise the future aggregator CANNOT ganuantee the
+                // correctness of the result. Therefore, we have to reuse the
+                // uuid of the current payload to the next function.
+                let mut payload = to_payload(
+                    &output.into_iter().flatten().collect::<Vec<_>>(),
+                    &[],
+                    uuid,
+                    sync,
+                );
+                payload.query_number = query_number;
+                payload.metadata = metadata;
+                let bytes = serde_json::to_vec(&payload)?;
+
+                info!(
+                    "[OK] {} function's payload bytes: {}",
+                    group_name,
+                    bytes.len()
+                );
+                lambda::invoke_function(group_name, &invocation_type, Some(bytes.into())).await?;
+            }
+            Ok(json!({
+                "response": format!("next function: {}", group_name)
+            }))
+        }
+        CloudFunction::Group(..) => {
+            let function_name = ring.get(&uuid.tid).expect("hash ring failure.").to_string();
+            let mut payload = to_payload(
+                &output.into_iter().flatten().collect::<Vec<_>>(),
+                &[],
+                uuid,
+                sync,
+            );
+            payload.query_number = query_number;
+            payload.metadata = metadata;
+            let bytes = serde_json::to_vec(&payload)?;
+
+            info!(
+                "[OK] {} function's payload bytes: {}",
+                function_name,
+                bytes.len()
+            );
+            lambda::invoke_function(&function_name, &invocation_type, Some(bytes.into())).await?;
+
+            Ok(json!({
+                "response": format!("next function: {}", function_name)
+            }))
         }
     }
-}
-
-/// Invoke functions in the next stage of the data flow.
-fn invoke_next_functions(_: &ExecutionContext, _: &mut Vec<RecordBatch>) -> Result<()> {
-    unimplemented!();
 }
 
 /// Infer the invocation mode of the function.

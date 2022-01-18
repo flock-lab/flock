@@ -114,8 +114,9 @@ pub async fn tumbling_window_tasks(
                     sync,
                 ))?;
                 info!(
-                    "[OK] Event {} - function payload bytes: {}",
+                    "[OK] Event {} - {} function payload bytes: {}",
                     eid,
+                    function_name,
                     payload.len()
                 );
                 lambda::invoke_function(&function_name, &invocation_type, Some(payload.into()))
@@ -217,8 +218,9 @@ pub async fn hopping_window_tasks(
                     sync,
                 ))?;
                 info!(
-                    "[OK] Event {} - function payload bytes: {}",
+                    "[OK] Event {} - {} function's payload bytes: {}",
                     eid,
+                    function_name,
                     payload.len()
                 );
                 lambda::invoke_function(&function_name, &invocation_type, Some(payload.into()))
@@ -497,8 +499,9 @@ pub async fn session_window_tasks(
                             sync,
                         ))?;
                         info!(
-                            "[OK] Event {} - function payload bytes: {}",
+                            "[OK] Event {} - {} function's payload bytes: {}",
                             eid,
+                            function_name,
                             payload.len()
                         );
                         lambda::invoke_function(&function_name, &invoke_type, Some(payload.into()))
@@ -799,8 +802,9 @@ pub async fn global_window_tasks(
                             sync,
                         ))?;
                         info!(
-                            "[OK] Event {} - function payload bytes: {}",
+                            "[OK] Event {} - {} function's payload bytes: {}",
                             eid,
+                            function_name,
                             payload.len()
                         );
                         lambda::invoke_function(&function_name, &invoke_type, Some(payload.into()))
@@ -860,7 +864,11 @@ pub async fn elementwise_tasks(
                     events.select_event_to_payload(epoch, 0, query_number, uuid, sync)?;
                 payload.metadata = metadata.clone();
                 let bytes = serde_json::to_vec(&payload)?;
-                info!("[OK] function payload bytes: {}", bytes.len());
+                info!(
+                    "[OK] {} function's payload bytes: {}",
+                    function_name,
+                    bytes.len()
+                );
                 lambda::invoke_function(&function_name, &invocation_type, Some(bytes.into()))
                     .await?;
             } else {
@@ -898,7 +906,11 @@ pub async fn elementwise_tasks(
                             payload.metadata = meta;
 
                             let bytes = serde_json::to_vec(&payload)?;
-                            info!("[OK] function payload bytes: {}", bytes.len());
+                            info!(
+                                "[OK] {} function's payload bytes: {}",
+                                function_name,
+                                bytes.len()
+                            );
                             lambda::invoke_function(
                                 &function_name,
                                 &invoke_type,
@@ -949,7 +961,12 @@ pub async fn elementwise_tasks(
                 payload.metadata = metadata.clone();
 
                 let bytes = serde_json::to_vec(&payload)?;
-                info!("[OK] Event {} - function payload bytes: {}", i, bytes.len());
+                info!(
+                    "[OK] Event {} - {} function's payload bytes: {}",
+                    i,
+                    function_name,
+                    bytes.len()
+                );
                 lambda::invoke_function(&function_name, &invocation_type, Some(bytes.into()))
                     .await?;
             }
