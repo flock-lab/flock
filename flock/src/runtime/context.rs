@@ -19,7 +19,7 @@ use crate::encoding::Encoding;
 use crate::error::{FlockError, Result};
 use crate::runtime::plan::CloudExecutionPlan;
 use crate::state::*;
-use datafusion::arrow::datatypes::SchemaRef;
+use datafusion::arrow::datatypes::{Schema, SchemaRef};
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::ExecutionPlan;
@@ -192,6 +192,36 @@ impl ExecutionContext {
             .collect())
     }
 
+    /// Clean the data source in the given context.
+    pub async fn clean_data_sources(&mut self) -> Result<()> {
+        // Breadth-first search
+        let mut queue = VecDeque::new();
+        self.plan().await?.into_iter().for_each(|plan| {
+            queue.push_back(plan);
+        });
+
+        while !queue.is_empty() {
+            let mut plan = queue.pop_front().unwrap();
+            if plan.children().is_empty() {
+                let schema = plan.schema().clone();
+                unsafe {
+                    Arc::get_mut_unchecked(&mut plan)
+                        .as_mut_any()
+                        .downcast_mut::<MemoryExec>()
+                        .unwrap()
+                        .set_partitions(&vec![vec![RecordBatch::new_empty(schema)]]);
+                }
+            }
+
+            plan.children()
+                .iter()
+                .enumerate()
+                .for_each(|(i, _)| queue.push_back(plan.children()[i].clone()));
+        }
+
+        Ok(())
+    }
+
     /// Feeds all data sources to the execution plan.
     pub async fn feed_data_sources(&mut self, sources: &[Vec<Vec<RecordBatch>>]) -> Result<()> {
         // Breadth-first search
@@ -200,12 +230,25 @@ impl ExecutionContext {
             queue.push_back(plan);
         });
         while !queue.is_empty() {
-            let mut p = queue.pop_front().unwrap();
-            if p.children().is_empty() {
+            let mut plan = queue.pop_front().unwrap();
+            if plan.children().is_empty() {
                 for partition in sources {
-                    if compare_schema(p.schema(), partition[0][0].schema()) {
+                    let mut schema = Arc::new(Schema::new(vec![]));
+                    let mut flag = false;
+                    for p in partition.iter().filter(|p| !p.is_empty()) {
+                        if let Some(b) = p.iter().next() {
+                            schema = b.schema();
+                            flag = true;
+                            break;
+                        }
+                    }
+                    if !flag {
+                        continue;
+                    }
+
+                    if compare_schema(plan.schema(), schema) {
                         unsafe {
-                            Arc::get_mut_unchecked(&mut p)
+                            Arc::get_mut_unchecked(&mut plan)
                                 .as_mut_any()
                                 .downcast_mut::<MemoryExec>()
                                 .unwrap()
@@ -216,10 +259,10 @@ impl ExecutionContext {
                 }
             }
 
-            p.children()
+            plan.children()
                 .iter()
                 .enumerate()
-                .for_each(|(i, _)| queue.push_back(p.children()[i].clone()));
+                .for_each(|(i, _)| queue.push_back(plan.children()[i].clone()));
         }
 
         Ok(())

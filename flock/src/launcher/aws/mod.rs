@@ -430,6 +430,7 @@ mod tests {
             ctx.feed_data_sources(&[vec![output[0][i].clone()], vec![output[1][i].clone()]])
                 .await?;
             let sliced_output = ctx.execute().await?;
+            ctx.clean_data_sources().await?;
             assert!(sliced_output.len() == 1);
             result.push(sliced_output.into_iter().next().unwrap());
         }
