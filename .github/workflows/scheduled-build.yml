@@ -2,8 +2,8 @@ name: release
 
 on:
   schedule:
-    # Runs "At minute 0 past every 2nd hour." (see https://crontab.guru)
-    - cron: "0 */2 * * *"
+    # Runs "At 12:00." (see https://crontab.guru)
+    - cron: "0 12 * * *"
 
 env:
   CARGO_TERM_COLOR: always
@@ -56,11 +56,11 @@ jobs:
           # and thus are specific for a particular OS, arch and rust version.
           path: target
           key: ${{ runner.os }}-${{ matrix.TARGET }}-target-cache-${{ matrix.RUST }}-
-      - name: Setup Rust toolchain
-        run: |
-          rustup toolchain install ${{ matrix.RUST }}
-          rustup default ${{ matrix.RUST }}
-          rustup component add rustfmt
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+          components: rustfmt
       # - name: update all third-party dependencies
       #   run: |
       #     cargo update

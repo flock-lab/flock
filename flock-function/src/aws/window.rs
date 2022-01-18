@@ -114,8 +114,9 @@ pub async fn tumbling_window_tasks(
                     sync,
                 ))?;
                 info!(
-                    "[OK] Event {} - function payload bytes: {}",
+                    "[OK] Event {} - {} function payload bytes: {}",
                     eid,
+                    function_name,
                     payload.len()
                 );
                 lambda::invoke_function(&function_name, &invocation_type, Some(payload.into()))
@@ -217,8 +218,9 @@ pub async fn hopping_window_tasks(
                     sync,
                 ))?;
                 info!(
-                    "[OK] Event {} - function payload bytes: {}",
+                    "[OK] Event {} - {} function's payload bytes: {}",
                     eid,
+                    function_name,
                     payload.len()
                 );
                 lambda::invoke_function(&function_name, &invocation_type, Some(payload.into()))
@@ -497,8 +499,9 @@ pub async fn session_window_tasks(
                             sync,
                         ))?;
                         info!(
-                            "[OK] Event {} - function payload bytes: {}",
+                            "[OK] Event {} - {} function's payload bytes: {}",
                             eid,
+                            function_name,
                             payload.len()
                         );
                         lambda::invoke_function(&function_name, &invoke_type, Some(payload.into()))
@@ -799,8 +802,9 @@ pub async fn global_window_tasks(
                             sync,
                         ))?;
                         info!(
-                            "[OK] Event {} - function payload bytes: {}",
+                            "[OK] Event {} - {} function's payload bytes: {}",
                             eid,
+                            function_name,
                             payload.len()
                         );
                         lambda::invoke_function(&function_name, &invoke_type, Some(payload.into()))
@@ -860,7 +864,11 @@ pub async fn elementwise_tasks(
                     events.select_event_to_payload(epoch, 0, query_number, uuid, sync)?;
                 payload.metadata = metadata.clone();
                 let bytes = serde_json::to_vec(&payload)?;
-                info!("[OK] function payload bytes: {}", bytes.len());
+                info!(
+                    "[OK] {} function's payload bytes: {}",
+                    function_name,
+                    bytes.len()
+                );
                 lambda::invoke_function(&function_name, &invocation_type, Some(bytes.into()))
                     .await?;
             } else {
@@ -880,25 +888,32 @@ pub async fn elementwise_tasks(
 
                 ctx.feed_data_sources(&input).await?;
                 let output = Box::new(ctx.execute_partitioned().await?);
-                let tasks = (0..output[0].len())
+                let size = output[0].len();
+                let mut uuid_builder =
+                    UuidBuilder::new_with_ts(group_name, Utc::now().timestamp(), size);
+                let tasks = (0..size)
                     .map(|i| {
                         let data = output.clone();
                         let function_name = group_name.clone();
                         let meta = metadata.clone();
                         let invoke_type = invocation_type.clone();
+                        let uuid = uuid_builder.next_uuid();
                         tokio::spawn(async move {
                             let mut payload = to_payload(
                                 &data[0][i],
                                 if data.len() == 1 { &[] } else { &data[1][i] },
-                                UuidBuilder::new_with_ts(&function_name, Utc::now().timestamp(), 1)
-                                    .next_uuid(),
+                                uuid,
                                 sync,
                             );
                             payload.query_number = query_number;
                             payload.metadata = meta;
 
                             let bytes = serde_json::to_vec(&payload)?;
-                            info!("[OK] function payload bytes: {}", bytes.len());
+                            info!(
+                                "[OK] {} function's payload bytes: {}",
+                                function_name,
+                                bytes.len()
+                            );
                             lambda::invoke_function(
                                 &function_name,
                                 &invoke_type,
@@ -949,7 +964,12 @@ pub async fn elementwise_tasks(
                 payload.metadata = metadata.clone();
 
                 let bytes = serde_json::to_vec(&payload)?;
-                info!("[OK] Event {} - function payload bytes: {}", i, bytes.len());
+                info!(
+                    "[OK] Event {} - {} function's payload bytes: {}",
+                    i,
+                    function_name,
+                    bytes.len()
+                );
                 lambda::invoke_function(&function_name, &invocation_type, Some(bytes.into()))
                     .await?;
             }

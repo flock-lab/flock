@@ -30,7 +30,7 @@ use std::sync::Arc;
 use uuid::Uuid as RandomId;
 
 /// A helper struct for building uuids of payloads.
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct UuidBuilder {
     /// The identifier of the data fragment or the payload.
     pub tid: String,
