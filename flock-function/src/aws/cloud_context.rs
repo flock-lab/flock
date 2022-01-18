@@ -155,6 +155,7 @@ pub fn update_consistent_hash_context(metadata: &Option<HashMap<String, String>>
             }
 
             unsafe {
+                // 
                 // * `ring`: the consistent hashing ring to forward the windowed events to the
                 // same function execution environment.
                 // * `group_name`: function group name.
