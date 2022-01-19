@@ -65,7 +65,9 @@ pub use s3::S3StateBackend;
 mod efs;
 pub use efs::EfsStateBackend;
 
+use crate::error::Result;
 use async_trait::async_trait;
+use datafusion::arrow::record_batch::RecordBatch;
 use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::fmt::Debug;
@@ -79,12 +81,18 @@ pub trait StateBackend: Debug + Send + Sync {
     /// Returns the state backend as [`Any`](std::any::Any) so that it can be
     /// downcast to a specific implementation.
     fn as_any(&self) -> &dyn Any;
-    /// Return the value as an mutable Any to allow for downcasts to specific
+    /// Returns the value as an mutable Any to allow for downcasts to specific
     /// implementations.
     fn as_mut_any(&mut self) -> &mut dyn Any;
+    /// Writes record batches to the state backend.
+    async fn write(&self, bucket: &str, key: &str, batches: Vec<RecordBatch>) -> Result<()>;
 }
 
 /// The default state backend.
+///
+/// Note: Currently, the functionalities of the HashMapStateBackend are
+/// implemented by the `Arena` module. `HashMapStateBackend` is an unified
+/// abstraction we will use to encapsulate the Arena module.
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct HashMapStateBackend {}
 
@@ -101,6 +109,10 @@ impl StateBackend for HashMapStateBackend {
 
     fn as_mut_any(&mut self) -> &mut dyn Any {
         self
+    }
+
+    async fn write(&self, bucket: &str, key: &str, batches: Vec<RecordBatch>) -> Result<()> {
+        Ok(())
     }
 }
 

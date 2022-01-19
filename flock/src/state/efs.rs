@@ -14,7 +14,9 @@
 //! Use EFS state backend to manage the state of the execution engine.
 
 use super::StateBackend;
+use crate::error::Result;
 use async_trait::async_trait;
+use datafusion::arrow::record_batch::RecordBatch;
 use serde::{Deserialize, Serialize};
 use std::any::Any;
 
@@ -36,6 +38,10 @@ impl StateBackend for EfsStateBackend {
 
     fn as_mut_any(&mut self) -> &mut dyn Any {
         self
+    }
+
+    async fn write(&self, bucket: &str, key: &str, batches: Vec<RecordBatch>) -> Result<()> {
+        unimplemented!();
     }
 }
 

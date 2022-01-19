@@ -14,7 +14,11 @@
 //! Use S3 state backend to manage the state of the execution engine.
 
 use super::StateBackend;
+use crate::aws::s3;
+use crate::error::{FlockError, Result};
 use async_trait::async_trait;
+use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::arrow_flight::utils::flight_data_from_arrow_batch;
 use serde::{Deserialize, Serialize};
 use std::any::Any;
 
@@ -35,6 +39,18 @@ impl StateBackend for S3StateBackend {
 
     fn as_mut_any(&mut self) -> &mut dyn Any {
         self
+    }
+
+    async fn write(&self, bucket: &str, key: &str, batches: Vec<RecordBatch>) -> Result<()> {
+        if !batches.is_empty() {
+            s3::create_bucket_if_missing(bucket).await?;
+            let batch =
+                RecordBatch::concat(&batches[0].schema(), &batches).map_err(FlockError::Arrow)?;
+            let options = datafusion::arrow::ipc::writer::IpcWriteOptions::default();
+            let (_, flight_data) = flight_data_from_arrow_batch(&batch, &options);
+            s3::put_object(bucket, key, flight_data.data_body).await?;
+        }
+        Ok(())
     }
 }
 
