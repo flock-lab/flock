@@ -28,7 +28,6 @@ use datafusion::physical_plan::Partitioning::{HashDiff, RoundRobinBatch};
 use flock::aws::lambda;
 use flock::datasource::nexmark::config::BASE_TIME;
 use flock::prelude::*;
-use futures::future::ok;
 use log::{info, warn};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -895,7 +894,6 @@ pub async fn elementwise_tasks(
                 let tasks = (0..size)
                     .map(|i| {
                         let data = output.clone();
-                        let state_backend = ctx.state_backend.clone();
                         let function_name = group_name.clone();
                         let meta = metadata.clone();
                         let invoke_type = invocation_type.clone();
@@ -916,36 +914,16 @@ pub async fn elementwise_tasks(
                                 function_name,
                                 bytes.len()
                             );
-
-                            let mut tasks: Vec<tokio::task::JoinHandle<Result<()>>> = vec![];
-                            let tid = payload.uuid.tid;
-                            let seq_num = payload.uuid.seq_num.to_string();
-                            let bytes_copy = bytes.clone();
-                            tasks.push(tokio::spawn(async move {
-                                if state_backend
-                                    .as_any()
-                                    .downcast_ref::<S3StateBackend>()
-                                    .is_some()
-                                {
-                                    state_backend.write(tid, seq_num, bytes_copy).await?;
-                                }
-                                Ok(())
-                            }));
-                            tasks.push(tokio::spawn(async move {
-                                lambda::invoke_function(
-                                    &function_name,
-                                    &invoke_type,
-                                    Some(bytes.into()),
-                                )
-                                .await?;
-                                Ok(())
-                            }));
-                            futures::future::join_all(tasks).await;
+                            lambda::invoke_function(
+                                &function_name,
+                                &invoke_type,
+                                Some(bytes.into()),
+                            )
+                            .await?;
                             Ok(())
                         })
                     })
                     .collect::<Vec<tokio::task::JoinHandle<Result<()>>>>();
-                futures::future::join_all(tasks).await;
                 // clear the data sources.
                 ctx.clean_data_sources().await?;
             }

@@ -340,10 +340,39 @@ async fn invoke_next_functions(
                 function_name,
                 bytes.len()
             );
-            lambda::invoke_function(&function_name, &invocation_type, Some(bytes.into())).await?;
+
+            let mut tasks: Vec<tokio::task::JoinHandle<Result<()>>> = vec![];
+            let bytes_copy = bytes.clone();
+            let state_backend = ctx.state_backend.clone();
+
+            tasks.push(tokio::spawn(async move {
+                if state_backend
+                    .as_any()
+                    .downcast_ref::<S3StateBackend>()
+                    .is_some()
+                {
+                    state_backend
+                        .write(
+                            payload.uuid.tid,
+                            payload.uuid.seq_num.to_string(),
+                            bytes_copy,
+                        )
+                        .await?;
+                }
+                Ok(())
+            }));
+
+            let next_function = function_name.clone();
+            tasks.push(tokio::spawn(async move {
+                lambda::invoke_function(&function_name, &invocation_type, Some(bytes.into()))
+                    .await?;
+                Ok(())
+            }));
+
+            futures::future::join_all(tasks).await;
 
             Ok(json!({
-                "response": format!("next function: {}", function_name)
+                "response": format!("next function: {}", next_function)
             }))
         }
     }
