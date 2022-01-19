@@ -16,6 +16,7 @@
 use super::StateBackend;
 use crate::aws::s3;
 use crate::error::Result;
+use crate::runtime::arena::Bitmap;
 use crate::runtime::payload::Payload;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -82,11 +83,18 @@ impl S3StateBackend {
     /// # Arguments
     /// * `bucket` - The S3 bucket to store the checkpoint.
     /// * `prefix` - The S3 key prefix to store each data partition.
+    ///
+    /// # Returns
+    /// A vector of S3 keys in usize format.
     pub async fn read_s3_keys(&self, bucket: &str, prefix: &str) -> Result<Vec<usize>> {
         Ok(s3::get_matched_keys(bucket, prefix)
             .await?
             .into_iter()
-            .map(|key| key.parse::<usize>().unwrap())
+            .map(|key| {
+                let mut key_parts = key.split('/');
+                key_parts.next(); // skip the prefix: plan index
+                key_parts.next().unwrap().parse::<usize>().unwrap()
+            })
             .collect())
     }
 
@@ -99,21 +107,18 @@ impl S3StateBackend {
     ///
     /// # Returns
     /// * The difference between the latest checkpointed keys and the old keys.
-    /// * The latest keys that have been checkpointed.
     pub async fn new_s3_keys(
         &self,
         bucket: &str,
         prefix: &str,
-        old_keys: &[usize],
-    ) -> Result<(Vec<usize>, Vec<usize>)> {
-        let new_keys = self.read_s3_keys(bucket, prefix).await?;
-        Ok((
-            new_keys
-                .iter()
-                .filter(|k| !old_keys.contains(k))
-                .cloned()
-                .collect(),
-            new_keys,
-        ))
+        old_keys: &Bitmap,
+    ) -> Result<Vec<String>> {
+        Ok(self
+            .read_s3_keys(bucket, prefix)
+            .await?
+            .into_iter()
+            .filter(|seq_num| !old_keys.is_set(*seq_num))
+            .map(|seq_num| format!("{:02}/{:02}", prefix, seq_num))
+            .collect())
     }
 }

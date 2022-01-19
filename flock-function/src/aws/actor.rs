@@ -199,14 +199,62 @@ async fn prepare_data_sources(
         input.push(vec![r2]);
     } else if is_aggregate_function(ctx) {
         // ressemble data packets to a single window.
-        let (ready, uuid) = arena.reassemble(event);
+        let (ready, uuid) = arena.collect(event);
         if ready {
             info!("Received all data packets for the window: {:?}", uuid.tid);
             arena
-                .batches(uuid.tid)
+                .take_batches(&uuid.tid)
                 .into_iter()
                 .for_each(|b| input.push(b));
         } else {
+            // Aggregation has not yet been completed. We can also check the query states in
+            // the corresponding S3 buckets. If some states exist in S3, Flock can bring the
+            // states to the current function directly to reduce the network traffic. This
+            // is because the aggregation states are not saved by its own, but are saved by
+            // the former stage of the dataflow pipeline. Since aggregator's ancestors are
+            // default Lambda functions with much higher concurrency, all of them can write
+            // the partial aggregation states to the S3 buckets in parallel.
+            match arena.get_bitmap(&uuid.tid) {
+                Some(bitmap) => {
+                    if ctx
+                        .state_backend
+                        .as_any()
+                        .downcast_ref::<S3StateBackend>()
+                        .is_some()
+                    {
+                        let state_backend: &S3StateBackend = ctx
+                            .state_backend
+                            .as_any()
+                            .downcast_ref::<S3StateBackend>()
+                            .unwrap();
+                        // function name format: <query code>-<plan index>-<group index>
+                        let mut name_parts = ctx.name.split('-');
+                        name_parts.next(); // skip the query code
+                        let plan_index = name_parts.next().unwrap();
+                        let keys = state_backend
+                            .new_s3_keys(&uuid.tid, &plan_index, &bitmap)
+                            .await?;
+                        if !keys.is_empty() {
+                            state_backend
+                                .read(uuid.tid.clone(), keys)
+                                .await?
+                                .into_iter()
+                                .for_each(|payload| {
+                                    arena.collect(payload);
+                                });
+                            if arena.is_complete(&uuid.tid) {
+                                info!("Received all data packets for the window: {:?}", uuid.tid);
+                                arena
+                                    .take_batches(&uuid.tid)
+                                    .into_iter()
+                                    .for_each(|b| input.push(b));
+                            }
+                        }
+                    }
+                }
+                None => {}
+            }
+
             return Ok(vec![]);
         }
     } else {
@@ -324,7 +372,7 @@ async fn invoke_next_functions(
             }))
         }
         CloudFunction::Group(..) => {
-            let function_name = ring.get(&uuid.tid).expect("hash ring failure.").to_string();
+            let next_function = ring.get(&uuid.tid).expect("hash ring failure.").to_string();
             let mut payload = to_payload(
                 &output.into_iter().flatten().collect::<Vec<_>>(),
                 &[],
@@ -337,7 +385,7 @@ async fn invoke_next_functions(
 
             info!(
                 "[OK] {} function's payload bytes: {}",
-                function_name,
+                next_function,
                 bytes.len()
             );
 
@@ -345,27 +393,33 @@ async fn invoke_next_functions(
             let bytes_copy = bytes.clone();
             let state_backend = ctx.state_backend.clone();
 
+            let current_function = ctx.name.clone();
             tasks.push(tokio::spawn(async move {
                 if state_backend
                     .as_any()
                     .downcast_ref::<S3StateBackend>()
                     .is_some()
                 {
-                    state_backend
-                        .write(
-                            payload.uuid.tid,
-                            payload.uuid.seq_num.to_string(),
-                            bytes_copy,
-                        )
-                        .await?;
+                    // function name format: <query code>-<plan index>-<group index>
+                    let plan_index = current_function.split('-').collect::<Vec<_>>()[1]
+                        .parse::<usize>()
+                        .expect("parse the plan index error.");
+                    let next_plan_index = plan_index + 1;
+
+                    let bucket = payload.uuid.tid;
+                    let key = format!("{:02}/{:02}", next_plan_index, payload.uuid.seq_num);
+
+                    // S3 state backend:
+                    // - bucket equals to tid: <query code>-<timestamp>-<random string>
+                    // - key: <plan index>-<sequence number>
+                    state_backend.write(bucket, key, bytes_copy).await?;
                 }
                 Ok(())
             }));
 
-            let next_function = function_name.clone();
+            let next_func = next_function.clone();
             tasks.push(tokio::spawn(async move {
-                lambda::invoke_function(&function_name, &invocation_type, Some(bytes.into()))
-                    .await?;
+                lambda::invoke_function(&next_func, &invocation_type, Some(bytes.into())).await?;
                 Ok(())
             }));
 

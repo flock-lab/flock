@@ -15,9 +15,11 @@
 //! the data frames of the previous stage of dataflow to ensure the integrity of
 //! the window data for stream processing.
 
+mod bitmap;
+pub use bitmap::Bitmap;
+
 use crate::error::{FlockError, Result};
 use crate::runtime::payload::{Payload, Uuid};
-use bitmap::Bitmap;
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::record_batch::RecordBatch;
 use hashbrown::HashMap;
@@ -77,15 +79,27 @@ impl Arena {
     }
 
     /// Get the data fragments in the temporal window via the key.
-    pub fn batches(&mut self, tid: String) -> Vec<Vec<Vec<RecordBatch>>> {
-        if let Some(window) = (*self).remove(&tid) {
+    pub fn take_batches(&mut self, tid: &str) -> Vec<Vec<Vec<RecordBatch>>> {
+        if let Some(window) = (*self).remove(tid) {
             vec![window.r1_records, window.r2_records]
         } else {
             vec![vec![], vec![]]
         }
     }
 
-    /// Reassemble the data fragments in the temporal window.
+    /// Return the Bitmap reference of the temporal window.
+    pub fn get_bitmap(&self, tid: &str) -> Option<&Bitmap> {
+        self.get(tid).map(|window| &window.bitmap)
+    }
+
+    /// Return true if the temporal window is empty.
+    pub fn is_complete(&self, tid: &str) -> bool {
+        self.get(tid)
+            .map(|window| window.size == window.r1_records.len())
+            .unwrap_or(false)
+    }
+
+    /// Collect the data fragments for temporal windows.
     ///
     /// # Arguments
     /// * `event` - the serialized data fragments from the previous stage of
@@ -95,7 +109,7 @@ impl Arena {
     /// * Return true if the window data collection is complete, otherwise
     ///   return false. Uuid is also returned no matter whether the window data
     ///   collection is complete.
-    pub fn reassemble(&mut self, event: Payload) -> (bool, Uuid) {
+    pub fn collect(&mut self, event: Payload) -> (bool, Uuid) {
         let mut ready = false;
         let (r1, r2, uuid) = event.to_record_batch();
         match &mut (*self).get_mut(&uuid.tid) {
@@ -188,7 +202,7 @@ mod tests {
         let mut arena = Arena::new();
         batches.into_iter().enumerate().for_each(|(i, batch)| {
             let payload = to_payload(&[batch], &[], uuids.get(i), false);
-            let (ready, _) = arena.reassemble(payload);
+            let (ready, _) = arena.collect(payload);
             if i < 7 {
                 assert!(!ready);
             } else {
@@ -205,11 +219,9 @@ mod tests {
             (0..8).for_each(|i| assert!(window.bitmap.is_set(i)));
         }
 
-        assert_eq!(8, arena.batches(tid)[0].len());
-        assert_eq!(0, arena.batches("no exists".to_string())[0].len());
+        assert_eq!(8, arena.take_batches(&tid)[0].len());
+        assert_eq!(0, arena.take_batches("no exists")[0].len());
 
         Ok(())
     }
 }
-
-pub mod bitmap;

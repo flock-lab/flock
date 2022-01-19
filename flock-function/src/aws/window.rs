@@ -924,7 +924,7 @@ pub async fn elementwise_tasks(
                         })
                     })
                     .collect::<Vec<tokio::task::JoinHandle<Result<()>>>>();
-                // clear the data sources.
+                futures::future::join_all(tasks).await;
                 ctx.clean_data_sources().await?;
             }
         } else {
