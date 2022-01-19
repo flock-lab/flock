@@ -16,7 +16,7 @@
 use super::StateBackend;
 use crate::aws::s3;
 use crate::error::Result;
-use crate::runtime::payload::{DataFrame, Payload};
+use crate::runtime::payload::Payload;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::any::Any;
@@ -41,26 +41,18 @@ impl StateBackend for S3StateBackend {
         self
     }
 
-    async fn write(
-        &self,
-        bucket: &'static str,
-        key: &'static str,
-        payload_bytes: Vec<u8>,
-    ) -> Result<()> {
-        s3::create_bucket_if_missing(bucket).await?;
-        s3::put_object(bucket, key, payload_bytes).await
+    async fn write(&self, bucket: String, key: String, payload_bytes: Vec<u8>) -> Result<()> {
+        s3::create_bucket_if_missing(&bucket).await?;
+        s3::put_object(&bucket, &key, payload_bytes).await
     }
 
-    async fn read(
-        &self,
-        bucket: &'static str,
-        keys: &'static [&'static str],
-    ) -> Result<Vec<Payload>> {
+    async fn read(&self, bucket: String, keys: Vec<String>) -> Result<Vec<Payload>> {
         let tasks = keys
-            .iter()
+            .into_iter()
             .map(|key| {
+                let b = bucket.clone();
                 tokio::spawn(async move {
-                    Ok(serde_json::from_slice(&s3::get_object(bucket, key).await?)?)
+                    Ok(serde_json::from_slice(&s3::get_object(&b, &key).await?)?)
                 })
             })
             .collect::<Vec<JoinHandle<Result<Payload>>>>();
