@@ -136,7 +136,7 @@ pub async fn get_object(bucket: &str, key: &str) -> Result<Vec<u8>> {
         buf
     })
     .await
-    .expect("failed to load plan from S3"))
+    .expect("failed to load object from S3"))
 }
 
 /// Checks if a bucket exists in AWS S3.

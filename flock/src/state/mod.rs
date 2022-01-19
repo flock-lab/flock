@@ -66,8 +66,8 @@ mod efs;
 pub use efs::EfsStateBackend;
 
 use crate::error::Result;
+use crate::runtime::payload::Payload;
 use async_trait::async_trait;
-use datafusion::arrow::record_batch::RecordBatch;
 use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::fmt::Debug;
@@ -85,7 +85,18 @@ pub trait StateBackend: Debug + Send + Sync {
     /// implementations.
     fn as_mut_any(&mut self) -> &mut dyn Any;
     /// Writes record batches to the state backend.
-    async fn write(&self, bucket: &str, key: &str, batches: Vec<RecordBatch>) -> Result<()>;
+    async fn write(
+        &self,
+        bucket: &'static str,
+        key: &'static str,
+        payload_bytes: Vec<u8>,
+    ) -> Result<()>;
+    /// Reads payloads from the state backend.
+    async fn read(
+        &self,
+        bucket: &'static str,
+        keys: &'static [&'static str],
+    ) -> Result<Vec<Payload>>;
 }
 
 /// The default state backend.
@@ -111,8 +122,12 @@ impl StateBackend for HashMapStateBackend {
         self
     }
 
-    async fn write(&self, _: &str, _: &str, _: Vec<RecordBatch>) -> Result<()> {
-        Ok(())
+    async fn write(&self, _: &'static str, _: &'static str, _: Vec<u8>) -> Result<()> {
+        unreachable!()
+    }
+
+    async fn read(&self, _: &'static str, _: &'static [&'static str]) -> Result<Vec<Payload>> {
+        unreachable!()
     }
 }
 

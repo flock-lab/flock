@@ -15,8 +15,8 @@
 
 use super::StateBackend;
 use crate::error::Result;
+use crate::runtime::payload::Payload;
 use async_trait::async_trait;
-use datafusion::arrow::record_batch::RecordBatch;
 use serde::{Deserialize, Serialize};
 use std::any::Any;
 
@@ -40,8 +40,12 @@ impl StateBackend for EfsStateBackend {
         self
     }
 
-    async fn write(&self, _: &str, _: &str, _: Vec<RecordBatch>) -> Result<()> {
+    async fn write(&self, _: &'static str, _: &'static str, _: Vec<u8>) -> Result<()> {
         unimplemented!();
+    }
+
+    async fn read(&self, _: &'static str, _: &'static [&'static str]) -> Result<Vec<Payload>> {
+        unreachable!()
     }
 }
 

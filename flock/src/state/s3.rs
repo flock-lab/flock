@@ -15,12 +15,12 @@
 
 use super::StateBackend;
 use crate::aws::s3;
-use crate::error::{FlockError, Result};
+use crate::error::Result;
+use crate::runtime::payload::{DataFrame, Payload};
 use async_trait::async_trait;
-use datafusion::arrow::record_batch::RecordBatch;
-use datafusion::arrow_flight::utils::flight_data_from_arrow_batch;
 use serde::{Deserialize, Serialize};
 use std::any::Any;
+use tokio::task::JoinHandle;
 
 /// S3StateBackend is a state backend that stores query states in Amazon S3.
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
@@ -41,16 +41,35 @@ impl StateBackend for S3StateBackend {
         self
     }
 
-    async fn write(&self, bucket: &str, key: &str, batches: Vec<RecordBatch>) -> Result<()> {
-        if !batches.is_empty() {
-            s3::create_bucket_if_missing(bucket).await?;
-            let batch =
-                RecordBatch::concat(&batches[0].schema(), &batches).map_err(FlockError::Arrow)?;
-            let options = datafusion::arrow::ipc::writer::IpcWriteOptions::default();
-            let (_, flight_data) = flight_data_from_arrow_batch(&batch, &options);
-            s3::put_object(bucket, key, flight_data.data_body).await?;
-        }
-        Ok(())
+    async fn write(
+        &self,
+        bucket: &'static str,
+        key: &'static str,
+        payload_bytes: Vec<u8>,
+    ) -> Result<()> {
+        s3::create_bucket_if_missing(bucket).await?;
+        s3::put_object(bucket, key, payload_bytes).await
+    }
+
+    async fn read(
+        &self,
+        bucket: &'static str,
+        keys: &'static [&'static str],
+    ) -> Result<Vec<Payload>> {
+        let tasks = keys
+            .iter()
+            .map(|key| {
+                tokio::spawn(async move {
+                    Ok(serde_json::from_slice(&s3::get_object(bucket, key).await?)?)
+                })
+            })
+            .collect::<Vec<JoinHandle<Result<Payload>>>>();
+
+        Ok(futures::future::join_all(tasks)
+            .await
+            .into_iter()
+            .map(|r| r.unwrap().unwrap())
+            .collect())
     }
 }
 
