@@ -111,7 +111,7 @@ impl StateBackend for HashMapStateBackend {
         self
     }
 
-    async fn write(&self, bucket: &str, key: &str, batches: Vec<RecordBatch>) -> Result<()> {
+    async fn write(&self, _: &str, _: &str, _: Vec<RecordBatch>) -> Result<()> {
         Ok(())
     }
 }

@@ -181,7 +181,7 @@ pub async fn bucket_exists_and_accessible(bucket: &str) -> Result<bool> {
         .map_err(|e| FlockError::AWS(e.to_string()))
     {
         Ok(_) => Ok(true),
-        Err(e) => Ok(false),
+        Err(_) => Ok(false),
     }
 }
 
@@ -209,4 +209,77 @@ pub async fn create_bucket_if_missing(bucket: &str) -> Result<()> {
             .map_err(|e| FlockError::AWS(e.to_string()))?;
     }
     Ok(())
+}
+
+/// Returns all S3 keys in a bucket.
+///
+/// # Arguments
+/// * `bucket` - The name of the bucket to get the keys from.
+///
+/// # Returns
+/// A list of keys in the bucket.
+pub async fn get_all_keys(bucket: &str) -> Result<Vec<String>> {
+    let mut keys = Vec::new();
+    let mut continuation_token = None;
+    loop {
+        let resp = FLOCK_S3_CLIENT
+            .list_objects_v2(ListObjectsV2Request {
+                bucket: bucket.to_owned(),
+                continuation_token,
+                ..Default::default()
+            })
+            .await
+            .map_err(|e| FlockError::AWS(e.to_string()))?;
+
+        resp.contents.iter().flatten().for_each(|obj| {
+            if obj.key.is_some() {
+                keys.push(obj.key.as_ref().unwrap().to_owned());
+            }
+        });
+
+        if resp.is_truncated.unwrap_or_default() {
+            continuation_token = Some(resp.next_continuation_token.unwrap_or_default());
+        } else {
+            break;
+        }
+    }
+    Ok(keys)
+}
+
+/// Returns S3 keys in a bucket that match the prefix.
+///
+/// # Arguments
+/// * `bucket` - The name of the bucket to get the keys from.
+/// * `prefix` - Limits the response to keys that begin with the specified
+///   prefix.
+///
+/// # Returns
+/// A list of keys in the bucket.
+pub async fn get_matched_keys(bucket: &str, prefix: &str) -> Result<Vec<String>> {
+    let mut keys = Vec::new();
+    let mut continuation_token = None;
+    loop {
+        let resp = FLOCK_S3_CLIENT
+            .list_objects_v2(ListObjectsV2Request {
+                bucket: bucket.to_owned(),
+                prefix: Some(prefix.to_owned()),
+                continuation_token,
+                ..Default::default()
+            })
+            .await
+            .map_err(|e| FlockError::AWS(e.to_string()))?;
+
+        resp.contents.iter().flatten().for_each(|obj| {
+            if obj.key.is_some() {
+                keys.push(obj.key.as_ref().unwrap().to_owned());
+            }
+        });
+
+        if resp.is_truncated.unwrap_or_default() {
+            continuation_token = Some(resp.next_continuation_token.unwrap_or_default());
+        } else {
+            break;
+        }
+    }
+    Ok(keys)
 }

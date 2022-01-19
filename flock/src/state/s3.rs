@@ -59,4 +59,50 @@ impl S3StateBackend {
     pub fn new() -> Self {
         Self {}
     }
+
+    /// Read S3 keys from a bucket with a prefix.
+    ///
+    /// This function can be used to monitor the progress of checkpointing, and
+    /// can also be used for early aggregation, if the payload has not reached
+    /// the current function through the function invocation. If the total
+    /// number of keys returned equals to the total number of payloads, then
+    /// the checkpoint is complete.
+    ///
+    /// # Arguments
+    /// * `bucket` - The S3 bucket to store the checkpoint.
+    /// * `prefix` - The S3 key prefix to store each data partition.
+    pub async fn read_s3_keys(&self, bucket: &str, prefix: &str) -> Result<Vec<usize>> {
+        Ok(s3::get_matched_keys(bucket, prefix)
+            .await?
+            .into_iter()
+            .map(|key| key.parse::<usize>().unwrap())
+            .collect())
+    }
+
+    /// Returns the latest checkpointed keys.
+    ///
+    /// # Arguments
+    /// * `bucket` - The S3 bucket to store the checkpoint.
+    /// * `prefix` - The S3 key prefix to store data partitions.
+    /// * `old_keys` - The keys that have been checkpointed before.
+    ///
+    /// # Returns
+    /// * The difference between the latest checkpointed keys and the old keys.
+    /// * The latest keys that have been checkpointed.
+    pub async fn new_s3_keys(
+        &self,
+        bucket: &str,
+        prefix: &str,
+        old_keys: &[usize],
+    ) -> Result<(Vec<usize>, Vec<usize>)> {
+        let new_keys = self.read_s3_keys(bucket, prefix).await?;
+        Ok((
+            new_keys
+                .iter()
+                .filter(|k| !old_keys.contains(k))
+                .cloned()
+                .collect(),
+            new_keys,
+        ))
+    }
 }
