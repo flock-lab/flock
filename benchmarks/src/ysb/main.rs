@@ -94,12 +94,14 @@ async fn create_ysb_functions(
         plan: CloudExecutionPlan::new(vec![FLOCK_EMPTY_PLAN.clone()], None),
         name: FLOCK_DATA_SOURCE_FUNC_NAME.clone(),
         next: next_func_name.clone(),
+        ..Default::default()
     };
 
     let ysb_worker_ctx = ExecutionContext {
         plan: CloudExecutionPlan::new(vec![physcial_plan], None),
         name: worker_func_name.clone(),
         next: CloudFunction::Sink(DataSinkType::new(&opt.data_sink_type)?),
+        ..Default::default()
     };
 
     // Create the function for the ysb source generator.
@@ -245,7 +247,7 @@ mod tests {
         };
 
         flock_ctx
-            .feed_data_sources(&[
+            .feed_data_sources(vec![
                 vec![event_bytes_to_batch(
                     &event.ad_events,
                     YSB_AD_EVENT.clone(),

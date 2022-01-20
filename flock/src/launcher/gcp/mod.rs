@@ -25,10 +25,9 @@ pub struct GCPLauncher {}
 
 #[async_trait]
 impl Launcher for GCPLauncher {
-    async fn new<T>(_: &Query<T>) -> Result<Self>
+    async fn new(_: &Query) -> Result<Self>
     where
         Self: Sized,
-        T: AsRef<str> + Send + Sync + 'static,
     {
         Ok(GCPLauncher {})
     }

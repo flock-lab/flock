@@ -18,7 +18,8 @@ use crate::datasink::DataSinkType;
 use crate::encoding::Encoding;
 use crate::error::{FlockError, Result};
 use crate::runtime::plan::CloudExecutionPlan;
-use datafusion::arrow::datatypes::SchemaRef;
+use crate::state::*;
+use datafusion::arrow::datatypes::{Schema, SchemaRef};
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::ExecutionPlan;
@@ -80,10 +81,10 @@ impl Default for CloudFunction {
 }
 
 /// Cloud execution context.
-#[derive(Default, Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ExecutionContext {
     /// The execution plan on cloud.
-    pub plan: CloudExecutionPlan,
+    pub plan:          CloudExecutionPlan,
     /// Cloud Function name in the current execution context.
     ///
     /// |      Cloud Function Naming Convention       |
@@ -104,9 +105,22 @@ pub struct ExecutionContext {
     /// at a certain moment.
     ///
     /// SX72HzqFz1Qij4bP-00-00
-    pub name: CloudFunctionName,
+    pub name:          CloudFunctionName,
     /// Lambda function name(s) for next invocation(s).
-    pub next: CloudFunction,
+    pub next:          CloudFunction,
+    /// The current state of the execution context.
+    pub state_backend: Arc<dyn StateBackend>,
+}
+
+impl Default for ExecutionContext {
+    fn default() -> Self {
+        ExecutionContext {
+            plan:          CloudExecutionPlan::default(),
+            name:          CloudFunctionName::default(),
+            next:          CloudFunction::default(),
+            state_backend: Arc::new(HashMapStateBackend::default()),
+        }
+    }
 }
 
 impl PartialEq for ExecutionContext {
@@ -178,34 +192,90 @@ impl ExecutionContext {
             .collect())
     }
 
-    /// Feeds all data sources to the execution plan.
-    pub async fn feed_data_sources(&mut self, sources: &[Vec<Vec<RecordBatch>>]) -> Result<()> {
+    /// Clean the data source in the given context.
+    pub async fn clean_data_sources(&mut self) -> Result<()> {
         // Breadth-first search
         let mut queue = VecDeque::new();
         self.plan().await?.into_iter().for_each(|plan| {
             queue.push_back(plan);
         });
+
         while !queue.is_empty() {
-            let mut p = queue.pop_front().unwrap();
-            if p.children().is_empty() {
-                for partition in sources {
-                    if compare_schema(p.schema(), partition[0][0].schema()) {
-                        unsafe {
-                            Arc::get_mut_unchecked(&mut p)
-                                .as_mut_any()
-                                .downcast_mut::<MemoryExec>()
-                                .unwrap()
-                                .set_partitions(partition);
+            let mut plan = queue.pop_front().unwrap();
+            if plan.children().is_empty() {
+                let schema = plan.schema().clone();
+                unsafe {
+                    Arc::get_mut_unchecked(&mut plan)
+                        .as_mut_any()
+                        .downcast_mut::<MemoryExec>()
+                        .unwrap()
+                        .set_partitions(vec![vec![RecordBatch::new_empty(schema)]]);
+                }
+            }
+
+            plan.children()
+                .iter()
+                .enumerate()
+                .for_each(|(i, _)| queue.push_back(plan.children()[i].clone()));
+        }
+
+        Ok(())
+    }
+
+    /// Feeds all data sources to the execution plan.
+    pub async fn feed_data_sources(
+        &mut self,
+        mut sources: Vec<Vec<Vec<RecordBatch>>>,
+    ) -> Result<()> {
+        // Breadth-first search
+        let mut queue = VecDeque::new();
+        self.plan().await?.into_iter().for_each(|plan| {
+            queue.push_back(plan);
+        });
+
+        let mut found = false;
+        let mut index = 0xFFFFFFFF;
+        while !queue.is_empty() {
+            let mut plan = queue.pop_front().unwrap();
+            if plan.children().is_empty() {
+                for (i, partition) in sources.iter().enumerate() {
+                    let mut schema = Arc::new(Schema::new(vec![]));
+                    let mut flag = false;
+                    for p in partition.iter().filter(|p| !p.is_empty()) {
+                        if let Some(b) = p.iter().next() {
+                            schema = b.schema();
+                            flag = true;
+                            break;
                         }
+                    }
+                    if !flag {
+                        continue;
+                    }
+
+                    if compare_schema(plan.schema(), schema) {
+                        index = i;
+                        found = true;
                         break;
+                    }
+                }
+
+                if found {
+                    unsafe {
+                        Arc::get_mut_unchecked(&mut plan)
+                            .as_mut_any()
+                            .downcast_mut::<MemoryExec>()
+                            .unwrap()
+                            .set_partitions(sources.remove(index));
+                        index = 0xFFFFFFFF;
+                        found = false;
                     }
                 }
             }
 
-            p.children()
+            plan.children()
                 .iter()
                 .enumerate()
-                .for_each(|(i, _)| queue.push_back(p.children()[i].clone()));
+                .for_each(|(i, _)| queue.push_back(plan.children()[i].clone()));
         }
 
         Ok(())
@@ -334,8 +404,9 @@ mod tests {
             plan: CloudExecutionPlan::new(vec![plan], None),
             name: "test".to_string(),
             next: CloudFunction::Sink(DataSinkType::Blackhole),
+            ..Default::default()
         };
-        ctx.feed_data_sources(&[vec![vec![batch]]]).await?;
+        ctx.feed_data_sources(vec![vec![vec![batch]]]).await?;
 
         let batches = ctx.execute().await?;
 
@@ -414,12 +485,13 @@ mod tests {
             plan: CloudExecutionPlan::new(vec![plan], None),
             name: "test".to_string(),
             next: CloudFunction::Sink(DataSinkType::Blackhole),
+            ..Default::default()
         };
         let se_json = marshal(&ctx, Encoding::default())?;
         let de_json = unmarshal(&se_json)?;
         assert_eq!(ctx, de_json);
 
-        ctx.feed_data_sources(&[vec![vec![batch1]], vec![vec![batch2]]])
+        ctx.feed_data_sources(vec![vec![vec![batch1]], vec![vec![batch2]]])
             .await?;
 
         let batches = ctx.execute().await?;

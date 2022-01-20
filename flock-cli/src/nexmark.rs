@@ -119,6 +119,15 @@ fn run_args() -> App<'static> {
                 .long("distributed")
                 .help("Runs the NEXMark benchmark with distributed workers"),
         )
+        .arg(
+            Arg::new("state backend")
+                .short('b')
+                .long("state-backend")
+                .help("Sets the state backend for the worker function")
+                .takes_value(true)
+                .possible_values(&["hashmap", "s3", "efs"])
+                .default_value("hashmap"),
+        )
 }
 
 pub fn run(matches: &ArgMatches) -> Result<()> {
@@ -190,6 +199,14 @@ pub fn run(matches: &ArgMatches) -> Result<()> {
 
     if matches.is_present("distributed") {
         opt.distributed = true;
+    }
+
+    if matches.is_present("state backend") {
+        opt.state_backend = matches
+            .value_of("state backend")
+            .unwrap()
+            .parse::<String>()
+            .with_context(|| anyhow!("Invalid state backend"))?;
     }
 
     rainbow_println(include_str!("./flock"));

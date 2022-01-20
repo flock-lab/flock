@@ -17,6 +17,7 @@
 use crate::datasink::DataSinkType;
 use crate::datasource::DataSource;
 use crate::error::{FlockError, Result};
+use crate::state::*;
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::datasource::MemTable;
@@ -25,20 +26,26 @@ use datafusion::physical_plan::ExecutionPlan;
 use std::fmt::Debug;
 use std::sync::Arc;
 
+/// TableName name for the query.
+pub type TableName = String;
+
 /// The relational table represents the logical view of incoming data.
 #[derive(Clone)]
-pub struct Table<T: AsRef<str>>(pub T, pub SchemaRef);
+pub struct Table(pub TableName, pub SchemaRef);
 
-impl<T: AsRef<str>> Table<T> {
+impl Table {
     /// Creates a new table.
-    pub fn new(name: T, schema: SchemaRef) -> Self {
-        Table(name, schema)
+    pub fn new<T>(name: T, schema: SchemaRef) -> Self
+    where
+        T: Into<String>,
+    {
+        Table(name.into(), schema)
     }
 }
 
-impl<T: AsRef<str>> Debug for Table<T> {
+impl Debug for Table {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Table({:?}, {:?})", self.0.as_ref(), self.1)
+        write!(f, "Table({:?}, {:?})", self.0, self.1)
     }
 }
 
@@ -71,55 +78,76 @@ impl Default for QueryType {
 }
 
 /// SQL queries in your application code execute over in-application batches.
-#[derive(Debug, Default, Clone)]
-pub struct Query<T: AsRef<str>> {
+#[derive(Debug, Clone)]
+pub struct Query {
     /// ANSI 2008 SQL standard with extensions.
     /// SQL is a domain-specific language used in programming and designed for
     /// managing data held in a relational database management system, or for
     /// stream processing in a relational data stream management system.
-    pub sql:        T,
+    pub sql:           String,
     /// Table defines the incoming data stream. Each table that is the skeleton
     /// structure that represents the logical view of streaming data.
-    pub tables:     Vec<Table<T>>,
+    pub tables:        Vec<Table>,
     /// A streaming data source.
-    pub datasource: DataSource,
+    pub datasource:    DataSource,
     /// A sink for the output of the query.
-    pub datasink:   DataSinkType,
+    pub datasink:      DataSinkType,
     /// This is used to specify the function name for benchmarking. Otherwise,
     /// the function name is generated from `sql`. To make the debugging easier,
     /// we define human-readable function name for benchmarking.
-    pub query_code: Option<T>,
+    pub query_code:    Option<String>,
     /// The query type.
-    pub query_type: QueryType,
+    pub query_type:    QueryType,
+    /// The state backend to use.
+    pub state_backend: Arc<dyn StateBackend>,
 }
 
-impl<T: AsRef<str>> Query<T> {
+impl Default for Query {
+    fn default() -> Self {
+        Query {
+            sql:           String::new(),
+            tables:        vec![],
+            datasource:    DataSource::default(),
+            datasink:      DataSinkType::default(),
+            query_code:    None,
+            query_type:    QueryType::default(),
+            state_backend: Arc::new(HashMapStateBackend::new()),
+        }
+    }
+}
+
+impl Query {
     /// Creates a new query.
-    pub fn new(
+    pub fn new<T>(
         sql: T,
-        tables: Vec<Table<T>>,
+        tables: Vec<Table>,
         datasource: DataSource,
         datasink: DataSinkType,
         query_code: Option<T>,
         query_type: QueryType,
-    ) -> Self {
+        state_backend: Arc<dyn StateBackend>,
+    ) -> Self
+    where
+        T: Into<String>,
+    {
         Self {
-            sql,
+            sql: sql.into(),
             tables,
             datasource,
             datasink,
-            query_code,
+            query_code: query_code.map(|x| x.into()),
             query_type,
+            state_backend,
         }
     }
 
     /// Returns a SQL query.
     pub fn sql(&self) -> String {
-        self.sql.as_ref().to_owned()
+        self.sql.to_owned()
     }
 
     /// Returns the data schema for a given query.
-    pub fn tables(&self) -> &Vec<Table<T>> {
+    pub fn tables(&self) -> &Vec<Table> {
         &self.tables
     }
 
@@ -131,6 +159,12 @@ impl<T: AsRef<str>> Query<T> {
     /// Returns the data sink for a given query.
     pub fn datasink(&self) -> DataSinkType {
         self.datasink.clone()
+    }
+
+    /// Returns the state backend for a given query.
+    /// The state backend is used to store the state of the query.
+    pub fn state_backend(&self) -> Arc<dyn StateBackend> {
+        self.state_backend.clone()
     }
 
     /// Returns the physical plan for a given query.
@@ -153,7 +187,7 @@ impl<T: AsRef<str>> Query<T> {
 
     /// Returns the query code for a given query.
     pub fn query_code(&self) -> Option<String> {
-        self.query_code.as_ref().map(|s| s.as_ref().to_owned())
+        self.query_code.to_owned()
     }
 
     /// Returns the physical plan for a given query.

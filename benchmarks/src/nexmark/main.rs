@@ -92,6 +92,10 @@ pub struct NexmarkBenchmarkOpt {
     /// Distributed mode or not
     #[structopt(short = "d", long = "distributed")]
     pub distributed: bool,
+
+    /// The state backend to use
+    #[structopt(short = "b", long = "state_backend", default_value = "hashmap")]
+    pub state_backend: String,
 }
 
 #[allow(dead_code)]
@@ -168,6 +172,13 @@ pub async fn create_nexmark_functions(
 ) -> Result<CloudFunction> {
     let worker_func_name = format!("q{}-00", opt.query_number);
 
+    let state_backend: Arc<dyn StateBackend> = match opt.state_backend.as_str() {
+        "hashmap" => Arc::new(HashMapStateBackend::new()),
+        "s3" => Arc::new(S3StateBackend::new()),
+        "efs" => Arc::new(EfsStateBackend::new()),
+        _ => unreachable!(),
+    };
+
     let granule_size = if opt.async_type {
         *FLOCK_ASYNC_GRANULE_SIZE * 2
     } else {
@@ -182,15 +193,17 @@ pub async fn create_nexmark_functions(
 
     let (plan, s3) = plan_placement(opt.query_number, physcial_plan).await?;
     let nexmark_source_ctx = ExecutionContext {
-        plan: CloudExecutionPlan::new(vec![FLOCK_EMPTY_PLAN.clone()], s3.clone()),
-        name: FLOCK_DATA_SOURCE_FUNC_NAME.clone(),
-        next: next_func_name.clone(),
+        plan:          CloudExecutionPlan::new(vec![FLOCK_EMPTY_PLAN.clone()], s3.clone()),
+        name:          FLOCK_DATA_SOURCE_FUNC_NAME.clone(),
+        next:          next_func_name.clone(),
+        state_backend: state_backend.clone(),
     };
 
     let nexmark_worker_ctx = ExecutionContext {
-        plan: CloudExecutionPlan::new(vec![plan.clone()], s3.clone()),
-        name: worker_func_name.clone(),
-        next: CloudFunction::Sink(DataSinkType::new(&opt.data_sink_type)?),
+        plan:          CloudExecutionPlan::new(vec![plan.clone()], s3.clone()),
+        name:          worker_func_name.clone(),
+        next:          CloudFunction::Sink(DataSinkType::new(&opt.data_sink_type)?),
+        state_backend: state_backend.clone(),
     };
 
     // Create the function for the nexmark source generator.
@@ -423,7 +436,7 @@ mod tests {
             };
 
             flock_ctx
-                .feed_data_sources(&[
+                .feed_data_sources(vec![
                     vec![event_bytes_to_batch(&event.bids, NEXMARK_BID.clone(), 1024)],
                     vec![event_bytes_to_batch(
                         &event.persons,

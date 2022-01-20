@@ -17,7 +17,7 @@ use crate::error::{FlockError, Result};
 use crate::launcher::{ExecutionMode, Launcher};
 use crate::query::Query;
 use async_trait::async_trait;
-use datafusion::arrow::datatypes::SchemaRef;
+use datafusion::arrow::datatypes::{Schema, SchemaRef};
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::physical_plan::collect;
 use datafusion::physical_plan::memory::MemoryExec;
@@ -34,10 +34,9 @@ pub struct LocalLauncher {
 
 #[async_trait]
 impl Launcher for LocalLauncher {
-    async fn new<T>(query: &Query<T>) -> Result<Self>
+    async fn new(query: &Query) -> Result<Self>
     where
         Self: Sized,
-        T: AsRef<str> + Send + Sync + 'static,
     {
         Ok(LocalLauncher {
             execution_plan: query.plan().unwrap(),
@@ -88,32 +87,54 @@ impl LocalLauncher {
     ///
     /// # Arguments
     /// * `sources` - A list of data sources.
-    pub fn feed_data_sources(&mut self, sources: &[Vec<Vec<RecordBatch>>]) {
+    pub fn feed_data_sources(&mut self, mut sources: Vec<Vec<Vec<RecordBatch>>>) {
         // Breadth-first search
         let mut queue = VecDeque::new();
-        queue.push_front(self.execution_plan.clone());
+        queue.push_back(self.execution_plan.clone());
 
+        let mut found = false;
+        let mut index = 0xFFFFFFFF;
         while !queue.is_empty() {
-            let mut p = queue.pop_front().unwrap();
-            if p.children().is_empty() {
-                for partition in sources {
-                    if LocalLauncher::compare_schema(p.schema(), partition[0][0].schema()) {
-                        unsafe {
-                            Arc::get_mut_unchecked(&mut p)
-                                .as_mut_any()
-                                .downcast_mut::<MemoryExec>()
-                                .unwrap()
-                                .set_partitions(partition);
+            let mut plan = queue.pop_front().unwrap();
+            if plan.children().is_empty() {
+                for (i, partition) in sources.iter().enumerate() {
+                    let mut schema = Arc::new(Schema::new(vec![]));
+                    let mut flag = false;
+                    for p in partition.iter().filter(|p| !p.is_empty()) {
+                        if let Some(b) = p.iter().next() {
+                            schema = b.schema();
+                            flag = true;
+                            break;
                         }
+                    }
+                    if !flag {
+                        continue;
+                    }
+
+                    if LocalLauncher::compare_schema(plan.schema(), schema) {
+                        index = i;
+                        found = true;
                         break;
+                    }
+                }
+
+                if found {
+                    unsafe {
+                        Arc::get_mut_unchecked(&mut plan)
+                            .as_mut_any()
+                            .downcast_mut::<MemoryExec>()
+                            .unwrap()
+                            .set_partitions(sources.remove(index));
+                        index = 0xFFFFFFFF;
+                        found = false;
                     }
                 }
             }
 
-            p.children()
+            plan.children()
                 .iter()
                 .enumerate()
-                .for_each(|(i, _)| queue.push_back(p.children()[i].clone()));
+                .for_each(|(i, _)| queue.push_back(plan.children()[i].clone()));
         }
     }
 
@@ -133,6 +154,7 @@ mod tests {
     use crate::datasource::DataSource;
     use crate::query::QueryType;
     use crate::query::Table;
+    use crate::state::*;
     use datafusion::arrow::array::*;
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
     use datafusion::arrow::record_batch::RecordBatch;
@@ -146,7 +168,7 @@ mod tests {
 
     #[tokio::test]
     async fn local_launcher() -> Result<()> {
-        let table_name = "test_table";
+        let table_name = "test_table".to_owned();
         let schema = Arc::new(Schema::new(vec![
             Field::new("c1", DataType::Int64, false),
             Field::new("c2", DataType::Float64, false),
@@ -163,6 +185,7 @@ mod tests {
             DataSinkType::Blackhole,
             None,
             QueryType::OLAP,
+            Arc::new(HashMapStateBackend::new()),
         );
 
         let mut launcher = LocalLauncher::new(&query).await?;
@@ -194,7 +217,7 @@ mod tests {
             ],
         )?;
 
-        launcher.feed_data_sources(&[vec![vec![batch]]]);
+        launcher.feed_data_sources(vec![vec![vec![batch]]]);
         let batches = launcher.collect().await?;
 
         let expected = vec![

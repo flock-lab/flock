@@ -38,6 +38,7 @@ pub mod launcher;
 pub mod prelude;
 pub mod query;
 pub mod runtime;
+pub mod state;
 pub mod stream;
 pub mod test_util;
 pub mod tests;

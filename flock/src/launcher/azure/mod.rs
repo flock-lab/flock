@@ -25,10 +25,9 @@ pub struct AzureLauncher {}
 
 #[async_trait]
 impl Launcher for AzureLauncher {
-    async fn new<T>(_: &Query<T>) -> Result<Self>
+    async fn new(_: &Query) -> Result<Self>
     where
         Self: Sized,
-        T: AsRef<str> + Send + Sync + 'static,
     {
         Ok(AzureLauncher {})
     }
