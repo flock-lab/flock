@@ -213,11 +213,13 @@ mod tests {
     use crate::assert_batches_sorted_eq;
     use crate::datasource::nexmark::event::{Auction, Bid, Person};
     use crate::datasource::nexmark::NEXMarkSource;
+    use crate::datasource::ysb::event::{AdEvent, Campaign};
+    use crate::datasource::ysb::YSBSource;
     use crate::datasource::DataSource;
     use crate::launcher::LocalLauncher;
     use crate::query::Table;
     use crate::query::{QueryType, StreamType};
-    use crate::stream::Window;
+    use crate::stream::{Schedule, Window};
     use crate::transmute::event_bytes_to_batch;
     use datafusion::arrow::array::*;
     use datafusion::arrow::datatypes::{DataType, Field, Schema};
@@ -487,7 +489,7 @@ mod tests {
         // Generate events.
         let seconds = 1;
         let threads = 1;
-        let event_per_second = 10_000;
+        let event_per_second = 1000;
         let nexmark_source =
             NEXMarkSource::new(seconds, threads, event_per_second, Window::ElementWise);
         let stream = nexmark_source.generate_data()?;
@@ -637,6 +639,172 @@ mod tests {
         }
 
         let result = output3.into_iter().flatten().collect::<Vec<_>>();
+        let formatted = pretty_format_batches(&result).unwrap().to_string();
+        let expected: Vec<&str> = formatted.trim().lines().collect();
+
+        // Local execution mode
+        let mut launcher = LocalLauncher::new(&query).await?;
+        launcher.feed_data_sources(input);
+        let batches = launcher.collect().await?;
+
+        assert_batches_sorted_eq!(expected, &batches);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn aws_launcher_nexmark_ysb_hash_join() -> Result<()> {
+        let ad_event_schema = Arc::new(AdEvent::schema());
+        let campaign_schema = Arc::new(Campaign::schema());
+
+        let query = Query::new(
+            indoc! {"
+                SELECT  campaign_id,
+                        Count(*)
+                FROM    ad_event
+                        INNER JOIN campaign
+                                ON ad_id = c_ad_id
+                WHERE   event_type = 'view'
+                GROUP   BY campaign_id;
+            "},
+            vec![
+                Table("ad_event".to_string(), ad_event_schema.clone()),
+                Table("campaign".to_string(), campaign_schema.clone()),
+            ],
+            DataSource::Memory,
+            DataSinkType::Blackhole,
+            None,
+            QueryType::Streaming(StreamType::YSBBench),
+            Arc::new(HashMapStateBackend::new()),
+        );
+
+        let mut launcher = AwsLambdaLauncher::new(&query).await?;
+        println!("SQL: {}", query.sql());
+        println!("Query Code: {}\n", launcher.query_code.as_ref().unwrap());
+        launcher.create_cloud_contexts()?;
+
+        // Generate events.
+        let seconds = 1;
+        let threads = 1;
+        let event_per_second = 1000;
+        let ysb_source = YSBSource::new(
+            seconds,
+            threads,
+            event_per_second,
+            Window::Tumbling(Schedule::Seconds(10)),
+        );
+        let stream = ysb_source.generate_data()?;
+        let (events, ad_event_num) = stream.select(0, 0).expect("Failed to select event.");
+
+        println!(
+            "Selecting events for epoch {}: {} ad events, {} campaigns.",
+            0, ad_event_num, stream.campaigns.1
+        );
+
+        let ad_events_batches = event_bytes_to_batch(&events.ad_events, ad_event_schema, 1024);
+        let campaigns_batches = event_bytes_to_batch(&stream.campaigns.0, campaign_schema, 1024);
+
+        #[rustfmt::skip]
+        // --------------------------------------------------------------------------------
+        //                               YSB Benchmark
+        // --------------------------------------------------------------------------------
+        // === Stage 0 ===
+        // CoalesceBatchesExec: target_batch_size=4096
+        //   RepartitionExec: partitioning=Hash([Column { name: "ad_id", index: 0 }], 8)
+        //     CoalesceBatchesExec: target_batch_size=4096
+        //       FilterExec: event_type@1 = view
+        //         RepartitionExec: partitioning=RoundRobinBatch(8)
+        //           MemoryExec: partitions=0, partition_sizes=[]
+        //
+        // CoalesceBatchesExec: target_batch_size=4096
+        //   RepartitionExec: partitioning=Hash([Column { name: "c_ad_id", index: 0 }], 8)
+        //     RepartitionExec: partitioning=RoundRobinBatch(8)
+        //       MemoryExec: partitions=0, partition_sizes=[]
+        //
+        // === Stage 1 ===
+        // CoalesceBatchesExec: target_batch_size=4096
+        //   RepartitionExec: partitioning=Hash([Column { name: "campaign_id", index: 0 }], 8)
+        //     HashAggregateExec: mode=Partial, gby=[campaign_id@3 as campaign_id], aggr=[COUNT(UInt8(1))]
+        //       CoalesceBatchesExec: target_batch_size=4096
+        //         HashJoinExec: mode=Partitioned, join_type=Inner, on=[(Column { name: "ad_id", index: 0 }, Column { name: "c_ad_id", index: 0 })]
+        //           MemoryExec: partitions=0, partition_sizes=[]
+        //           MemoryExec: partitions=0, partition_sizes=[]
+        //
+        // === Stage 2 ===
+        // ProjectionExec: expr=[campaign_id@0 as campaign_id, COUNT(UInt8(1))@1 as COUNT(UInt8(1))]
+        //   HashAggregateExec: mode=FinalPartitioned, gby=[campaign_id@0 as campaign_id], aggr=[COUNT(UInt8(1))]
+        //     MemoryExec: partitions=0, partition_sizes=[]
+
+        let stages = launcher.dag.get_all_stages();
+        for (i, stage) in stages.iter().enumerate() {
+            println!("=== Stage {} ===\n{}", i, stage.get_plan_str());
+        }
+        assert!(launcher.dag.node_count() == 3);
+
+        let input = vec![vec![ad_events_batches], vec![campaigns_batches]];
+
+        // === Query Stage 0 ===
+        let mut ctx = stages[0].context.clone().unwrap();
+        ctx.feed_data_sources(input.clone()).await?;
+        // We **MUST USE** execute_partitioned() instead of execute() here.
+        let output0 = ctx.execute_partitioned().await?;
+        assert!(output0.len() == 2);
+        assert_eq!(output0[0].len(), output0[1].len());
+
+        // === Query Stage 1 ===
+        let num_partitions = output0[0].len();
+        let mut ctx = stages[1].context.clone().unwrap();
+        let mut output1 = vec![];
+        for i in 0..num_partitions {
+            ctx.feed_data_sources(vec![
+                vec![output0[0][i].clone()],
+                vec![output0[1][i].clone()],
+            ])
+            .await?;
+            // We **MUST USE** execute_partitioned() instead of execute() here.
+            let sliced_output = ctx.execute_partitioned().await?;
+            ctx.clean_data_sources().await?;
+            assert!(sliced_output[0].len() == num_partitions);
+            output1.push(sliced_output.into_iter().next().unwrap());
+        }
+
+        // === Query Stage 2 ===
+        let num_partitions = output1[0].len();
+        let mut ctx = stages[2].context.clone().unwrap();
+        let mut output2 = vec![];
+
+        // Shuffling output1
+        //
+        // For example:
+        //
+        // output1[0][0], output1[1][0], ..., output1[7][0]
+        //      => output2[0]
+        //
+        // output1[0][1], output1[1][1], ..., output1[7][1]
+        //      => output2[1]
+        //
+        // ...
+        //
+        // output1[0][7], output1[1][7], ..., output1[7][7]
+        //      => output2[7]
+        for i in 0..num_partitions {
+            let mut output1_partition = vec![];
+            for o1 in output1.iter().take(num_partitions) {
+                output1_partition.push(o1[i].clone());
+            }
+            // We **MUST FLATTEN** partitioned input here. The reason is that the current
+            // plan is `FinalPartitioned` and all shuffled inputs belong to the same
+            // partition.
+            let output1_partition = output1_partition.into_iter().flatten().collect::<Vec<_>>();
+            ctx.feed_data_sources(vec![vec![output1_partition]]).await?;
+            let sliced_output = ctx.execute().await?;
+
+            ctx.clean_data_sources().await?;
+            assert!(sliced_output[0].len() == 1);
+            output2.push(sliced_output.into_iter().next().unwrap());
+        }
+
+        let result = output2.into_iter().flatten().collect::<Vec<_>>();
         let formatted = pretty_format_batches(&result).unwrap().to_string();
         let expected: Vec<&str> = formatted.trim().lines().collect();
 
