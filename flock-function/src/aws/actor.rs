@@ -215,45 +215,42 @@ async fn prepare_data_sources(
             // the former stage of the dataflow pipeline. Since aggregator's ancestors are
             // default Lambda functions with much higher concurrency, all of them can write
             // the partial aggregation states to the S3 buckets in parallel.
-            match arena.get_bitmap(&uuid.tid) {
-                Some(bitmap) => {
-                    if ctx
+            if let Some(bitmap) = arena.get_bitmap(&uuid.tid) {
+                if ctx
+                    .state_backend
+                    .as_any()
+                    .downcast_ref::<S3StateBackend>()
+                    .is_some()
+                {
+                    let state_backend: &S3StateBackend = ctx
                         .state_backend
                         .as_any()
                         .downcast_ref::<S3StateBackend>()
-                        .is_some()
-                    {
-                        let state_backend: &S3StateBackend = ctx
-                            .state_backend
-                            .as_any()
-                            .downcast_ref::<S3StateBackend>()
-                            .unwrap();
-                        // function name format: <query code>-<plan index>-<group index>
-                        let mut name_parts = ctx.name.split('-');
-                        name_parts.next(); // skip the query code
-                        let plan_index = name_parts.next().unwrap();
-                        let keys = state_backend
-                            .new_s3_keys(&uuid.tid, &plan_index, &bitmap)
-                            .await?;
-                        if !keys.is_empty() {
-                            state_backend
-                                .read(uuid.tid.clone(), keys)
-                                .await?
+                        .unwrap();
+                    // function name format: <query code>-<plan index>-<group index>
+                    let mut name_parts = ctx.name.split('-');
+                    name_parts.next(); // skip the query code
+                    let plan_index = name_parts.next().unwrap();
+                    let keys = state_backend
+                        .new_s3_keys(&uuid.tid, plan_index, bitmap)
+                        .await?;
+                    if !keys.is_empty() {
+                        state_backend
+                            .read(uuid.tid.clone(), keys)
+                            .await?
+                            .into_iter()
+                            .for_each(|payload| {
+                                arena.collect(payload);
+                            });
+                        if arena.is_complete(&uuid.tid) {
+                            info!("Received all data packets for the window: {:?}", uuid.tid);
+                            arena
+                                .take_batches(&uuid.tid)
                                 .into_iter()
-                                .for_each(|payload| {
-                                    arena.collect(payload);
-                                });
-                            if arena.is_complete(&uuid.tid) {
-                                info!("Received all data packets for the window: {:?}", uuid.tid);
-                                arena
-                                    .take_batches(&uuid.tid)
-                                    .into_iter()
-                                    .for_each(|b| input.push(b));
-                            }
+                                .for_each(|b| input.push(b));
                         }
                     }
                 }
-                None => {}
             }
 
             return Ok(vec![]);
