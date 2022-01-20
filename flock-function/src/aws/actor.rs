@@ -54,6 +54,7 @@ pub async fn collect(
     partitions: Vec<Vec<Vec<RecordBatch>>>,
 ) -> Result<Vec<Vec<RecordBatch>>> {
     let inputs = Arc::new(Mutex::new(vec![]));
+    let num_partitions = partitions.len();
 
     info!("Repartitioning the input data before execution.");
     let tasks = partitions
@@ -91,7 +92,7 @@ pub async fn collect(
     let input_partitions = Arc::try_unwrap(inputs).unwrap().into_inner().unwrap();
 
     info!("Executing the physical plan.");
-    if input_partitions.is_empty() {
+    if input_partitions.is_empty() || input_partitions.len() != num_partitions {
         Ok(vec![])
     } else {
         ctx.feed_data_sources(input_partitions).await?;
