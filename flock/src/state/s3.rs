@@ -27,14 +27,14 @@ use tokio::task::JoinHandle;
 ///
 /// S3 bucket name is the tid of the function payload:
 ///
-///     `<query code>-<timestamp>-<random string>`
+/// | query code | timestamp  | random string |
 ///
 /// S3 key composed of the following parts:
 ///
-///     `<plan index>/<shuffle id>/<sequence id>`
+/// | plan index | shuffle id | sequence id   |
 ///
 /// Note: Parts of component are derived from cloud function name. The cloud
-/// function name has three parts: `<query code>-<plan index>-<group index>`.
+/// function name has three parts: | query code | plan index | group index |.
 /// `query code` is the hash digest of the SQL query. `plan index` is the stage
 /// index of the query DAG. `group index` is the current index of the function
 /// group.
