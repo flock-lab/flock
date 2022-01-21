@@ -15,18 +15,18 @@ use crate::{consistent_hash_context, ConsistentHashContext, CONSISTENT_HASH_CONT
 use chrono::Utc;
 use datafusion::arrow::csv::reader::ReaderBuilder;
 use datafusion::arrow::record_batch::RecordBatch;
-use datafusion::physical_plan::Partitioning::RoundRobinBatch;
 use flock::aws::lambda;
 use flock::aws::s3;
 use flock::prelude::*;
 use lazy_static::lazy_static;
 use log::info;
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use rayon::prelude::*;
 use serde_json::json;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::io::Cursor;
-use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 lazy_static! {
     static ref CONCURRENCY: usize = FLOCK_CONF["lambda"]["concurrency"]
@@ -44,67 +44,45 @@ lazy_static! {
 ///
 /// ## Arguments
 /// * `ctx` - The runtime context of the function.
-/// * `r1_records` - The input record batches for the first relation.
-/// * `r2_records` - The input record batches for the second relation.
+/// * `streams` - The input streams of the function.
 ///
 /// ## Returns
-/// A vector of Arrow RecordBatch.
+/// The output stream of the function.
 pub async fn collect(
     ctx: &mut ExecutionContext,
-    partitions: Vec<Vec<Vec<RecordBatch>>>,
+    streams: Vec<Vec<Vec<RecordBatch>>>,
 ) -> Result<Vec<Vec<RecordBatch>>> {
-    let inputs = Arc::new(Mutex::new(vec![]));
-    let num_partitions = partitions.len();
-
-    info!("Repartitioning the input data before execution.");
-    let tasks = partitions
+    let num_streams = streams.len();
+    let input_streams = streams
         .into_iter()
-        .map(|batches| {
-            let input = inputs.clone();
-            tokio::spawn(async move {
-                if !(batches.is_empty() || batches.iter().all(|r| r.is_empty())) {
-                    if batches.len() != 1 {
-                        let output = repartition(batches, RoundRobinBatch(1)).await?;
-                        assert_eq!(1, output.len());
-                        info!(
-                            "Input record size: {}.",
-                            output[0].par_iter().map(|r| r.num_rows()).sum::<usize>()
-                        );
-                        let output = coalesce_batches(output, 1024).await?;
-                        let output = repartition(output, RoundRobinBatch(16)).await?;
-                        input.lock().unwrap().push(output);
-                    } else {
-                        info!(
-                            "Input record size: {}.",
-                            batches[0].par_iter().map(|r| r.num_rows()).sum::<usize>()
-                        );
-                        let output = repartition(batches, RoundRobinBatch(16)).await?;
-                        input.lock().unwrap().push(output);
-                    }
-                }
-                Ok(())
-            })
-        })
-        .collect::<Vec<tokio::task::JoinHandle<Result<()>>>>();
-
-    futures::future::join_all(tasks).await;
-
-    let input_partitions = Arc::try_unwrap(inputs).unwrap().into_inner().unwrap();
+        .filter(|r| !r.is_empty())
+        .collect::<Vec<_>>();
 
     info!("Executing the physical plan.");
-    if input_partitions.is_empty() || input_partitions.len() != num_partitions {
-        Ok(vec![])
+    let output = if input_streams.is_empty() || input_streams.len() != num_streams {
+        vec![]
     } else {
-        ctx.feed_data_sources(input_partitions).await?;
-        let output = ctx.execute().await?;
-        ctx.clean_data_sources().await?;
-        info!("[OK] The execution is finished.");
-        if !output.is_empty() && !output[0].is_empty() {
-            info!("[Ok] Output schema: {:?}", output[0][0].schema());
-            info!("[Ok] Output row count: {}", output[0][0].num_rows());
+        ctx.feed_data_sources(input_streams).await?;
+        if ctx.is_shuffling().await? {
+            let output = ctx.execute_partitioned().await?;
+            assert!(output.len() == 1);
+            output.into_iter().next().unwrap()
+        } else {
+            ctx.execute().await?
         }
-        Ok(output)
-    }
+    };
+    ctx.clean_data_sources().await?;
+    info!("[OK] The execution is finished.");
+
+    info!(
+        "[INFO] The number of rows in the output is {}.",
+        output
+            .par_iter()
+            .map(|s| s.par_iter().map(|b| b.num_rows()).sum::<usize>())
+            .sum::<usize>()
+    );
+
+    Ok(output)
 }
 
 /// Read the payload from S3 via the S3 bucket and the key.
@@ -112,24 +90,6 @@ async fn read_payload_from_s3(bucket: String, key: String) -> Result<Payload> {
     let body = s3::get_object(&bucket, &key).await?;
     let payload: Payload = serde_json::from_slice(&body)?;
     Ok(payload)
-}
-
-/// Check the current function type.
-///
-/// If the function type is `lambda`, the function uses the default lambda
-/// concurrency. If the function type is `group`, the function is an aggregator
-/// and the concurrency is 1.
-fn is_aggregate_function(ctx: &ExecutionContext) -> bool {
-    // if the function name format is "<query code>-<plan index>-<group index>",
-    // then it is an aggregate function.
-    let dash_count = ctx.name.matches('-').count();
-    if dash_count == 2 {
-        true
-    } else if dash_count == 1 {
-        false
-    } else {
-        panic!("Invalid function name: {}", ctx.name);
-    }
 }
 
 /// The endpoint for worker function invocations. The worker function
@@ -182,6 +142,18 @@ async fn prepare_data_sources(
     arena: &mut Arena,
     event: Payload,
 ) -> Result<Vec<Vec<Vec<RecordBatch>>>> {
+    let uuid = event.uuid.clone();
+    let shuffle_id = if event.shuffle_id.is_some() {
+        event.shuffle_id.unwrap()
+    } else {
+        0
+    };
+    // function name format: <query code>-<plan index>-<group index>
+    let mut name_parts = ctx.name.split('-');
+    name_parts.next(); // skip the query code
+    let plan_index = name_parts.next().unwrap();
+    let prefix = format!("{:02}/{:02}", plan_index, shuffle_id);
+
     let mut input = vec![];
     if let Ok(batch) = infer_side_input(&event.metadata).await {
         input.push(vec![batch]);
@@ -198,7 +170,7 @@ async fn prepare_data_sources(
 
         input.push(vec![r1]);
         input.push(vec![r2]);
-    } else if is_aggregate_function(ctx) {
+    } else if ctx.is_aggregate() {
         // ressemble data packets to a single window.
         let (ready, uuid) = arena.collect(event);
         if ready {
@@ -210,7 +182,7 @@ async fn prepare_data_sources(
         } else {
             // Aggregation has not yet been completed. We can also check the query states in
             // the corresponding S3 buckets. If some states exist in S3, Flock can bring the
-            // states to the current function directly to reduce the network traffic. This
+            // states to the current function directly to reduce the query's latency. This
             // is because the aggregation states are not saved by its own, but are saved by
             // the former stage of the dataflow pipeline. Since aggregator's ancestors are
             // default Lambda functions with much higher concurrency, all of them can write
@@ -227,12 +199,8 @@ async fn prepare_data_sources(
                         .as_any()
                         .downcast_ref::<S3StateBackend>()
                         .unwrap();
-                    // function name format: <query code>-<plan index>-<group index>
-                    let mut name_parts = ctx.name.split('-');
-                    name_parts.next(); // skip the query code
-                    let plan_index = name_parts.next().unwrap();
                     let keys = state_backend
-                        .new_s3_keys(&uuid.tid, plan_index, bitmap)
+                        .new_s3_keys(&uuid.tid, &prefix, bitmap)
                         .await?;
                     if !keys.is_empty() {
                         state_backend
@@ -262,6 +230,33 @@ async fn prepare_data_sources(
         input.push(vec![r2]);
     }
 
+    // If state backend is enabled, we need to check if the states are stored in the
+    // S3 buckets before returning the input and starting the executor. If not, we
+    // have to wait until the states are ready to make fault tolerance work.
+    if ctx.is_aggregate()
+        && ctx
+            .state_backend
+            .as_any()
+            .downcast_ref::<S3StateBackend>()
+            .is_some()
+    {
+        let state_backend: &S3StateBackend = ctx
+            .state_backend
+            .as_any()
+            .downcast_ref::<S3StateBackend>()
+            .unwrap();
+
+        let mut retries = 0;
+        loop {
+            if state_backend.get_s3_key_num(&uuid.tid, &prefix).await? == uuid.seq_len {
+                break;
+            }
+            // back-off strategy: exponential back-off withoout upper bound
+            tokio::time::sleep(Duration::from_millis(2_u64.pow(retries) * 100)).await;
+            retries += 1;
+        }
+    }
+
     Ok(input)
 }
 
@@ -277,7 +272,7 @@ async fn prepare_data_sources(
 /// # Returns
 /// A JSON object that contains the return value of the current function.
 async fn invoke_next_functions(
-    ctx: &ExecutionContext,
+    ctx: &mut ExecutionContext,
     query_number: Option<usize>,
     uuid: Uuid,
     metadata: Option<HashMap<String, String>>,
@@ -304,7 +299,7 @@ async fn invoke_next_functions(
             }
         }
         CloudFunction::Lambda(group_name) => {
-            if is_aggregate_function(ctx) {
+            if ctx.is_aggregate() {
                 // If the current function is an aggregator, which means its output
                 // can be repartitioned to multiple partitions, and each partition
                 // can be executed by a single lambda function for the next stage of the
@@ -369,63 +364,162 @@ async fn invoke_next_functions(
                 "response": format!("next function: {}", group_name)
             }))
         }
-        CloudFunction::Group(..) => {
-            let next_function = ring.get(&uuid.tid).expect("hash ring failure.").to_string();
-            let mut payload = to_payload(
-                &output.into_iter().flatten().collect::<Vec<_>>(),
-                &[],
-                uuid,
-                sync,
-            );
-            payload.query_number = query_number;
-            payload.metadata = metadata;
-            let bytes = serde_json::to_vec(&payload)?;
+        CloudFunction::Group((group_name, _)) => {
+            if !ctx.is_shuffling().await? {
+                let next_function = ring.get(&uuid.tid).expect("hash ring failure.").to_string();
+                let mut payload = to_payload(
+                    &output.into_iter().flatten().collect::<Vec<_>>(),
+                    &[],
+                    uuid,
+                    sync,
+                );
+                payload.query_number = query_number;
+                payload.metadata = metadata;
+                let bytes = serde_json::to_vec(&payload)?;
 
-            info!(
-                "[OK] {} function's payload bytes: {}",
-                next_function,
-                bytes.len()
-            );
+                info!(
+                    "[OK] {} function's payload bytes: {}",
+                    next_function,
+                    bytes.len()
+                );
 
-            let mut tasks: Vec<tokio::task::JoinHandle<Result<()>>> = vec![];
-            let bytes_copy = bytes.clone();
-            let state_backend = ctx.state_backend.clone();
+                let mut tasks: Vec<tokio::task::JoinHandle<Result<()>>> = vec![];
+                let bytes_copy = bytes.clone();
+                let state_backend = ctx.state_backend.clone();
 
-            let current_function = ctx.name.clone();
-            tasks.push(tokio::spawn(async move {
-                if state_backend
-                    .as_any()
-                    .downcast_ref::<S3StateBackend>()
-                    .is_some()
-                {
-                    // function name format: <query code>-<plan index>-<group index>
-                    let plan_index = current_function.split('-').collect::<Vec<_>>()[1]
-                        .parse::<usize>()
-                        .expect("parse the plan index error.");
-                    let next_plan_index = plan_index + 1;
+                let current_function = ctx.name.clone();
+                tasks.push(tokio::spawn(async move {
+                    if state_backend
+                        .as_any()
+                        .downcast_ref::<S3StateBackend>()
+                        .is_some()
+                    {
+                        // function name format: <query code>-<plan index>-<group index>
+                        let plan_index = current_function.split('-').collect::<Vec<_>>()[1]
+                            .parse::<usize>()
+                            .expect("parse the plan index error.");
+                        let next_plan_index = plan_index + 1;
+                        let shuffle_id = 0; // since the current function is not shuffling
+                        let bucket = payload.uuid.tid;
+                        let key = format!(
+                            "{:02}/{:02}/{:02}",
+                            next_plan_index, shuffle_id, payload.uuid.seq_num
+                        );
 
-                    let bucket = payload.uuid.tid;
-                    let key = format!("{:02}/{:02}", next_plan_index, payload.uuid.seq_num);
+                        // S3 state backend:
+                        // - bucket equals to tid: <query code>-<timestamp>-<random string>
+                        // - key: <plan index>-<shuffle id>-<sequence id>
+                        state_backend.write(bucket, key, bytes_copy).await?;
+                    }
+                    Ok(())
+                }));
 
-                    // S3 state backend:
-                    // - bucket equals to tid: <query code>-<timestamp>-<random string>
-                    // - key: <plan index>-<sequence number>
-                    state_backend.write(bucket, key, bytes_copy).await?;
-                }
-                Ok(())
-            }));
+                let next_func = next_function.clone();
+                tasks.push(tokio::spawn(async move {
+                    lambda::invoke_function(&next_func, &invocation_type, Some(bytes.into()))
+                        .await?;
+                    Ok(())
+                }));
 
-            let next_func = next_function.clone();
-            tasks.push(tokio::spawn(async move {
-                lambda::invoke_function(&next_func, &invocation_type, Some(bytes.into())).await?;
-                Ok(())
-            }));
+                futures::future::join_all(tasks).await;
 
-            futures::future::join_all(tasks).await;
+                Ok(json!({
+                    "response": format!("next function: {}", next_function)
+                }))
+            } else {
+                let mut rng = StdRng::seed_from_u64(0xDEAD); // Predictable RNG clutch
+                let tasks = (0..output.len())
+                    .map(|i| {
+                        let my_output = output.clone();
+                        let my_metadata = metadata.clone();
+                        let my_uuid = uuid.clone();
+                        let state_backend = ctx.state_backend.clone();
+                        let current_function = ctx.name.clone();
+                        let invoke_type = invocation_type.clone();
 
-            Ok(json!({
-                "response": format!("next function: {}", next_function)
-            }))
+                        // Partitions at the same index position in different functions can get the
+                        // same hash key. Therefore, they can be forwarded to the same lambda
+                        // function.
+                        //
+                        // Function 0: data[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+                        // Function 1: data[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+                        // Function 2: data[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+                        // ..
+                        // Function n: data[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+                        //
+                        // F0[0], F1[0], F2[0] .. Fn[0] ---> lambda function x
+                        // F0[1], F1[1], F2[1] .. Fn[1] ---> lambda function y
+                        // F0[2], F1[2], F2[2] .. Fn[2] ---> lambda function z
+                        // ..
+                        // F0[n], F1[n], F2[n] .. Fn[n] ---> lambda function v
+                        let mut arr = [0u8; 64];
+                        rng.fill(&mut arr);
+                        let next_function = ring.get(&arr).expect("hash ring failure.").to_string();
+
+                        tokio::spawn(async move {
+                            let mut payload = to_payload(&my_output[i], &[], my_uuid, sync);
+                            payload.query_number = query_number;
+                            payload.metadata = my_metadata;
+                            // set shuffle id to each data partition since they will be aggregated
+                            // at different functions.
+                            payload.shuffle_id = Some(i);
+                            let bytes = serde_json::to_vec(&payload)?;
+
+                            info!(
+                                "[OK] {} function's payload bytes: {}",
+                                next_function,
+                                bytes.len()
+                            );
+
+                            let mut tasks: Vec<tokio::task::JoinHandle<Result<()>>> = vec![];
+                            let bytes_copy = bytes.clone();
+                            let my_state = state_backend.clone();
+                            let current_func = current_function.clone();
+                            tasks.push(tokio::spawn(async move {
+                                if my_state.as_any().downcast_ref::<S3StateBackend>().is_some() {
+                                    // function name format: <query code>-<plan index>-<group index>
+                                    let plan_index = current_func.split('-').collect::<Vec<_>>()[1]
+                                        .parse::<usize>()
+                                        .expect("parse the plan index error.");
+                                    let next_plan_index = plan_index + 1;
+                                    let shuffle_id = i; // since the current function is shuffling
+                                    let bucket = payload.uuid.tid;
+                                    let key = format!(
+                                        "{:02}/{:02}/{:02}",
+                                        next_plan_index, shuffle_id, payload.uuid.seq_num
+                                    );
+
+                                    // S3 state backend:
+                                    // - bucket equals to tid: <query code>-<timestamp>-<random
+                                    //   string>
+                                    // - key: <plan index>-<shuffle id>-<sequence id>
+                                    state_backend.write(bucket, key, bytes_copy).await?;
+                                }
+                                Ok(())
+                            }));
+
+                            tasks.push(tokio::spawn(async move {
+                                lambda::invoke_function(
+                                    &next_function,
+                                    &invoke_type,
+                                    Some(bytes.into()),
+                                )
+                                .await?;
+                                Ok(())
+                            }));
+
+                            futures::future::join_all(tasks).await;
+
+                            Ok(())
+                        })
+                    })
+                    .collect::<Vec<tokio::task::JoinHandle<Result<()>>>>();
+                futures::future::join_all(tasks).await;
+
+                Ok(json!({
+                    "response": format!("next function group: {}", group_name)
+                }))
+            }
         }
     }
 }

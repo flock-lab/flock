@@ -152,6 +152,9 @@ pub struct Payload {
     pub datasource:   DataSource,
     /// The Nexmark query number for the benchmarking purposes.
     pub query_number: Option<usize>,
+    /// The shuffle id. This is used to identify the shuffled data for the
+    /// aggregation in the next cloud function.
+    pub shuffle_id:   Option<usize>,
     /// The extra metadata for the payload.
     pub metadata:     Option<HashMap<String, String>>,
 }

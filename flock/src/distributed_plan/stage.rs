@@ -276,28 +276,7 @@ fn build_query_dag_from_serde_json(plan: Arc<dyn ExecutionPlan>) -> Result<Query
     loop {
         match json["execution_plan"].as_str() {
             Some("hash_aggregate_exec") => match json["mode"].as_str() {
-                Some("FinalPartitioned") => {
-                    // Split the plan into two subplans
-                    let object = (*json["input"].take().as_object().ok_or_else(|| {
-                        FlockError::QueryStage(
-                            "Failed to parse input for HashAggregateExec".to_string(),
-                        )
-                    })?)
-                    .clone();
-                    // Add a input for the new subplan
-                    let input: Arc<dyn ExecutionPlan> = Arc::new(MemoryExec::try_new(
-                        &[],
-                        curr.children()[0].schema().clone(),
-                        None,
-                    )?);
-                    json["input"] = serde_json::to_value(input)?;
-                    // Add the new subplan to DAG
-                    leaf = dag.insert(leaf, vec![root], *FLOCK_FUNCTION_CONCURRENCY)?;
-                    // Point to the next subplan
-                    root = Value::Object(object);
-                    json = &mut root;
-                }
-                Some("Final") => {
+                Some("Final") | Some("FinalPartitioned") => {
                     // Split the plan into two subplans
                     let object = (*json["input"].take().as_object().ok_or_else(|| {
                         FlockError::QueryStage(

@@ -284,8 +284,9 @@ impl ExecutionContext {
     }
 
     /// Checks whether the execution plan needs to be shuffled.
-    pub async fn is_shuffling(&mut self) -> Result<bool> {
-        Ok(self.plan().await?.iter().all(|p| {
+    pub async fn is_shuffling(&self) -> Result<bool> {
+        assert!(!self.plan.execution_plans.is_empty());
+        Ok(self.plan.execution_plans.iter().all(|p| {
             p.as_any().downcast_ref::<CoalesceBatchesExec>().is_some()
                 && !p.children().is_empty()
                 && p.children()
@@ -295,10 +296,27 @@ impl ExecutionContext {
     }
 
     /// Checks whether the execution plan is the last one.
-    pub async fn is_last_stage(&mut self) -> Result<bool> {
+    pub async fn is_last_stage(&self) -> Result<bool> {
         match self.next {
             CloudFunction::Sink(..) => Ok(true),
             _ => Ok(false),
+        }
+    }
+
+    /// Check the current function type.
+    ///
+    /// If the function name is "<query code>-<plan index>-<group index>",
+    /// then it is a group-type function.
+    /// If the function name is "<query code>-<plan index>",
+    /// then it is a lambda-type function.
+    pub fn is_aggregate(&self) -> bool {
+        let dash_count = self.name.matches('-').count();
+        if dash_count == 2 {
+            true
+        } else if dash_count == 1 {
+            false
+        } else {
+            panic!("Invalid function name: {}", self.name);
         }
     }
 }
