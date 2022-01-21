@@ -21,7 +21,9 @@ use crate::runtime::plan::CloudExecutionPlan;
 use crate::state::*;
 use datafusion::arrow::datatypes::{Schema, SchemaRef};
 use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::physical_plan::coalesce_batches::CoalesceBatchesExec;
 use datafusion::physical_plan::memory::MemoryExec;
+use datafusion::physical_plan::repartition::RepartitionExec;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::physical_plan::{collect, collect_partitioned};
 use serde::{Deserialize, Serialize};
@@ -279,6 +281,25 @@ impl ExecutionContext {
         }
 
         Ok(())
+    }
+
+    /// Checks whether the execution plan needs to be shuffled.
+    pub async fn is_shuffling(&mut self) -> Result<bool> {
+        Ok(self.plan().await?.iter().all(|p| {
+            p.as_any().downcast_ref::<CoalesceBatchesExec>().is_some()
+                && !p.children().is_empty()
+                && p.children()
+                    .iter()
+                    .all(|c| c.as_any().downcast_ref::<RepartitionExec>().is_some())
+        }))
+    }
+
+    /// Checks whether the execution plan is the last one.
+    pub async fn is_last_stage(&mut self) -> Result<bool> {
+        match self.next {
+            CloudFunction::Sink(..) => Ok(true),
+            _ => Ok(false),
+        }
     }
 }
 
