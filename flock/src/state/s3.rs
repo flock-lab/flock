@@ -25,7 +25,7 @@ use tokio::task::JoinHandle;
 
 /// S3StateBackend is a state backend that stores query states in Amazon S3.
 ///
-/// S3 bucket name is the tid of the function payload:
+/// S3 bucket name is the qid of the function payload:
 ///
 /// | query code | timestamp  | random string |
 ///

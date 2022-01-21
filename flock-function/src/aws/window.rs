@@ -89,7 +89,7 @@ pub async fn tumbling_window_tasks(
 
         // Distribute the window data to a single function execution environment.
         let function_name = ring
-            .get(&uuid_builder.tid)
+            .get(&uuid_builder.qid)
             .expect("hash ring failure.")
             .to_string();
 
@@ -193,7 +193,7 @@ pub async fn hopping_window_tasks(
 
         // Distribute the window data to a single function execution environment.
         let function_name = ring
-            .get(&uuid_builder.tid)
+            .get(&uuid_builder.qid)
             .expect("hash ring failure.")
             .to_string();
 
@@ -472,10 +472,10 @@ pub async fn session_window_tasks(
                 let query_code = group_name.split('-').next().unwrap();
                 let timestamp = Utc::now().timestamp();
                 let rand_id = uuid::Uuid::new_v4().as_u128();
-                let tid = format!("{}-{}-{}", query_code, timestamp, rand_id);
+                let qid = format!("{}-{}-{}", query_code, timestamp, rand_id);
 
                 // Distribute the window data to a single function execution environment.
-                let function_name = ring.get(&tid).expect("hash ring failure.").to_string();
+                let function_name = ring.get(&qid).expect("hash ring failure.").to_string();
                 info!("Session window -> function name: {}", function_name);
 
                 tokio::spawn(async move {
@@ -775,10 +775,10 @@ pub async fn global_window_tasks(
                 let query_code = group_name.split('-').next().unwrap();
                 let timestamp = Utc::now().timestamp();
                 let rand_id = uuid::Uuid::new_v4().as_u128();
-                let tid = format!("{}-{}-{}", query_code, timestamp, rand_id);
+                let qid = format!("{}-{}-{}", query_code, timestamp, rand_id);
 
                 // Distribute the window data to a single function execution environment.
-                let function_name = ring.get(&tid).expect("hash ring failure.").to_string();
+                let function_name = ring.get(&qid).expect("hash ring failure.").to_string();
                 info!("Tumbling window -> function name: {}", function_name);
 
                 tokio::spawn(async move {
@@ -943,7 +943,7 @@ pub async fn elementwise_tasks(
 
             // Distribute the epoch data to a single function execution environment.
             let function_name = ring
-                .get(&uuid_builder.tid)
+                .get(&uuid_builder.qid)
                 .expect("hash ring failure.")
                 .to_string();
 

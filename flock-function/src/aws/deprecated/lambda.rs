@@ -220,7 +220,7 @@ async fn payload_handler(
             // ressemble lambda n to 1
             let (ready, uuid) = arena.reassemble(event);
             if ready {
-                arena.batches(uuid.tid)
+                arena.batches(uuid.qid)
             } else {
                 return Err(FlockError::Execution(
                     "window data collection has not been completed.".to_string(),

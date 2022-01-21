@@ -19,11 +19,15 @@ mod bitmap;
 pub use bitmap::Bitmap;
 
 use crate::error::{FlockError, Result};
-use crate::runtime::payload::{Payload, Uuid};
+use crate::runtime::payload::Payload;
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::record_batch::RecordBatch;
 use hashbrown::HashMap;
 use std::ops::{Deref, DerefMut};
+
+type QueryId = String;
+type ShuffleId = usize;
+type WindowId = (QueryId, ShuffleId);
 
 /// `Arena` is a global hash map inside the lambda function that is used to
 /// aggregate the data frames of the previous stage of dataflow to ensure the
@@ -34,7 +38,7 @@ use std::ops::{Deref, DerefMut};
 ///   query time.
 /// * The value is the data frames of the previous stage of dataflow for a given
 ///   query at a given time wrapped by `WindowSession`.
-pub struct Arena(HashMap<String, WindowSession>);
+pub struct Arena(HashMap<WindowId, WindowSession>);
 
 /// `WindowSession` is an abstraction of a temporal window that is used to store
 /// the data frames of the previous stage of dataflow to ensure the integrity of
@@ -75,12 +79,12 @@ impl WindowSession {
 impl Arena {
     /// Create a new `Arena`.
     pub fn new() -> Arena {
-        Arena(HashMap::<String, WindowSession>::new())
+        Arena(HashMap::<WindowId, WindowSession>::new())
     }
 
     /// Get the data fragments in the temporal window via the key.
-    pub fn take_batches(&mut self, tid: &str) -> Vec<Vec<Vec<RecordBatch>>> {
-        if let Some(window) = (*self).remove(tid) {
+    pub fn take_batches(&mut self, window_id: &WindowId) -> Vec<Vec<Vec<RecordBatch>>> {
+        if let Some(window) = (*self).remove(window_id) {
             vec![window.r1_records, window.r2_records]
         } else {
             vec![vec![], vec![]]
@@ -88,13 +92,13 @@ impl Arena {
     }
 
     /// Return the Bitmap reference of the temporal window.
-    pub fn get_bitmap(&self, tid: &str) -> Option<&Bitmap> {
-        self.get(tid).map(|window| &window.bitmap)
+    pub fn get_bitmap(&self, window_id: &WindowId) -> Option<&Bitmap> {
+        self.get(window_id).map(|window| &window.bitmap)
     }
 
     /// Return true if the temporal window is empty.
-    pub fn is_complete(&self, tid: &str) -> bool {
-        self.get(tid)
+    pub fn is_complete(&self, window_id: &WindowId) -> bool {
+        self.get(window_id)
             .map(|window| window.size == window.r1_records.len())
             .unwrap_or(false)
     }
@@ -102,17 +106,18 @@ impl Arena {
     /// Collect the data fragments for temporal windows.
     ///
     /// # Arguments
-    /// * `event` - the serialized data fragments from the previous stage of
-    /// dataflow.
+    /// * `payload` - The payload of the data frame.
     ///
     /// # Returns
     /// * Return true if the window data collection is complete, otherwise
     ///   return false. Uuid is also returned no matter whether the window data
     ///   collection is complete.
-    pub fn collect(&mut self, event: Payload) -> (bool, Uuid) {
+    pub fn collect(&mut self, payload: Payload) -> bool {
         let mut ready = false;
-        let (r1, r2, uuid) = event.to_record_batch();
-        match &mut (*self).get_mut(&uuid.tid) {
+        let uuid = payload.uuid.clone();
+        let window_id = payload.get_window_id();
+        let (r1, r2) = payload.to_record_batch();
+        match &mut (*self).get_mut(&window_id) {
             Some(window) => {
                 assert!(uuid.seq_len == window.size);
                 if !window.bitmap.is_set(uuid.seq_num) {
@@ -133,15 +138,15 @@ impl Arena {
                 // SEQ_NUM is used to indicate the data existence in the window via bitmap.
                 window.bitmap.set(uuid.seq_num);
                 ready = window.size == 1;
-                (*self).insert(uuid.tid.clone(), window);
+                (*self).insert(window_id, window);
             }
         }
-        (ready, uuid)
+        ready
     }
 }
 
 impl Deref for Arena {
-    type Target = HashMap<String, WindowSession>;
+    type Target = HashMap<WindowId, WindowSession>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -202,7 +207,7 @@ mod tests {
         let mut arena = Arena::new();
         batches.into_iter().enumerate().for_each(|(i, batch)| {
             let payload = to_payload(&[batch], &[], uuids.get(i), false);
-            let (ready, _) = arena.collect(payload);
+            let ready = arena.collect(payload);
             if i < 7 {
                 assert!(!ready);
             } else {
@@ -210,17 +215,18 @@ mod tests {
             }
         });
 
-        let tid = uuids.get(0).tid;
-        assert!((*arena).get(&tid).is_some());
+        let qid = uuids.get(0).qid;
+        let window_id = (qid, 0);
+        assert!((*arena).get(&window_id).is_some());
 
-        if let Some(window) = (*arena).get(&tid) {
+        if let Some(window) = (*arena).get(&window_id) {
             assert_eq!(8, window.size);
             assert_eq!(8, window.r1_records.len());
             (0..8).for_each(|i| assert!(window.bitmap.is_set(i)));
         }
 
-        assert_eq!(8, arena.take_batches(&tid)[0].len());
-        assert_eq!(0, arena.take_batches("no exists")[0].len());
+        assert_eq!(8, arena.take_batches(&window_id)[0].len());
+        assert_eq!(0, arena.take_batches(&("no exists".to_owned(), 0))[0].len());
 
         Ok(())
     }
