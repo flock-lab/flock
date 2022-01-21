@@ -333,7 +333,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn aws_launcher_nexmark_q3_dist_hash_join() -> Result<()> {
+    async fn aws_launcher_extended_nexmark_q3_dist_hash_join_with_sort() -> Result<()> {
         let auction_schema = Arc::new(Auction::schema());
         let person_schema = Arc::new(Person::schema());
 
@@ -349,7 +349,8 @@ mod tests {
                 WHERE  category = 10
                         AND ( state = 'or'
                                 OR state = 'id'
-                                OR state = 'ca' );
+                                OR state = 'ca' )
+                ORDER BY a_id ASC
             "},
             vec![
                 Table("auction".to_string(), auction_schema.clone()),
@@ -411,13 +412,23 @@ mod tests {
         //     HashJoinExec: mode=Partitioned, join_type=Inner, on=[(Column { name: "seller", index: 1 }, Column { name: "p_id", index: 0 })]
         //       MemoryExec: partitions=0, partition_sizes=[]
         //       MemoryExec: partitions=0, partition_sizes=[]
-        assert!(launcher.dag.node_count() == 2);
+        //
+        // === Stage 2 ===
+        // SortExec: [a_id@3 ASC NULLS LAST]
+        //   MemoryExec: partitions=0, partition_sizes=[]
+        assert!(launcher.dag.node_count() == 3);
 
         let stages = launcher.dag.get_all_stages();
+        for (i, stage) in stages.iter().enumerate() {
+            println!("=== Stage {} ===\n{}", i, stage.get_plan_str());
+        }
+
         let input = vec![vec![auctions_batches], vec![person_batches]];
 
         // === Query Stage 0 ===
         let mut ctx = stages[0].context.clone().unwrap();
+        assert!(ctx.is_shuffling().await?);
+        assert!(!ctx.is_last_stage().await?);
         ctx.feed_data_sources(input.clone()).await?;
         // We **MUST USE** execute_partitioned() instead of execute() here.
         let output = ctx.execute_partitioned().await?;
@@ -427,15 +438,26 @@ mod tests {
         // === Query Stage 1 ===
         let num_partitions = output[0].len();
         let mut ctx = stages[1].context.clone().unwrap();
-        let mut result = vec![];
+        assert!(!ctx.is_shuffling().await?);
+        assert!(!ctx.is_last_stage().await?);
+        let mut output1 = vec![];
         for i in 0..num_partitions {
             ctx.feed_data_sources(vec![vec![output[0][i].clone()], vec![output[1][i].clone()]])
                 .await?;
             let sliced_output = ctx.execute().await?;
             ctx.clean_data_sources().await?;
             assert!(sliced_output.len() == 1);
-            result.push(sliced_output.into_iter().next().unwrap());
+            output1.push(sliced_output.into_iter().next().unwrap());
         }
+
+        // === Query Stage 2 ===
+        let mut ctx = stages[2].context.clone().unwrap();
+        assert!(!ctx.is_shuffling().await?);
+        assert!(ctx.is_last_stage().await?);
+        let output1 = output1.into_iter().flatten().collect::<Vec<_>>();
+        ctx.feed_data_sources(vec![vec![output1]]).await?;
+        let result = ctx.execute().await?;
+        ctx.clean_data_sources().await?;
 
         let result = result.into_iter().flatten().collect::<Vec<_>>();
         let formatted = pretty_format_batches(&result).unwrap().to_string();
@@ -446,7 +468,7 @@ mod tests {
         launcher.feed_data_sources(input);
         let batches = launcher.collect().await?;
 
-        assert_batches_sorted_eq!(expected, &batches);
+        assert_batches_eq!(expected, &batches);
 
         Ok(())
     }
