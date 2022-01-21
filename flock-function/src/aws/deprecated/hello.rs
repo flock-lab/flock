@@ -11,12 +11,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-use lambda_runtime::{handler_fn, Context};
+use lambda_runtime::{service_fn, LambdaEvent};
 use serde_json::Value;
 
 type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
 
-async fn handler(event: Value, _: Context) -> Result<Value, Error> {
+async fn handler(event: LambdaEvent<Value>) -> Result<Value, Error> {
     Ok(event)
 }
 

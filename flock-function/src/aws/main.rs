@@ -25,7 +25,7 @@ mod ysb;
 use cloud_context::*;
 use flock::prelude::*;
 use hashring::HashRing;
-use lambda_runtime::{handler_fn, Context};
+use lambda_runtime::{service_fn, LambdaEvent};
 use log::info;
 use serde_json::Value;
 
@@ -37,20 +37,21 @@ static ALLOC: snmalloc_rs::SnMalloc = snmalloc_rs::SnMalloc;
 #[global_allocator]
 static ALLOC: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
-async fn handler(event: Payload, _: Context) -> Result<Value> {
+async fn handler(event: LambdaEvent<Payload>) -> Result<Value> {
+    let payload = event.payload;
     let (ctx, arena) = init_exec_context!();
-    update_consistent_hash_context(&event.metadata)?;
+    update_consistent_hash_context(&payload.metadata)?;
 
     info!(
         "AWS Lambda function architecture: {}",
         std::env::consts::ARCH
     );
 
-    match &event.datasource {
-        DataSource::Payload(_) => actor::handler(ctx, arena, event).await,
-        DataSource::NEXMarkEvent(_) => nexmark::handler(ctx, event).await,
-        DataSource::YSBEvent(_) => ysb::handler(ctx, event).await,
-        DataSource::S3(_) => s3::handler(ctx, event).await,
+    match &payload.datasource {
+        DataSource::Payload(_) => actor::handler(ctx, arena, payload).await,
+        DataSource::NEXMarkEvent(_) => nexmark::handler(ctx, payload).await,
+        DataSource::YSBEvent(_) => ysb::handler(ctx, payload).await,
+        DataSource::S3(_) => s3::handler(ctx, payload).await,
         _ => unimplemented!(),
     }
 }
@@ -58,6 +59,6 @@ async fn handler(event: Payload, _: Context) -> Result<Value> {
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::init();
-    lambda_runtime::run(handler_fn(handler)).await?;
+    lambda_runtime::run(service_fn(handler)).await?;
     Ok(())
 }
