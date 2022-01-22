@@ -55,7 +55,9 @@ pub async fn collect(
     let num_streams = streams.len();
     let input_streams = streams
         .into_iter()
-        .filter(|r| !r.is_empty())
+        .filter(|r| {
+            r.par_iter().any(|s| s.par_iter().any(|b| b.num_rows() > 0))
+        })
         .collect::<Vec<_>>();
 
     info!("Executing the physical plan.");
