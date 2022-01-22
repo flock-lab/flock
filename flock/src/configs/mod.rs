@@ -89,4 +89,7 @@ lazy_static! {
     pub static ref FLOCK_EMPTY_PLAN: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(false, Arc::new(Schema::empty())));
     /// Flock data source function name
     pub static ref FLOCK_DATA_SOURCE_FUNC_NAME: String = FLOCK_CONF["flock"]["data_source"].to_string();
+
+    /// Flock target partitions.
+    pub static ref FLOCK_TARGET_PARTITIONS: usize = FLOCK_CONF["datafusion"]["target_partitions"].parse::<usize>().unwrap();
 }

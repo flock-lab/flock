@@ -335,8 +335,8 @@ async fn invoke_next_functions(
                                 &invoke_type,
                                 Some(bytes.into()),
                             )
-                            .await?;
-                            Ok(())
+                            .await
+                            .map(|_| ())
                         })
                     })
                     .collect::<Vec<tokio::task::JoinHandle<Result<()>>>>();
@@ -413,16 +413,17 @@ async fn invoke_next_functions(
                         // S3 state backend:
                         // - bucket equals to qid: <query code>-<timestamp>-<random string>
                         // - key: <plan index>-<shuffle id>-<sequence id>
-                        state_backend.write(bucket, key, bytes_copy).await?;
-
-                        Ok(())
+                        state_backend
+                            .write(bucket, key, bytes_copy)
+                            .await
+                            .map(|_| ())
                     }));
                 }
 
                 tasks.push(tokio::spawn(async move {
                     lambda::invoke_function(&next_function, &invocation_type, Some(bytes.into()))
-                        .await?;
-                    Ok(())
+                        .await
+                        .map(|_| ())
                 }));
 
                 futures::future::join_all(tasks).await;
@@ -502,9 +503,10 @@ async fn invoke_next_functions(
                                     // - bucket equals to qid: <query code>-<timestamp>-<random
                                     //   string>
                                     // - key: <plan index>-<shuffle id>-<sequence id>
-                                    state_backend.write(bucket, key, bytes_copy).await?;
-
-                                    Ok(())
+                                    state_backend
+                                        .write(bucket, key, bytes_copy)
+                                        .await
+                                        .map(|_| ())
                                 }));
                             }
 
@@ -514,8 +516,8 @@ async fn invoke_next_functions(
                                     &invoke_type,
                                     Some(bytes.into()),
                                 )
-                                .await?;
-                                Ok(())
+                                .await
+                                .map(|_| ())
                             }));
 
                             futures::future::join_all(tasks).await;

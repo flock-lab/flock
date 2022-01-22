@@ -76,6 +76,7 @@ mod queries;
 pub use self::config::NEXMarkConfig;
 pub use self::event::{side_input_schema, Auction, Bid, Person};
 pub use self::nexmark::{NEXMarkEvent, NEXMarkSource, NEXMarkStream};
+use crate::configs::FLOCK_TARGET_PARTITIONS;
 use crate::error::Result;
 use datafusion::arrow::datatypes::Schema;
 use datafusion::arrow::record_batch::RecordBatch;
@@ -98,10 +99,9 @@ pub fn get_nexmark_schema(table: &str) -> Schema {
 }
 
 /// Register the NEXMark tables with empty data.
-pub async fn register_nexmark_tables_with_shuffle_partitions(
-    shuffle_partitions: usize,
+pub async fn register_nexmark_tables_with_config(
+    config: ExecutionConfig,
 ) -> Result<ExecutionContext> {
-    let config = ExecutionConfig::new().with_target_partitions(shuffle_partitions);
     let mut ctx = ExecutionContext::with_config(config);
     let person_schema = Arc::new(Person::schema());
     let person_table = MemTable::try_new(
@@ -137,5 +137,6 @@ pub async fn register_nexmark_tables_with_shuffle_partitions(
 
 /// Register the NEXMark tables with empty data.
 pub async fn register_nexmark_tables() -> Result<ExecutionContext> {
-    register_nexmark_tables_with_shuffle_partitions(16).await
+    let config = ExecutionConfig::new().with_target_partitions(*FLOCK_TARGET_PARTITIONS);
+    register_nexmark_tables_with_config(config).await
 }

@@ -919,8 +919,8 @@ pub async fn elementwise_tasks(
                                 &invoke_type,
                                 Some(bytes.into()),
                             )
-                            .await?;
-                            Ok(())
+                            .await
+                            .map(|_| ())
                         })
                     })
                     .collect::<Vec<tokio::task::JoinHandle<Result<()>>>>();

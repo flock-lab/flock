@@ -96,6 +96,11 @@ pub struct NexmarkBenchmarkOpt {
     /// The state backend to use
     #[structopt(short = "b", long = "state_backend", default_value = "hashmap")]
     pub state_backend: String,
+
+    /// The target partitions to use in Arrow DataFusion.
+    /// This is only used in distributed mode.
+    #[structopt(short = "p", long = "target_partitions", default_value = "8")]
+    pub target_partitions: usize,
 }
 
 #[allow(dead_code)]

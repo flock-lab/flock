@@ -22,12 +22,14 @@ use super::create_physical_plans;
 use super::nexmark_query;
 use crate::NexmarkBenchmarkOpt;
 use daggy::NodeIndex;
+use datafusion::execution::context::ExecutionConfig;
 use flock::aws::lambda;
 use flock::distributed_plan::QueryDag;
 use flock::prelude::*;
+use humantime::parse_duration;
 use lazy_static::lazy_static;
 use log::info;
-use nexmark::register_nexmark_tables;
+use nexmark::register_nexmark_tables_with_config;
 use rainbow::{rainbow_println, rainbow_string};
 use rusoto_lambda::InvocationResponse;
 use std::collections::HashMap;
@@ -49,7 +51,9 @@ pub async fn nexmark_benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
     let query_code = format!("q{}", opt.query_number);
     let nexmark_conf = create_nexmark_source(opt).await?;
 
-    let mut ctx = register_nexmark_tables().await?;
+    let config = ExecutionConfig::new().with_target_partitions(opt.target_partitions);
+    let mut ctx = register_nexmark_tables_with_config(config).await?;
+
     let plans = create_physical_plans(&mut ctx, query_number).await?;
     let plan = plans.last().unwrap().clone();
     let sink_type = DataSinkType::new(&opt.data_sink_type)?;
@@ -161,6 +165,7 @@ async fn create_nexmark_functions(
                 })
                 .collect::<Vec<JoinHandle<Result<()>>>>();
             futures::future::join_all(tasks).await;
+            tokio::time::sleep(parse_duration("2s").unwrap()).await;
         } else {
             lambda::create_function(
                 node.context.as_ref().unwrap(),

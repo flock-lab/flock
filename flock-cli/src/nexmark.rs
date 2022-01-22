@@ -128,6 +128,15 @@ fn run_args() -> App<'static> {
                 .possible_values(&["hashmap", "s3", "efs"])
                 .default_value("hashmap"),
         )
+        .arg(
+            Arg::new("Arrow Datafusion target partitions")
+                .short('p')
+                .long("partitions")
+                .help("Sets the number of partitions for the Arrow Datafusion target")
+                .takes_value(true)
+                .possible_values(&["1", "2", "4", "8", "16", "32"])
+                .default_value("8"),
+        )
 }
 
 pub fn run(matches: &ArgMatches) -> Result<()> {
@@ -207,6 +216,14 @@ pub fn run(matches: &ArgMatches) -> Result<()> {
             .unwrap()
             .parse::<String>()
             .with_context(|| anyhow!("Invalid state backend"))?;
+    }
+
+    if matches.is_present("Arrow Datafusion target partitions") {
+        opt.target_partitions = matches
+            .value_of("Arrow Datafusion target partitions")
+            .unwrap()
+            .parse::<usize>()
+            .with_context(|| anyhow!("Invalid Arrow Datafusion target partitions"))?;
     }
 
     rainbow_println(include_str!("./flock"));
