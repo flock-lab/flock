@@ -19,6 +19,7 @@ mod rainbow;
 use super::add_extra_metadata;
 use super::create_nexmark_source;
 use super::create_physical_plans;
+use super::nexmark_query;
 use crate::NexmarkBenchmarkOpt;
 use daggy::NodeIndex;
 use flock::aws::lambda;
@@ -42,7 +43,7 @@ pub async fn nexmark_benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
     rainbow_println("                    Running the benchmark                       ");
     rainbow_println("================================================================");
     info!("Running the NEXMark benchmark with the following options:\n");
-    rainbow_println(format!("{:#?}\n", opt));
+    println!("{:#?}\n", opt);
 
     let query_number = opt.query_number;
     let query_code = format!("q{}", opt.query_number);
@@ -63,8 +64,32 @@ pub async fn nexmark_benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
     let mut launcher =
         AwsLambdaLauncher::try_new(query_code, plan, sink_type, state_backend).await?;
     launcher.create_cloud_contexts(*FLOCK_FUNCTION_CONCURRENCY)?;
+
+    info!(
+        "Streaming: {}",
+        rainbow_string(format!("{:?}", nexmark_conf.window))
+    );
+    info!(
+        "SQL query:\n\n{}",
+        nexmark_query(query_number).last().unwrap()
+    );
+
+    let stages = launcher.dag.get_all_stages();
+    for (i, stage) in stages.iter().enumerate() {
+        info!("{}", rainbow_string(format!("=== Query Stage {} ===", i)));
+        info!(
+            "Current function type: {}",
+            rainbow_string(format!("{:?}", stage.get_function_type()))
+        );
+        info!(
+            "Next function name: {}",
+            rainbow_string(format!("{:?}", stage.context.as_ref().unwrap().next))
+        );
+        println!("{}", stage.get_plan_str());
+    }
+
     let dag = &mut launcher.dag;
-    create_nexmark_functions(dag, opt).await?;
+    create_nexmark_functions(dag, opt, *FLOCK_FUNCTION_CONCURRENCY).await?;
 
     let mut metadata = HashMap::new();
     add_extra_metadata(opt, &mut metadata).await?;
@@ -100,7 +125,11 @@ pub async fn nexmark_benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
 }
 
 /// Create lambda functions for a given NexMark query.
-async fn create_nexmark_functions(dag: &mut QueryDag, opt: &NexmarkBenchmarkOpt) -> Result<()> {
+async fn create_nexmark_functions(
+    dag: &mut QueryDag,
+    opt: &NexmarkBenchmarkOpt,
+    group_size: usize,
+) -> Result<()> {
     let count = dag.node_count();
     assert!(count < 100);
 
@@ -111,12 +140,12 @@ async fn create_nexmark_functions(dag: &mut QueryDag, opt: &NexmarkBenchmarkOpt)
     for i in (0..count).rev() {
         let node = dag.get_node_mut(NodeIndex::new(i)).unwrap();
         if func_types[i] == CloudFunctionType::Group {
-            let group_name = format!("q{}-{:02}", opt.query_number, i);
+            let group_name = format!("q{}-{:02}", opt.query_number, count - 1 - i);
             info!(
                 "Creating lambda function group: {}",
-                rainbow_string(format!("({}, {})", group_name, *FLOCK_FUNCTION_CONCURRENCY))
+                rainbow_string(format!("({}, {})", group_name, group_size))
             );
-            let tasks = (0..*FLOCK_FUNCTION_CONCURRENCY)
+            let tasks = (0..group_size)
                 .into_iter()
                 .map(|j| {
                     let mut ctx = node.context.clone().unwrap();
@@ -125,24 +154,24 @@ async fn create_nexmark_functions(dag: &mut QueryDag, opt: &NexmarkBenchmarkOpt)
                     let architecture = opt.architecture.clone();
                     tokio::spawn(async move {
                         ctx.name = format!("{}-{:02}", name, j);
-                        info!("Creating function member: {}", rainbow_string(&ctx.name));
                         lambda::create_function(&ctx, memory_size, &architecture).await?;
+                        info!("Created function member: {}", rainbow_string(&ctx.name));
                         lambda::set_concurrency(&ctx.name, 1).await
                     })
                 })
                 .collect::<Vec<JoinHandle<Result<()>>>>();
             futures::future::join_all(tasks).await;
         } else {
-            info!(
-                "Creating lambda function: {}",
-                rainbow_string(format!("q{}-{:02}", opt.query_number, i))
-            );
             lambda::create_function(
                 node.context.as_ref().unwrap(),
                 opt.memory_size,
                 &opt.architecture,
             )
             .await?;
+            info!(
+                "Created lambda function: {}",
+                rainbow_string(format!("q{}-{:02}", opt.query_number, count - 1 - i))
+            );
         }
     }
 

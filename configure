@@ -107,6 +107,9 @@ target="unknown"
 compile=false
 run=false
 
+rustup install nightly-2022-01-20
+rustup default nightly-2022-01-20
+
 # Get the options
 while getopts "hgcra:" option; do
   case $option in
