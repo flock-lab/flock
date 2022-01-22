@@ -58,7 +58,7 @@ jobs:
           key: ${{ runner.os }}-${{ matrix.TARGET }}-target-cache-${{ matrix.RUST }}-
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
+          toolchain: nightly-2022-01-20
           override: true
           components: rustfmt
       # - name: update all third-party dependencies
@@ -90,7 +90,8 @@ jobs:
         run: rustup target add $TARGET
       - name: Run build
         run: |
-          cargo +nightly build --release --verbose --target $TARGET --features "simd mimalloc"
+          rustup default nightly-2022-01-20
+          cargo build --release --verbose --target $TARGET --features "simd mimalloc"
         env:
           CARGO_HOME: "~/.cargo"
           CARGO_TARGET_DIR: "target"

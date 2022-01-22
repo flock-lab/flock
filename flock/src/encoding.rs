@@ -70,7 +70,7 @@ impl Encoding {
                     .map_err(|e| FlockError::Execution(e.to_string()))?
             }
             Encoding::Zstd => {
-                zstd::bulk::compress(s, 3).map_err(|e| FlockError::Execution(e.to_string()))?
+                zstd::block::compress(s, 3).map_err(|e| FlockError::Execution(e.to_string()))?
             }
             Encoding::None => s.into(),
             _ => unimplemented!(),
@@ -89,7 +89,7 @@ impl Encoding {
             Encoding::Lz4 => {
                 lz4::block::decompress(s, None).map_err(|e| FlockError::Execution(e.to_string()))?
             }
-            Encoding::Zstd => zstd::bulk::decompress(s, 10485760)
+            Encoding::Zstd => zstd::block::decompress(s, 10485760)
                 .map_err(|e| FlockError::Execution(e.to_string()))?,
             Encoding::None => s.into(),
             _ => {

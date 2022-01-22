@@ -152,7 +152,7 @@ jobs:
           key: ${{ runner.os }}-${{ matrix.TARGET }}-target-cache-${{ matrix.RUST }}-
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
+          toolchain: nightly-2022-01-20
           override: true
           components: rustfmt
       # - name: update all third-party dependencies
@@ -197,7 +197,8 @@ jobs:
       - name: Run build
         if: steps.changes.outputs.src == 'true'
         run: |
-          cargo +nightly build --verbose --target $TARGET
+          rustup default nightly-2022-01-20
+          cargo build --verbose --target $TARGET
         env:
           CARGO_HOME: "~/.cargo"
           CARGO_TARGET_DIR: "target"
@@ -234,7 +235,7 @@ jobs:
           key: ${{ runner.os }}-${{ matrix.TARGET }}-target-cache-${{ matrix.RUST }}-
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
+          toolchain: nightly-2022-01-20
           override: true
           components: rustfmt
       # - name: update all third-party dependencies
@@ -256,7 +257,8 @@ jobs:
       - name: Run build
         if: steps.changes.outputs.src == 'true'
         run: |
-          cargo +nightly test --target $TARGET
+          rustup default nightly-2022-01-20
+          cargo test --target $TARGET
         env:
           CARGO_HOME: "~/.cargo"
           CARGO_TARGET_DIR: "target"

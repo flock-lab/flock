@@ -62,7 +62,7 @@ pub async fn nexmark_benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
 
     let mut launcher =
         AwsLambdaLauncher::try_new(query_code, plan, sink_type, state_backend).await?;
-    launcher.create_cloud_contexts()?;
+    launcher.create_cloud_contexts(*FLOCK_FUNCTION_CONCURRENCY)?;
     let dag = &mut launcher.dag;
     create_nexmark_functions(dag, opt).await?;
 
@@ -104,13 +104,13 @@ async fn create_nexmark_functions(dag: &mut QueryDag, opt: &NexmarkBenchmarkOpt)
     let count = dag.node_count();
     assert!(count < 100);
 
-    let concurrency = (0..count)
-        .map(|i| dag.get_node(NodeIndex::new(i)).unwrap().concurrency)
-        .collect::<Vec<usize>>();
+    let func_types = (0..count)
+        .map(|i| dag.get_node(NodeIndex::new(i)).unwrap().get_function_type())
+        .collect::<Vec<CloudFunctionType>>();
 
     for i in (0..count).rev() {
         let node = dag.get_node_mut(NodeIndex::new(i)).unwrap();
-        if concurrency[i] == 1 {
+        if func_types[i] == CloudFunctionType::Group {
             let group_name = format!("q{}-{:02}", opt.query_number, i);
             info!(
                 "Creating lambda function group: {}",

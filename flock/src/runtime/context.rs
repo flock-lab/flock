@@ -48,7 +48,23 @@ pub struct CloudEnvironment {
     pub encoding: Encoding,
 }
 
-/// Next lambda function call.
+/// The cloud function type.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+pub enum CloudFunctionType {
+    /// The default cloud function type.
+    /// For AWS Lambda, the default concurrency is 1000. This function type is
+    /// used for partial hash aggregation and join. The data is partitioned by
+    /// the hash value of the key, and each partition is forwarded and processed
+    /// by a different lambda function.
+    Lambda,
+    /// The function belongs to a group, and the concurrency of each function in
+    /// the group is **1**. Each of them executes in a different AWS Lambda
+    /// instance. This function type is used for data aggregation to save all
+    /// partial results in a single AWS Lambda instance.
+    Group,
+}
+
+/// Next cloud function for invocation.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub enum CloudFunction {
     /// Function type: parititioned computation
