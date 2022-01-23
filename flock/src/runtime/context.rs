@@ -251,6 +251,7 @@ impl ExecutionContext {
             queue.push_back(plan);
         });
 
+        let num_partitions = sources[0].len();
         let mut found = false;
         let mut index = 0xFFFFFFFF;
         while !queue.is_empty() {
@@ -286,6 +287,17 @@ impl ExecutionContext {
                             .set_partitions(sources.remove(index));
                         index = 0xFFFFFFFF;
                         found = false;
+                    }
+                } else {
+                    let batches = (0..num_partitions)
+                        .map(|_| RecordBatch::new_empty(plan.schema()))
+                        .collect::<Vec<RecordBatch>>();
+                    unsafe {
+                        Arc::get_mut_unchecked(&mut plan)
+                            .as_mut_any()
+                            .downcast_mut::<MemoryExec>()
+                            .unwrap()
+                            .set_partitions(vec![batches]);
                     }
                 }
             }

@@ -210,6 +210,11 @@ impl Payload {
         }
     }
 
+    /// Returns true if the incoming payload is shuffled.
+    pub fn is_shuffled(&self) -> bool {
+        self.shuffle_id.is_some()
+    }
+
     /// Returns the shuffle id string in the payload.
     pub fn get_shuffle_id_str(&self) -> String {
         format!(

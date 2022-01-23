@@ -52,24 +52,14 @@ pub async fn collect(
     ctx: &mut ExecutionContext,
     streams: Vec<Vec<Vec<RecordBatch>>>,
 ) -> Result<Vec<Vec<RecordBatch>>> {
-    let num_streams = streams.len();
-    let input_streams = streams
-        .into_iter()
-        .filter(|r| r.par_iter().any(|s| s.par_iter().any(|b| b.num_rows() > 0)))
-        .collect::<Vec<_>>();
-
     info!("Executing the physical plan.");
-    let output = if input_streams.is_empty() || input_streams.len() != num_streams {
-        vec![]
+    ctx.feed_data_sources(streams).await?;
+    let output = if ctx.is_shuffling().await? {
+        let output = ctx.execute_partitioned().await?;
+        assert!(output.len() == 1);
+        output.into_iter().next().unwrap()
     } else {
-        ctx.feed_data_sources(input_streams).await?;
-        if ctx.is_shuffling().await? {
-            let output = ctx.execute_partitioned().await?;
-            assert!(output.len() == 1);
-            output.into_iter().next().unwrap()
-        } else {
-            ctx.execute().await?
-        }
+        ctx.execute().await?
     };
     ctx.clean_data_sources().await?;
     info!("[OK] The execution is finished.");
@@ -113,6 +103,7 @@ pub async fn handler(
     let query_number = event.query_number;
     let metadata = event.metadata.clone();
     let uuid = event.uuid.clone();
+    let shuffle_id = event.shuffle_id;
 
     let input = prepare_data_sources(ctx, arena, event).await?;
     if input.is_empty() {
@@ -125,7 +116,7 @@ pub async fn handler(
     }
 
     let output = collect(ctx, input).await?;
-    invoke_next_functions(ctx, query_number, uuid, metadata, output).await
+    invoke_next_functions(ctx, query_number, uuid, metadata, shuffle_id, output).await
 }
 
 /// Get the S3 key's prefix for the current query stage
@@ -280,6 +271,7 @@ async fn invoke_next_functions(
     query_number: Option<usize>,
     uuid: Uuid,
     metadata: Option<HashMap<String, String>>,
+    shuffle_id: Option<usize>,
     output: Vec<Vec<RecordBatch>>,
 ) -> Result<Value> {
     let (ring, _) = consistent_hash_context!();
@@ -437,10 +429,18 @@ async fn invoke_next_functions(
                     .map(|i| {
                         let my_output = output.clone();
                         let my_metadata = metadata.clone();
-                        let my_uuid = uuid.clone();
                         let state_backend = ctx.state_backend.clone();
                         let current_function = ctx.name.clone();
                         let invoke_type = invocation_type.clone();
+
+                        let mut my_uuid = uuid.clone();
+                        if let Some(new_seq_num) = shuffle_id {
+                            // This is REALLY important and tricky.
+                            // The shuffle id must be assigned to the new payload's sequence number.
+                            // Otherwise, the next function will not be able to distinguish the
+                            // payloads for aggregation.
+                            my_uuid.seq_num = new_seq_num;
+                        }
 
                         // Partitions at the same index position in different functions can get the
                         // same hash key. Therefore, they can be forwarded to the same lambda
