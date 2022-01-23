@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Liao"
+  given-names: "Gang"
+- family-names: "Abadi"
+  given-names: "Daniel"
+title: "Flock"
+url: "https://github.com/flock-lab/flock"
