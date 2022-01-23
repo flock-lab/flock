@@ -89,7 +89,7 @@ pub async fn nexmark_benchmark(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
             "Next function name: {}",
             rainbow_string(format!("{:?}", stage.context.as_ref().unwrap().next))
         );
-        println!("{}", stage.get_plan_str());
+        info!("Physical Plan:\n{}", stage.get_plan_str());
     }
 
     let dag = &mut launcher.dag;
