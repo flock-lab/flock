@@ -15,7 +15,7 @@
 //! function.
 
 use chrono::Utc;
-use lambda_runtime::{handler_fn, Context};
+use lambda_runtime::{service_fn, LambdaEvent};
 use serde_json::json;
 use serde_json::Value;
 
@@ -23,9 +23,9 @@ type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
 
 static mut SUM: i64 = 0;
 
-async fn handler(event: Value, _: Context) -> Result<Value, Error> {
+async fn handler(event: LambdaEvent<Value>) -> Result<Value, Error> {
     unsafe {
-        SUM += event["val"].as_i64().unwrap();
+        SUM += event.payload["val"].as_i64().unwrap();
         println!("{}: {}", Utc::now(), SUM);
         Ok(json!({ "val": SUM }))
     }
@@ -33,6 +33,6 @@ async fn handler(event: Value, _: Context) -> Result<Value, Error> {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    lambda_runtime::run(handler_fn(handler)).await?;
+    lambda_runtime::run(service_fn(handler)).await?;
     Ok(())
 }

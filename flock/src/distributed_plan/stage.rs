@@ -15,9 +15,8 @@
 //! query statement.
 
 extern crate daggy;
-use crate::configs::FLOCK_FUNCTION_CONCURRENCY;
 use crate::error::{FlockError, Result};
-use crate::runtime::context::ExecutionContext;
+use crate::runtime::context::{CloudFunctionType, ExecutionContext};
 use daggy::{Dag, NodeIndex, Walker};
 use datafusion::physical_plan::displayable;
 use datafusion::physical_plan::memory::MemoryExec;
@@ -33,11 +32,11 @@ type DistributedPlan = Dag<QueryStage, QueryStageEdge>;
 #[derive(Debug, Clone)]
 pub struct QueryStage {
     /// Subplans of the query statement.
-    pub stage:       Vec<Arc<dyn ExecutionPlan>>,
-    /// Function concurrency in cloud environment.
-    pub concurrency: usize,
+    pub stage:         Vec<Arc<dyn ExecutionPlan>>,
+    /// Function type in cloud environment.
+    pub function_type: CloudFunctionType,
     /// The cloud execution context for this query stage.
-    pub context:     Option<ExecutionContext>,
+    pub context:       Option<ExecutionContext>,
 }
 
 impl QueryStage {
@@ -50,19 +49,19 @@ impl QueryStage {
         plan_str.to_string()
     }
 
-    /// Return the concurrency of the query plan in the stage.
-    pub fn get_concurrency(&self) -> usize {
-        self.concurrency
+    /// Return the query stage's cloud function type.
+    pub fn get_function_type(&self) -> CloudFunctionType {
+        self.function_type.clone()
     }
 
     /// Create a new query stage from a physical plan with a given concurrency.
-    pub fn from_with_concurrency(
+    pub fn from_with_type(
         stage: Vec<Arc<dyn ExecutionPlan>>,
-        concurrency: usize,
+        function_type: CloudFunctionType,
     ) -> QueryStage {
         QueryStage {
             stage,
-            concurrency,
+            function_type,
             context: None,
         }
     }
@@ -72,7 +71,7 @@ impl From<Vec<Arc<dyn ExecutionPlan>>> for QueryStage {
     fn from(stage: Vec<Arc<dyn ExecutionPlan>>) -> QueryStage {
         QueryStage {
             stage,
-            concurrency: *FLOCK_FUNCTION_CONCURRENCY,
+            function_type: CloudFunctionType::Lambda,
             context: None,
         }
     }
@@ -230,7 +229,7 @@ impl QueryDag {
         &mut self,
         parent: NodeIndex,
         nodes: Vec<Value>,
-        concurrency: usize,
+        function_type: CloudFunctionType,
     ) -> Result<NodeIndex> {
         let stage = nodes
             .into_iter()
@@ -239,7 +238,7 @@ impl QueryDag {
         if parent == NodeIndex::end() {
             Ok(self.add_node(QueryStage {
                 stage,
-                concurrency,
+                function_type,
                 context: None,
             }))
         } else {
@@ -248,7 +247,7 @@ impl QueryDag {
                 parent,
                 QueryStage {
                     stage,
-                    concurrency,
+                    function_type,
                     context: None,
                 },
             ))
@@ -276,7 +275,7 @@ fn build_query_dag_from_serde_json(plan: Arc<dyn ExecutionPlan>) -> Result<Query
     loop {
         match json["execution_plan"].as_str() {
             Some("hash_aggregate_exec") => match json["mode"].as_str() {
-                Some("FinalPartitioned") => {
+                Some("Final") | Some("FinalPartitioned") => {
                     // Split the plan into two subplans
                     let object = (*json["input"].take().as_object().ok_or_else(|| {
                         FlockError::QueryStage(
@@ -292,28 +291,7 @@ fn build_query_dag_from_serde_json(plan: Arc<dyn ExecutionPlan>) -> Result<Query
                     )?);
                     json["input"] = serde_json::to_value(input)?;
                     // Add the new subplan to DAG
-                    leaf = dag.insert(leaf, vec![root], *FLOCK_FUNCTION_CONCURRENCY)?;
-                    // Point to the next subplan
-                    root = Value::Object(object);
-                    json = &mut root;
-                }
-                Some("Final") => {
-                    // Split the plan into two subplans
-                    let object = (*json["input"].take().as_object().ok_or_else(|| {
-                        FlockError::QueryStage(
-                            "Failed to parse input for HashAggregateExec".to_string(),
-                        )
-                    })?)
-                    .clone();
-                    // Add a input for the new subplan
-                    let input: Arc<dyn ExecutionPlan> = Arc::new(MemoryExec::try_new(
-                        &[],
-                        curr.children()[0].schema().clone(),
-                        None,
-                    )?);
-                    json["input"] = serde_json::to_value(input)?;
-                    // Add the new subplan to DAG
-                    leaf = dag.insert(leaf, vec![root], 1)?;
+                    leaf = dag.insert(leaf, vec![root], CloudFunctionType::Group)?;
                     // Point to the next subplan
                     root = Value::Object(object);
                     json = &mut root;
@@ -348,11 +326,11 @@ fn build_query_dag_from_serde_json(plan: Arc<dyn ExecutionPlan>) -> Result<Query
                 json["left"] = serde_json::to_value(left)?;
                 json["right"] = serde_json::to_value(right)?;
 
-                leaf = dag.insert(leaf, vec![root], *FLOCK_FUNCTION_CONCURRENCY)?;
+                leaf = dag.insert(leaf, vec![root], CloudFunctionType::Lambda)?;
                 dag.insert(
                     leaf,
                     vec![Value::Object(left_obj), Value::Object(right_obj)],
-                    *FLOCK_FUNCTION_CONCURRENCY,
+                    CloudFunctionType::Lambda,
                 )?;
                 return Ok(dag);
             }
@@ -369,7 +347,7 @@ fn build_query_dag_from_serde_json(plan: Arc<dyn ExecutionPlan>) -> Result<Query
                 )?);
                 json["input"] = serde_json::to_value(input)?;
                 // Add the new subplan to DAG
-                leaf = dag.insert(leaf, vec![root], 1)?;
+                leaf = dag.insert(leaf, vec![root], CloudFunctionType::Group)?;
                 // Point to the next subplan
                 root = Value::Object(object);
                 json = &mut root;
@@ -382,7 +360,7 @@ fn build_query_dag_from_serde_json(plan: Arc<dyn ExecutionPlan>) -> Result<Query
         curr = curr.children()[0].clone();
     }
 
-    dag.insert(leaf, vec![root], *FLOCK_FUNCTION_CONCURRENCY)?;
+    dag.insert(leaf, vec![root], CloudFunctionType::Lambda)?;
     assert!(dag.node_count() >= 1);
 
     Ok(dag)

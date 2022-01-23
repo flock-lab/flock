@@ -77,25 +77,29 @@ pub async fn invoke_function(
         // Error retries and exponential backoff in AWS Lambda
         let mut retries = 0;
         loop {
-            let response = FLOCK_LAMBDA_CLIENT
+            match FLOCK_LAMBDA_CLIENT
                 .invoke(request.clone())
                 .await
-                .map_err(|e| FlockError::AWS(e.to_string()))?;
-            if response.function_error.is_none() {
-                return Ok(response);
-            }
-            if retries > 0 {
-                if response.payload.is_some() {
-                    info!(
-                        "Function invocation error: {:?}",
-                        serde_json::from_slice::<serde_json::Value>(&response.payload.unwrap())
-                    );
+                .map_err(|e| FlockError::AWS(e.to_string()))
+            {
+                Ok(response) => {
+                    if response.function_error.is_none() {
+                        return Ok(response);
+                    } else {
+                        info!(
+                            "Function execution error: {}, details: {:?}",
+                            response.function_error.unwrap(),
+                            serde_json::from_slice::<serde_json::Value>(&response.payload.unwrap())
+                        );
+                    }
                 }
-                info!("Retrying invocation...");
+                Err(e) => {
+                    info!("Function invocation error: {}", e);
+                }
             }
 
+            info!("Retrying {} function invocation...", function_name);
             tokio::time::sleep(Duration::from_millis(2_u64.pow(retries) * 100)).await;
-
             retries += 1;
 
             if retries as usize > *FLOCK_LAMBDA_MAX_RETRIES {

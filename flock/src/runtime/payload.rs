@@ -32,8 +32,8 @@ use uuid::Uuid as RandomId;
 /// A helper struct for building uuids of payloads.
 #[derive(Default, Debug, Clone)]
 pub struct UuidBuilder {
-    /// The identifier of the data fragment or the payload.
-    pub tid: String,
+    /// The window identifier of the data fragment or the payload.
+    pub qid: String,
     /// The data fragment index in the time window.
     pub pos: usize,
     /// The total number of data fragments in the time window.
@@ -45,7 +45,7 @@ impl UuidBuilder {
     pub fn new_with_ts(function_name: &str, timestamp: i64, len: usize) -> Self {
         let query_code = function_name.split('-').next().unwrap();
         Self {
-            tid: format!(
+            qid: format!(
                 "{}-{}-{}",
                 query_code,
                 timestamp,
@@ -60,7 +60,7 @@ impl UuidBuilder {
     pub fn new_with_ts_uuid(function_name: &str, timestamp: i64, uuid: u128, len: usize) -> Self {
         let query_code = function_name.split('-').next().unwrap();
         Self {
-            tid: format!("{}-{}-{}", query_code, timestamp, uuid),
+            qid: format!("{}-{}-{}", query_code, timestamp, uuid),
             pos: 0,
             len,
         }
@@ -70,14 +70,14 @@ impl UuidBuilder {
     pub fn next_uuid(&mut self) -> Uuid {
         assert!(self.pos < self.len);
 
-        let tid = self.tid.to_owned();
+        let qid = self.qid.to_owned();
         let seq_num = self.pos;
         let seq_len = self.len;
 
         self.pos += 1;
 
         Uuid {
-            tid,
+            qid,
             seq_num,
             seq_len,
         }
@@ -87,12 +87,12 @@ impl UuidBuilder {
     pub fn get(&self, i: usize) -> Uuid {
         assert!(i < self.len);
 
-        let tid = self.tid.to_owned();
+        let qid = self.qid.to_owned();
         let seq_num = i;
         let seq_len = self.len;
 
         Uuid {
-            tid,
+            qid,
             seq_num,
             seq_len,
         }
@@ -103,15 +103,12 @@ impl UuidBuilder {
 /// window.
 #[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct Uuid {
-    /// The identifier of the query triggered at the specific time.
-    ///
-    /// # Note
-    /// * [`Uuid::tid`] is also used to pick the next function to execute using
-    ///   consistent hashing.
-    pub tid:     String,
+    /// The identifier of the query triggered at the specific time. `qid`is also
+    /// used to pick the next function to execute using consistent hashing.
+    pub qid:     String,
     /// `seq_num` represents the position of the data fragment in the time
     /// window, starting from 0, which will be recorded in the
-    /// `[WindowSession::bitmap]`.
+    /// `WindowSession::bitmap`.
     pub seq_num: usize,
     /// `seq_len` represents the total number of fragments after the data is
     /// fragmented into different payloads.
@@ -152,13 +149,16 @@ pub struct Payload {
     pub datasource:   DataSource,
     /// The Nexmark query number for the benchmarking purposes.
     pub query_number: Option<usize>,
+    /// The shuffle id. This is used to identify the shuffled data for the
+    /// aggregation in the next cloud function.
+    pub shuffle_id:   Option<usize>,
     /// The extra metadata for the payload.
     pub metadata:     Option<HashMap<String, String>>,
 }
 
 impl Payload {
     /// Convert incoming payload to record batch in Arrow.
-    pub fn to_record_batch(self) -> (Vec<RecordBatch>, Vec<RecordBatch>, Uuid) {
+    pub fn to_record_batch(self) -> (Vec<RecordBatch>, Vec<RecordBatch>) {
         let record_batch = |df: Vec<DataFrame>, schema: Arc<Schema>| -> Vec<RecordBatch> {
             df.into_par_iter()
                 .map(|d| {
@@ -177,7 +177,7 @@ impl Payload {
                 .collect()
         };
 
-        let mut res = (vec![], vec![], self.uuid.clone());
+        let mut res = (vec![], vec![]);
         if !self.data.is_empty() {
             let dataframe = unmarshal(self.data, self.encoding.clone());
             let schema = schema_from_bytes(&self.schema).unwrap();
@@ -189,6 +189,42 @@ impl Payload {
             res.1 = record_batch(dataframe, schema);
         }
         res
+    }
+
+    /// Returns the window id of the payload.
+    pub fn get_window_id(&self) -> (String, usize) {
+        (self.get_query_id(), self.get_shuffle_id())
+    }
+
+    /// Rerurns the query id in the payload.
+    pub fn get_query_id(&self) -> String {
+        self.uuid.qid.clone()
+    }
+
+    /// Returns the shuffle id in the payload.
+    pub fn get_shuffle_id(&self) -> usize {
+        if self.shuffle_id.is_some() {
+            self.shuffle_id.unwrap()
+        } else {
+            0
+        }
+    }
+
+    /// Returns true if the incoming payload is shuffled.
+    pub fn is_shuffled(&self) -> bool {
+        self.shuffle_id.is_some()
+    }
+
+    /// Returns the shuffle id string in the payload.
+    pub fn get_shuffle_id_str(&self) -> String {
+        format!(
+            "{:02}",
+            if self.shuffle_id.is_some() {
+                self.shuffle_id.unwrap()
+            } else {
+                0
+            }
+        )
     }
 }
 
@@ -216,14 +252,14 @@ mod tests {
             UuidBuilder::new_with_ts_uuid(function_name, timestamp, uuid, payload_num);
         assert_eq!(
             format!("SX72HzqFz1Qij4bP-{}-{}", timestamp, uuid),
-            uuid_builder.tid
+            uuid_builder.qid
         );
 
         for i in 0..payload_num {
             assert_eq!(
                 uuid_builder.next_uuid(),
                 Uuid {
-                    tid:     format!("SX72HzqFz1Qij4bP-{}-{}", timestamp, uuid),
+                    qid:     format!("SX72HzqFz1Qij4bP-{}-{}", timestamp, uuid),
                     seq_num: i,
                     seq_len: payload_num,
                 }
@@ -437,7 +473,7 @@ mod tests {
 
         let payload1: Payload = serde_json::from_value(value.clone())?;
         let now = Instant::now();
-        let (de_batches, _, de_uuid) = json_value_to_batch(value);
+        let (de_batches, _) = json_value_to_batch(value);
         println!(
             "serde value to batch (with decompression) - time: {} ms",
             now.elapsed().as_millis()
@@ -449,7 +485,6 @@ mod tests {
             assert_eq!(batches[0].num_columns(), de_batches[0].num_columns());
             assert_eq!(batches[0].num_rows(), de_batches[0].num_rows());
             assert_eq!(batches[0].columns(), de_batches[0].columns());
-            assert_eq!(uuid, de_uuid);
         }
 
         let now = Instant::now();
@@ -499,7 +534,7 @@ mod tests {
         let batches = init_batches();
         let bytes = to_bytes(&batches[0], uuid_builder.next_uuid(), Encoding::default());
         let value: Value = serde_json::from_slice(&bytes)?;
-        let (de_batches, _, _) = json_value_to_batch(value);
+        let (de_batches, _) = json_value_to_batch(value);
 
         assert_eq!(batches[0].schema(), de_batches[0].schema());
         assert_eq!(batches[0].columns(), de_batches[0].columns());

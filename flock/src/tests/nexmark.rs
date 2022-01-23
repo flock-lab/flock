@@ -18,30 +18,31 @@ use crate::datasource::nexmark::NEXMarkEvent;
 use crate::error::Result;
 use crate::transmute::event_bytes_to_batch;
 use datafusion::arrow::util::pretty::pretty_format_batches;
-use lambda_runtime::{handler_fn, Context};
+use lambda_runtime::{service_fn, LambdaEvent};
 use std::sync::Arc;
 
 #[allow(dead_code)]
-async fn handler(event: NEXMarkEvent, _: Context) -> Result<NEXMarkEvent> {
+async fn handler(event: LambdaEvent<NEXMarkEvent>) -> Result<NEXMarkEvent> {
+    let payload = event.payload;
     let person_schema = Arc::new(Person::schema());
-    let batches = event_bytes_to_batch(&event.persons, person_schema, 1024);
+    let batches = event_bytes_to_batch(&payload.persons, person_schema, 1024);
     println!("{}", pretty_format_batches(&batches)?);
 
     let auction_schema = Arc::new(Auction::schema());
-    let batches = event_bytes_to_batch(&event.auctions, auction_schema, 1024);
+    let batches = event_bytes_to_batch(&payload.auctions, auction_schema, 1024);
     println!("{}", pretty_format_batches(&batches)?);
 
     let bid_schema = Arc::new(Bid::schema());
-    let batches = event_bytes_to_batch(&event.bids, bid_schema, 1024);
+    let batches = event_bytes_to_batch(&payload.bids, bid_schema, 1024);
     println!("{}", pretty_format_batches(&batches)?);
 
-    Ok(event)
+    Ok(payload)
 }
 
 #[allow(dead_code)]
 #[tokio::main]
 async fn main() -> Result<()> {
-    lambda_runtime::run(handler_fn(handler)).await?;
+    lambda_runtime::run(service_fn(handler)).await?;
     Ok(())
 }
 
@@ -50,6 +51,8 @@ mod tests {
     use super::*;
     use crate::datasource::config::Config;
     use crate::datasource::nexmark::NEXMarkSource;
+    use http::{HeaderMap, HeaderValue};
+    use lambda_runtime::Context;
     use rusoto_core::Region;
     use rusoto_lambda::{InvocationRequest, Lambda, LambdaClient};
 
@@ -66,7 +69,27 @@ mod tests {
         let events = nex.generate_data()?;
         let (events, _) = events.select(0, 1).unwrap();
 
-        let ret_events = handler(events, Context::default()).await?;
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "lambda-runtime-aws-request-id",
+            HeaderValue::from_static("my-id"),
+        );
+        headers.insert(
+            "lambda-runtime-deadline-ms",
+            HeaderValue::from_static("123"),
+        );
+        headers.insert(
+            "lambda-runtime-invoked-function-arn",
+            HeaderValue::from_static("arn::myarn"),
+        );
+        headers.insert(
+            "lambda-runtime-trace-id",
+            HeaderValue::from_static("arn::myarn"),
+        );
+        let tried = Context::try_from(headers);
+        assert!(tried.is_ok());
+
+        let ret_events = handler(LambdaEvent::new(events, tried.unwrap())).await?;
 
         let person_schema = Arc::new(Person::schema());
         let batches = event_bytes_to_batch(&ret_events.persons, person_schema, 1024);

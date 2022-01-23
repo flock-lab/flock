@@ -18,7 +18,7 @@ use aws_lambda_events::event::kinesis::KinesisEvent;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::physical_plan::Partitioning;
 use futures::executor::block_on;
-use lambda_runtime::{handler_fn, Context};
+use lambda_runtime::{service_fn, LambdaEvent};
 use log::warn;
 use rayon::prelude::*;
 use runtime::prelude::*;
@@ -220,7 +220,7 @@ async fn payload_handler(
             // ressemble lambda n to 1
             let (ready, uuid) = arena.reassemble(event);
             if ready {
-                arena.batches(uuid.tid)
+                arena.batches(uuid.qid)
             } else {
                 return Err(FlockError::Execution(
                     "window data collection has not been completed.".to_string(),
@@ -258,7 +258,7 @@ async fn payload_handler(
     Ok(serde_json::to_value(&ctx.name)?)
 }
 
-async fn handler(event: Value, _: Context) -> Result<Value> {
+async fn handler(event: LambdaEvent<Value>) -> Result<Value> {
     let (mut ctx, mut arena) = init_exec_context!();
 
     match &ctx.datasource {

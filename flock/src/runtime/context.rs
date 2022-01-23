@@ -48,7 +48,23 @@ pub struct CloudEnvironment {
     pub encoding: Encoding,
 }
 
-/// Next lambda function call.
+/// The cloud function type.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+pub enum CloudFunctionType {
+    /// The default cloud function type.
+    /// For AWS Lambda, the default concurrency is 1000. This function type is
+    /// used for partial hash aggregation and join. The data is partitioned by
+    /// the hash value of the key, and each partition is forwarded and processed
+    /// by a different lambda function.
+    Lambda,
+    /// The function belongs to a group, and the concurrency of each function in
+    /// the group is **1**. Each of them executes in a different AWS Lambda
+    /// instance. This function type is used for data aggregation to save all
+    /// partial results in a single AWS Lambda instance.
+    Group,
+}
+
+/// Next cloud function for invocation.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub enum CloudFunction {
     /// Function type: parititioned computation
@@ -235,6 +251,7 @@ impl ExecutionContext {
             queue.push_back(plan);
         });
 
+        let num_partitions = sources[0].len();
         let mut found = false;
         let mut index = 0xFFFFFFFF;
         while !queue.is_empty() {
@@ -271,6 +288,17 @@ impl ExecutionContext {
                         index = 0xFFFFFFFF;
                         found = false;
                     }
+                } else {
+                    let batches = (0..num_partitions)
+                        .map(|_| RecordBatch::new_empty(plan.schema()))
+                        .collect::<Vec<RecordBatch>>();
+                    unsafe {
+                        Arc::get_mut_unchecked(&mut plan)
+                            .as_mut_any()
+                            .downcast_mut::<MemoryExec>()
+                            .unwrap()
+                            .set_partitions(vec![batches]);
+                    }
                 }
             }
 
@@ -284,8 +312,9 @@ impl ExecutionContext {
     }
 
     /// Checks whether the execution plan needs to be shuffled.
-    pub async fn is_shuffling(&mut self) -> Result<bool> {
-        Ok(self.plan().await?.iter().all(|p| {
+    pub async fn is_shuffling(&self) -> Result<bool> {
+        assert!(!self.plan.execution_plans.is_empty());
+        Ok(self.plan.execution_plans.iter().all(|p| {
             p.as_any().downcast_ref::<CoalesceBatchesExec>().is_some()
                 && !p.children().is_empty()
                 && p.children()
@@ -295,10 +324,27 @@ impl ExecutionContext {
     }
 
     /// Checks whether the execution plan is the last one.
-    pub async fn is_last_stage(&mut self) -> Result<bool> {
+    pub async fn is_last_stage(&self) -> Result<bool> {
         match self.next {
             CloudFunction::Sink(..) => Ok(true),
             _ => Ok(false),
+        }
+    }
+
+    /// Check the current function type.
+    ///
+    /// If the function name is "<query code>-<plan index>-<group index>",
+    /// then it is a group-type function.
+    /// If the function name is "<query code>-<plan index>",
+    /// then it is a lambda-type function.
+    pub fn is_aggregate(&self) -> bool {
+        let dash_count = self.name.matches('-').count();
+        if dash_count == 2 {
+            true
+        } else if dash_count == 1 {
+            false
+        } else {
+            panic!("Invalid function name: {}", self.name);
         }
     }
 }

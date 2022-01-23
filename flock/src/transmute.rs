@@ -138,7 +138,7 @@ pub fn schema_from_bytes(bytes: &[u8]) -> Result<Arc<Schema>> {
 }
 
 /// Convert incoming payload to record batches in Arrow format.
-pub fn json_value_to_batch(event: Value) -> (Vec<RecordBatch>, Vec<RecordBatch>, Uuid) {
+pub fn json_value_to_batch(event: Value) -> (Vec<RecordBatch>, Vec<RecordBatch>) {
     let payload: Payload = serde_json::from_value(event).unwrap();
     payload.to_record_batch()
 }

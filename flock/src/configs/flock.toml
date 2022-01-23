@@ -50,7 +50,7 @@ payload_batch_size = 524288
 
 # Lambda function group's concurrency or size, and the concurrency
 # of each function in the group is 1
-concurrency = 32
+concurrency = 16
 
 aggregate_threshold = 10485760
 join_threshold = 5242880
@@ -102,3 +102,8 @@ s3_key = "nexmark"
 [ysb]
 
 s3_key = "ysb"
+
+[datafusion]
+
+# Customize target partitions
+target_partitions = 8

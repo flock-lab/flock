@@ -24,6 +24,20 @@ use std::any::Any;
 use tokio::task::JoinHandle;
 
 /// S3StateBackend is a state backend that stores query states in Amazon S3.
+///
+/// S3 bucket name is the qid of the function payload:
+///
+/// | query code | timestamp  | random string |
+///
+/// S3 key composed of the following parts:
+///
+/// | plan index | shuffle id | sequence id   |
+///
+/// Note: Parts of component are derived from cloud function name. The cloud
+/// function name has three parts: | query code | plan index | group index |.
+/// `query code` is the hash digest of the SQL query. `plan index` is the stage
+/// index of the query DAG. `group index` is the current index of the function
+/// group.
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct S3StateBackend {}
 
@@ -92,10 +106,23 @@ impl S3StateBackend {
             .into_iter()
             .map(|key| {
                 let mut key_parts = key.split('/');
-                key_parts.next(); // skip the prefix: plan index
-                key_parts.next().unwrap().parse::<usize>().unwrap()
+                key_parts.next(); // skip the plan index
+                key_parts.next(); // skip the shuffle id
+                key_parts.next().unwrap().parse::<usize>().unwrap() // get the sequence id
             })
             .collect())
+    }
+
+    /// Counts the number of S3 keys in a bucket with a prefix.
+    ///
+    /// # Arguments
+    /// * `bucket` - The S3 bucket to store the checkpoint.
+    /// * `prefix` - The S3 key prefix to store each data partition.
+    ///
+    /// # Returns
+    /// The number of S3 keys.
+    pub async fn get_s3_key_num(&self, bucket: &str, prefix: &str) -> Result<usize> {
+        Ok(s3::get_matched_keys(bucket, prefix).await?.len())
     }
 
     /// Returns the latest checkpointed keys.

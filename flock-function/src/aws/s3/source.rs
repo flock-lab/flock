@@ -66,7 +66,7 @@ pub async fn handler(_ctx: &ExecutionContext, payload: Payload) -> Result<Value>
     let function_name = if ring.len() == 1 {
         group_name.clone()
     } else {
-        ring.get(&uuid.tid).expect("hash ring failure.").to_string()
+        ring.get(&uuid.qid).expect("hash ring failure.").to_string()
     };
 
     let bytes = match source.window {

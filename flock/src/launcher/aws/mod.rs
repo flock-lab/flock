@@ -81,7 +81,7 @@ impl Launcher for AwsLambdaLauncher {
     }
 
     fn deploy(&mut self) -> Result<()> {
-        self.create_cloud_contexts()?;
+        self.create_cloud_contexts(*FLOCK_FUNCTION_CONCURRENCY)?;
         self.create_cloud_functions()?;
         Ok(())
     }
@@ -136,7 +136,7 @@ impl AwsLambdaLauncher {
     /// Create the cloud contexts for the query.
     ///
     /// This function creates a new context for each query stage in the DAG.
-    pub fn create_cloud_contexts(&mut self) -> Result<()> {
+    pub fn create_cloud_contexts(&mut self, group_size: usize) -> Result<()> {
         debug!("Creating cloud contexts for both central and distributed query processing.");
 
         // Creates the cloud contexts for the distributed mode
@@ -145,9 +145,9 @@ impl AwsLambdaLauncher {
             let count = dag.node_count();
             assert!(count < 100);
 
-            let concurrency = (0..count)
-                .map(|i| dag.get_node(NodeIndex::new(i)).unwrap().concurrency)
-                .collect::<Vec<usize>>();
+            let func_types = (0..count)
+                .map(|i| dag.get_node(NodeIndex::new(i)).unwrap().get_function_type())
+                .collect::<Vec<CloudFunctionType>>();
 
             (0..count).rev().for_each(|i| {
                 let node = dag.get_node_mut(NodeIndex::new(i)).unwrap();
@@ -155,10 +155,10 @@ impl AwsLambdaLauncher {
 
                 let next = if i == 0 {
                     CloudFunction::Sink(self.sink_type.clone())
-                } else if concurrency[i - 1 /* parent */] == 1 {
+                } else if func_types[i - 1 /* follower stage */] == CloudFunctionType::Group {
                     CloudFunction::Group((
                         format!("{}-{:02}", query_code, count - 1 - (i - 1)),
-                        *FLOCK_FUNCTION_CONCURRENCY,
+                        group_size,
                     ))
                 } else {
                     CloudFunction::Lambda(format!("{}-{:02}", query_code, count - 1 - (i - 1)))
@@ -263,16 +263,13 @@ mod tests {
         let mut launcher = AwsLambdaLauncher::new(&query).await?;
         println!("SQL: {}", query.sql());
         println!("Query Code: {}\n", launcher.query_code.as_ref().unwrap());
-        launcher.create_cloud_contexts()?;
+        launcher.create_cloud_contexts(*FLOCK_FUNCTION_CONCURRENCY)?;
 
         let stages = launcher.dag.get_all_stages();
         for (i, stage) in stages.iter().enumerate() {
             println!("=== Query Stage {:02} ===", i);
-            println!(
-                "{:#?}\nFunction Concurrency: {}\n",
-                stage.context.as_ref().unwrap(),
-                stage.concurrency
-            );
+            println!("{:#?}", stage.context.as_ref().unwrap());
+            println!("Function Type: {:?}\n\n", stage.get_function_type());
         }
 
         Ok(())
@@ -284,7 +281,7 @@ mod tests {
         let mut launcher = AwsLambdaLauncher::new(&query).await?;
         println!("SQL: {}", query.sql());
         println!("Query Code: {}\n", launcher.query_code.as_ref().unwrap());
-        launcher.create_cloud_contexts()?;
+        launcher.create_cloud_contexts(*FLOCK_FUNCTION_CONCURRENCY)?;
 
         // define data.
         let batch1 = RecordBatch::try_new(
@@ -366,7 +363,7 @@ mod tests {
         let mut launcher = AwsLambdaLauncher::new(&query).await?;
         println!("SQL: {}", query.sql());
         println!("Query Code: {}\n", launcher.query_code.as_ref().unwrap());
-        launcher.create_cloud_contexts()?;
+        launcher.create_cloud_contexts(*FLOCK_FUNCTION_CONCURRENCY)?;
 
         // Generate events.
         let seconds = 1;
@@ -506,7 +503,7 @@ mod tests {
         let mut launcher = AwsLambdaLauncher::new(&query).await?;
         println!("SQL: {}", query.sql());
         println!("Query Code: {}\n", launcher.query_code.as_ref().unwrap());
-        launcher.create_cloud_contexts()?;
+        launcher.create_cloud_contexts(*FLOCK_FUNCTION_CONCURRENCY)?;
 
         // Generate events.
         let seconds = 1;
@@ -568,7 +565,13 @@ mod tests {
         //     MemoryExec: partitions=0, partition_sizes=[]
         let stages = launcher.dag.get_all_stages();
         for (i, stage) in stages.iter().enumerate() {
-            println!("=== Stage {} ===\n{}", i, stage.get_plan_str());
+            println!("=== Stage {} ===", i);
+            println!("{}", stage.get_plan_str());
+            println!("Current Function Type: {:?}", stage.get_function_type());
+            println!(
+                "Next Function: {:?}\n",
+                stage.context.as_ref().unwrap().next
+            );
         }
 
         let input = vec![vec![auctions_batches], vec![bids_batches]];
@@ -656,7 +659,7 @@ mod tests {
             let sliced_output = ctx.execute().await?;
 
             ctx.clean_data_sources().await?;
-            assert!(sliced_output[0].len() == 1);
+            assert!(sliced_output.len() == 1);
             output3.push(sliced_output.into_iter().next().unwrap());
         }
 
@@ -703,7 +706,7 @@ mod tests {
         let mut launcher = AwsLambdaLauncher::new(&query).await?;
         println!("SQL: {}", query.sql());
         println!("Query Code: {}\n", launcher.query_code.as_ref().unwrap());
-        launcher.create_cloud_contexts()?;
+        launcher.create_cloud_contexts(*FLOCK_FUNCTION_CONCURRENCY)?;
 
         // Generate events.
         let seconds = 1;

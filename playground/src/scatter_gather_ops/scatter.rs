@@ -15,26 +15,27 @@
 //! its running instances to a lambda function `flock_pg_gather`.
 
 use chrono::Utc;
-use lambda_runtime::{handler_fn, Context};
+use lambda_runtime::{service_fn, LambdaEvent};
 use rusoto_core::Region;
 use rusoto_lambda::{InvokeAsyncRequest, Lambda, LambdaClient};
 use serde_json::Value;
 
 type Error = Box<dyn std::error::Error + Sync + Send + 'static>;
 
-async fn handler(event: Value, _: Context) -> Result<Value, Error> {
-    println!("{}: {}", Utc::now(), event["val"]);
+async fn handler(event: LambdaEvent<Value>) -> Result<Value, Error> {
+    let payload = event.payload;
+    println!("{}: {}", Utc::now(), payload["val"]);
     LambdaClient::new(Region::UsEast1)
         .invoke_async(InvokeAsyncRequest {
             function_name: "flock_pg_gather".to_string(),
-            invoke_args:   serde_json::to_vec(&event)?.into(),
+            invoke_args:   serde_json::to_vec(&payload)?.into(),
         })
         .await?;
-    Ok(event)
+    Ok(payload)
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    lambda_runtime::run(handler_fn(handler)).await?;
+    lambda_runtime::run(service_fn(handler)).await?;
     Ok(())
 }
