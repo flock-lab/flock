@@ -18,8 +18,8 @@ use crate::error::{FlockError, Result};
 use rayon::prelude::*;
 use rusoto_core::ByteStream;
 use rusoto_s3::{
-    CreateBucketRequest, GetObjectRequest, HeadBucketRequest, ListObjectsV2Request,
-    PutObjectRequest, S3,
+    CreateBucketRequest, Delete, DeleteBucketRequest, DeleteObjectsRequest, GetObjectRequest,
+    HeadBucketRequest, ListObjectsV2Request, ObjectIdentifier, PutObjectRequest, S3,
 };
 use std::io::Read;
 
@@ -282,4 +282,83 @@ pub async fn get_matched_keys(bucket: &str, prefix: &str) -> Result<Vec<String>>
         }
     }
     Ok(keys)
+}
+
+/// Deletes all objects in a bucket.
+pub async fn delete_all_objects(bucket: &str) -> Result<()> {
+    if bucket_exists(bucket).await? {
+        FLOCK_S3_CLIENT
+            .delete_objects(DeleteObjectsRequest {
+                bucket: bucket.to_owned(),
+                delete: Delete {
+                    objects: get_all_keys(bucket)
+                        .await?
+                        .iter()
+                        .map(|key| ObjectIdentifier {
+                            key:        key.to_owned(),
+                            version_id: None,
+                        })
+                        .collect(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .await
+            .map_err(|e| FlockError::AWS(e.to_string()))?;
+    }
+    Ok(())
+}
+
+/// Deletes an S3 bucket.
+///
+/// All objects (including all object versions and delete markers) in the bucket
+/// must be deleted before the bucket itself can be deleted.
+pub async fn delete_bucket(bucket: &str) -> Result<()> {
+    if bucket_exists(bucket).await? {
+        delete_all_objects(bucket).await?;
+        FLOCK_S3_CLIENT
+            .delete_bucket(DeleteBucketRequest {
+                bucket: bucket.to_owned(),
+                ..Default::default()
+            })
+            .await
+            .map_err(|e| FlockError::AWS(e.to_string()))?;
+    }
+    Ok(())
+}
+
+/// Lists all buckets owned by the authenticated user.
+pub async fn list_buckets() -> Result<Vec<String>> {
+    Ok(FLOCK_S3_CLIENT
+        .list_buckets()
+        .await
+        .map_err(|e| FlockError::AWS(e.to_string()))?
+        .buckets
+        .into_iter()
+        .flatten()
+        .map(|bucket| bucket.name.unwrap())
+        .collect())
+}
+
+/// Returns the S3 buckets with the specified bucket parttern.
+pub async fn get_matched_buckets(bucket_parttern: &str) -> Result<Vec<String>> {
+    Ok(FLOCK_S3_CLIENT
+        .list_buckets()
+        .await
+        .map_err(|e| FlockError::AWS(e.to_string()))?
+        .buckets
+        .into_iter()
+        .flatten()
+        .filter(|bucket| bucket.name.as_ref().unwrap().contains(bucket_parttern))
+        .map(|bucket| bucket.name.unwrap())
+        .collect())
+}
+
+/// Dektes the S3 buckets with the specified bucket parttern.
+pub async fn delete_buckets(bucket_parttern: &str) -> Result<()> {
+    get_matched_buckets(bucket_parttern)
+        .await?
+        .into_par_iter()
+        .for_each(|bucket| futures::executor::block_on(delete_bucket(&bucket)).unwrap());
+    Ok(())
 }

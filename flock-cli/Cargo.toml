@@ -20,6 +20,7 @@ benchmarks = { path = "../benchmarks" }
 clap = { version = "3.0.0", features = [ "cargo" ] }
 ctrlc = "3.1.1"
 env_logger = "^0.9"
+flock = { path = "../flock" }
 futures = "0.3.12"
 lazy_static = "1.4.0"
 log = "0.4.14"
