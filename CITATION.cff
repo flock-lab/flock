@@ -5,5 +5,5 @@ authors:
   given-names: "Gang"
 - family-names: "Abadi"
   given-names: "Daniel"
-title: "Flock"
+title: "Flock: A Practical Serverless Streaming SQL Query Engine"
 url: "https://github.com/flock-lab/flock"
