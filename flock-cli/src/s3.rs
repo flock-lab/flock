@@ -66,9 +66,10 @@ fn delete_args() -> App<'static> {
     App::new("delete").about("Deletes AWS S3 Buckets").arg(
         Arg::new("delete buckets with substring pattern")
             .short('p')
-            .long("prefix")
-            .help("Delete buckets with substring pattern")
-            .takes_value(true),
+            .long("pattern")
+            .help("Sets the pattern to delete buckets with")
+            .takes_value(true)
+            .default_value("flock-"),
     )
 }
 
@@ -76,9 +77,10 @@ fn list_args() -> App<'static> {
     App::new("list").about("List AWS S3 Buckets").arg(
         Arg::new("list buckets with substring pattern")
             .short('p')
-            .long("prefix")
-            .help("List buckets with substring pattern")
-            .takes_value(true),
+            .long("pattern")
+            .help("Sets the pattern to list buckets with")
+            .takes_value(true)
+            .default_value("flock-"),
     )
 }
 

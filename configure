@@ -78,7 +78,7 @@ Build_and_Deploy() {
   echo
   echo $(echogreen "[3/3]") $(echoblue "Deploying Flock Lambda Function...")
   echo
-  ./target/$host_arch/release/flock-cli upload -p ./target/$target_arch/release/flock -k flock_$target
+  ./target/$host_arch/release/flock-cli s3 put -p ./target/$target_arch/release/flock -k flock_$target
   echo
   echo $(echogreen "============================================================")
   echo
