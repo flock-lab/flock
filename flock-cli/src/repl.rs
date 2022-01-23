@@ -50,7 +50,7 @@ pub async fn main() -> Result<()> {
     match command {
         "nexmark" => nexmark::command(matches),
         "ysb" => ysb::command(matches),
-        "upload" => s3::command(matches),
+        "s3" => s3::command(matches),
         "lambda" => lambda::command(matches),
         "fsql" => fsql::command(matches),
         _ => {

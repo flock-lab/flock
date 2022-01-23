@@ -13,11 +13,13 @@
 
 //! Flock CLI reads/writes objects from/to AWS S3.
 
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Context as _, Ok, Result};
 use benchmarks::rainbow_println;
-use clap::{App, Arg, ArgMatches};
+use clap::{App, AppSettings, Arg, ArgMatches};
+use flock::aws::s3;
 use ini::Ini;
 use lazy_static::lazy_static;
+use log::warn;
 use rusoto_core::Region;
 use rusoto_s3::PutObjectRequest;
 use rusoto_s3::{S3Client, S3};
@@ -32,21 +34,59 @@ lazy_static! {
 }
 
 pub fn command(matches: &ArgMatches) -> Result<()> {
-    futures::executor::block_on(put_function_object(
-        &FLOCK_S3_BUCKET,
-        matches
-            .value_of("s3 key")
-            .expect("No function s3 key provided"),
-        matches
-            .value_of("code path")
-            .expect("No function code path provided"),
-    ))?;
+    let (command, matches) = match matches.subcommand() {
+        Some((command, matches)) => (command, matches),
+        None => unreachable!(),
+    };
+
+    match command {
+        "put" => futures::executor::block_on(put_function_object(matches)),
+        "list" => futures::executor::block_on(list_buckets(matches)),
+        "delete" => futures::executor::block_on(delete_buckets(matches)),
+        _ => {
+            warn!("{} command is not implemented", command);
+            Ok(())
+        }
+    }
+    .with_context(|| anyhow!("{} command failed", command))?;
+
     Ok(())
 }
 
 pub fn command_args() -> App<'static> {
-    App::new("upload")
-        .about("Uploads a function code to AWS S3")
+    App::new("s3")
+        .about("The AWS S3 Tool for Flock")
+        .setting(AppSettings::SubcommandRequired)
+        .subcommand(put_args())
+        .subcommand(list_args())
+        .subcommand(delete_args())
+}
+
+fn delete_args() -> App<'static> {
+    App::new("delete").about("Deletes AWS S3 Buckets").arg(
+        Arg::new("delete buckets with substring pattern")
+            .short('p')
+            .long("pattern")
+            .help("Sets the pattern to delete buckets with")
+            .takes_value(true)
+            .default_value("flock-"),
+    )
+}
+
+fn list_args() -> App<'static> {
+    App::new("list").about("List AWS S3 Buckets").arg(
+        Arg::new("list buckets with substring pattern")
+            .short('p')
+            .long("pattern")
+            .help("Sets the pattern to list buckets with")
+            .takes_value(true)
+            .default_value("flock-"),
+    )
+}
+
+fn put_args() -> App<'static> {
+    App::new("put")
+        .about("Puts a function code to AWS S3")
         .arg(
             Arg::new("code path")
                 .short('p')
@@ -66,20 +106,23 @@ pub fn command_args() -> App<'static> {
 }
 
 /// Puts a lambda function code to AWS S3.
-///
-/// # Arguments
-/// * `bucket` - The S3 bucket to put the code in.
-/// * `key` - The S3 key to put the code in.
-/// * `code_path` - The path to the code to put.
-pub async fn put_function_object(bucket: &str, key: &str, code_path: &str) -> Result<()> {
-    rainbow_println("============================================================");
-    rainbow_println("                Upload function code to S3                  ");
-    rainbow_println("============================================================");
-    rainbow_println("\n\nPackaging code and uploading to S3...");
+pub async fn put_function_object(matches: &ArgMatches) -> Result<()> {
+    let bucket = &FLOCK_S3_BUCKET;
+    let key = matches
+        .value_of("s3 key")
+        .expect("No function's s3 key provided");
+    let code_path = matches
+        .value_of("code path")
+        .expect("No function's code path provided");
 
     if !std::path::Path::new(code_path).exists() {
         bail!("The function code ({}) doesn't exist.", code_path);
     }
+
+    rainbow_println("============================================================");
+    rainbow_println("                Upload function code to S3                  ");
+    rainbow_println("============================================================");
+    rainbow_println("\n\nPackaging code and uploading to S3...");
 
     // Package the lambda function code into a zip file.
     let fname = Path::new(code_path).parent().unwrap().join("bootstrap.zip");
@@ -108,6 +151,74 @@ pub async fn put_function_object(bucket: &str, key: &str, code_path: &str) -> Re
 
     S3Client::new(Region::default()).put_object(request).await?;
     rainbow_println("[OK] Upload Succeed.");
+
+    Ok(())
+}
+
+/// Lists S3 buckets.
+async fn list_buckets(matches: &ArgMatches) -> Result<()> {
+    if matches.is_present("list buckets with substring pattern") {
+        if s3::get_matched_buckets(
+            matches
+                .value_of("list buckets with substring pattern")
+                .as_ref()
+                .unwrap(),
+        )
+        .await?
+        .into_iter()
+        .map(|bucket| {
+            rainbow_println(bucket);
+        })
+        .count()
+            == 0
+        {
+            rainbow_println("No matched buckets found.");
+        }
+    } else if s3::list_buckets()
+        .await?
+        .into_iter()
+        .map(|bucket| {
+            rainbow_println(bucket);
+        })
+        .count()
+        == 0
+    {
+        rainbow_println("No bucket found.");
+    }
+
+    Ok(())
+}
+
+/// Deletes S3 buckets.
+async fn delete_buckets(matches: &ArgMatches) -> Result<()> {
+    if matches.is_present("delete buckets with substring pattern") {
+        let prefix = matches
+            .value_of("delete buckets with substring pattern")
+            .expect("No prefix provided");
+        let buckets = s3::get_matched_buckets(prefix).await?;
+        if buckets.is_empty() {
+            rainbow_println("No matched buckets found.");
+        } else {
+            let mut count = 0;
+            for bucket in buckets {
+                s3::delete_bucket(&bucket).await?;
+                count += 1;
+            }
+            rainbow_println(format!("Deleted {} buckets.", count));
+        }
+    } else {
+        let buckets = s3::list_buckets().await?;
+        if buckets.is_empty() {
+            rainbow_println("No buckets found.");
+        } else {
+            let mut count = 0;
+            for bucket in buckets {
+                s3::delete_bucket(&bucket).await?;
+                count += 1;
+            }
+            rainbow_println(format!("Deleted {} buckets.", count));
+        }
+    }
 
     Ok(())
 }
