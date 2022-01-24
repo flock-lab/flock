@@ -105,12 +105,14 @@ pub async fn handler(
     let uuid = event.uuid.clone();
     let shuffle_id = event.shuffle_id;
 
-    let (input, ready) = prepare_data_sources(ctx, arena, event).await?;
-    if !ready {
-        let info = format!(
-            "[Ok] Function {}: aggregation has not yet been completed or already completed.",
-            ctx.name
-        );
+    let (input, status) = prepare_data_sources(ctx, arena, event).await?;
+
+    if status == HashAggregateStatus::Processed {
+        let info = format!("[Ok] Function {}: data is already processed.", ctx.name);
+        info!("{}", info);
+        return Ok(json!({ "response": info }));
+    } else if status == HashAggregateStatus::NotReady {
+        let info = format!("[Ok] Function {}: data aggregation is not ready.", ctx.name);
         info!("{}", info);
         return Ok(json!({ "response": info }));
     }
@@ -141,14 +143,15 @@ async fn prepare_data_sources(
     ctx: &mut ExecutionContext,
     arena: &mut Arena,
     event: Payload,
-) -> Result<(Vec<Vec<Vec<RecordBatch>>>, bool)> {
+) -> Result<(Vec<Vec<Vec<RecordBatch>>>, HashAggregateStatus)> {
     let uuid = event.uuid.clone();
     let metadata = event.metadata.clone();
     let s3_key_prefix = s3_key_prefix(ctx, &event);
     let window_id = event.get_window_id();
 
     // If all data packets have been received, then the data sources are ready.
-    let mut ready = false;
+    #[allow(unused_assignments)]
+    let mut status = HashAggregateStatus::NotReady;
     let mut input = vec![];
 
     // Read payload from S3 is a baseline for our system.
@@ -163,17 +166,17 @@ async fn prepare_data_sources(
 
         input.push(vec![r1]);
         input.push(vec![r2]);
-        ready = true;
+        status = HashAggregateStatus::Ready;
     } else if ctx.is_aggregate() {
-        // ressemble data packets to a single window.
-        if arena.collect(event) {
+        // aggregate incoming data to its specific destination
+        status = arena.collect(event);
+        if status == HashAggregateStatus::Ready {
             info!("Received all data packets for the window: {:?}", window_id);
             arena
                 .take_batches(&window_id)
                 .into_iter()
                 .for_each(|b| input.push(b));
-            ready = true;
-        } else {
+        } else if status == HashAggregateStatus::NotReady {
             // Aggregation has not yet been completed. We can also check the query states in
             // the corresponding S3 buckets. If some states exist in S3, Flock can bring the
             // states to the current function directly to reduce the query's latency. This
@@ -196,6 +199,10 @@ async fn prepare_data_sources(
                     let keys = state_backend
                         .new_s3_keys(&uuid.qid, &s3_key_prefix, bitmap)
                         .await?;
+
+                    println!("[INFO] window_id: {:?}", window_id);
+                    keys.iter().for_each(|k| println!("new key from S3: {}", k));
+
                     if !keys.is_empty() {
                         // TODO: optimize the performance of this part.
                         // Because the S3 key include a negative sequence number, we don't need
@@ -205,6 +212,8 @@ async fn prepare_data_sources(
                             .await?
                             .into_iter()
                             .for_each(|payload| {
+                                println!("new payload's window_id: {:?}", payload.get_window_id());
+                                println!("new payload's uuid: {:?}", payload.uuid);
                                 arena.collect(payload);
                             });
                         if arena.is_complete(&window_id) {
@@ -213,7 +222,7 @@ async fn prepare_data_sources(
                                 .take_batches(&window_id)
                                 .into_iter()
                                 .for_each(|b| input.push(b));
-                            ready = true;
+                            status = HashAggregateStatus::Ready;
                         }
                     }
                 }
@@ -224,17 +233,17 @@ async fn prepare_data_sources(
         let (r1, r2) = event.to_record_batch();
         input.push(vec![r1]);
         input.push(vec![r2]);
-        ready = true;
+        status = HashAggregateStatus::Ready;
     }
 
-    if ready {
+    if status == HashAggregateStatus::Ready {
         // If the data sources are ready, then we can read the side inputs from S3.
         if let Ok(batch) = infer_side_input(&metadata).await {
             input.push(vec![batch]);
         }
     }
 
-    Ok((input, ready))
+    Ok((input, status))
 }
 
 /// Invoke the next functions in the dataflow pipeline.

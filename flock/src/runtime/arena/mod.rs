@@ -29,6 +29,17 @@ type QueryId = String;
 type ShuffleId = usize;
 type WindowId = (QueryId, ShuffleId);
 
+/// The aggregator function has three status to determine the next step.
+#[derive(PartialEq)]
+pub enum HashAggregateStatus {
+    /// The window data is not ready to be processed.
+    Processed,
+    /// The window data is ready to be processed.
+    Ready,
+    /// The window data has been processed.
+    NotReady,
+}
+
 /// `Arena` is a global hash map inside the lambda function that is used to
 /// aggregate the data frames of the previous stage of dataflow to ensure the
 /// integrity of the window data for stream processing.
@@ -112,8 +123,7 @@ impl Arena {
     /// * Return true if the window data collection is complete, otherwise
     ///   return false. Uuid is also returned no matter whether the window data
     ///   collection is complete.
-    pub fn collect(&mut self, payload: Payload) -> bool {
-        let mut ready = false;
+    pub fn collect(&mut self, payload: Payload) -> HashAggregateStatus {
         let uuid = payload.uuid.clone();
         let window_id = payload.get_window_id();
         match &mut (*self).get_mut(&window_id) {
@@ -125,7 +135,13 @@ impl Arena {
                     window.r2_records.push(r2);
                     assert!(window.r1_records.len() == window.r2_records.len());
                     window.bitmap.set(uuid.seq_num);
-                    ready = window.size == window.r1_records.len();
+                    if window.size == window.r1_records.len() {
+                        HashAggregateStatus::Ready
+                    } else {
+                        HashAggregateStatus::NotReady
+                    }
+                } else {
+                    HashAggregateStatus::Processed
                 }
             }
             None => {
@@ -138,11 +154,14 @@ impl Arena {
                 };
                 // SEQ_NUM is used to indicate the data existence in the window via bitmap.
                 window.bitmap.set(uuid.seq_num);
-                ready = window.size == 1;
                 (*self).insert(window_id, window);
+                if uuid.seq_len == 1 {
+                    HashAggregateStatus::Ready
+                } else {
+                    HashAggregateStatus::NotReady
+                }
             }
         }
-        ready
     }
 }
 
@@ -208,11 +227,11 @@ mod tests {
         let mut arena = Arena::new();
         batches.into_iter().enumerate().for_each(|(i, batch)| {
             let payload = to_payload(&[batch], &[], uuids.get(i + 1), false);
-            let ready = arena.collect(payload);
+            let status = arena.collect(payload);
             if i < 7 {
-                assert!(!ready);
+                assert!(status == HashAggregateStatus::NotReady);
             } else {
-                assert!(ready);
+                assert!(status == HashAggregateStatus::Ready);
             }
         });
 
