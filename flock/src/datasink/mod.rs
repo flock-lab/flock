@@ -105,7 +105,7 @@ impl DataSinkType {
 pub struct DataSink {
     /// The record batch to write.
     #[serde(skip)]
-    pub record_batches: Box<Vec<RecordBatch>>,
+    pub record_batches: Vec<RecordBatch>,
     /// The record batches are encoded in the Arrow Flight Data format.
     pub encoded_data:   Vec<DataFrame>,
     /// The schema of the record batches in binary format.
@@ -125,7 +125,7 @@ impl DataSink {
         encoding: Encoding,
     ) -> Self {
         Self {
-            record_batches: Box::new(record_batches),
+            record_batches,
             encoding,
             function_name,
             ..Default::default()
@@ -195,8 +195,7 @@ impl DataSink {
 
         if self.record_batches.is_empty() {
             let dataframe = unmarshal(self.encoded_data.clone(), self.encoding.clone());
-            self.record_batches =
-                Box::new(record_batch(dataframe, schema_from_bytes(&self.schema)?));
+            self.record_batches = record_batch(dataframe, schema_from_bytes(&self.schema)?);
         }
 
         Ok(())
@@ -410,7 +409,7 @@ impl DataSink {
 
         Ok(DataSink {
             function_name: function_name.clone(),
-            record_batches: Box::new(records.into_iter().flatten().collect()),
+            record_batches: records.into_iter().flatten().collect(),
             ..Default::default()
         })
     }

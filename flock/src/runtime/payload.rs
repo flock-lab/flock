@@ -35,6 +35,7 @@ pub struct UuidBuilder {
     /// The window identifier of the data fragment or the payload.
     pub qid: String,
     /// The data fragment index in the time window.
+    /// The position starts from 1.
     pub pos: usize,
     /// The total number of data fragments in the time window.
     pub len: usize,
@@ -51,7 +52,7 @@ impl UuidBuilder {
                 timestamp,
                 RandomId::new_v4().as_u128()
             ),
-            pos: 0,
+            pos: 1,
             len,
         }
     }
@@ -61,14 +62,14 @@ impl UuidBuilder {
         let query_code = function_name.split('-').next().unwrap();
         Self {
             qid: format!("{}-{}-{}", query_code, timestamp, uuid),
-            pos: 0,
+            pos: 1,
             len,
         }
     }
 
     /// Returns the next Uuid for the next payload.
     pub fn next_uuid(&mut self) -> Uuid {
-        assert!(self.pos < self.len);
+        assert!(self.pos <= self.len);
 
         let qid = self.qid.to_owned();
         let seq_num = self.pos;
@@ -85,8 +86,7 @@ impl UuidBuilder {
 
     /// Returns the Uuid with a specific index.
     pub fn get(&self, i: usize) -> Uuid {
-        assert!(i < self.len);
-
+        assert!(1 <= i && i <= self.len);
         let qid = self.qid.to_owned();
         let seq_num = i;
         let seq_len = self.len;
@@ -191,9 +191,19 @@ impl Payload {
         res
     }
 
+    /// Return true if the records in the payload are empty.
+    pub fn is_empty_data(&self) -> bool {
+        self.data.is_empty() && self.data2.is_empty()
+    }
+
     /// Returns the window id of the payload.
     pub fn get_window_id(&self) -> (String, usize) {
         (self.get_query_id(), self.get_shuffle_id())
+    }
+
+    /// Returns the squence number of the payload.
+    pub fn get_seq_num(&self) -> usize {
+        self.uuid.seq_num
     }
 
     /// Rerurns the query id in the payload.
@@ -260,7 +270,7 @@ mod tests {
                 uuid_builder.next_uuid(),
                 Uuid {
                     qid:     format!("SX72HzqFz1Qij4bP-{}-{}", timestamp, uuid),
-                    seq_num: i,
+                    seq_num: i + 1,
                     seq_len: payload_num,
                 }
             );
@@ -529,7 +539,7 @@ mod tests {
     async fn uuid() -> Result<()> {
         let mut uuid_builder =
             UuidBuilder::new_with_ts("SX72HzqFz1Qij4bP-00-2021-01-28T19:27:50.298504836", 1, 10);
-        (0..10).for_each(|i| assert_eq!(uuid_builder.get(i).seq_num, i));
+        (0..10).for_each(|i| assert_eq!(uuid_builder.get(i + 1).seq_num, i + 1));
 
         let batches = init_batches();
         let bytes = to_bytes(&batches[0], uuid_builder.next_uuid(), Encoding::default());

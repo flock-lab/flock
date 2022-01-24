@@ -185,6 +185,20 @@ pub async fn bucket_exists_and_accessible(bucket: &str) -> Result<bool> {
     }
 }
 
+/// Creates a new S3 bucket if it does not exist.
+pub async fn create_bucket_if_missing(bucket: &str) -> Result<()> {
+    if !bucket_exists(bucket).await? {
+        FLOCK_S3_CLIENT
+            .create_bucket(CreateBucketRequest {
+                bucket: bucket.to_owned(),
+                ..Default::default()
+            })
+            .await
+            .map_err(|e| FlockError::AWS(e.to_string()))?;
+    }
+    Ok(())
+}
+
 /// Creates a new S3 bucket. To create a bucket, you must register with Amazon
 /// S3 and have a valid AWS Access Key ID to authenticate requests. Anonymous
 /// requests are never allowed to create buckets. By creating the bucket, you
@@ -198,17 +212,15 @@ pub async fn bucket_exists_and_accessible(bucket: &str) -> Result<bool> {
 /// Region to optimize latency, minimize costs, or address regulatory
 /// requirements. For example, if you reside in Europe, you will probably find
 /// it advantageous to create buckets in the Europe (Ireland) Region.
-pub async fn create_bucket_if_missing(bucket: &str) -> Result<()> {
-    if !bucket_exists_and_accessible(bucket).await? {
-        FLOCK_S3_CLIENT
-            .create_bucket(CreateBucketRequest {
-                bucket: bucket.to_owned(),
-                ..Default::default()
-            })
-            .await
-            .map_err(|e| FlockError::AWS(e.to_string()))?;
-    }
-    Ok(())
+pub async fn create_bucket(bucket: &str) -> Result<()> {
+    FLOCK_S3_CLIENT
+        .create_bucket(CreateBucketRequest {
+            bucket: bucket.to_owned(),
+            ..Default::default()
+        })
+        .await
+        .map_err(|e| FlockError::AWS(e.to_string()))
+        .map(|_| ())
 }
 
 /// Returns all S3 keys in a bucket.

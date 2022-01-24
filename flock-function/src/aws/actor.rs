@@ -26,7 +26,7 @@ use serde_json::json;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::io::Cursor;
-use std::time::Duration;
+use std::sync::Arc;
 
 lazy_static! {
     static ref CONCURRENCY: usize = FLOCK_CONF["lambda"]["concurrency"]
@@ -105,10 +105,10 @@ pub async fn handler(
     let uuid = event.uuid.clone();
     let shuffle_id = event.shuffle_id;
 
-    let input = prepare_data_sources(ctx, arena, event).await?;
-    if input.is_empty() {
+    let (input, ready) = prepare_data_sources(ctx, arena, event).await?;
+    if !ready {
         let info = format!(
-            "[Ok] Function {}: aggregation has not yet been completed.",
+            "[Ok] Function {}: aggregation has not yet been completed or already completed.",
             ctx.name
         );
         info!("{}", info);
@@ -141,17 +141,18 @@ async fn prepare_data_sources(
     ctx: &mut ExecutionContext,
     arena: &mut Arena,
     event: Payload,
-) -> Result<Vec<Vec<Vec<RecordBatch>>>> {
+) -> Result<(Vec<Vec<Vec<RecordBatch>>>, bool)> {
     let uuid = event.uuid.clone();
+    let metadata = event.metadata.clone();
     let s3_key_prefix = s3_key_prefix(ctx, &event);
     let window_id = event.get_window_id();
 
+    // If all data packets have been received, then the data sources are ready.
+    let mut ready = false;
     let mut input = vec![];
-    if let Ok(batch) = infer_side_input(&event.metadata).await {
-        input.push(vec![batch]);
-    }
 
-    if let Some((bucket, key)) = infer_s3_mode(&event.metadata) {
+    // Read payload from S3 is a baseline for our system.
+    if let Some((bucket, key)) = infer_s3_mode(&metadata) {
         info!("Reading payload from S3...");
         let payload = read_payload_from_s3(bucket, key).await?;
         info!("[OK] Received payload from S3.");
@@ -162,6 +163,7 @@ async fn prepare_data_sources(
 
         input.push(vec![r1]);
         input.push(vec![r2]);
+        ready = true;
     } else if ctx.is_aggregate() {
         // ressemble data packets to a single window.
         if arena.collect(event) {
@@ -170,6 +172,7 @@ async fn prepare_data_sources(
                 .take_batches(&window_id)
                 .into_iter()
                 .for_each(|b| input.push(b));
+            ready = true;
         } else {
             // Aggregation has not yet been completed. We can also check the query states in
             // the corresponding S3 buckets. If some states exist in S3, Flock can bring the
@@ -194,6 +197,9 @@ async fn prepare_data_sources(
                         .new_s3_keys(&uuid.qid, &s3_key_prefix, bitmap)
                         .await?;
                     if !keys.is_empty() {
+                        // TODO: optimize the performance of this part.
+                        // Because the S3 key include a negative sequence number, we don't need
+                        // to read its object from S3.
                         state_backend
                             .read(uuid.qid.clone(), keys)
                             .await?
@@ -207,52 +213,28 @@ async fn prepare_data_sources(
                                 .take_batches(&window_id)
                                 .into_iter()
                                 .for_each(|b| input.push(b));
+                            ready = true;
                         }
                     }
                 }
             }
-
-            return Ok(vec![]);
         }
     } else {
         // data packet is an individual event for the current function.
         let (r1, r2) = event.to_record_batch();
         input.push(vec![r1]);
         input.push(vec![r2]);
+        ready = true;
     }
 
-    // If state backend is enabled, we need to check if the states are stored in the
-    // S3 buckets before returning the input and starting the executor. If not, we
-    // have to wait until the states are ready to make fault tolerance work.
-    if ctx.is_aggregate()
-        && ctx
-            .state_backend
-            .as_any()
-            .downcast_ref::<S3StateBackend>()
-            .is_some()
-    {
-        let state_backend: &S3StateBackend = ctx
-            .state_backend
-            .as_any()
-            .downcast_ref::<S3StateBackend>()
-            .unwrap();
-
-        let mut retries = 0;
-        loop {
-            if state_backend
-                .get_s3_key_num(&uuid.qid, &s3_key_prefix)
-                .await?
-                == uuid.seq_len
-            {
-                break;
-            }
-            // back-off strategy: exponential back-off withoout upper bound
-            tokio::time::sleep(Duration::from_millis(2_u64.pow(retries) * 100)).await;
-            retries += 1;
+    if ready {
+        // If the data sources are ready, then we can read the side inputs from S3.
+        if let Ok(batch) = infer_side_input(&metadata).await {
+            input.push(vec![batch]);
         }
     }
 
-    Ok(input)
+    Ok((input, ready))
 }
 
 /// Invoke the next functions in the dataflow pipeline.
@@ -300,7 +282,7 @@ async fn invoke_next_functions(
                 // can be repartitioned to multiple partitions, and each partition
                 // can be executed by a single lambda function for the next stage of the
                 // dataflow pipeline.
-                let output = Box::new(output);
+                let output = Arc::new(output);
                 let size = output.len();
                 let mut uuid_builder =
                     UuidBuilder::new_with_ts(group_name, Utc::now().timestamp(), size);
@@ -395,12 +377,15 @@ async fn invoke_next_functions(
                             .parse::<usize>()
                             .expect("parse the plan index error.");
                         let next_plan_index = plan_index + 1;
-                        let shuffle_id = 0; // since the current function is not shuffling
-                        let bucket = payload.uuid.qid;
-                        let key = format!(
-                            "{:02}/{:02}/{:02}",
-                            next_plan_index, shuffle_id, payload.uuid.seq_num
-                        );
+                        let shuffle_id = 1; // since the current function is not shuffling
+                        let seq_num = if payload.is_empty_data() {
+                            -(payload.get_seq_num() as i32)
+                        } else {
+                            payload.get_seq_num() as i32
+                        };
+                        let key =
+                            format!("{:02}/{:02}/{:02}", next_plan_index, shuffle_id, seq_num);
+                        let bucket = payload.get_query_id();
 
                         // S3 state backend:
                         // - bucket equals to qid: <query code>-<timestamp>-<random string>
@@ -424,6 +409,7 @@ async fn invoke_next_functions(
                     "response": format!("next function group: {}", group_name)
                 }))
             } else {
+                let output = Arc::new(output);
                 let mut rng = StdRng::seed_from_u64(0xDEAD); // Predictable RNG clutch
                 let tasks = (0..output.len())
                     .map(|i| {
@@ -467,7 +453,7 @@ async fn invoke_next_functions(
                             payload.metadata = my_metadata;
                             // set shuffle id to each data partition since they will be aggregated
                             // at different functions.
-                            payload.shuffle_id = Some(i);
+                            payload.shuffle_id = Some(i + 1); // Starts from 1.
                             let bytes = serde_json::to_vec(&payload)?;
 
                             info!(
@@ -492,12 +478,17 @@ async fn invoke_next_functions(
                                             .parse::<usize>()
                                             .expect("parse the plan index error.");
                                     let next_plan_index = plan_index + 1;
-                                    let shuffle_id = i; // since the current function is shuffling
-                                    let bucket = payload.uuid.qid;
+                                    let shuffle_id = i + 1; // since the current function is shuffling
+                                    let seq_num = if payload.is_empty_data() {
+                                        -(payload.get_seq_num() as i32)
+                                    } else {
+                                        payload.get_seq_num() as i32
+                                    };
                                     let key = format!(
                                         "{:02}/{:02}/{:02}",
-                                        next_plan_index, shuffle_id, payload.uuid.seq_num
+                                        next_plan_index, shuffle_id, seq_num
                                     );
+                                    let bucket = payload.get_query_id();
 
                                     // S3 state backend:
                                     // - bucket equals to qid: <query code>-<timestamp>-<random

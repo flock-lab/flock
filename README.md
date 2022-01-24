@@ -67,10 +67,10 @@ If you prefer to use the `cargo` command to build and deploy Flock, you can use 
 
 2.  Deploy Flock binary to AWS S3
 
-     ```ignore
-     $ cd ./target/x86_64-unknown-linux-gnu/release
-     $ ./flock-cli s3 put --path ./flock --key flock_x86_64
-     ```
+    ```ignore
+    $ cd ./target/x86_64-unknown-linux-gnu/release
+    $ ./flock-cli s3 put --path ./flock --key flock_x86_64
+    ```
 
     </details>
     </br>

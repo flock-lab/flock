@@ -116,11 +116,11 @@ impl Arena {
         let mut ready = false;
         let uuid = payload.uuid.clone();
         let window_id = payload.get_window_id();
-        let (r1, r2) = payload.to_record_batch();
         match &mut (*self).get_mut(&window_id) {
             Some(window) => {
                 assert!(uuid.seq_len == window.size);
                 if !window.bitmap.is_set(uuid.seq_num) {
+                    let (r1, r2) = payload.to_record_batch();
                     window.r1_records.push(r1);
                     window.r2_records.push(r2);
                     assert!(window.r1_records.len() == window.r2_records.len());
@@ -129,11 +129,12 @@ impl Arena {
                 }
             }
             None => {
+                let (r1, r2) = payload.to_record_batch();
                 let mut window = WindowSession {
                     size:       uuid.seq_len,
                     r1_records: vec![r1],
                     r2_records: vec![r2],
-                    bitmap:     Bitmap::new(uuid.seq_len),
+                    bitmap:     Bitmap::new(uuid.seq_len + 1), // Starts from 1.
                 };
                 // SEQ_NUM is used to indicate the data existence in the window via bitmap.
                 window.bitmap.set(uuid.seq_num);
@@ -206,7 +207,7 @@ mod tests {
 
         let mut arena = Arena::new();
         batches.into_iter().enumerate().for_each(|(i, batch)| {
-            let payload = to_payload(&[batch], &[], uuids.get(i), false);
+            let payload = to_payload(&[batch], &[], uuids.get(i + 1), false);
             let ready = arena.collect(payload);
             if i < 7 {
                 assert!(!ready);
@@ -215,14 +216,14 @@ mod tests {
             }
         });
 
-        let qid = uuids.get(0).qid;
+        let qid = uuids.get(1).qid;
         let window_id = (qid, 0);
         assert!((*arena).get(&window_id).is_some());
 
         if let Some(window) = (*arena).get(&window_id) {
             assert_eq!(8, window.size);
             assert_eq!(8, window.r1_records.len());
-            (0..8).for_each(|i| assert!(window.bitmap.is_set(i)));
+            (0..8).for_each(|i| assert!(window.bitmap.is_set(i + 1)));
         }
 
         assert_eq!(8, arena.take_batches(&window_id)[0].len());

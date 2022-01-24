@@ -61,7 +61,7 @@ async_granule = 3096
 sync_granule = 74304
 
 # Error retries and exponential backoff in AWS Lambda
-max_invoke_retries = 10
+max_invoke_retries = 20
 
 # Timeout for the function
 timeout = "300"
