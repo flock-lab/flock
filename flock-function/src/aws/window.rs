@@ -25,7 +25,7 @@ use datafusion::physical_plan::collect_partitioned;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::expressions::col as expr_col;
 use datafusion::physical_plan::Partitioning::{HashDiff, RoundRobinBatch};
-use flock::aws::lambda;
+use flock::aws::{lambda, s3};
 use flock::datasource::nexmark::config::BASE_TIME;
 use flock::prelude::*;
 use log::{info, warn};
@@ -887,10 +887,21 @@ pub async fn elementwise_tasks(
                 }
 
                 ctx.feed_data_sources(input).await?;
-                let output = Box::new(ctx.execute_partitioned().await?);
+                let output = Arc::new(ctx.execute_partitioned().await?);
                 let size = output[0].len();
                 let mut uuid_builder =
                     UuidBuilder::new_with_ts(group_name, Utc::now().timestamp(), size);
+
+                // Creates the S3 bucket for the current query if state backend is S3.
+                if ctx
+                    .state_backend
+                    .as_any()
+                    .downcast_ref::<S3StateBackend>()
+                    .is_some()
+                {
+                    s3::create_bucket(&uuid_builder.qid).await?;
+                }
+
                 let tasks = (0..size)
                     .map(|i| {
                         let data = output.clone();
