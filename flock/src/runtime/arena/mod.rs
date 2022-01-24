@@ -27,7 +27,9 @@ use std::ops::{Deref, DerefMut};
 
 type QueryId = String;
 type ShuffleId = usize;
-type WindowId = (QueryId, ShuffleId);
+
+/// The window identifier to identify the window in the global arena.
+pub type WindowId = (QueryId, ShuffleId);
 
 /// The aggregator function has three status to determine the next step.
 #[derive(PartialEq)]

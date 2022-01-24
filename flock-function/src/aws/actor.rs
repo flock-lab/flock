@@ -18,6 +18,7 @@ use datafusion::arrow::record_batch::RecordBatch;
 use flock::aws::lambda;
 use flock::aws::s3;
 use flock::prelude::*;
+use flock::runtime::arena::WindowId;
 use lazy_static::lazy_static;
 use log::info;
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -25,13 +26,16 @@ use rayon::prelude::*;
 use serde_json::json;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::io::Cursor;
 use std::sync::Arc;
+use std::sync::Mutex;
 
 lazy_static! {
     static ref CONCURRENCY: usize = FLOCK_CONF["lambda"]["concurrency"]
         .parse::<usize>()
         .unwrap();
+    static ref PROCESSED_WINDOWS: Mutex<HashSet<WindowId>> = Mutex::new(HashSet::new());
 }
 
 /// The generic function executor.
@@ -149,6 +153,10 @@ async fn prepare_data_sources(
     let s3_key_prefix = s3_key_prefix(ctx, &event);
     let window_id = event.get_window_id();
 
+    if PROCESSED_WINDOWS.lock().unwrap().contains(&window_id) {
+        return Ok((vec![], HashAggregateStatus::Processed));
+    }
+
     // If all data packets have been received, then the data sources are ready.
     #[allow(unused_assignments)]
     let mut status = HashAggregateStatus::NotReady;
@@ -176,6 +184,7 @@ async fn prepare_data_sources(
                 .take_batches(&window_id)
                 .into_iter()
                 .for_each(|b| input.push(b));
+            PROCESSED_WINDOWS.lock().unwrap().insert(window_id);
         } else if status == HashAggregateStatus::NotReady {
             // Aggregation has not yet been completed. We can also check the query states in
             // the corresponding S3 buckets. If some states exist in S3, Flock can bring the
@@ -200,9 +209,6 @@ async fn prepare_data_sources(
                         .new_s3_keys(&uuid.qid, &s3_key_prefix, bitmap)
                         .await?;
 
-                    println!("[INFO] window_id: {:?}", window_id);
-                    keys.iter().for_each(|k| println!("new key from S3: {}", k));
-
                     if !keys.is_empty() {
                         // TODO: optimize the performance of this part.
                         // Because the S3 key include a negative sequence number, we don't need
@@ -212,8 +218,6 @@ async fn prepare_data_sources(
                             .await?
                             .into_iter()
                             .for_each(|payload| {
-                                println!("new payload's window_id: {:?}", payload.get_window_id());
-                                println!("new payload's uuid: {:?}", payload.uuid);
                                 arena.collect(payload);
                             });
                         if arena.is_complete(&window_id) {
@@ -223,6 +227,7 @@ async fn prepare_data_sources(
                                 .into_iter()
                                 .for_each(|b| input.push(b));
                             status = HashAggregateStatus::Ready;
+                            PROCESSED_WINDOWS.lock().unwrap().insert(window_id);
                         }
                     }
                 }
