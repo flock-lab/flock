@@ -112,13 +112,11 @@ pub async fn handler(
     let (input, status) = prepare_data_sources(ctx, arena, event).await?;
 
     if status == HashAggregateStatus::Processed {
-        let info = format!("[Ok] Function {}: data is already processed.", ctx.name);
-        info!("{}", info);
-        return Ok(json!({ "response": info }));
+        info!("[Ok] Function {}: data is already processed.", ctx.name);
+        return Ok(Value::Null);
     } else if status == HashAggregateStatus::NotReady {
-        let info = format!("[Ok] Function {}: data aggregation is not ready.", ctx.name);
-        info!("{}", info);
-        return Ok(json!({ "response": info }));
+        info!("[Ok] Function {}: data aggregation is not ready.", ctx.name);
+        return Ok(Value::Null);
     }
 
     let output = collect(ctx, input).await?;
@@ -181,7 +179,8 @@ async fn prepare_data_sources(
         if status == HashAggregateStatus::Ready {
             info!("Received all data packets for the window: {:?}", window_id);
             arena
-                .take_batches(&window_id)
+                .take(&window_id)
+                .await?
                 .into_iter()
                 .for_each(|b| input.push(b));
             PROCESSED_WINDOWS.lock().unwrap().insert(window_id);
@@ -223,7 +222,8 @@ async fn prepare_data_sources(
                         if arena.is_complete(&window_id) {
                             info!("Received all data packets for the window: {:?}", window_id);
                             arena
-                                .take_batches(&window_id)
+                                .take(&window_id)
+                                .await?
                                 .into_iter()
                                 .for_each(|b| input.push(b));
                             status = HashAggregateStatus::Ready;
@@ -287,7 +287,7 @@ async fn invoke_next_functions(
                     .write(sink_type.clone(), DataSinkFormat::SerdeBinary)
                     .await
             } else {
-                Ok(json!({ "response": "No data to sink." }))
+                Ok(Value::Null)
             }
         }
         CloudFunction::Lambda(group_name) => {
@@ -352,9 +352,7 @@ async fn invoke_next_functions(
                 );
                 lambda::invoke_function(group_name, &invocation_type, Some(bytes.into())).await?;
             }
-            Ok(json!({
-                "response": format!("next function: {}", group_name)
-            }))
+            Ok(Value::Null)
         }
         CloudFunction::Group((group_name, _)) => {
             if !ctx.is_shuffling().await? {
@@ -419,9 +417,7 @@ async fn invoke_next_functions(
 
                 futures::future::join_all(tasks).await;
 
-                Ok(json!({
-                    "response": format!("next function group: {}", group_name)
-                }))
+                Ok(Value::Null)
             } else {
                 let output = Arc::new(output);
                 let mut rng = StdRng::seed_from_u64(0xDEAD); // Predictable RNG clutch
@@ -533,9 +529,7 @@ async fn invoke_next_functions(
                     .collect::<Vec<tokio::task::JoinHandle<Result<()>>>>();
                 futures::future::join_all(tasks).await;
 
-                Ok(json!({
-                    "response": format!("next function group: {}", group_name)
-                }))
+                Ok(Value::Null)
             }
         }
     }

@@ -18,12 +18,18 @@
 mod bitmap;
 pub use bitmap::Bitmap;
 
+use crate::encoding::Encoding;
 use crate::error::{FlockError, Result};
-use crate::runtime::payload::Payload;
+use crate::runtime::payload::{DataFrame, Payload};
+use crate::transmute::*;
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::arrow_flight::utils::flight_data_to_arrow_batch;
+use datafusion::arrow_flight::FlightData;
 use hashbrown::HashMap;
+use rayon::prelude::*;
 use std::ops::{Deref, DerefMut};
+use tokio::task::JoinHandle;
 
 type QueryId = String;
 type ShuffleId = usize;
@@ -61,29 +67,38 @@ pub struct Arena(HashMap<WindowId, WindowSession>);
 pub struct WindowSession {
     /// The number of data fragments in the window.
     /// [`WindowSession::size`] equals to [`Uuid::seq_len`].
-    pub size:       usize,
-    /// Aggregate record batches for the first relation.
-    pub r1_records: Vec<Vec<RecordBatch>>,
-    /// Aggregate record batches for the second relation.
-    pub r2_records: Vec<Vec<RecordBatch>>,
+    pub size:           usize,
+    /// Aggregate the encoded data frames for the first relation.
+    /// https://arrow.apache.org/blog/2019/10/13/introducing-arrow-flight/
+    pub r1_flight_data: Vec<Vec<DataFrame>>,
+    /// The schema of the first relation.
+    pub r1_schema:      Vec<u8>,
+    /// Aggregate the encoded data frames for the second relation.
+    /// https://arrow.apache.org/blog/2019/10/13/introducing-arrow-flight/
+    pub r2_flight_data: Vec<Vec<DataFrame>>,
+    /// The schema of the second relation.
+    pub r2_schema:      Vec<u8>,
     /// Bitmap indicating the data existence in the window.
-    pub bitmap:     Bitmap,
+    pub bitmap:         Bitmap,
+    /// The compression method.
+    pub encoding:       Encoding,
 }
 
 impl WindowSession {
     /// Return the schema of data fragments in the temporal window.
     pub fn schema(&self) -> Result<(SchemaRef, Option<SchemaRef>)> {
-        if self.r1_records.is_empty() || self.r1_records[0].is_empty() {
+        if self.r1_schema.is_empty() {
             return Err(FlockError::Internal(
                 "Record batches are empty.".to_string(),
             ));
         }
-        if !self.r2_records.is_empty() && !self.r2_records[0].is_empty() {
-            Ok((self.r1_records[0][0].schema(), None))
+
+        if self.r2_schema.is_empty() {
+            Ok((schema_from_bytes(&self.r1_schema)?, None))
         } else {
             Ok((
-                self.r1_records[0][0].schema(),
-                Some(self.r2_records[0][0].schema()),
+                schema_from_bytes(&self.r1_schema)?,
+                Some(schema_from_bytes(&self.r2_schema)?),
             ))
         }
     }
@@ -95,12 +110,59 @@ impl Arena {
         Arena(HashMap::<WindowId, WindowSession>::new())
     }
 
-    /// Get the data fragments in the temporal window via the key.
-    pub fn take_batches(&mut self, window_id: &WindowId) -> Vec<Vec<Vec<RecordBatch>>> {
+    /// Take a window from the arena.
+    pub async fn take(&mut self, window_id: &WindowId) -> Result<Vec<Vec<Vec<RecordBatch>>>> {
+        let to_batches = |df: Vec<DataFrame>, schema: SchemaRef| -> Vec<RecordBatch> {
+            df.into_par_iter()
+                .map(|d| {
+                    flight_data_to_arrow_batch(
+                        &FlightData {
+                            data_body:         d.body,
+                            data_header:       d.header,
+                            app_metadata:      vec![],
+                            flight_descriptor: None,
+                        },
+                        schema.clone(),
+                        &[],
+                    )
+                    .unwrap()
+                })
+                .collect()
+        };
+
         if let Some(window) = (*self).remove(window_id) {
-            vec![window.r1_records, window.r2_records]
+            let (schema1, schema2) = window.schema()?;
+
+            let mut tasks: Vec<JoinHandle<Vec<Vec<RecordBatch>>>> = vec![];
+
+            let encoding = window.encoding.clone();
+            tasks.push(tokio::spawn(async move {
+                window
+                    .r1_flight_data
+                    .into_par_iter()
+                    .map(|d| to_batches(unmarshal(d, encoding.clone()), schema1.clone()))
+                    .collect()
+            }));
+
+            if schema2.is_some() {
+                let encoding = window.encoding.clone();
+                let schema2 = schema2.unwrap();
+                tasks.push(tokio::spawn(async move {
+                    window
+                        .r2_flight_data
+                        .into_par_iter()
+                        .map(|d| to_batches(unmarshal(d, encoding.clone()), schema2.clone()))
+                        .collect()
+                }));
+            }
+
+            Ok(futures::future::join_all(tasks)
+                .await
+                .into_iter()
+                .map(|r| r.unwrap())
+                .collect())
         } else {
-            vec![vec![], vec![]]
+            Ok(vec![vec![], vec![]])
         }
     }
 
@@ -112,7 +174,7 @@ impl Arena {
     /// Return true if the temporal window is empty.
     pub fn is_complete(&self, window_id: &WindowId) -> bool {
         self.get(window_id)
-            .map(|window| window.size == window.r1_records.len())
+            .map(|window| window.size == window.r1_flight_data.len())
             .unwrap_or(false)
     }
 
@@ -132,12 +194,11 @@ impl Arena {
             Some(window) => {
                 assert!(uuid.seq_len == window.size);
                 if !window.bitmap.is_set(uuid.seq_num) {
-                    let (r1, r2) = payload.to_record_batch();
-                    window.r1_records.push(r1);
-                    window.r2_records.push(r2);
-                    assert!(window.r1_records.len() == window.r2_records.len());
+                    window.r1_flight_data.push(payload.data);
+                    window.r2_flight_data.push(payload.data2);
+                    assert!(window.r1_flight_data.len() == window.r2_flight_data.len());
                     window.bitmap.set(uuid.seq_num);
-                    if window.size == window.r1_records.len() {
+                    if window.size == window.r1_flight_data.len() {
                         HashAggregateStatus::Ready
                     } else {
                         HashAggregateStatus::NotReady
@@ -147,12 +208,14 @@ impl Arena {
                 }
             }
             None => {
-                let (r1, r2) = payload.to_record_batch();
                 let mut window = WindowSession {
-                    size:       uuid.seq_len,
-                    r1_records: vec![r1],
-                    r2_records: vec![r2],
-                    bitmap:     Bitmap::new(uuid.seq_len + 1), // Starts from 1.
+                    size:           uuid.seq_len,
+                    r1_flight_data: vec![payload.data],
+                    r2_flight_data: vec![payload.data2],
+                    r1_schema:      payload.schema,
+                    r2_schema:      payload.schema2,
+                    bitmap:         Bitmap::new(uuid.seq_len + 1), // Starts from 1.
+                    encoding:       payload.encoding,
                 };
                 // SEQ_NUM is used to indicate the data existence in the window via bitmap.
                 window.bitmap.set(uuid.seq_num);
@@ -243,12 +306,12 @@ mod tests {
 
         if let Some(window) = (*arena).get(&window_id) {
             assert_eq!(8, window.size);
-            assert_eq!(8, window.r1_records.len());
+            assert_eq!(8, window.r1_flight_data.len());
             (0..8).for_each(|i| assert!(window.bitmap.is_set(i + 1)));
         }
 
-        assert_eq!(8, arena.take_batches(&window_id)[0].len());
-        assert_eq!(0, arena.take_batches(&("no exists".to_owned(), 0))[0].len());
+        assert_eq!(8, arena.take(&window_id).await?[0].len());
+        assert_eq!(0, arena.take(&("no exists".to_owned(), 0)).await?[0].len());
 
         Ok(())
     }
