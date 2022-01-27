@@ -74,5 +74,5 @@ pub async fn handler(ctx: &mut ExecutionContext, payload: Payload) -> Result<Val
         _ => unimplemented!(),
     };
 
-    Ok(json!({"name": &ctx.name, "type": "nexmark_bench".to_string()}))
+    Ok(Value::Null)
 }
