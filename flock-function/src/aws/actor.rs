@@ -181,7 +181,8 @@ async fn prepare_data_sources(
         if status == HashAggregateStatus::Ready {
             info!("Received all data packets for the window: {:?}", window_id);
             arena
-                .take_batches(&window_id)
+                .take(&window_id)
+                .await?
                 .into_iter()
                 .for_each(|b| input.push(b));
             PROCESSED_WINDOWS.lock().unwrap().insert(window_id);
@@ -223,7 +224,8 @@ async fn prepare_data_sources(
                         if arena.is_complete(&window_id) {
                             info!("Received all data packets for the window: {:?}", window_id);
                             arena
-                                .take_batches(&window_id)
+                                .take(&window_id)
+                                .await?
                                 .into_iter()
                                 .for_each(|b| input.push(b));
                             status = HashAggregateStatus::Ready;
