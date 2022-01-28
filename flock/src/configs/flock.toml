@@ -60,8 +60,11 @@ regular_threshold = 20971520
 async_granule = 3096
 sync_granule = 74304
 
-# Error retries and exponential backoff in AWS Lambda
-max_invoke_retries = 20
+# Error retries in AWS Lambda
+max_invoke_retries = 200
+
+# Maximum backoff in milliseconds
+max_backoff = 500
 
 # Timeout for the function
 timeout = "120"
