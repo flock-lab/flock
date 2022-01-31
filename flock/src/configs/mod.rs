@@ -37,6 +37,8 @@ lazy_static! {
     pub static ref FLOCK_LAMBDA_SYNC_CALL: String = "RequestResponse".to_string();
     /// AWS Lambda function maximum error retry.
     pub static ref FLOCK_LAMBDA_MAX_RETRIES: usize = FLOCK_CONF["lambda"]["max_invoke_retries"].parse::<usize>().unwrap();
+    /// AWS Lambda function maximum error retry.
+    pub static ref FLOCK_LAMBDA_MAX_BACKOFF: u64 = FLOCK_CONF["lambda"]["max_backoff"].parse::<u64>().unwrap();
     /// AWS Lambda function timeout.
     pub static ref FLOCK_LAMBDA_TIMEOUT: i64 = FLOCK_CONF["lambda"]["timeout"].parse::<i64>().unwrap();
     /// AWS Lambda function concurrency.

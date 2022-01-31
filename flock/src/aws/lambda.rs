@@ -17,7 +17,8 @@ use crate::configs::*;
 use crate::error::{FlockError, Result};
 use crate::runtime::context::ExecutionContext;
 use bytes::Bytes;
-use log::info;
+use log::{debug, info};
+use rand::Rng;
 use rusoto_lambda::{
     CreateFunctionRequest, GetFunctionRequest, InvocationRequest, InvocationResponse, Lambda,
     PutFunctionConcurrencyRequest, UpdateFunctionCodeRequest,
@@ -74,8 +75,10 @@ pub async fn invoke_function(
             .map_err(|e| FlockError::AWS(e.to_string()))?;
         Ok(response)
     } else {
-        // Error retries and exponential backoff in AWS Lambda
+        // Error retry uses linear random backoff algorithm
+        // min(50 * increase_factor + random_milliseconds, max_backoff)
         let mut retries = 0;
+        let mut increase_factor = 0;
         loop {
             match FLOCK_LAMBDA_CLIENT
                 .invoke(request.clone())
@@ -94,13 +97,25 @@ pub async fn invoke_function(
                     }
                 }
                 Err(e) => {
-                    info!("Function invocation error: {}", e);
+                    debug!("Function invocation error: {}", e);
                 }
             }
 
-            info!("Retrying {} function invocation...", function_name);
-            tokio::time::sleep(Duration::from_millis(2_u64.pow(retries) * 100)).await;
+            debug!(
+                "Retrying #{}: {} function invocation...",
+                retries, function_name
+            );
             retries += 1;
+
+            increase_factor = std::cmp::min(increase_factor, 9) + 1;
+
+            let random_milliseconds = rand::thread_rng().gen_range(0..100);
+            let backoff = Duration::from_millis(std::cmp::min(
+                50 * increase_factor + random_milliseconds,
+                *FLOCK_LAMBDA_MAX_BACKOFF,
+            ));
+
+            tokio::time::sleep(backoff).await;
 
             if retries as usize > *FLOCK_LAMBDA_MAX_RETRIES {
                 return Err(FlockError::AWS(format!(
