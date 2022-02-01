@@ -124,7 +124,7 @@ mod tests {
         };
 
         let payload = Payload {
-            datasource: DataSource::Arch(500_000),
+            datasource: DataSource::Arch(5000),
             ..Default::default()
         };
 
