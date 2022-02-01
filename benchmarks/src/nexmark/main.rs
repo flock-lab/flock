@@ -65,7 +65,7 @@ pub struct NexmarkBenchmarkOpt {
     #[structopt(short = "g", long = "generators", default_value = "1")]
     pub generators: usize,
 
-    /// Number of threads to use for parallel execution
+    /// Number of seconds to run each test
     #[structopt(short = "s", long = "seconds", default_value = "10")]
     pub seconds: usize,
 

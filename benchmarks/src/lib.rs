@@ -19,5 +19,9 @@ pub use nexmark::{nexmark_benchmark, NexmarkBenchmarkOpt};
 pub mod ysb;
 pub use ysb::{ysb_benchmark, YSBBenchmarkOpt};
 
+#[path = "./arch/main.rs"]
+pub mod arch;
+pub use arch::{arch_benchmark, ArchBenchmarkOpt};
+
 pub mod rainbow;
 pub use rainbow::{rainbow_println, rainbow_string};

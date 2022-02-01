@@ -23,7 +23,6 @@ use lazy_static::lazy_static;
 use log::info;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use rayon::prelude::*;
-use serde_json::json;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -354,7 +353,7 @@ async fn invoke_next_functions(
             }
             Ok(Value::Null)
         }
-        CloudFunction::Group((group_name, _)) => {
+        CloudFunction::Group(..) => {
             if !ctx.is_shuffling().await? {
                 let next_function = ring.get(&uuid.qid).expect("hash ring failure.").to_string();
                 let mut payload = to_payload(

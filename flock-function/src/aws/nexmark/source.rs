@@ -16,7 +16,6 @@
 use crate::window::*;
 use flock::prelude::*;
 use log::info;
-use serde_json::json;
 use serde_json::Value;
 use std::sync::Arc;
 

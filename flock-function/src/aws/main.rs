@@ -16,6 +16,7 @@
 #![feature(get_mut_unchecked)]
 
 mod actor;
+mod arch;
 mod cloud_context;
 mod nexmark;
 mod s3;
@@ -29,9 +30,9 @@ use lambda_runtime::{service_fn, LambdaEvent};
 use log::info;
 use serde_json::Value;
 
-#[cfg(feature = "snmalloc")]
-#[global_allocator]
-static ALLOC: snmalloc_rs::SnMalloc = snmalloc_rs::SnMalloc;
+// #[cfg(feature = "snmalloc")]
+// #[global_allocator]
+// static ALLOC: snmalloc_rs::SnMalloc = snmalloc_rs::SnMalloc;
 
 #[cfg(feature = "mimalloc")]
 #[global_allocator]
@@ -52,6 +53,7 @@ async fn handler(event: LambdaEvent<Payload>) -> Result<Value> {
         DataSource::NEXMarkEvent(_) => nexmark::handler(ctx, payload).await,
         DataSource::YSBEvent(_) => ysb::handler(ctx, payload).await,
         DataSource::S3(_) => s3::handler(ctx, payload).await,
+        DataSource::Arch(_) => arch::handler(ctx, payload).await,
         _ => unimplemented!(),
     }
 }

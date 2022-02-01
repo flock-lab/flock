@@ -26,6 +26,7 @@ use serde::{Deserialize, Serialize};
 pub type RelationPartitions = Vec<Vec<RecordBatch>>;
 /// To determine the function type to be called: sync or async.
 pub type FastAggregate = bool;
+type NumEvents = usize;
 
 /// A streaming data source trait.
 pub trait DataStream {
@@ -103,6 +104,8 @@ pub enum DataSource {
     S3(NEXMarkSource),
     /// Data source from the local memory.
     Memory,
+    /// benchmarking on x86_64 and arm64.
+    Arch(NumEvents),
     /// Unknown data source.
     UnknownEvent,
 }

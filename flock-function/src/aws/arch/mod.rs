@@ -11,19 +11,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-mod arch;
-mod args;
-mod fsql;
-mod lambda;
-mod nexmark;
-#[cfg(feature = "cli")]
-mod repl;
-mod s3;
-mod ysb;
+//! The data source handler of the NEXMark benchmark.
 
-use anyhow::Result;
-
-pub fn main() -> Result<()> {
-    #[cfg(feature = "cli")]
-    repl::main()
-}
+mod source;
+pub use source::handler;
