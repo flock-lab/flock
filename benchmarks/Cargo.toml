@@ -45,3 +45,7 @@ path = "src/ysb/main.rs"
 [[bin]]
 name = "s3_bench"
 path = "src/s3/main.rs"
+
+[[bin]]
+name = "arch_bench"
+path = "src/arch/main.rs"

@@ -160,6 +160,11 @@ impl ExecutionContext {
         self.plan.get_execution_plans().await
     }
 
+    /// Sets the execution plan of the current execution context.
+    pub async fn set_plan(&mut self, plan: CloudExecutionPlan) {
+        self.plan = plan;
+    }
+
     /// Executes the physical plan.
     ///
     /// `execute` must be called after the execution of `feed_one_source` or

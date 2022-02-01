@@ -11,6 +11,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+use crate::arch;
 use crate::args;
 use crate::fsql;
 use crate::lambda;
@@ -37,6 +38,7 @@ pub async fn main() -> Result<()> {
         .subcommand(ysb::command_args())
         .subcommand(s3::command_args())
         .subcommand(lambda::command_args())
+        .subcommand(arch::command_args())
         .subcommand(fsql::command_args());
 
     let global_matches = app_cli.get_matches();
@@ -53,6 +55,7 @@ pub async fn main() -> Result<()> {
         "s3" => s3::command(matches),
         "lambda" => lambda::command(matches),
         "fsql" => fsql::command(matches),
+        "arch" => arch::command(matches),
         _ => {
             warn!("{} command is not implemented", command);
             Ok(())
