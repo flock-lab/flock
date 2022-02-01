@@ -183,11 +183,7 @@ pub fn run(matches: &ArgMatches) -> Result<()> {
     }
 
     if matches.is_present("async type") {
-        opt.async_type = matches
-            .value_of("async type")
-            .unwrap()
-            .parse::<bool>()
-            .with_context(|| anyhow!("Invalid async type"))?;
+        opt.async_type = true;
     }
 
     if matches.is_present("memory size") {
