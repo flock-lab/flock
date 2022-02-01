@@ -17,8 +17,6 @@
 use anyhow::{anyhow, Context as _, Ok, Result};
 use benchmarks::{arch_benchmark, rainbow_println, ArchBenchmarkOpt};
 use clap::{App, AppSettings, Arg, ArgMatches};
-use ini::Ini;
-use lazy_static::lazy_static;
 use log::warn;
 
 pub fn command(matches: &ArgMatches) -> Result<()> {
