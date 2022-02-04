@@ -69,7 +69,7 @@ Build_and_Deploy() {
   echo
   cd flock-function
   echo "Building with features: $features"
-  cargo build --target $target_arch --release --features $features
+  cargo build --target $target_arch --release --features "$features"
   cd ..
   echo
   echo $(echogreen "[2/3]") $(echoblue "Compiling Flock CLI...")
