@@ -180,7 +180,7 @@ impl DataStream for NEXMarkStream {
         };
         let (r1, r2) = match query_number.expect("Query number is not set.") {
             0 | 1 | 2 | 5 | 7 | 10..=13 => (
-                event_bytes_to_batch(&event.bids, NEXMARK_BID.clone(), granule_size * 2),
+                event_bytes_to_batch(&event.bids, NEXMARK_BID.clone(), (granule_size as f32 * 2.4) as usize),
                 vec![],
             ),
             3 | 8 => (
@@ -189,7 +189,7 @@ impl DataStream for NEXMarkStream {
             ),
             4 | 6 | 9 => (
                 event_bytes_to_batch(&event.auctions, NEXMARK_AUCTION.clone(), granule_size / 8),
-                event_bytes_to_batch(&event.bids, NEXMARK_BID.clone(), granule_size * 2),
+                event_bytes_to_batch(&event.bids, NEXMARK_BID.clone(), (granule_size as f32 * 2.4) as usize),
             ),
             _ => unimplemented!(),
         };
