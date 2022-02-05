@@ -22,7 +22,7 @@ datafusion = { git = "https://github.com/flock-lab/arrow-datafusion", branch = "
 env_logger = "^0.9"
 flock = { path = "../flock" }
 futures = "0.3.12"
-hashring = "0.2.0"
+hashring = { git = "https://github.com/flock-lab/hashring-rs", branch = "flock" }
 itertools = "0.10.0"
 lambda_runtime = { git = "https://github.com/awslabs/aws-lambda-rust-runtime/", branch = "master" }
 lazy_static = "1.4"

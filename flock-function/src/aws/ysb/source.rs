@@ -55,7 +55,7 @@ pub async fn handler(ctx: &ExecutionContext, payload: Payload) -> Result<Value> 
     info!("[OK] Generate YSB events.");
 
     if let Window::Tumbling(Schedule::Seconds(window_size)) = source.window {
-        tumbling_window_tasks(payload, events, sec, window_size).await?;
+        tumbling::launch_tasks(payload, events, sec, window_size).await?;
     } else {
         unreachable!();
     }

@@ -56,19 +56,19 @@ pub async fn handler(ctx: &mut ExecutionContext, payload: Payload) -> Result<Val
 
     match source.window {
         Window::Tumbling(Schedule::Seconds(window_size)) => {
-            tumbling_window_tasks(payload, events, sec, window_size).await?;
+            tumbling::launch_tasks(payload, events, sec, window_size).await?;
         }
         Window::Hopping((window_size, hop_size)) => {
-            hopping_window_tasks(payload, events, sec, window_size, hop_size).await?;
+            hopping::launch_tasks(payload, events, sec, window_size, hop_size).await?;
         }
         Window::ElementWise => {
-            elementwise_tasks(ctx, payload, events, sec).await?;
+            elementwise::launch_tasks(ctx, payload, events, sec).await?;
         }
         Window::Session(Schedule::Seconds(timeout)) => {
-            session_window_tasks(payload, events, sec, timeout).await?;
+            session::launch_tasks(payload, events, sec, timeout).await?;
         }
         Window::Global(Schedule::Seconds(window_size)) => {
-            global_window_tasks(payload, events, sec, window_size).await?;
+            global::launch_tasks(payload, events, sec, window_size).await?;
         }
         _ => unimplemented!(),
     };
