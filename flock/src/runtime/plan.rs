@@ -19,6 +19,7 @@ use crate::aws::s3;
 use crate::error::Result;
 use datafusion::execution::context::ExecutionContext;
 use datafusion::physical_plan::displayable;
+use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::hash_aggregate::HashAggregateExec;
 use datafusion::physical_plan::hash_join::HashJoinExec;
 use datafusion::physical_plan::sort::SortExec;
@@ -73,7 +74,10 @@ impl CloudExecutionPlan {
 
     /// Returns the execution plan.
     pub async fn get_execution_plans(&mut self) -> Result<Vec<Arc<dyn ExecutionPlan>>> {
-        if self.execution_plans.is_empty() {
+        if self.execution_plans.is_empty()
+            || (self.execution_plans.len() == 1
+                && self.execution_plans[0].as_any().is::<EmptyExec>())
+        {
             if self.object_storage.is_some() {
                 info!("Loading plan from S3 {:?}", self.object_storage);
                 let (bucket, key) = self.object_storage.as_ref().unwrap();
