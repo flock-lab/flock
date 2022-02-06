@@ -52,6 +52,7 @@ lazy_static! {
     pub static ref NEXMARK_SOURCE_LOG_GROUP: String = "/aws/lambda/flock_datasource".to_string();
     pub static ref NEXMARK_Q4_S3_KEY: String = FLOCK_CONF["nexmark"]["q4_s3_key"].to_string();
     pub static ref NEXMARK_Q6_S3_KEY: String = FLOCK_CONF["nexmark"]["q6_s3_key"].to_string();
+    pub static ref NEXMARK_Q9_S3_KEY: String = FLOCK_CONF["nexmark"]["q9_s3_key"].to_string();
     pub static ref NEXMARK_Q13_S3_SIDE_INPUT_KEY: String = FLOCK_CONF["nexmark"]["q13_s3_side_input_key"].to_string();
 }
 
@@ -153,10 +154,11 @@ pub async fn plan_placement(
     physcial_plan: Arc<dyn ExecutionPlan>,
 ) -> Result<(Arc<dyn ExecutionPlan>, Option<(String, String)>)> {
     match query_number {
-        4 | 6 => {
+        4 | 6 | 9 => {
             let (s3_bucket, s3_key) = match query_number {
                 4 => (FLOCK_S3_BUCKET.clone(), NEXMARK_Q4_S3_KEY.clone()),
                 6 => (FLOCK_S3_BUCKET.clone(), NEXMARK_Q6_S3_KEY.clone()),
+                9 => (FLOCK_S3_BUCKET.clone(), NEXMARK_Q9_S3_KEY.clone()),
                 _ => unreachable!(),
             };
             s3::put_object_if_missing(&s3_bucket, &s3_key, serde_json::to_vec(&physcial_plan)?)

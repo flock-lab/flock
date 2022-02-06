@@ -99,6 +99,7 @@ permissions = "0777"
 q13_s3_side_input_key = "nexmark_q13_side_input"
 q4_s3_key = "nexmark_q4_plan"
 q6_s3_key = "nexmark_q6_plan"
+q9_s3_key = "nexmark_q9_plan"
 s3_key = "nexmark"
 
 # YSB configuration
