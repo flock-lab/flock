@@ -218,7 +218,7 @@ pub async fn create_nexmark_functions(
         "Creating lambda function: {}",
         rainbow_string(FLOCK_DATA_SOURCE_FUNC_NAME.clone())
     );
-    lambda::create_function(&nexmark_source_ctx, 2048 /* MB */, &opt.architecture).await?;
+    lambda::create_function(&nexmark_source_ctx, 4096 /* MB */, &opt.architecture).await?;
 
     // Create the function for the nexmark worker.
     match next_func_name.clone() {
