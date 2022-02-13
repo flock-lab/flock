@@ -37,8 +37,8 @@ pub fn set_nexmark_config(opt: &mut NexmarkBenchmarkOpt) -> Result<()> {
     opt.async_type = false;
     opt.generators = 1;
     match opt.query_number {
-        0..=3 | 6 | 9 | 13 => opt.seconds = 1, // ElementWise
-        4..=5 | 7..=8 | 11..=12 => opt.seconds = 10,
+        0..=4 | 6 | 9 | 13 => opt.seconds = 1, // ElementWise
+        5 | 7..=8 | 11..=12 => opt.seconds = 10,
         _ => unreachable!(),
     };
     Ok(())
