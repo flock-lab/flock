@@ -427,7 +427,7 @@ async fn invoke_next_functions(
                 let mut rng = StdRng::seed_from_u64(0xDEAD); // Predictable RNG clutch
                 let mut arr = [0u8; 64];
                 rng.fill(&mut arr);
-                let mut func_idx = ring.get_index(&arr).expect("hash ring failure.");
+                let func_idx = ring.get_index(&arr).expect("hash ring failure.");
                 let tasks = (0..output.len())
                     .map(|i| {
                         let my_output = output.clone();
@@ -462,10 +462,9 @@ async fn invoke_next_functions(
                         // F0[n], F1[n], F2[n] .. Fn[n] ---> lambda function v
 
                         let next_function = ring
-                            .get_by_index(func_idx)
+                            .get_by_index((func_idx + i) % ring.len())
                             .expect("hash ring failure.")
                             .to_string();
-                        func_idx = (func_idx + 1) % ring.len();
 
                         tokio::spawn(async move {
                             let mut payload = to_payload(&my_output[i], &[], my_uuid, sync);
