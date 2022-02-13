@@ -276,6 +276,7 @@ async fn invoke_next_functions(
     } else {
         FLOCK_LAMBDA_ASYNC_CALL.to_string()
     };
+    let schema = schema_to_bytes(ctx.schema(0).await?);
 
     match &ctx.next {
         CloudFunction::Sink(sink_type) => {
@@ -306,10 +307,12 @@ async fn invoke_next_functions(
                         let meta = metadata.clone();
                         let invoke_type = invocation_type.clone();
                         let uuid = uuid_builder.next_uuid();
+                        let schema_bytes = schema.clone();
                         tokio::spawn(async move {
                             let mut payload = to_payload(&data[i], &[], uuid, sync);
                             payload.query_number = query_number;
                             payload.metadata = meta;
+                            payload.schema = schema_bytes;
                             let bytes = serde_json::to_vec(&payload)?;
 
                             info!(
@@ -340,6 +343,7 @@ async fn invoke_next_functions(
                     uuid,
                     sync,
                 );
+                payload.schema = schema;
                 payload.query_number = query_number;
                 payload.metadata = metadata;
                 let bytes = serde_json::to_vec(&payload)?;
@@ -362,6 +366,7 @@ async fn invoke_next_functions(
                     uuid,
                     sync,
                 );
+                payload.schema = schema;
                 payload.query_number = query_number;
                 payload.metadata = metadata;
                 let bytes = serde_json::to_vec(&payload)?;
@@ -427,7 +432,7 @@ async fn invoke_next_functions(
                         let state_backend = ctx.state_backend.clone();
                         let current_function = ctx.name.clone();
                         let invoke_type = invocation_type.clone();
-
+                        let schema_bytes = schema.clone();
                         let mut my_uuid = uuid.clone();
                         if let Some(new_seq_num) = shuffle_id {
                             // This is REALLY important and tricky.
@@ -460,6 +465,7 @@ async fn invoke_next_functions(
                             let mut payload = to_payload(&my_output[i], &[], my_uuid, sync);
                             payload.query_number = query_number;
                             payload.metadata = my_metadata;
+                            payload.schema = schema_bytes;
                             // set shuffle id to each data partition since they will be aggregated
                             // at different functions.
                             payload.shuffle_id = Some(i + 1); // Starts from 1.
