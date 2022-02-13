@@ -114,8 +114,8 @@ async fn main() -> Result<()> {
 
 pub async fn create_nexmark_source(opt: &mut NexmarkBenchmarkOpt) -> Result<NEXMarkSource> {
     let window = match opt.query_number {
-        0..=4 | 6 | 9 | 10 | 13 => Window::ElementWise,
-        5 => Window::Hopping((10, 5)),
+        0..=3 | 6 | 9 | 10 | 13 => Window::ElementWise,
+        4..=5 => Window::Hopping((10, 5)),
         7..=8 => Window::Tumbling(Schedule::Seconds(10)),
         11 => Window::Session(Schedule::Seconds(10)),
         12 => Window::Global(Schedule::Seconds(10)),
@@ -218,7 +218,7 @@ pub async fn create_nexmark_functions(
         "Creating lambda function: {}",
         rainbow_string(FLOCK_DATA_SOURCE_FUNC_NAME.clone())
     );
-    lambda::create_function(&nexmark_source_ctx, 2048 /* MB */, &opt.architecture).await?;
+    lambda::create_function(&nexmark_source_ctx, 4096 /* MB */, &opt.architecture).await?;
 
     // Create the function for the nexmark worker.
     match next_func_name.clone() {

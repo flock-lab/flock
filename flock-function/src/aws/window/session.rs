@@ -28,6 +28,7 @@ use flock::prelude::*;
 use log::{info, warn};
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Instant;
 
 /// Get back the input data from the registered table after the query is
 /// executed to avoid copying the input data.
@@ -226,6 +227,7 @@ pub async fn launch_tasks(
 
     for (time, batches) in events.into_iter().enumerate() {
         info!("Processing events in epoch: {}", time);
+        let now = Instant::now();
         let table = MemTable::try_new(schema.clone(), batches)?;
         ctx.deregister_table(&*table_name)?;
         ctx.register_table(&*table_name, Arc::new(table))?;
@@ -308,6 +310,11 @@ pub async fn launch_tasks(
             })
             .collect::<Vec<tokio::task::JoinHandle<Result<()>>>>();
         futures::future::join_all(tasks).await;
+
+        let elapsed = now.elapsed().as_millis() as u64;
+        if elapsed < 1000 {
+            std::thread::sleep(std::time::Duration::from_millis(1000 - elapsed));
+        }
     }
 
     Ok(())
