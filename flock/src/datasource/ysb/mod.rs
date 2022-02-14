@@ -70,11 +70,12 @@ pub mod ysb;
 pub use self::ysb::{YSBEvent, YSBSource, YSBStream};
 
 use self::event::{AdEvent, Campaign};
+use crate::configs::FLOCK_TARGET_PARTITIONS;
 use crate::error::Result;
 use datafusion::arrow::datatypes::Schema;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::datasource::MemTable;
-use datafusion::execution::context::ExecutionContext;
+use datafusion::execution::context::{ExecutionConfig, ExecutionContext};
 use std::sync::Arc;
 
 /// The YSB tables.
@@ -90,8 +91,8 @@ pub fn get_nexmark_schema(table: &str) -> Schema {
 }
 
 /// Register the YSB tables with empty data.
-pub async fn register_ysb_tables() -> Result<ExecutionContext> {
-    let mut ctx = ExecutionContext::new();
+pub async fn register_ysb_tables_with_config(config: ExecutionConfig) -> Result<ExecutionContext> {
+    let mut ctx = ExecutionContext::with_config(config);
     let ad_event_schema = Arc::new(AdEvent::schema());
     let ad_event_table = MemTable::try_new(
         ad_event_schema.clone(),
@@ -107,4 +108,10 @@ pub async fn register_ysb_tables() -> Result<ExecutionContext> {
     ctx.register_table("campaign", Arc::new(campaign_table))?;
 
     Ok(ctx)
+}
+
+/// Register the YSB tables with empty data.
+pub async fn register_ysb_tables() -> Result<ExecutionContext> {
+    let config = ExecutionConfig::new().with_target_partitions(*FLOCK_TARGET_PARTITIONS);
+    register_ysb_tables_with_config(config).await
 }
