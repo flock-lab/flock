@@ -134,7 +134,7 @@ fn run_args() -> App<'static> {
                 .long("partitions")
                 .help("Sets the number of partitions for the Arrow Datafusion target")
                 .takes_value(true)
-                .possible_values(&["1", "2", "4", "8", "16", "32"])
+                .possible_values(&["1", "2", "4", "8", "16", "24", "32"])
                 .default_value("8"),
         )
 }

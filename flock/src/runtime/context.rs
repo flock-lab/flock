@@ -215,6 +215,14 @@ impl ExecutionContext {
             .collect())
     }
 
+    /// The output schema of the current execution context.
+    ///
+    /// # Arguments
+    /// * `index` - The index of the subplan.
+    pub async fn schema(&mut self, index: usize) -> Result<SchemaRef> {
+        Ok(self.plan.get_execution_plans().await?[index].schema())
+    }
+
     /// Clean the data source in the given context.
     pub async fn clean_data_sources(&mut self) -> Result<()> {
         // Breadth-first search

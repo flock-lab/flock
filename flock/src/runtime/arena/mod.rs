@@ -140,6 +140,7 @@ impl Arena {
                 window
                     .r1_flight_data
                     .into_par_iter()
+                    .filter(|d| !d.is_empty())
                     .map(|d| to_batches(unmarshal(d, encoding.clone()), schema1.clone()))
                     .collect()
             }));
@@ -151,6 +152,7 @@ impl Arena {
                     window
                         .r2_flight_data
                         .into_par_iter()
+                        .filter(|d| !d.is_empty())
                         .map(|d| to_batches(unmarshal(d, encoding.clone()), schema2.clone()))
                         .collect()
                 }));
