@@ -30,7 +30,7 @@ use std::sync::Arc;
 ///
 /// # Returns
 /// A JSON object that contains the return value of the function invocation.
-pub async fn handler(ctx: &ExecutionContext, payload: Payload) -> Result<Value> {
+pub async fn handler(ctx: &mut ExecutionContext, payload: Payload) -> Result<Value> {
     // Copy data source from the payload.
     let mut source = match payload.datasource.clone() {
         DataSource::YSBEvent(source) => source,
@@ -55,7 +55,7 @@ pub async fn handler(ctx: &ExecutionContext, payload: Payload) -> Result<Value> 
     info!("[OK] Generate YSB events.");
 
     if let Window::Tumbling(Schedule::Seconds(window_size)) = source.window {
-        tumbling::launch_tasks(payload, events, sec, window_size).await?;
+        tumbling::launch_tasks(ctx, payload, events, sec, window_size).await?;
     } else {
         unreachable!();
     }

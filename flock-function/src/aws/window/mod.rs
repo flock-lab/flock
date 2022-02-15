@@ -20,7 +20,8 @@ pub mod session;
 pub mod tumbling;
 
 use datafusion::arrow::record_batch::RecordBatch;
-use flock::error::Result;
+use datafusion::physical_plan::empty::EmptyExec;
+use flock::prelude::*;
 
 /// This function is used to coalesce smaller session windows or global windows
 /// to bigger ones so that the number of events in each payload is greater than
@@ -52,4 +53,12 @@ fn coalesce_windows(
         res.push(tmp.into_iter().flatten().collect::<Vec<Vec<RecordBatch>>>());
     }
     Ok(res)
+}
+
+/// Is distributed execution enabled?
+fn is_distributed(ctx: &ExecutionContext) -> bool {
+    ctx.plan.execution_plans[0]
+        .as_any()
+        .downcast_ref::<EmptyExec>()
+        .is_none()
 }
