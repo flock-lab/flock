@@ -56,7 +56,7 @@ pub async fn handler(ctx: &mut ExecutionContext, payload: Payload) -> Result<Val
 
     match source.window {
         Window::Tumbling(Schedule::Seconds(window_size)) => {
-            tumbling::launch_tasks(payload, events, sec, window_size).await?;
+            tumbling::launch_tasks(ctx, payload, events, sec, window_size).await?;
         }
         Window::Hopping((window_size, hop_size)) => {
             hopping::launch_tasks(payload, events, sec, window_size, hop_size).await?;
