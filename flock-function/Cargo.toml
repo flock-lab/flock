@@ -13,7 +13,7 @@ simd = [ "datafusion/simd" ]
 
 [dependencies]
 async-trait = "0.1.42"
-aws_lambda_events = "0.5"
+aws_lambda_events = "0.6"
 base64 = "0.13.0"
 bytes = "1.1.0"
 chrono = "0.4.19"
