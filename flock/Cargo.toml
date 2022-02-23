@@ -51,7 +51,7 @@ rusoto_lambda = { git = "https://github.com/flock-lab/rusoto", branch = "flock" 
 rusoto_logs = { git = "https://github.com/flock-lab/rusoto", branch = "flock" }
 rusoto_s3 = { git = "https://github.com/flock-lab/rusoto", branch = "flock" }
 rusoto_sqs = { git = "https://github.com/flock-lab/rusoto", branch = "flock" }
-rust-ini = "0.17"
+rust-ini = "0.18"
 serde = { version = "1.0", features = [ "derive" ] }
 serde_bytes = "0.11"
 serde_json = "1.0"
