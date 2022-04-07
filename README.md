@@ -1,6 +1,6 @@
 <img src="docs/img/flock.png" width=60%>
 
-## Flock: A Practical Serverless Streaming SQL Query Engine
+## Flock: A SQL-on-FaaS Streaming Query Engine at Scale
 
 [![CI](https://github.com/flock-lab/flock/workflows/CI/badge.svg?branch=code&event=pull_request)](https://github.com/flock-lab/flock/actions)
 [![codecov](https://codecov.io/gh/flock-lab/flock/branch/master/graph/badge.svg?token=1FOM4DJUZJ)](https://codecov.io/gh/flock-lab/flock)
