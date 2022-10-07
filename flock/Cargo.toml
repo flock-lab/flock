@@ -31,7 +31,7 @@ humantime = "2.1.0"
 indoc = "1.0.3"
 itertools = "0.10.0"
 json = "0.12.4"
-lambda_runtime = { git = "https://github.com/awslabs/aws-lambda-rust-runtime/", branch = "master" }
+lambda_runtime = { git = "https://github.com/awslabs/aws-lambda-rust-runtime/", branch = "main" }
 lazy_static = "1.4"
 log = "0.4.14"
 lz4 = "1.23.1"

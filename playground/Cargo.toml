@@ -21,7 +21,7 @@ flock = { path = "../flock" }
 futures = "0.3.12"
 indoc = "1.0.3"
 itertools = "0.10.0"
-lambda_runtime = { git = "https://github.com/awslabs/aws-lambda-rust-runtime/", branch = "master" }
+lambda_runtime = { git = "https://github.com/awslabs/aws-lambda-rust-runtime/", branch = "main" }
 lazy_static = "1.4"
 log = "0.4.14"
 mimalloc = { version = "0.1", optional = true, default-features = false }
