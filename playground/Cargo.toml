@@ -13,7 +13,7 @@ simd = [ "datafusion/simd" ]
 
 [dependencies]
 async-trait = "0.1.42"
-aws_lambda_events = "0.6"
+aws_lambda_events = "0.7"
 chrono = "0.4.19"
 datafusion = { git = "https://github.com/flock-lab/arrow-datafusion", branch = "flock" }
 env_logger = "^0.9"
