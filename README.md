@@ -1,5 +1,3 @@
-<img src="docs/img/flock.png" width=60%>
-
 ## Flock: A Low-Cost Streaming Query Engine on FaaS Platforms
 
 [![CI](https://github.com/flock-lab/flock/workflows/CI/badge.svg?branch=code&event=pull_request)](https://github.com/flock-lab/flock/actions)
