@@ -29,7 +29,7 @@ rusoto_lambda = { git = "https://github.com/flock-lab/rusoto", branch = "flock" 
 rusoto_s3 = { git = "https://github.com/flock-lab/rusoto", branch = "flock" }
 rust-ini = "0.18"
 rustyline = { version = "9.0.0", optional = true }
-sqlparser = { version = "0.14.0", features = [ "json_example" ] }
+sqlparser = { version = "0.32.0", features = [ "json_example" ] }
 tokio = { version = "1.4", features = [ "macros", "io-util", "sync", "rt-multi-thread" ] }
 zip = "0.5.12"
 
