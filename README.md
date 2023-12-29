@@ -5,11 +5,28 @@
 <a href="https://cla-assistant.io/flock-lab/flock"><img src="https://cla-assistant.io/readme/badge/flock-lab/flock" alt="CLA assistant" /></a>
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
 
+Flock is a cloud-native streaming query engine that leverages the on-demand elasticity of Function-as-a-Service (FaaS) platforms to perform real-time data analytics. Traditional server-centric deployments often suffer from resource under- or over-provisioning, leading to resource wastage or performance degradation. Flock addresses these issues by providing more fine-grained elasticity that can dynamically match the per-query basis with continuous scaling, and its billing methods are more fine-grained with millisecond granularity, making it a low-cost solution for stream processing. Our approach, payload invocation, eliminates the need for external storage services and eliminates the requirement for a query coordinator in the data architecture. Our evaluation shows that Flock significantly outperforms state-of-the-art systems in terms of cost, especially on ARM processors, making it a promising solution for real-time data analytics on FaaS platforms.
+
+
+
 The generic lambda function code is built in advance and uploaded to AWS S3.
 
 | FaaS Service | AWS Lambda | GCP Functions | Azure Functions | Architectures | SIMD | [YSB](https://github.com/yahoo/streaming-benchmarks) | [NEXMark](https://beam.apache.org/documentation/sdks/java/testing/nexmark/) |
 | :----------: | :--------: | :-----------: | :-------------: | :-----------: | :--: | :--------------------------------------------------: | :-------------------------------------------------------------------------: |
 |  **Flock**   |  🏅🏅🏅🏅  |    👉 TBD     |     👉 TBD      | **Arm**, x86  |  ✅  |                          ✅                          |                                     ✅                                      |
+
+## Paper
+
+```
+@misc{gang2023flock,
+      title={Flock: A Low-Cost Streaming Query Engine on FaaS Platforms}, 
+      author={Gang Liao and Amol Deshpande and Daniel J. Abadi},
+      year={2023},
+      eprint={2312.16735},
+      archivePrefix={arXiv},
+      primaryClass={cs.DB}
+}
+```
 
 ## Build From Source Code
 
