@@ -25,7 +25,7 @@ filetime = { version = "0.2", optional = true }
 fixedbitset = { version = "0.4.0", optional = true }
 futures = "0.3.12"
 glob = { version = "0.3", optional = true }
-hashbrown = "0.12"
+hashbrown = "0.13"
 hashring = { git = "https://github.com/flock-lab/hashring-rs", branch = "flock" }
 humantime = "2.1.0"
 indoc = "1.0.3"
